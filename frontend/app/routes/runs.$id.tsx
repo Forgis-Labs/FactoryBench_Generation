@@ -22,13 +22,48 @@ export async function loader({ params }: LoaderFunctionArgs) {
 export default function RunDetail() {
   const { run, id } = useLoaderData<typeof loader>();
   if (!run) return <div className="card">Run not found: {id}</div>;
+  const agg = run.aggregate || {};
+  const ds = run.dataset || {};
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Run {run.run_id}</h2>
-      <p className="muted">Stage: {run.stage} • Model: {run.model}</p>
-      <pre style={{ whiteSpace: "pre-wrap", overflowX: "auto" }}>
-        {JSON.stringify(run.aggregate, null, 2)}
-      </pre>
+      <p className="muted">Status: {run.status || 'completed'} • Stage: {run.stage} • Model: {run.model}</p>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:16, marginTop:16 }}>
+        <Metric label="Dataset" value={ds.dataset_id || '-'} />
+        <Metric label="Samples" value={agg.samples ?? '-'} />
+        <Metric label="OK Rate" value={agg.ok_rate != null ? (agg.ok_rate*100).toFixed(1)+'%' : '-'} />
+        <Metric label="Mean Err" value={fmt(agg.mean_abs_err_mean)} />
+        <Metric label="Min Err" value={fmt(agg.min_abs_err_mean)} />
+        <Metric label="Max Err" value={fmt(agg.max_abs_err_mean)} />
+        <Metric label="Started" value={run.started_at?.replace('T',' ').slice(0,19) || '-'} />
+        <Metric label="Ended" value={run.ended_at?.replace('T',' ').slice(0,19) || '-'} />
+        <Metric label="Total Tokens" value={agg.total_tokens ?? '-'} />
+        <Metric label="Cost Total" value={fmt(agg.cost_total)} />
+        <Metric label="Cost/Sample" value={fmt(agg.cost_per_sample)} />
+      </div>
+      <details style={{ marginTop:24 }}>
+        <summary style={{ cursor:'pointer', fontWeight:500 }}>Raw Aggregate JSON</summary>
+        <pre style={{ whiteSpace: 'pre-wrap', overflowX:'auto', marginTop:12 }}>{JSON.stringify(run.aggregate, null, 2)}</pre>
+      </details>
+      <details style={{ marginTop:16 }}>
+        <summary style={{ cursor:'pointer', fontWeight:500 }}>Per-sample Results</summary>
+        <pre style={{ whiteSpace: 'pre-wrap', overflowX:'auto', marginTop:12 }}>{JSON.stringify(run.results, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
+function fmt(v: any){
+  if (v == null) return '-';
+  if (typeof v === 'number') return v.toFixed(4);
+  return String(v);
+}
+
+function Metric({label, value}:{label:string; value:any}){
+  return (
+    <div style={{ padding:12, border:'1px solid var(--fg-border)', borderRadius:8 }}>
+      <div style={{ fontSize:12, textTransform:'uppercase', letterSpacing:0.5, color:'var(--fg-steel)' }}>{label}</div>
+      <div style={{ marginTop:4, fontSize:16, fontWeight:600, color:'var(--fg-platinum)' }}>{value}</div>
     </div>
   );
 }

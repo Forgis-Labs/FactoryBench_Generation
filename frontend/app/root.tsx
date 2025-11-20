@@ -6,11 +6,17 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from "@remix-run/react";
-import stylesHref from "./styles/global.css?url";
+import globalStylesUrl from "./styles/global.css";
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: stylesHref },
+  { rel: "stylesheet", href: globalStylesUrl },
+  { rel: "icon", type: "image/x-icon", href: "/favicon_io/favicon.ico" },
+  { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon_io/favicon-16x16.png" },
+  { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon_io/favicon-32x32.png" },
+  { rel: "apple-touch-icon", sizes: "180x180", href: "/favicon_io/apple-touch-icon.png" },
+  { rel: "manifest", href: "/favicon_io/site.webmanifest" },
 ];
 
 export const meta: MetaFunction = () => ([
@@ -19,6 +25,9 @@ export const meta: MetaFunction = () => ([
 ]);
 
 export default function App() {
+  const location = useLocation();
+  const path = location.pathname;
+  const isActive = (href: string) => (path === href || (href !== '/' && path.startsWith(href))) ? 'active' : '';
   return (
     <html lang="en">
       <head>
@@ -28,13 +37,19 @@ export default function App() {
       <body>
         <header className="header">
           <div className="container">
-            <a className="brand" href="/">FactoryBench</a>
+            <a className="brand" href="/">
+              <img src="/Forgis_white logomark.png" alt="Forgis" style={{ height: 32, width: 32, objectFit: "contain", marginRight: 8 }} />
+              FactoryBench
+            </a>
             <nav className="nav">
-              <a href="/leaderboard">Leaderboard</a>
+              <a className={isActive('/leaderboard')} href="/leaderboard">Leaderboard</a>
+              <a className={isActive('/analysis')} href="/analysis">Analysis</a>
+              <a className={isActive('/run')} href="/run">Run</a>
+              <a className={isActive('/readme')} href="/readme">Readme</a>
             </nav>
           </div>
         </header>
-        <main className="container">
+        <main className="container" style={{ marginTop: 32 }}>
           <Outlet />
         </main>
         <footer className="footer">

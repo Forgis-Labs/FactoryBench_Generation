@@ -2,321 +2,401 @@
 
 Lean benchmark for evaluating AI model performance on industrial troubleshooting — from telemetry literacy to guided remediation — with a minimal Python backend and a clean Remix frontend.
 
+## Quick Links
+
+- **Leaderboard**: [localhost:3000/leaderboard](http://localhost:3000/leaderboard) (after `npm run dev`)
+- **Methodology**: [localhost:3000/readme](http://localhost:3000/readme) (detailed metrics & dataset structure)
+- **Analysis**: [localhost:3000/analysis](http://localhost:3000/analysis) (charts & visualizations)
+- **API Docs**: `http://localhost:5173/docs` (FastAPI Swagger UI)
+
 ## Overview
 
-FactoryBench evaluates how well AI models can generate step-by-step instructions to fix industrial machines based on:
-- Multivariate time series data
-- Machine manuals and documentation
-- Machine metadata (including fault codes)
-- Factory process context and dependencies
+FactoryBench evaluates AI model performance on industrial troubleshooting tasks through a three-stage progression:
 
-All datasets across all stages live in the external FactorySet repository
-(currently hosted under Xelerit-Robotics and migrating to Forgis):
-https://github.com/Xelerit-Robotics/FactorySet
-and are mirrored to Hugging Face Datasets for streaming at scale.
+1. **Telemetry Literacy** (Current): Basic time series comprehension and statistical analysis
+2. **Root Cause Analysis** (Planned): Diagnostic reasoning and fault correlation
+3. **Guided Remediation** (Planned): Complete troubleshooting workflow with repair instructions
+
+### Current Status: Stage 1 - Telemetry Literacy ✅
+
+The benchmark currently evaluates models on:
+- Statistical measures (mean, min, max) from univariate time series
+- Pattern recognition in temporal data
+- Step function detection and analysis
+
+**Available Datasets**:
+- Local: `basic_statistics` (10 samples), `step_functions` (15 samples), `pattern_recognition` (12 samples)
+- HuggingFace: `Forgis/FactorySet` (50k+ samples, gated)
+
+**Supported Models**:
+- Mock adapter (testing)
+- Azure OpenAI: gpt-4o, gpt-4o-mini, gpt-5, o3-2025, o4-mini-2025, gpt-5-nano
+
+**Key Features**:
+- Cost tracking per run (token usage & USD cost)
+- Sortable leaderboard with filtering by model/dataset/stage
+- Interactive charts with explanations
+- Run creation UI with progress tracking
+- Detailed run artifacts (JSON) with per-sample metrics
 
 ## Architecture
 
-### Frontend
-- Framework: Remix (React)
-- Hosting: Vercel (planned)
-- Purpose: Leaderboard, run browser, and basic dataset metadata views
-
-### Development Stages
-
-FactoryBench follows a modular development approach with progressive complexity:
-
-#### Stage 1: Telemetry Literacy (Current Focus)
-Goal: Evaluate basic time series comprehension capabilities
-
-Capabilities Tested:
-- Step function detection and analysis
-- Statistical measures (max, min, average, coefficient of variation, etc.)
-- Pattern recognition in multivariate sensor data
-- Anomaly detection in temporal data
-
-Dataset: Synthetic and semi-synthetic time series with known properties
-
-Evaluation Metrics:
-- Accuracy of statistical calculations
-- Correct identification of step changes
-- Pattern detection precision/recall
-
-#### Stage 2: Root Cause Analysis (Planned)
-Goal: Bridge the gap between basic time series understanding and full troubleshooting
-
-Capabilities Tested (TBD):
-- Correlation between sensor readings and fault types
-- Basic diagnostic reasoning
-- Understanding of machine state transitions
-- Context integration (manual snippets + sensor data)
-
-Dataset: Partially curated real-world examples with simplified troubleshooting scenarios
-
-#### Stage 3: Guided Remediation with FactorySet (Final Goal)
-Goal: Evaluate complete diagnostic and instruction generation capabilities
-
-Capabilities Tested:
-- Multi-modal input integration (time series + manuals + metadata)
-- Step-by-step repair instruction generation
-- Contextual understanding of factory process dependencies
-- Fault code interpretation and correlation
-- Root cause analysis
-
-Dataset: FactorySet — a curated dataset containing:
-- Real industrial machine failure scenarios
-- Corresponding sensor data (multivariate time series)
-- Relevant manual sections and documentation
-- Machine metadata and fault codes
-- Process context and dependencies
-- Expert-validated repair instructions (ground truth)
-
-Evaluation Metrics:
-- Instruction correctness and completeness
-- Safety compliance
-- Efficiency (unnecessary steps)
-- Logical flow and ordering
-- Context awareness
-
-## Ideal System Components
-
-### 1. Data Pipeline
 ```
-Raw Data → Preprocessing → Feature Extraction → Storage
-                                                   ↓
-                                            Benchmark API
+┌─────────────────────────────────────────────────────────────┐
+│                     Remix Frontend (Port 3000)              │
+│  Routes: /, /leaderboard, /run, /runs/:id, /analysis        │
+│  Features: Leaderboard, Run Creation, Charts, Filters       │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ HTTP
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              FastAPI Backend (Port 5173)                    │
+│  Endpoints: /runs, /runs/:id, /charts/:type, /metadata      │
+│  Adapters: Mock, Azure OpenAI                              │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+          ┌────────────────┴────────────────┐
+          ▼                                 ▼
+┌─────────────────────┐         ┌──────────────────────┐
+│  Local JSON Files   │         │  HuggingFace Hub     │
+│  runs/*.json        │         │  Forgis/FactorySet   │
+│  datasets/*.json    │         │  (Gated)             │
+└─────────────────────┘         └──────────────────────┘
 ```
 
-**Components**:
-- Time series ingestion and validation
-- Manual/documentation parser
-- Metadata normalization
-- Version control for datasets (FactorySet stages)
+### Tech Stack
 
-### 2. Evaluation Engine
-```
-Samples → Prompt Builder → Model Adapter → Parser → Scoring → Artifact
-```
+**Backend**:
+- FastAPI + Uvicorn (Python 3.11+)
+- Pydantic for data validation
+- Click for CLI
+- HuggingFace Datasets for remote data loading
+- Matplotlib + Seaborn for chart generation
+- Azure OpenAI SDK
 
-Features:
-- Stage 1 deterministic scoring (mean/min/max abs errors)
-- Model adapters (OpenAI, mock); logging + reproducible run manifests
-- Local JSON artifacts for runs in `runs/`
+**Frontend**:
+- Remix (React-based meta-framework)
+- TypeScript
+- CSS variables (Forgis brand colors)
+- No heavy dependencies (lean & fast)
 
-### 3. Frontend Application (Remix)
-```
-/
-├── /leaderboard         # Historical results and leaderboard
-├── /runs/:id            # Run detail (aggregate + raw)
-└── /                    # Overview
-```
+**Storage**:
+- Local JSON artifacts in `runs/` directory
+- Chart PNGs cached in `charts/` directory
+- Upgradable to PostgreSQL/S3 without API changes
 
-Key Features:
-- Leaderboard and simple run explorer
-- Static-first; switches to API once available
+## Quick Start
 
-### 4. Backend/API (MVP implemented)
-```
-GET  /healthz
-GET  /runs              # list run summaries
-GET  /runs/{id}         # retrieve run artifact
-POST /runs              # create a new telemetry_literacy run
-```
+### Prerequisites
+- Python 3.11+
+- Node.js 18+
+- npm or pnpm
+- (Optional) Azure OpenAI API access
 
-### 5. Persistence (MVP)
-- Local JSON files under `runs/` (artifact + manifest)
-- Upgradable later to Postgres/S3 without changing public APIs
+### 1. Install Python Backend
 
-## Technology Stack
-
-### Frontend
-- Remix (React), CSS variables themed with Forgis palette
-
-### Backend
-- Python FastAPI + Uvicorn, Click CLI
-- HF Datasets for optional data loading
-
-### Model Integration
-- OpenAI SDK (optional), Mock adapter by default
-
-## Development Environment
-
-Use uv virtual environments (Forgis standard):
-
+Using `uv` (recommended):
 ```powershell
 pipx install uv
 uv venv
-uv pip install -e ".[dev]"
+uv pip install -e .
 ```
 
-Environment variables (examples): `OPENAI_API_KEY`, `HF_API_TOKEN`, `DATABASE_URL`, `REDIS_URL`, `FACTORYBENCH_S3_URL`.
-
-Fallback (without uv):
+Or using standard venv:
 ```powershell
 python -m venv .venv
-./.venv/Scripts/python -m pip install --upgrade pip
-./.venv/Scripts/python -m pip install -e .
+.\.venv\Scripts\Activate.ps1
+pip install -e .
 ```
 
-## Quick Start (Local)
+### 2. Configure Environment (Optional)
 
-Prereqs: Python 3.11+, Node 18+, npm
-
-1) Install Python deps and set env (optional for OpenAI):
+For Azure OpenAI models:
 ```powershell
-pipx install uv
-uv venv
-uv pip install -e .
 Copy-Item .env.example .env -ErrorAction SilentlyContinue
-# Optional if using OpenAI adapter
-$env:OPENAI_API_KEY="<your_key>"
+
+# Edit .env and add:
+# AZURE_OPENAI_API_KEY=your-key-here
+# AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+# AZURE_OPENAI_API_VERSION=2024-02-15-preview
+# HF_API_TOKEN=your-hf-token  # For gated datasets
 ```
 
-2) Start the API (Stage 1: telemetry_literacy):
+### 3. Start the Backend API
+
 ```powershell
+# With uv
 uv run uvicorn factorybench.api.app:app --reload --port 5173
+
+# Or without uv
+.\.venv\Scripts\Activate.ps1
+uvicorn factorybench.api.app:app --reload --port 5173
 ```
 
-3) Create a sample run (mock model):
+API will be available at `http://localhost:5173`
+
+### 4. Run a Benchmark (CLI)
+
 ```powershell
-uv run python -m factorybench.cli run-stage1 --model mock --limit 5
+# Mock adapter (no API key needed)
+uv run python -m factorybench.cli run-stage1 `
+  --model mock `
+  --dataset-id local_basic `
+  --fixture-path datasets/basic_statistics.json `
+  --limit 5
+
+# Azure OpenAI (requires API key)
+uv run python -m factorybench.cli run-stage1 `
+  --model "azure:gpt-4o-mini" `
+  --dataset-id local_basic `
+  --fixture-path datasets/basic_statistics.json `
+  --limit 10
+
+# HuggingFace dataset (requires HF_API_TOKEN for gated datasets)
+uv run python -m factorybench.cli run-stage1 `
+  --dataset-source hf `
+  --hf-slug Forgis/FactorySet `
+  --hf-split train `
+  --limit 50 `
+  --model "azure:gpt-4o"
 ```
 
-4) Frontend (Remix) in another terminal:
+### 5. Start the Frontend
+
 ```powershell
-Push-Location frontend
+cd frontend
 npm install
-# Optional: point UI to API if not default
-$env:API_BASE="http://127.0.0.1:5173"
 npm run dev
-Pop-Location
 ```
 
-Routes:
-- API: `GET http://127.0.0.1:5173/runs`, `GET /runs/{id}`, `POST /runs`
-- Frontend: `/` (overview), `/leaderboard`, `/runs/:id`
+Frontend will be available at `http://localhost:3000`
 
-HF datasets (optional when available):
-```powershell
-uv run python -m factorybench.cli run-stage1 --dataset-source hf --hf-slug Forgis/FactorySet-telemetry_literacy --hf-split train --limit 50 --model mock
+**Available Routes**:
+- `/` - Overview & quick links
+- `/leaderboard` - Sortable table of all runs with filters
+- `/run` - Create new benchmark runs
+- `/runs/:id` - Detailed view of a specific run
+- `/analysis` - Interactive charts & visualizations
+- `/readme` - Benchmark methodology & metrics (in-app docs)
+
+## API Endpoints
+
+### GET /runs
+List all benchmark runs with optional filters.
+
+**Query Parameters**:
+- `model` (multiple): Filter by model ID
+- `dataset` (multiple): Filter by dataset ID
+- `stage`: Filter by benchmark stage
+
+**Response**:
+```json
+{
+  "items": [
+    {
+      "run_id": "tl-20251119T201643",
+      "stage": "telemetry_literacy",
+      "model": "azure:gpt-4o-mini",
+      "status": "completed",
+      "dataset": {
+        "dataset_id": "local_basic",
+        "source": "local",
+        "fixture_path": "datasets/basic_statistics.json"
+      },
+      "aggregate": {
+        "samples": 10.0,
+        "ok_rate": 1.0,
+        "mean_abs_err_mean": 0.0,
+        "min_abs_err_mean": 0.0,
+        "max_abs_err_mean": 0.0,
+        "cost_per_sample": 0.000123,
+        "cost_total": 0.00123,
+        "tokens_input": 1500,
+        "tokens_output": 450
+      }
+    }
+  ]
+}
 ```
 
-## Dataset Structure: FactorySet (illustrative)
+### GET /runs/:id
+Retrieve detailed run artifact including per-sample results.
 
-```
-FactorySet/
-├── metadata.json                    # Dataset version, statistics
-├── stage1_timeseries/
-│   ├── simple/                     # Basic statistical tests
-│   ├── intermediate/               # Pattern detection
-│   └── advanced/                   # Complex multivariate
-├── stage2_intermediate/            # TBD
-└── stage3_full/
-    ├── scenario_001/
-    │   ├── timeseries.parquet      # Sensor data
-    │   ├── manual.pdf              # Relevant manual pages
-    │   ├── metadata.json           # Fault codes, machine info
-    │   ├── context.json            # Process dependencies
-    │   └── ground_truth.json       # Expert instructions
-    ├── scenario_002/
-    └── ...
+### POST /runs
+Create a new benchmark run.
+
+**Request Body**:
+```json
+{
+  "stage": "telemetry_literacy",
+  "model": "azure:gpt-4o-mini",
+  "dataset_id": "local_basic",
+  "dataset_source": "local",
+  "fixture_path": "datasets/basic_statistics.json",
+  "limit": 10
+}
 ```
 
-Data hosting:
-- Canonical schemas/scripts live in the FactorySet GitHub repo (migrating to Forgis org): https://github.com/Xelerit-Robotics/FactorySet
-- Large data artifacts are mirrored to Hugging Face Datasets for streaming access.
+### GET /charts/:type
+Generate analysis charts (PNG images).
 
-Hugging Face mirrors (to be created later):
-- An HF slug is the dataset identifier on Hugging Face Hub, e.g., `org/name`.
-- Recommended naming once ready (Forgis org):
-    - `Forgis/FactorySet-telemetry_literacy`
-    - `Forgis/FactorySet-root_cause_analysis`
-    - `Forgis/FactorySet-guided_remediation`
-  
-We’ll replace these with the actual slugs after the HF repos are created.
+**Chart Types**: `error_distribution`, `convergence`, `ok_rate`, `model_comparison`, `error_breakdown`, `cost_quality`
 
-## Evaluation Workflow
+**Query Parameters**:
+- `model` (multiple): Filter by model
+- `dataset` (multiple): Filter by dataset
+- `regenerate`: Force regeneration (bypass cache)
 
-1. **Select Benchmark Stage** (1, 2, or 3)
-2. **Choose Model(s)** to evaluate
-3. **Configure Parameters** (temperature, prompting strategy, etc.)
-4. **Run Evaluation** (parallel or sequential)
-5. **Automated Scoring** against ground truth
-6. **Optional Human Review** (for Stage 3)
-7. **View Results** in dashboard
-8. **Compare Models** side-by-side
+### GET /metadata/models
+List available models.
 
-## Success Metrics
+### GET /metadata/datasets
+List available datasets for a stage.
 
-### Stage 1 (Telemetry Literacy)
-- Statistical accuracy: >95%
-- Pattern detection F1-score
-- Processing time per sample
+## Dataset Structure
 
-### Stage 2 (Root Cause Analysis)
-- TBD based on specific capabilities tested
+### Telemetry Literacy (Stage 1)
 
-### Stage 3 (Guided Remediation)
-- Instruction correctness: % of steps correct
-- Safety score: compliance with safety protocols
-- Completeness: % of necessary steps included
-- Efficiency: ratio of necessary to total steps
-- Expert rating: 1-5 scale by domain experts
-- Time to resolution (simulated)
-
-## Quick Start (Local)
-
-Prereqs: Python 3.11+, Node 18+, npm
-
-1) Install Python deps and set env (optional for OpenAI):
-```powershell
-pipx install uv
-uv venv
-uv pip install -e .
-Copy-Item .env.example .env -ErrorAction SilentlyContinue
-# Optional if using OpenAI adapter
-$env:OPENAI_API_KEY="<your_key>"
+Each sample contains:
+```json
+{
+  "id": "basic_001",
+  "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0],
+  "values": [10.0, 20.0, 30.0, 40.0, 50.0],
+  "domain": "synthetic",
+  "subtype": "linear_increase",
+  "statistics": {
+    "mean": 30.0,
+    "std": 14.142135,
+    "min": 10.0,
+    "max": 50.0
+  }
+}
 ```
 
-2) Start the API (Stage 1: telemetry_literacy):
-```powershell
-uv run uvicorn factorybench.api.app:app --reload --port 5173
+**Evaluation**: Models are prompted to compute `mean`, `min`, `max`. Scores are calculated as absolute errors against ground truth.
+
+See `/readme` route in the UI for full methodology.
+
+## Evaluation Metrics
+
+### Stage 1: Telemetry Literacy
+
+**Per-Sample Metrics**:
+- `mean_abs_err`: Absolute error for mean prediction
+- `min_abs_err`: Absolute error for min prediction
+- `max_abs_err`: Absolute error for max prediction
+- `ok`: Boolean indicating if all three metrics were successfully extracted
+
+**Aggregate Metrics**:
+- `mean_abs_err_mean`: Average of mean errors across samples
+- `min_abs_err_mean`: Average of min errors across samples
+- `max_abs_err_mean`: Average of max errors across samples
+- `ok_rate`: Percentage of samples with successful predictions
+- `samples`: Total number of samples evaluated
+
+**Cost Metrics**:
+- `tokens_input`: Total input tokens consumed
+- `tokens_output`: Total output tokens consumed
+- `cost_input`: USD cost for input tokens
+- `cost_output`: USD cost for output tokens
+- `cost_total`: Total USD cost
+- `cost_per_sample`: Average cost per sample
+
+### Stage 2: Root Cause Analysis (Planned)
+
+TBD - Will focus on diagnostic reasoning and fault correlation.
+
+### Stage 3: Guided Remediation (Planned)
+
+TBD - Will evaluate complete troubleshooting workflows with repair instructions.
+
+## Development Roadmap
+
+### ✅ Completed (Phase 1-2)
+- [x] Stage 1 backend evaluation engine
+- [x] FastAPI REST API with run management
+- [x] CLI for benchmark execution
+- [x] Mock & Azure OpenAI adapters
+- [x] Remix frontend with leaderboard
+- [x] Run detail views with JSON artifacts
+- [x] Cost tracking & token usage
+- [x] Interactive charts with filtering
+- [x] Sortable leaderboard columns
+- [x] Run creation UI with progress tracking
+- [x] HuggingFace dataset integration
+
+### 🚧 In Progress (Phase 3)
+- [ ] Expanded Stage 1 datasets (industrial patterns)
+- [ ] WandB integration for experiment tracking
+- [ ] Additional chart types (latency, token efficiency)
+
+### 📋 Planned (Phase 4-5)
+- [ ] Stage 2: Root Cause Analysis specification
+- [ ] Stage 2: Dataset curation & evaluation engine
+- [ ] PostgreSQL/S3 backend (optional upgrade)
+- [ ] Public leaderboard deployment
+- [ ] API authentication & rate limiting
+
+### 🔮 Future (Phase 6+)
+- [ ] Stage 3: FactorySet curation (real industrial scenarios)
+- [ ] Stage 3: Multi-modal evaluation (text + images + PDFs)
+- [ ] Human-in-the-loop evaluation interface
+- [ ] Model fine-tuning benchmarks
+- [ ] Cross-model ensemble evaluation
+
+## File Structure
+
+```
+FactoryBench/
+├── factorybench/           # Python package
+│   ├── adapters/          # Model adapters (mock, azure_openai)
+│   ├── api/               # FastAPI app & chart generation
+│   ├── data/              # Data loaders (local, HF)
+│   ├── eval/              # Evaluation runner
+│   ├── metrics/           # Scoring functions
+│   ├── viz/               # Visualization (charts)
+│   ├── cli.py             # Click CLI
+│   ├── config.py          # Dataset/model registry, env config
+│   └── stages.py          # Stage definitions
+├── frontend/              # Remix app
+│   ├── app/
+│   │   ├── routes/        # Pages (_index, leaderboard, run, runs.$id, analysis, readme)
+│   │   ├── styles/        # Global CSS
+│   │   └── root.tsx       # Layout with nav
+│   ├── public/            # Static assets
+│   └── package.json
+├── datasets/              # Local dataset fixtures
+│   ├── basic_statistics.json
+│   ├── step_functions.json
+│   └── pattern_recognition.json
+├── runs/                  # Run artifacts (JSON)
+├── charts/                # Generated chart PNGs (cached)
+├── pyproject.toml         # Python dependencies
+├── README.md              # This file
+└── .env.example           # Environment variable template
 ```
 
-3) Create a sample run (mock model):
-```powershell
-uv run python -m factorybench.cli run-stage1 --model mock --limit 5
-```
+## Legacy & Outdated Code
 
-4) Frontend (Remix) in another terminal:
-```powershell
-Push-Location frontend
-npm install
-$env:API_BASE="http://127.0.0.1:5173"
-npm run dev
-Pop-Location
-```
+⚠️ **Alert**: The following code/files are legacy or outdated:
 
-Routes:
-- API: `GET http://127.0.0.1:5173/runs`, `GET /runs/{id}`, `POST /runs`
-- Frontend: `/` (overview), `/leaderboard`, `/runs/:id`
-
-## Roadmap
-
-- [x] Phase 1: Implement Stage 1 MVP (telemetry_literacy) backend + CLI + API
-- [x] Phase 2: Minimal Remix frontend (leaderboard + run detail)
-- [ ] Phase 3: Add HF dataset integration presets & docs
-- [ ] Phase 4: Reports and richer metrics visualization
-- [ ] Phase 5: Stage 2 (root_cause_analysis) task specs
-- [ ] **Phase 6**: Design Stage 2 intermediate benchmarks
-- [ ] **Phase 7**: Begin FactorySet curation (Stage 3 dataset)
-- [ ] **Phase 8**: Implement guided_remediation evaluation (Stage 3)
-- [ ] **Phase 9**: Add human evaluation interface
-- [ ] **Phase 10**: Public leaderboard and API access
+1. **README.md references to OpenAI adapter**: Only Azure OpenAI is currently supported. Direct OpenAI adapter was removed.
+2. **Duplicate "Quick Start" sections**: README has redundant setup instructions.
+3. **FactorySet repository location**: References to `Xelerit-Robotics/FactorySet` are outdated; migrating to `Forgis` org.
+4. **WandB placeholders**: WandB integration is mentioned but not implemented.
+5. **Stage 2 & 3 datasets**: Placeholder references exist but no actual implementation.
+6. **Future Azure model versions**: Model IDs like `gpt-5`, `o3-2025`, `o4-mini-2025`, `gpt-5-nano` are speculative and may not exist.
 
 ## Contributing
 
-FactorySet curation is a critical component. Contributions of real-world industrial scenarios with expert-validated solutions are highly valued.
+Contributions are welcome! Key areas:
+
+1. **Dataset Curation**: Real-world industrial scenarios for Stage 2 & 3
+2. **Model Adapters**: Support for Anthropic, Google, local models
+3. **Metrics**: Enhanced evaluation metrics for Stages 2 & 3
+4. **Frontend**: UI/UX improvements, chart types, export features
+5. **Documentation**: Tutorials, case studies, best practices
 
 ## License
 
@@ -324,4 +404,6 @@ TBD
 
 ---
 
-**Status**: Stage 1 — Telemetry Literacy (MVP running)
+**Maintained by**: Forgis  
+**Status**: Stage 1 MVP - Telemetry Literacy  
+**Last Updated**: November 2025

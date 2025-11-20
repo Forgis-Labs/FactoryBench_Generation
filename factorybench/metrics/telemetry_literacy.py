@@ -27,13 +27,13 @@ def series_stats(series: List[float]) -> Dict[str, float]:
 
 
 def score_sample(sample: Dict[str, Any], pred_text: str) -> Dict[str, Any]:
-    ref = sample.get("reference", {})
+    statistics = sample.get("statistics", {})
     pred = parse_prediction(pred_text)
     metrics: Dict[str, Any] = {"ok": True}
 
     for k in ("mean", "min", "max"):
-        if k in ref and k in pred:
-            metrics[f"{k}_abs_err"] = abs(pred[k] - ref[k])
+        if k in statistics and k in pred:
+            metrics[f"{k}_abs_err"] = abs(pred[k] - statistics[k])
         else:
             metrics["ok"] = False
     return metrics

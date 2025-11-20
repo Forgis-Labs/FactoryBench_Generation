@@ -7,8 +7,10 @@
     "jsx": "react-jsx",
     "strict": true,
     "baseUrl": ".",
-    "paths": {},
+    "paths": {
+      "~/*": ["./app/*"]
+    },
     "types": ["@remix-run/node", "@remix-run/react"]
   },
-  "include": ["app/**/*"]
+  "include": ["app/**/*", "remix.env.d.ts"]
 }

@@ -1,0 +1,197 @@
+[
+  {
+    "id": "step_001",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+    "values": [10.0, 10.0, 10.0, 10.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0],
+    "domain": "synthetic",
+    "subtype": "single_step_up",
+    "statistics": {
+      "mean": 22.0,
+      "std": 9.797959,
+      "min": 10.0,
+      "max": 30.0
+    }
+  },
+  {
+    "id": "step_002",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+    "values": [50.0, 50.0, 50.0, 50.0, 20.0, 20.0, 20.0, 20.0, 20.0],
+    "domain": "synthetic",
+    "subtype": "single_step_down",
+    "statistics": {
+      "mean": 31.111111,
+      "std": 14.142135,
+      "min": 20.0,
+      "max": 50.0
+    }
+  },
+  {
+    "id": "step_003",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0],
+    "values": [5.0, 5.0, 5.0, 15.0, 15.0, 15.0, 25.0, 25.0, 25.0, 35.0, 35.0, 35.0],
+    "domain": "synthetic",
+    "subtype": "multiple_steps_up",
+    "statistics": {
+      "mean": 20.0,
+      "std": 10.801234,
+      "min": 5.0,
+      "max": 35.0
+    }
+  },
+  {
+    "id": "step_004",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+    "values": [100.0, 100.0, 80.0, 80.0, 60.0, 60.0, 40.0, 40.0, 20.0, 20.0],
+    "domain": "synthetic",
+    "subtype": "multiple_steps_down",
+    "statistics": {
+      "mean": 60.0,
+      "std": 26.832815,
+      "min": 20.0,
+      "max": 100.0
+    }
+  },
+  {
+    "id": "step_005",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+    "values": [10.0, 10.0, 30.0, 30.0, 20.0, 20.0, 40.0, 40.0],
+    "domain": "synthetic",
+    "subtype": "alternating_steps",
+    "statistics": {
+      "mean": 25.0,
+      "std": 10.801234,
+      "min": 10.0,
+      "max": 40.0
+    }
+  },
+  {
+    "id": "step_006",
+    "timestamps": [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0],
+    "values": [2.0, 2.0, 2.0, 8.0, 8.0, 8.0, 14.0, 14.0, 14.0, 20.0, 20.0],
+    "domain": "synthetic",
+    "subtype": "stepped_increase",
+    "statistics": {
+      "mean": 10.181818,
+      "std": 6.204837,
+      "min": 2.0,
+      "max": 20.0
+    }
+  },
+  {
+    "id": "step_007",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
+    "values": [50.0, 50.0, 50.0, 50.0, 25.0, 25.0, 25.0, 25.0, 50.0, 50.0, 50.0, 50.0, 50.0],
+    "domain": "synthetic",
+    "subtype": "step_with_recovery",
+    "statistics": {
+      "mean": 44.230769,
+      "std": 10.690449,
+      "min": 25.0,
+      "max": 50.0
+    }
+  },
+  {
+    "id": "step_008",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+    "values": [15.0, 15.0, 15.0, 45.0, 45.0, 45.0, 15.0, 15.0, 15.0],
+    "domain": "synthetic",
+    "subtype": "spike_step",
+    "statistics": {
+      "mean": 25.0,
+      "std": 14.142135,
+      "min": 15.0,
+      "max": 45.0
+    }
+  },
+  {
+    "id": "step_009",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+    "values": [70.0, 70.0, 70.0, 50.0, 50.0, 30.0, 30.0, 10.0, 10.0, 10.0, 10.0],
+    "domain": "synthetic",
+    "subtype": "gradual_stepped_decrease",
+    "statistics": {
+      "mean": 37.272727,
+      "std": 23.570226,
+      "min": 10.0,
+      "max": 70.0
+    }
+  },
+  {
+    "id": "step_010",
+    "timestamps": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0],
+    "values": [3.0, 3.0, 3.0, 3.0, 9.0, 9.0, 9.0, 9.0, 15.0, 15.0, 15.0],
+    "domain": "synthetic",
+    "subtype": "two_step_increase",
+    "statistics": {
+      "mean": 8.454545,
+      "std": 4.690416,
+      "min": 3.0,
+      "max": 15.0
+    }
+  },
+  {
+    "id": "step_011",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0],
+    "values": [100.0, 100.0, 100.0, 100.0, 80.0, 80.0, 80.0, 60.0, 60.0, 60.0, 40.0, 40.0, 40.0, 40.0],
+    "domain": "synthetic",
+    "subtype": "irregular_steps_down",
+    "statistics": {
+      "mean": 70.0,
+      "std": 21.602469,
+      "min": 40.0,
+      "max": 100.0
+    }
+  },
+  {
+    "id": "step_012",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+    "values": [12.0, 12.0, 24.0, 24.0, 36.0, 36.0, 48.0, 48.0, 60.0],
+    "domain": "synthetic",
+    "subtype": "regular_steps_up",
+    "statistics": {
+      "mean": 33.333333,
+      "std": 15.491933,
+      "min": 12.0,
+      "max": 60.0
+    }
+  },
+  {
+    "id": "step_013",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+    "values": [5.0, 5.0, 15.0, 15.0, 10.0, 10.0, 20.0, 20.0, 15.0, 15.0],
+    "domain": "synthetic",
+    "subtype": "oscillating_steps",
+    "statistics": {
+      "mean": 13.0,
+      "std": 5.0,
+      "min": 5.0,
+      "max": 20.0
+    }
+  },
+  {
+    "id": "step_014",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+    "values": [30.0, 30.0, 30.0, 60.0, 60.0, 60.0, 90.0, 90.0, 90.0, 120.0, 120.0],
+    "domain": "synthetic",
+    "subtype": "large_steps_up",
+    "statistics": {
+      "mean": 70.909091,
+      "std": 32.403703,
+      "min": 30.0,
+      "max": 120.0
+    }
+  },
+  {
+    "id": "step_015",
+    "timestamps": [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0],
+    "values": [8.0, 8.0, 6.0, 6.0, 10.0, 10.0, 4.0, 4.0, 12.0, 12.0, 2.0, 2.0, 2.0],
+    "domain": "synthetic",
+    "subtype": "random_steps",
+    "statistics": {
+      "mean": 6.769231,
+      "std": 3.464102,
+      "min": 2.0,
+      "max": 12.0
+    }
+  }
+]
