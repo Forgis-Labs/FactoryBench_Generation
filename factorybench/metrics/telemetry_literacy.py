@@ -50,4 +50,11 @@ def aggregate(scores: List[Dict[str, Any]]) -> Dict[str, float]:
             agg[f"{k}_mean"] = sum(vals) / len(vals)
     agg["samples"] = float(len(scores))
     agg["ok_rate"] = sum(1 for s in scores if s.get("ok")) / max(1, len(scores))
+    
+    # Performance metric: average of mean, min, and max errors (lower is better)
+    mean_err = agg.get("mean_abs_err_mean", 0.0)
+    min_err = agg.get("min_abs_err_mean", 0.0)
+    max_err = agg.get("max_abs_err_mean", 0.0)
+    agg["performance"] = (mean_err + min_err + max_err) / 3.0
+    
     return agg

@@ -5,7 +5,7 @@ from pathlib import Path
 
 try:
     from datasets import load_dataset
-except Exception:  # pragma: no cover
+except ImportError:
     load_dataset = None  # type: ignore
 
 
@@ -24,6 +24,9 @@ def load_telemetry_literacy(
         try:
             # Use HF_API_TOKEN if available for private/gated datasets
             token = os.getenv("HF_API_TOKEN")
+            # Don't pass empty token (causes auth errors)
+            token = token if token and token.strip() else None
+            # Load dataset without streaming (streaming returns malformed metadata)
             ds = load_dataset(hf_slug, split=split, streaming=False, token=token)
         except Exception as e:
             error_msg = str(e)
@@ -33,27 +36,48 @@ def load_telemetry_literacy(
                 raise RuntimeError(f"Dataset '{hf_slug}' not found on HuggingFace Hub.")
             else:
                 raise RuntimeError(f"Failed to load HuggingFace dataset '{hf_slug}': {type(e).__name__}: {e}")
+        
         rows: List[Dict[str, Any]] = []
-        for r in ds:
-            # HF dataset structure: id, timestamps, values, domain, subtype, statistics
-            rows.append(
-                {
+        # Determine how many samples to process
+        num_samples = limit if limit else len(ds)
+        num_samples = min(num_samples, len(ds))  # Don't exceed dataset size
+        
+        for idx in range(num_samples):
+            r = ds[idx]
+            
+            try:
+                # Extract statistics dict
+                stats = r.get("statistics", {})
+                stats_dict = {
+                    "mean": float(stats.get("mean", 0.0)),
+                    "std": float(stats.get("std", 0.0)),
+                    "min": float(stats.get("min", 0.0)),
+                    "max": float(stats.get("max", 0.0)),
+                }
+                
+                row = {
                     "id": r.get("id"),
                     "timestamps": list(r.get("timestamps", [])),
                     "values": list(r.get("values", [])),
-                    "domain": r.get("domain"),
-                    "subtype": r.get("subtype"),
-                    "statistics": dict(r.get("statistics", {})),
+                    "domain": r.get("domain", "unknown"),
+                    "subtype": r.get("subtype", "unknown"),
+                    "statistics": stats_dict,
                 }
-            )
-            if limit and len(rows) >= limit:
-                break
+                rows.append(row)
+            except Exception as e:
+                print(f"Warning: Skipping malformed sample {idx}: {e}")
+                continue
+        
+        if len(rows) == 0:
+            raise RuntimeError(f"No valid samples loaded from HuggingFace dataset '{hf_slug}'")
+        
         return rows
 
-    # local - new format only (timestamps, values, statistics)
+    # Local JSON file
     p = Path(path)
     if not p.exists():
-        raise FileNotFoundError(f"Dataset not found: {p}")
+        raise FileNotFoundError(f"Local dataset not found: {p}")
+    
     with p.open("r", encoding="utf-8") as f:
         data = json.load(f)
     

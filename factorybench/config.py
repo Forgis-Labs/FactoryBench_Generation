@@ -40,7 +40,7 @@ DATASETS = {
         },
         {
             "id": "hf_factoryset",
-            "name": "FS-TL v0.1 (50k samples)",
+            "name": "FactorySet v0.1 (50k)",
             "source": "hf",
             "hf_slug": "Forgis/FactorySet",
             "split": "train",
@@ -51,14 +51,10 @@ DATASETS = {
 # Model Registry
 MODELS = [
     {"id": "mock", "name": "Mock Adapter", "provider": "local"},
-    # Current generation (2024)
-    {"id": "azure:gpt-4o", "name": "GPT-4o (Azure)", "provider": "azure"},
-    {"id": "azure:gpt-4o-mini", "name": "GPT-4o Mini (Azure)", "provider": "azure"},
-    # Next generation (2025)
-    {"id": "azure:gpt-5", "name": "GPT-5 Global (SOTA)", "provider": "azure"},
-    {"id": "azure:o3-2025-04-16", "name": "o3 2025-04-16 (SOTA Affordable)", "provider": "azure"},
-    {"id": "azure:o4-mini-2025-04-16", "name": "o4-mini 2025-04-16 (Efficient RAG)", "provider": "azure"},
-    {"id": "azure:gpt-5-nano", "name": "GPT-5-nano (Super Inexpensive)", "provider": "azure"},
+    {"id": "azure:gpt-4o", "name": "GPT-4o", "provider": "azure"},
+    {"id": "azure:gpt-4o-mini", "name": "GPT-4o Mini", "provider": "azure"},
+    {"id": "azure:o1", "name": "o1 (Reasoning)", "provider": "azure"},
+    {"id": "azure:o1-mini", "name": "o1-mini (Efficient)", "provider": "azure"},
 ]
 
 # Azure OpenAI pricing (USD per 1K tokens) - updated Nov 2024
@@ -66,17 +62,13 @@ MODELS = [
 # Prices converted from per 1M tokens to per 1K tokens (divide by 1000)
 AZURE_PRICING = {
     # Current generation (2024)
-    # gpt-4o-2024-11-20
     "azure:gpt-4o": {"input_per_1k": 0.0025, "output_per_1k": 0.01},
-    # gpt-4o-mini-2024-07-18
     "azure:gpt-4o-mini": {"input_per_1k": 0.00015, "output_per_1k": 0.0006},
-    # Next generation (2025) - Global pricing per 1M tokens converted to per 1K
-    # GPT-5: $1.25/$10.00 per 1M → $0.00125/$0.01 per 1K
-    "azure:gpt-5": {"input_per_1k": 0.00125, "output_per_1k": 0.01},
-    # o3 2025-04-16: $2.00/$8.00 per 1M → $0.002/$0.008 per 1K
-    "azure:o3-2025-04-16": {"input_per_1k": 0.002, "output_per_1k": 0.008},
-    # o4-mini 2025-04-16: $1.10/$4.40 per 1M → $0.0011/$0.0044 per 1K
-    "azure:o4-mini-2025-04-16": {"input_per_1k": 0.0011, "output_per_1k": 0.0044},
-    # GPT-5-nano: $0.05/$0.40 per 1M → $0.00005/$0.0004 per 1K
-    "azure:gpt-5-nano": {"input_per_1k": 0.00005, "output_per_1k": 0.0004},
+    # o1 series (reasoning models)
+    "azure:o1": {"input_per_1k": 0.015, "output_per_1k": 0.06},
+    "azure:o1-mini": {"input_per_1k": 0.003, "output_per_1k": 0.012},
 }
+
+# Cost Limits (USD)
+MAX_COST_PER_RUN = 1.0  # Maximum spend per benchmark run
+MAX_COST_PER_DAY = 20.0  # Maximum total spend per day

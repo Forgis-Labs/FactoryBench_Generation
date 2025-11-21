@@ -78,10 +78,11 @@ export default function RunPage(){
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const creating = nav.state === 'submitting' || nav.state === 'loading';
-  const [submittedRun, setSubmittedRun] = React.useState<string|undefined>(undefined);
+  
   React.useEffect(()=>{
     if (actionData?.ok && actionData.run_id){
-      setSubmittedRun(actionData.run_id);
+      // Navigate immediately to run detail page to see progress
+      window.location.href = `/runs/${actionData.run_id}`;
     }
   }, [actionData]);
 
@@ -91,12 +92,12 @@ export default function RunPage(){
       <p className="muted">Evaluate a model on a selected telemetry literacy dataset.</p>
       <Form method="post" style={{ display:'grid', gap:16, maxWidth:520, marginTop:16 }}>
         <Field label="Model" name="model" error={actionData?.errors?.model}>
-          <select name="model" defaultValue={models[0]?.id || ''} style={selectStyle}>
+          <select name="model" defaultValue="azure:gpt-4o-mini" style={selectStyle}>
             {models.map((m:any)=>(<option key={m.id} value={m.id}>{m.name}</option>))}
           </select>
         </Field>
         <Field label="Dataset" name="dataset_id" error={actionData?.errors?.dataset_id}>
-          <select name="dataset_id" defaultValue={datasets[0]?.id || ''} style={selectStyle}>
+          <select name="dataset_id" defaultValue="hf_factoryset" style={selectStyle}>
             {datasets.map((d:any)=>(<option key={d.id} value={d.id}>{d.name} ({d.id})</option>))}
           </select>
         </Field>
@@ -108,11 +109,6 @@ export default function RunPage(){
         )}
         <button className="btn primary" type="submit" disabled={creating}>{creating ? 'Creating...' : 'Run Evaluation'}</button>
       </Form>
-      {submittedRun && (
-        <div style={{ marginTop:24 }}>
-          <div style={{ fontSize:14 }}>Run created: <a href={`/runs/${submittedRun}`}>{submittedRun}</a></div>
-        </div>
-      )}
     </div>
   );
 }

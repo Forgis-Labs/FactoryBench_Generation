@@ -59,6 +59,27 @@ export default function Analysis() {
   
   const modelFilters = searchParams.getAll("model");
   const datasetFilters = searchParams.getAll("dataset");
+  
+  // Set default filters on mount
+  React.useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    let needsUpdate = false;
+    
+    if (datasetFilters.length === 0) {
+      params.append("dataset", "hf_factoryset");
+      needsUpdate = true;
+    }
+    
+    if (modelFilters.length === 0) {
+      params.append("model", "azure:gpt-4o");
+      params.append("model", "azure:gpt-4o-mini");
+      needsUpdate = true;
+    }
+    
+    if (needsUpdate) {
+      setSearchParams(params, { replace: true });
+    }
+  }, []); // Only run on mount
 
   function toggleFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams);
@@ -93,12 +114,9 @@ export default function Analysis() {
       title: "Stage 1: Telemetry Literacy",
       runs: tlRuns,
       charts: [
-        { title: "Error Distribution (Mean/Min/Max)", type: "error_distribution" },
-        { title: "Model Convergence", type: "convergence" },
-        { title: "OK Rate Over Time", type: "ok_rate" },
-        { title: "Model Comparison", type: "model_comparison" },
-        { title: "Error Breakdown by Metric", type: "error_breakdown" },
-        { title: "Performance vs Cost", type: "cost_quality" }
+        { title: "Model Performance Comparison", type: "model_performance" },
+        { title: "Cost vs Performance Tradeoff", type: "cost_vs_performance" },
+        { title: "Model Metrics Heatmap", type: "metrics_heatmap" }
       ]
     },
     {
@@ -240,12 +258,9 @@ function ChartCard({ title, type, runs, modelFilters, datasetFilters }: {
 
   // Chart explanations
   const chartExplanations: Record<string, string> = {
-    error_distribution: "Shows the distribution of mean, min, and max errors across all samples.",
-    convergence: "Visualizes how model error decreases as more samples are processed.",
-    ok_rate: "Displays the percentage of correct predictions over time.",
-    model_comparison: "Compares performance metrics across different models.",
-    error_breakdown: "Breaks down errors by metric to highlight strengths and weaknesses.",
-    cost_quality: "Plots model performance against API cost for cost-effectiveness analysis.",
+    model_performance: "Compares models by performance score (average of mean/min/max errors). Lower is better. Shows best run for each model-dataset combination.",
+    cost_vs_performance: "Scatter plot of total cost vs performance. Ideal models are in the lower-left (low cost, low error). Point size indicates sample count.",
+    metrics_heatmap: "Heatmap showing all error metrics for each model-dataset combo. Darker colors indicate higher values.",
     retrieval: "Measures how accurately the model retrieves relevant information (Precision@K).",
     ordering: "Evaluates step ordering accuracy using Kendall tau correlation.",
     classification: "Shows F1 score for fault classification tasks.",

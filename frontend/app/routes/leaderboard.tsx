@@ -53,7 +53,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export default function Leaderboard() {
   const { items, models, datasets } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [creating, setCreating] = React.useState(false);
   const [modelDropdownOpen, setModelDropdownOpen] = React.useState(false);
   const [datasetDropdownOpen, setDatasetDropdownOpen] = React.useState(false);
   const [sortBy, setSortBy] = React.useState<string>("run_id");
@@ -62,6 +61,27 @@ export default function Leaderboard() {
   const modelFilters = searchParams.getAll("model");
   const datasetFilters = searchParams.getAll("dataset");
   const stageFilter = searchParams.get("stage") || "";
+  
+  // Set default filters on mount
+  React.useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    let needsUpdate = false;
+    
+    if (datasetFilters.length === 0) {
+      params.append("dataset", "hf_factoryset");
+      needsUpdate = true;
+    }
+    
+    if (modelFilters.length === 0) {
+      params.append("model", "azure:gpt-4o");
+      params.append("model", "azure:gpt-4o-mini");
+      needsUpdate = true;
+    }
+    
+    if (needsUpdate) {
+      setSearchParams(params, { replace: true });
+    }
+  }, []); // Only run on mount
 
   function toggleSort(column: string) {
     if (sortBy === column) {
@@ -87,6 +107,9 @@ export default function Leaderboard() {
       } else if (sortBy === "max_err") {
         aVal = a.aggregate?.max_abs_err_mean ?? 0;
         bVal = b.aggregate?.max_abs_err_mean ?? 0;
+      } else if (sortBy === "performance") {
+        aVal = a.aggregate?.performance ?? 0;
+        bVal = b.aggregate?.performance ?? 0;
       } else if (sortBy === "cost_per_sample") {
         aVal = a.aggregate?.cost_per_sample ?? 0;
         bVal = b.aggregate?.cost_per_sample ?? 0;
@@ -131,7 +154,7 @@ export default function Leaderboard() {
   };
 
   const fmtNum = (val: any) => (val != null ? val.toFixed(3) : '-');
-  const fmtCost = (val: any) => (val != null ? `$${val.toFixed(6)}` : '-');
+  const fmtCost = (val: any) => (val != null ? `$${val.toFixed(3)}` : '-');
 
   function toggleFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams);
@@ -158,42 +181,9 @@ export default function Leaderboard() {
     setSearchParams(params);
   }
 
-  async function createRun() {
-    setCreating(true);
-    try {
-      const apiBase = typeof window !== "undefined" ? "http://127.0.0.1:5173" : "";
-      const res = await fetch(`${apiBase}/runs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          stage: "telemetry_literacy", 
-          model: "mock", 
-          limit: 5,
-          dataset_source: "local",
-          dataset_id: "local_basic",
-          fixture_path: "datasets/basic_statistics.json"
-        })
-      });
-      if (res.ok) {
-        window.location.reload();
-      } else {
-        alert("Failed to create run");
-      }
-    } catch (err) {
-      alert("Error creating run: " + err);
-    } finally {
-      setCreating(false);
-    }
-  }
-
   return (
     <div className="card">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>Leaderboard</h2>
-        <button className="btn primary" onClick={createRun} disabled={creating}>
-          {creating ? "Creating..." : "+ Create Mock Run"}
-        </button>
-      </div>
+      <h2 style={{ marginBottom: 16 }}>Leaderboard</h2>
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -262,13 +252,14 @@ export default function Leaderboard() {
             <SortTh column="mean_err" label="Mean" sortBy={sortBy} sortDir={sortDir} onToggle={toggleSort} />
             <SortTh column="min_err" label="Min" sortBy={sortBy} sortDir={sortDir} onToggle={toggleSort} />
             <SortTh column="max_err" label="Max" sortBy={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+            <SortTh column="performance" label="Performance" sortBy={sortBy} sortDir={sortDir} onToggle={toggleSort} />
             <SortTh column="cost_per_sample" label="$/Sample" sortBy={sortBy} sortDir={sortDir} onToggle={toggleSort} />
             <SortTh column="cost_total" label="Total $" sortBy={sortBy} sortDir={sortDir} onToggle={toggleSort} />
           </tr>
         </thead>
         <tbody>
           {sortedItems.length === 0 && (
-            <tr><td colSpan={12} className="muted">No runs match the filters. Try adjusting or clearing them.</td></tr>
+            <tr><td colSpan={13} className="muted">No runs match the filters. Try adjusting or clearing them.</td></tr>
           )}
           {sortedItems.map((r: any) => {
             const agg = r.aggregate || {};
@@ -286,6 +277,7 @@ export default function Leaderboard() {
                 <td>{fmtNum(agg.mean_abs_err_mean)}</td>
                 <td>{fmtNum(agg.min_abs_err_mean)}</td>
                 <td>{fmtNum(agg.max_abs_err_mean)}</td>
+                <td>{fmtNum(agg.performance)}</td>
                 <td>{fmtCost(agg.cost_per_sample)}</td>
                 <td>{fmtCost(agg.cost_total)}</td>
               </tr>
