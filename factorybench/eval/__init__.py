@@ -1,56 +1,23 @@
 """
 FactoryBench Evaluation Framework
 
-Hierarchical evaluation across Pearl's causal ladder:
-- Rung 1: Associational (telemetry literacy, anomaly detection)
-- Rung 2: Interventional (causal discovery, RCA)
-- Rung 3: Counterfactual (blame attribution, prevention)
-- Rung 4: Remediation (retrieval, action generation)
+Q&A evaluation across 5 levels of machine understanding:
+- Level 1: State Identification
+- Level 2: Anomaly Detection
+- Level 3: Root Cause Analysis
+- Level 4: Counterfactual Reasoning
+- Level 5: Procedure + Prior
 
-Key classes:
-- HierarchicalEvaluator: Main evaluation orchestrator
-- CausalDiscoveryMetrics: Metrics for causal graph evaluation
-- RCAMetrics: Metrics for root cause analysis
-- ConformalWrapper: Calibrated prediction sets
+Current implementation:
+- Stage 1 runner (telemetry literacy) - working
+
+TODO:
+- LLM-Match scoring for open-ended Q&A
+- Per-level evaluation metrics
 """
 
-from .metrics import (
-    CausalDiscoveryMetrics,
-    RCAMetrics,
-    CounterfactualMetrics,
-    RemediationMetrics,
-    compute_map_at_k,
-    compute_hit_at_k,
-    compute_mrr,
-    compute_graph_f1,
-    compute_shd,
-)
-
-from .hierarchical import HierarchicalEvaluator, HierarchicalResults
-from .irca import IRCAProtocol, IRCAResult
-from .conformal import ConformalRCA, ConformalResult
+from .runner import run_stage1_evaluation
 
 __all__ = [
-    # Main evaluator
-    "HierarchicalEvaluator",
-    "HierarchicalResults",
-
-    # Metrics
-    "CausalDiscoveryMetrics",
-    "RCAMetrics",
-    "CounterfactualMetrics",
-    "RemediationMetrics",
-
-    # Metric functions
-    "compute_map_at_k",
-    "compute_hit_at_k",
-    "compute_mrr",
-    "compute_graph_f1",
-    "compute_shd",
-
-    # Novel evaluation protocols
-    "IRCAProtocol",
-    "IRCAResult",
-    "ConformalRCA",
-    "ConformalResult",
+    "run_stage1_evaluation",
 ]
