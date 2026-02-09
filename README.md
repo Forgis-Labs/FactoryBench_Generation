@@ -1,288 +1,210 @@
 # FactoryBench
 
-Comprehensive benchmark for evaluating AI model performance on industrial troubleshooting tasks — from telemetry literacy to guided remediation — featuring real-time progress tracking, cost controls, and model comparison analytics.
+**Q&A benchmark for machine understanding** — evaluating whether AI can reason about industrial machines, not just detect anomalies.
 
-## Quick Links
-
-- **Leaderboard**: [localhost:3000/leaderboard](http://localhost:3000/leaderboard) - Sortable table with all runs
-- **Analysis**: [localhost:3000/analysis](http://localhost:3000/analysis) - Model comparison charts
-- **Create Run**: [localhost:3000/run](http://localhost:3000/run) - Start new benchmarks with real-time progress
-- **Methodology**: [localhost:3000/readme](http://localhost:3000/readme) - In-app documentation
-- **API Docs**: `http://localhost:5173/docs` - FastAPI Swagger UI
-
-## Overview
-
-FactoryBench evaluates AI models on industrial troubleshooting through a three-stage progression:
-
-1. **Telemetry Literacy** ✅ (Current): Statistical analysis of time series data
-2. **Root Cause Analysis** 📋 (Planned): Diagnostic reasoning and fault correlation
-3. **Guided Remediation** 📋 (Planned): Complete troubleshooting workflows
-
-### Stage 1: Telemetry Literacy (Live)
-
-**What We Measure**:
-- Statistical comprehension (mean, min, max) from univariate time series
-- Pattern recognition in temporal data
-- Step function detection and change point analysis
-
-**Available Datasets**:
-- `local_basic` - 10 samples, basic statistics
-- `local_step_functions` - 15 samples, change detection
-- `local_patterns` - 12 samples, pattern recognition
-- `hf_factoryset` - 50,000+ samples, industrial telemetry (via HuggingFace)
-
-**Supported Models**:
-- `mock` - Testing adapter (no API required)
-- `azure:gpt-4o` - GPT-4 Omni
-- `azure:gpt-4o-mini` - GPT-4 Omni Mini (cost-effective)
-- `azure:o1` - O1 reasoning model
-- `azure:o1-mini` - O1 Mini
-
-## Key Features
-
-### 🎯 Core Functionality
-- **Cost Safeguards**: $1/run and $20/day limits with pre-flight checks
-- **Real-time Progress**: 2-second polling with sample-by-sample updates
-- **Graceful Cancellation**: Stop button saves partial results
-- **Performance Metric**: Composite score = avg(mean_err, min_err, max_err)
-
-### 📊 Analytics & Visualization
-- **Model Performance Bar**: Sorted comparison with sample counts
-- **Cost vs Performance Scatter**: Efficiency analysis with sample size indicators
-- **Model Metrics Heatmap**: Traffic-light coloring (red=high error, green=low)
-- **Smart Run Selection**: Most samples processed, then most recent
-
-### 🎨 User Experience
-- **Default Filters**: Pre-select gpt-4o/gpt-4o-mini + FactorySet dataset
-- **Connected Filtering**: Shared state across leaderboard & analysis
-- **Loading Stages**: Dataset loading → Processing samples
-- **Auto-refresh**: Detail pages reload on run completion
-- **Responsive Tables**: 13 columns with sortable headers
-
-### 💰 Cost Management
-- **Per-run Limits**: Enforce $1 maximum per execution
-- **Daily Limits**: Track $20 cumulative spending across all runs
-- **Persistent Tracking**: File-based daily cost survives restarts
-- **Color-coded Warnings**: Visual alerts at 80% threshold
-- **Token Breakdown**: Separate input/output token counts and costs
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│               Remix Frontend (localhost:3000)                │
-│  Routes: /, /leaderboard, /run, /runs/:id, /analysis         │
-│  Features: Real-time progress, filters, charts, stop button  │
-└────────────────────────┬─────────────────────────────────────┘
-                         │ HTTP + 2s polling
-                         ▼
-┌──────────────────────────────────────────────────────────────┐
-│            FastAPI Backend (localhost:5173)                  │
-│  /runs - List/create with background tasks                  │
-│  /runs/:id - Detail view with artifacts                     │
-│  /runs/:id/progress - Real-time progress tracking           │
-│  /runs/:id/stop - Graceful cancellation                     │
-│  /charts/:type - Model comparison charts (PNG)              │
-│  /metadata/* - Models, datasets, cost limits                │
-└────────────────────────┬─────────────────────────────────────┘
-                         │
-         ┌───────────────┴────────────────┐
-         ▼                                ▼
-┌──────────────────┐            ┌─────────────────────┐
-│  Local Storage   │            │  HuggingFace Hub    │
-│  runs/*.json     │            │  Forgis/FactorySet  │
-│  (50+ runs)      │            │  (50k+ samples)     │
-└──────────────────┘            └─────────────────────┘
-```
-
-### Tech Stack
-
-**Backend** (Python 3.11+):
-- FastAPI + BackgroundTasks for async execution
-- RunStateManager for thread-safe progress tracking
-- HuggingFace Datasets (streaming disabled for reliability)
-- Matplotlib with Forgis brand colors (traffic-light heatmaps)
-- Azure OpenAI SDK with token counting
-
-**Frontend** (TypeScript + React):
-- Remix v2 with loader-based data fetching
-- 2-second polling for progress updates
-- Multi-select dropdowns with outside-click detection
-- CSS variables for consistent theming
-- No heavy dependencies (lean bundle)
-
-**State Management**:
-- In-memory: RunStateManager (progress, stop flags)
-- Persistent: JSON files in `runs/` directory
-- Daily cost: Aggregated from run files (survives restarts)
-
-## Quick Start
-
-### Prerequisites
-- Python 3.11+ (3.12 recommended)
-- Node.js 18+ and npm
-- Azure OpenAI API credentials (or use mock adapter)
-- HuggingFace token for gated datasets (optional)
-
-### 1. Install Python Dependencies
-
-Using `uv` (recommended - fast):
-```powershell
-pipx install uv
-uv venv
-uv pip install -e .
-```
-
-Or standard venv:
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -e .
-```
-
-### 2. Configure Environment
-
-Create `.env` from template:
-```powershell
-Copy-Item .env.example .env
-
-# Edit .env with your credentials:
-# AZURE_OPENAI_API_KEY=your-key-here
-# AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-# AZURE_OPENAI_API_VERSION=2024-02-15-preview
-# HF_API_TOKEN=your-hf-token  # For Forgis/FactorySet
-```
-
-### 3. Start Backend API
-
-```powershell
-uvicorn factorybench.api.app:app --reload --port 5173
-```
-
-API available at `http://localhost:5173` (Swagger docs at `/docs`)
-
-### 4. Start Frontend
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend available at `http://localhost:3000`
-
-### 5. Run Your First Benchmark
-
-**Option A: Web UI (Recommended)**
-1. Navigate to http://localhost:3000/run
-2. Select model: `azure:gpt-4o-mini`
-3. Select dataset: `hf_factoryset`
-4. Set limit: `10` samples
-5. Click "Start Run"
-6. Watch real-time progress with cost tracking
-7. Use Stop button if needed
-
-**Option B: CLI**
-```powershell
-# Mock adapter (no API key)
-python -m factorybench.cli run-stage1 --model mock --dataset-id local_basic --limit 5
-
-# Azure OpenAI with HuggingFace dataset
-python -m factorybench.cli run-stage1 --model "azure:gpt-4o-mini" --dataset-source hf --hf-slug Forgis/FactorySet --limit 50
-```
-
-## Evaluation Metrics
-
-### Performance Metric (Primary)
-**`performance = (mean_abs_err_mean + min_abs_err_mean + max_abs_err_mean) / 3`**
-
-Lower is better. This composite metric provides a single score for model comparison.
-
-### Detailed Metrics
-
-**Per-Sample** (computed after each prediction):
-- `mean_abs_err` - |predicted_mean - true_mean|
-- `min_abs_err` - |predicted_min - true_min|
-- `max_abs_err` - |predicted_max - true_max|
-- `ok` - Boolean: all three metrics successfully extracted
-
-**Aggregate** (averaged across all samples):
-- `mean_abs_err_mean` - Average error for mean predictions
-- `min_abs_err_mean` - Average error for min predictions
-- `max_abs_err_mean` - Average error for max predictions
-- `ok_rate` - Percentage with successful predictions (0.0-1.0)
-- `samples` - Total samples evaluated
-
-**Cost** (summed across run):
-- `prompt_tokens_total` - Total input tokens
-- `completion_tokens_total` - Total output tokens
-- `cost_total` - Total USD spent
-- `cost_per_sample` - Average USD per sample
-
-## File Structure
-
-```
-FactoryBench/
-├── factorybench/              # Python package
-│   ├── adapters/             # Model adapters (mock, azure_openai)
-│   ├── api/                  # FastAPI app (app.py, charts.py)
-│   ├── data/                 # Data loaders (local JSON, HuggingFace)
-│   ├── eval/                 # Evaluation engine (runner.py)
-│   ├── metrics/              # Scoring functions (telemetry_literacy.py)
-│   ├── viz/                  # Charts (model comparison focus)
-│   ├── cli.py                # Click CLI
-│   ├── config.py             # Cost limits, model/dataset registry
-│   ├── stages.py             # Stage definitions
-│   └── state.py              # RunStateManager (thread-safe)
-├── frontend/                 # Remix app
-│   ├── app/routes/           # Pages (leaderboard, run, analysis, etc.)
-│   ├── app/styles/           # Global CSS (Forgis brand)
-│   └── package.json
-├── datasets/                 # Local JSON fixtures
-├── runs/                     # Run artifacts (JSON, 50+ files)
-├── charts/                   # Generated PNG cache
-├── pyproject.toml            # Python dependencies
-└── README.md                 # This file
-```
-
-## Development Roadmap
-
-### ✅ Completed (Phase 1-3)
-- Cost safeguards ($1/run, $20/day)
-- Real-time progress tracking
-- Performance metric
-- Model comparison charts
-- Default filters
-- HuggingFace integration
-- Traffic-light heatmaps
-- Graceful cancellation
-
-### 🚧 In Progress (Phase 4)
-- Additional industrial patterns
-- Multi-variate time series
-- Anomaly detection scenarios
-
-### 📋 Planned
-- **Phase 5**: Stage 2 - Root Cause Analysis
-- **Phase 6**: Production deployment (PostgreSQL, S3, auth)
-- **Phase 7**: Stage 3 - Guided Remediation
-
-## Contributing
-
-Contributions welcome! Focus areas:
-1. Dataset curation (real industrial time series)
-2. Model adapters (Anthropic, Google, local models)
-3. Evaluation metrics (Stage 2 & 3)
-4. UI/UX improvements
-5. Documentation
-
-## License
-
-TBD - Contact Forgis for licensing information.
+**Target:** NeurIPS 2026 Datasets and Benchmarks Track
 
 ---
 
-**Maintained by**: Forgis  
-**Status**: Stage 1 Production-Ready  
-**Version**: 0.2.0 (Nov 2025)  
-**Support**: [GitHub Issues](https://github.com/Xelerit-Robotics/FactoryBench/issues)
+## The Idea
+
+When a robot stops at 3 AM, operators face a cascade of questions:
+- *"Is this normal?"* (State)
+- *"Is something degrading?"* (Anomaly)
+- *"Why did this happen?"* (Root Cause)
+- *"What if we had maintained it last week?"* (Counterfactual)
+- *"How do we recover?"* (Procedure)
+
+**FactoryBench tests all five levels** on collaborative robots (UR5e), going deeper on one machine family than existing benchmarks go across many.
+
+---
+
+## 5-Level Q&A Framework
+
+| Level | Task | Example Question | Ground Truth Source |
+|-------|------|------------------|---------------------|
+| **1** | State Identification | "Is joint 3 moving?" | Sensor data (deterministic) |
+| **2** | Anomaly Detection | "Is friction increasing?" | Pattern detection (deterministic) |
+| **3** | Root Cause Analysis | "Why did cycle time increase 15%?" | Simulation + physics |
+| **4** | Counterfactual | "When will thermal throttling occur at 25% faster?" | Digital twin |
+| **5** | Procedure + Prior | "Robot stopped. What happened and how to recover?" | Manual + sensor fusion |
+
+**Key insight:** Each level builds on previous. Failure at Level N implies failure at Level N+1.
+
+---
+
+## Repository Structure
+
+```
+FactoryBench/
+├── docs/
+│   └── FactoryBench_NeurIPS_Paper_Draft.md    # Current paper (start here)
+├── factorybench/                               # Python package
+│   ├── adapters/          # LLM adapters (Azure OpenAI)
+│   ├── api/               # FastAPI backend
+│   ├── data/              # Data loaders
+│   ├── eval/              # Evaluation runner
+│   ├── metrics/           # Scoring (to extend for Q&A)
+│   └── viz/               # Charts
+├── frontend/              # Remix web UI
+├── datasets/              # Local test fixtures
+├── runs/                  # Benchmark results
+└── archive/               # Deprecated causal framework code
+```
+
+---
+
+## Ground Truth Generation (The Hard Problem)
+
+Scaling Q&A requires reliable answers **without human labeling every sample**. Here's the strategy by level:
+
+### Levels 1-2: Deterministic from Sensors
+```yaml
+question: "What is the mean current of joint 3 over the last hour?"
+answer: 2.47  # Computed directly from RTDE data
+provenance: sensor
+confidence: 1.0
+```
+
+### Level 3: Physics + Simulation
+```yaml
+question: "Why did joint 3 current increase 12% without velocity change?"
+answer: "Increasing friction in gearbox, likely due to insufficient lubrication"
+provenance: simulation
+evidence:
+  - "Inverse dynamics: current increase without velocity change = resistive load"
+  - "Thermal model: 8°C temperature rise correlates with friction"
+confidence: 0.95
+```
+
+**Tools:**
+- **NVIDIA Isaac Sim** — UR5e model with fault injection, ground-truth sensor export
+- **Inverse dynamics** — τ = M(q)q̈ + C(q,q̇)q̇ + g(q) + τ_friction
+- **Thermal models** — Predict overheating from motor currents and duty cycles
+
+### Level 4: Digital Twin Counterfactuals
+```yaml
+question: "If we run 25% faster, when will thermal throttling occur?"
+answer: "After 47 minutes of continuous operation"
+provenance: simulation
+method: "Isaac Sim with accelerated thermal model"
+confidence: 0.90
+```
+
+### Level 5: Manual + LLM Consensus
+```yaml
+question: "Robot stopped with error C203A. What happened and how to recover?"
+answer: "Joint 3 protective stop due to force limit exceeded. Recovery: 1) Clear obstruction..."
+provenance: consensus
+sources:
+  - "UR5e Manual Section 4.3.2"
+  - "3/3 LLM agreement (GPT-4o, Gemini-2.5, Claude-3.5)"
+confidence: 0.85
+```
+
+**RAG Pipeline:**
+1. Chunk UR5e manual by semantic sections
+2. Embed with multimodal model (diagrams matter)
+3. Retrieve relevant sections for question
+4. Generate answer with citation tracking
+5. Validate via multi-LLM consensus
+
+---
+
+## Scaling Strategy
+
+| Phase | Q&A Pairs | Method | Notes |
+|-------|-----------|--------|-------|
+| **Seed** | 1,000 | Expert annotation | You + domain experts on FactoryCell |
+| **Bootstrap** | 10,000 | Template + simulation | Level 1-2 scale easily |
+| **Scale** | 50,000 | Consensus + validation | Level 3-4 require physics |
+| **Full** | 200,000 | Pipeline automation | Level 5 smaller quantities OK |
+
+**Key:** Levels 1-2 are cheap to scale (deterministic). Levels 3-5 need validation but smaller N is acceptable for benchmark.
+
+---
+
+## Key Resources
+
+### Digital Twin
+- [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac/sim) — UR robot models included
+- [Universal_Robots_Isaac_Driver](https://github.com/UniversalRobots/Universal_Robots_Isaac_Driver)
+- [URSim](https://www.universal-robots.com/download/software-e-series/simulator-non-linux/) — Official UR offline simulator
+
+### Technical Documentation
+- [UR5e User Manual](https://s3-eu-west-1.amazonaws.com/ur-support-site/40971/UR5e_User_Manual_en_Global.pdf) (400+ pages)
+- [UR5e Technical Specs](https://www.universal-robots.com/media/1807465/ur5e_e-series_datasheets_web.pdf)
+
+### Related Benchmarks
+- **TSAQA** ([arXiv:2601.23204](https://arxiv.org/abs/2601.23204)) — 210k samples, 13 domains, broad but shallow
+- **PHM-Bench** ([arXiv:2508.02490](https://arxiv.org/abs/2508.02490)) — Prognostics evaluation framework
+- **OpenEQA** — Embodied Q&A, not industrial
+
+### LLM Evaluation
+- **LLM-Match** — Open-ended scoring with 0.91 human correlation ([OpenEQA protocol](https://arxiv.org/abs/2312.06648))
+- **ReConcile** ([arXiv:2309.13007](https://arxiv.org/abs/2309.13007)) — Multi-LLM consensus voting
+
+---
+
+## Quick Start
+
+### 1. Setup
+```powershell
+uv venv && uv pip install -e .
+cp .env.example .env  # Add Azure OpenAI keys
+```
+
+### 2. Run Existing Stage 1 (Telemetry Literacy)
+```powershell
+# Backend
+uvicorn factorybench.api.app:app --reload --port 5173
+
+# Frontend (separate terminal)
+cd frontend && npm install && npm run dev
+```
+
+### 3. Read the Paper Draft
+```
+docs/FactoryBench_NeurIPS_Paper_Draft.md
+```
+
+Section 4.2 (Pipeline Overview) is marked for expansion.
+
+---
+
+## Coral's Focus Areas
+
+### Priority 1: Q&A Pair Generation
+- [ ] Define question templates per level
+- [ ] Implement deterministic answer generation (Levels 1-2)
+- [ ] Setup Isaac Sim for UR5e fault scenarios (Levels 3-4)
+- [ ] Build RAG pipeline over UR5e manual (Level 5)
+
+### Priority 2: Evaluation Protocol
+- [ ] Implement LLM-Match scoring
+- [ ] Calibrate against human judgments
+- [ ] Design physical validation experiments
+
+### Priority 3: Scaling Beyond UR5e
+- [ ] Identify 2-3 additional machine families
+- [ ] Test template generalization
+- [ ] Document scalability findings
+
+---
+
+## Architecture Notes
+
+The existing codebase has a working **Stage 1 (Telemetry Literacy)** pipeline:
+- FastAPI backend with cost controls ($1/run, $20/day)
+- Real-time progress tracking
+- Azure OpenAI integration
+- Remix frontend with leaderboard
+
+**To extend for Q&A:** The `factorybench/eval/` and `factorybench/metrics/` modules need adapting from numeric error metrics to LLM-Match scoring.
+
+---
+
+**Maintainer:** Jonas Petersen
+**Researcher:** Coral
+**Organization:** Forgis AG
+**Version:** 0.3.0 (Feb 2026)
