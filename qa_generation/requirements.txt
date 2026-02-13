@@ -1,0 +1,9 @@
+ipykernel
+datasets
+faiss-cpu
+tiktoken
+openai
+python-dotenv
+pypdf
+numpy
+pyyaml
