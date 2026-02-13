@@ -28,7 +28,7 @@ This directory contains notebooks and scripts to generate Q&A pairs for FactoryB
 
 ## Running the Notebooks
 
-1. **Open `generate_qa.ipynb`** (or `generate_qa rag.ipynb`) and select the "QA Generation" kernel.
+1. **Open `generate_qa.ipynb`** and select the "qa_gen" kernel.
 
 ## Configuration
 
