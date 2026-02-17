@@ -6,7 +6,7 @@ UR3e schema specified in ur3e_schema.md. The script maps raw columns to the
 standardized schema, replacing missing values with null.
 
 Usage:
-    python -m factorybench.data.ur3e_normalizer --input <excel_file> --output <output_dir> [--episode-id <id>]
+    python -m src.data.ur3e_normalizer --input <excel_file> --output <output_dir> [--episode-id <id>]
 """
 
 import json

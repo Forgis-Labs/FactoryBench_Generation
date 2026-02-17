@@ -19,6 +19,10 @@ def main():
     parser_l1.add_argument("--min-dt-ms", type=int, default=100)
     parser_l1.add_argument("--max-dt-ms", type=int, default=2000)
     parser_l1.add_argument("--eps-q", type=float, default=1e-3)
+    parser_l1.add_argument("--eps-1", type=float, default=None, help="Threshold for Q1 (same position check)")
+    parser_l1.add_argument("--eps-2", type=float, default=None, help="Threshold for Q2 (friction check, percent)")
+    parser_l1.add_argument("--delta-1", type=int, default=None, help="Time window for Q2 (ms)")
+    parser_l1.add_argument("--eps-3", type=float, default=None, help="Threshold for Q4 external force detection")
     parser_l1.add_argument("--seed", type=int, default=None)
 
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -37,6 +41,10 @@ def main():
             max_dt_ms=args.max_dt_ms,
             eps_q=args.eps_q,
             seed=args.seed,
+            eps_1=args.eps_1,
+            eps_2=args.eps_2,
+            delta_1=args.delta_1,
+            eps_3=args.eps_3,
         )
     else:
         parser.print_help()
