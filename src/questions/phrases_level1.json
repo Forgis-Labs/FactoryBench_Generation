@@ -1,0 +1,18 @@
+[
+  "Has joint {axis} moved between {t1}ms and {t2}ms (threshold of {eps_q})?",
+  "Has joint {axis} friction increased between {t1}ms and {t2}ms?",
+  "What is the acceleration of the end effector at time {t}ms?",
+  "Is external force detected at time {t}ms?",
+  "What is the jerk of joint {axis} at time {t}ms?",
+  "What is the torque magnitude about axis {axis} at time {t}ms?",
+  "What is the end effector position at time {t}ms given the joint angles?",
+  "What is the end effector angular velocity at time {t}ms computed from joint velocities?",
+  "At what time does the end effector speed first exceed {X} in [{t1}ms, {t2}ms]?",
+  "Is the robot in a singular configuration at time {t}ms?",
+  "Is the robot near a singularity at time {t}ms (condition number > {X})?",
+  "At time {t}ms, which Cartesian direction is hardest to move in?",
+  "Is the robot closer to singularity at {t2}ms than at {t1}ms?",
+  "Is the robot in a wrist singularity at time {t}ms?",
+  "Is the robot in an elbow singularity at time {t}ms?",
+  "Is the robot in a shoulder singularity at time {t}ms?"
+]
