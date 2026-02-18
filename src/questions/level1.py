@@ -194,9 +194,9 @@ def answer_q1_position_check(
     interpolation_t1 = "exact" if before_t1 == after_t1 else "interpolated"
     interpolation_t2 = "exact" if before_t2 == after_t2 else "interpolated"
     reasoning = (
-        f"I define t1={t1_ms}ms and t2={t2_ms}ms. I computed the joint position q(t) for joint {axis}. "
+        f"I define t1={t1_ms}ms and t2={t2_ms}ms, and epsilon={eps_1}. I computed the joint position q(t) for joint {axis}. "
         f"At t1 I used an {interpolation_t1} value q(t1)={q_t1:.6f} rad, and at t2 I used an {interpolation_t2} value "
-        f"q(t2)={q_t2:.6f} rad. The displacement is Δq={delta_q:.6f} rad. With threshold eps_1={eps_1}, "
+        f"q(t2)={q_t2:.6f} rad. The displacement is Δq={delta_q:.6f} rad. With threshold epsilon={eps_1}, "
         f"this is {'>' if moved else '<='} the threshold, so the answer is {'Yes' if moved else 'No'}."
     )
     return {"answer": "Yes" if moved else "No", "reasoning": reasoning}
@@ -273,7 +273,7 @@ def answer_q2_friction_increase(
     
     if f1 is None or f2 is None:
         reasoning = (
-            f"I define t1={t1_ms}ms and t2={t2_ms}ms. I built symmetric windows around t1 and t2 and clipped them to the data range. "
+            f"I define t1={t1_ms}ms, t2={t2_ms}ms, epsilon={eps_2}, and delta={delta_1_ms}. I built symmetric windows around t1 and t2 and clipped them to the data range. "
             f"W1=[{w1_start:.1f},{w1_end:.1f}] ms (raw [{w1_start_raw:.1f},{w1_end_raw:.1f}]) and "
             f"W2=[{w2_start:.1f},{w2_end:.1f}] ms (raw [{w2_start_raw:.1f},{w2_end_raw:.1f}]). "
             "I then used all samples in each window to compute the friction proxy. "
@@ -281,19 +281,19 @@ def answer_q2_friction_increase(
         )
         return {"answer": "Unknown", "reasoning": reasoning}
 
-    # Decide: friction increased if f2/f1 > (1 + eps_2/100)
+    # Decide: friction increased if f2/f1 > (1 + epsilon/100)
     ratio = f2 / f1 if f1 != 0 else float('inf')
     threshold_ratio = 1.0 + (eps_2 / 100.0)
     increased = ratio > threshold_ratio
     
     reasoning = (
-        f"I define t1={t1_ms}ms and t2={t2_ms}ms. I built symmetric windows around t1 and t2 and clipped them to the data range. "
+        f"I define t1={t1_ms}ms, t2={t2_ms}ms, epsilon={eps_2}, and delta={delta_1_ms}. I built symmetric windows around t1 and t2 and clipped them to the data range. "
         f"W1=[{w1_start:.1f},{w1_end:.1f}] ms (raw [{w1_start_raw:.1f},{w1_end_raw:.1f}]) and "
         f"W2=[{w2_start:.1f},{w2_end:.1f}] ms (raw [{w2_start_raw:.1f},{w2_end_raw:.1f}]). "
         "I used joint speed and motor current and used all samples in each window. "
         f"The friction proxies are f1={float(f1):.6f} and f2={float(f2):.6f} (median of |I| / |v|). "
-        f"The ratio f2/f1={float(ratio):.6f}, and the threshold is 1 + eps_2 / 100 = {threshold_ratio:.6f} "
-        f"for eps_2={eps_2}%. Since the ratio is {'>' if increased else '<='} the threshold, the answer is {'Yes' if increased else 'No'}."
+        f"The ratio f2/f1={float(ratio):.6f}, and the threshold is 1 + epsilon / 100 = {threshold_ratio:.6f} "
+        f"for epsilon={eps_2}%. Since the ratio is {'>' if increased else '<='} the threshold, the answer is {'Yes' if increased else 'No'}."
     )
     return {"answer": "Yes" if increased else "No", "reasoning": reasoning}
 
@@ -349,7 +349,7 @@ def answer_q3_end_effector_accel(
         
         interp_mode = "exact" if before_idx == after_idx else "interpolated"
         reasoning = (
-            f"I define t1={t1_ms}ms and computed {interp_mode} three-axis accelerometer values "
+            f"I define t1={t1_ms}ms. I computed {interp_mode} three-axis accelerometer values "
             f"v=[{float(vib_0):.6f}, {float(vib_1):.6f}, {float(vib_2):.6f}] g. "
             f"Converting with g=9.81 m/s² gives a=[{float(accel_x):.6f}, {float(accel_y):.6f}, {float(accel_z):.6f}] m/s², "
             f"with magnitude {float(magnitude):.6f} m/s²."
@@ -382,9 +382,9 @@ def answer_q4_external_force(
     magnitude = np.sqrt(fx**2 + fy**2 + fz**2)
     detected = magnitude >= eps_3
     reasoning = (
-        f"I define t={t_ms}ms. I obtained the force components at t using the {source} with {interp_mode} values: "
+        f"I define t={t_ms}ms and epsilon={eps_3}. I obtained the force components at t using the {source} with {interp_mode} values: "
         f"Fx={fx:.6f} N, Fy={fy:.6f} N, Fz={fz:.6f} N. The magnitude is F=√(Fx² + Fy² + Fz²)={magnitude:.6f} N. "
-        f"The threshold eps_3={eps_3} N. Since F is {'>=' if detected else '<'} eps_3, "
+        f"The threshold epsilon={eps_3} N. Since F is {'>=' if detected else '<'} epsilon, "
         f"the answer is {'Yes' if detected else 'No'}."
     )
     return {"answer": "Yes" if detected else "No", "reasoning": reasoning}
@@ -445,8 +445,8 @@ def answer_q5_joint_jerk(
     reasoning = (
         f"I define t={t_ms}ms. I found the closest timestamp to t at {t_k}ms and used two samples on each side at "
         f"{t_km2}ms, {t_km1}ms, {t_kp1}ms, and {t_kp2}ms. Any common derivative estimation is acceptable; here I use central differences. "
-        f"I computed a₋={accel_km1:.6f} rad/s² = (v_k - v_km2) / Δt_-, and a₊={accel_kp1:.6f} rad/s² = (v_kp2 - v_k) / Δt_+. "
-        f"Then jerk j = (a₊ - a₋) / Δt = {jerk:.6f} rad/s³."
+        f"I computed a_minus={accel_km1:.6f} rad/s² = (v_k - v_km2) / delta_t_minus, and a_plus={accel_kp1:.6f} rad/s² = (v_kp2 - v_k) / delta_t_plus. "
+        f"Then jerk j = (a_plus - a_minus) / delta_t = {jerk:.6f} rad/s³."
     )
     return {"answer": jerk, "reasoning": reasoning}
 
