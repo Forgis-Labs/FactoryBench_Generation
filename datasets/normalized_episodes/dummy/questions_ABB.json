@@ -1,0 +1,262 @@
+[
+  {
+    "id": "L1-ABB-0001",
+    "question": {
+      "text": "Has joint 5 friction increased between 0.0ms and 90.0ms (threshold of 0.03 rad)? Calculate over a symmetric half window of 500.",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 5
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09000000000000001
+      }
+    },
+    "provenance": "deterministic"
+  },
+  {
+    "id": "L1-ABB-0002",
+    "question": {
+      "text": "Has joint 1 friction increased between 0.0ms and 90.0ms (threshold of 0.03 rad)? Calculate over a symmetric half window of 500.",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 1
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09
+      }
+    },
+    "provenance": "deterministic"
+  },
+  {
+    "id": "L1-ABB-0003",
+    "question": {
+      "text": "What is the acceleration of the end effector at time 0.0ms?",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 1
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09
+      }
+    },
+    "provenance": "deterministic"
+  },
+  {
+    "id": "L1-ABB-0004",
+    "question": {
+      "text": "What is the acceleration of the end effector at time 0.0ms?",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 0
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09000000000000002
+      }
+    },
+    "provenance": "deterministic"
+  },
+  {
+    "id": "L1-ABB-0005",
+    "question": {
+      "text": "Is joint 1 at the same position in 0.0ms and 90.0ms (threshold of 0.05 rad)?",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 1
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09
+      }
+    },
+    "provenance": "deterministic"
+  },
+  {
+    "id": "L1-ABB-0006",
+    "question": {
+      "text": "Is joint 4 at the same position in 0.0ms and 90.0ms (threshold of 0.05 rad)?",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 4
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09
+      }
+    },
+    "provenance": "deterministic"
+  },
+  {
+    "id": "L1-ABB-0007",
+    "question": {
+      "text": "What is the acceleration of the end effector at time 0.0ms?",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 4
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09
+      }
+    },
+    "provenance": "deterministic"
+  },
+  {
+    "id": "L1-ABB-0008",
+    "question": {
+      "text": "What is the acceleration of the end effector at time 0.0ms?",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 3
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09
+      }
+    },
+    "provenance": "deterministic"
+  },
+  {
+    "id": "L1-ABB-0009",
+    "question": {
+      "text": "Has joint 4 friction increased between 0.0ms and 90.0ms (threshold of 0.03 rad)? Calculate over a symmetric half window of 500.",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 4
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09
+      }
+    },
+    "provenance": "deterministic"
+  },
+  {
+    "id": "L1-ABB-0010",
+    "question": {
+      "text": "Is joint 5 at the same position in 0.0ms and 90.0ms (threshold of 0.05 rad)?",
+      "level": 1
+    },
+    "context": {
+      "episode": "datasets\\normalized_episodes\\dummy\\ABB.json",
+      "time_window": [
+        0.0,
+        90.0
+      ],
+      "joint": 5
+    },
+    "params": {
+      "eps_q": 0.001,
+      "method": "position"
+    },
+    "answer": {
+      "ground_truth": true,
+      "evidence": {
+        "displacement_rad": 0.09000000000000001
+      }
+    },
+    "provenance": "deterministic"
+  }
+]
