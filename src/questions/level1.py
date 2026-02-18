@@ -196,8 +196,8 @@ def answer_q1_position_check(
     reasoning = (
         f"I define t1={t1_ms}ms and t2={t2_ms}ms. I computed the joint position q(t) for joint {axis}. "
         f"At t1 I used an {interpolation_t1} value q(t1)={q_t1:.6f} rad, and at t2 I used an {interpolation_t2} value "
-        f"q(t2)={q_t2:.6f} rad. The displacement is delta_q={delta_q:.6f} rad. With the threshold epsilon_1={eps_1}, "
-        f"this is {'greater' if moved else 'not greater'} than the threshold, so the answer is {'Yes' if moved else 'No'}."
+        f"q(t2)={q_t2:.6f} rad. The displacement is Δq={delta_q:.6f} rad. With threshold eps_1={eps_1}, "
+        f"this is {'>' if moved else '<='} the threshold, so the answer is {'Yes' if moved else 'No'}."
     )
     return {"answer": "Yes" if moved else "No", "reasoning": reasoning}
 
@@ -291,9 +291,9 @@ def answer_q2_friction_increase(
         f"W1=[{w1_start:.1f},{w1_end:.1f}] ms (raw [{w1_start_raw:.1f},{w1_end_raw:.1f}]) and "
         f"W2=[{w2_start:.1f},{w2_end:.1f}] ms (raw [{w2_start_raw:.1f},{w2_end_raw:.1f}]). "
         "I used joint speed and motor current and used all samples in each window. "
-        f"The friction proxies are f1={float(f1):.6f} and f2={float(f2):.6f} (median of absolute current divided by absolute speed). "
-        f"The ratio f2/f1={float(ratio):.6f}, and the threshold is 1 plus epsilon_2 divided by 100, which is {threshold_ratio:.6f} "
-        f"for epsilon_2={eps_2} percent. Since the ratio is {'greater' if increased else 'not greater'} than the threshold, the answer is {'Yes' if increased else 'No'}."
+        f"The friction proxies are f1={float(f1):.6f} and f2={float(f2):.6f} (median of |I| / |v|). "
+        f"The ratio f2/f1={float(ratio):.6f}, and the threshold is 1 + eps_2 / 100 = {threshold_ratio:.6f} "
+        f"for eps_2={eps_2}%. Since the ratio is {'>' if increased else '<='} the threshold, the answer is {'Yes' if increased else 'No'}."
     )
     return {"answer": "Yes" if increased else "No", "reasoning": reasoning}
 
@@ -313,6 +313,53 @@ def answer_q3_end_effector_accel(
         reasoning = (
             f"I define t1={t1_ms}ms. I looked for samples bracketing t1 to interpolate vibration, but none were found, "
             "so acceleration cannot be estimated. Answer: Unknown."
+        )
+        return {"answer": "Unknown", "reasoning": reasoning}
+
+    try:
+        if before_idx == after_idx:
+            # Exact sample
+            vib_0 = float(rows[before_idx]["vibration_0"])
+            vib_1 = float(rows[before_idx]["vibration_1"])
+            vib_2 = float(rows[before_idx]["vibration_2"])
+        else:
+            # Interpolate each axis
+            t_before = float(rows[before_idx]["timestamp_ms"])
+            t_after = float(rows[after_idx]["timestamp_ms"])
+            
+            v0_before = float(rows[before_idx]["vibration_0"])
+            v0_after = float(rows[after_idx]["vibration_0"])
+            vib_0 = interpolate_value(t1_ms, t_before, v0_before, t_after, v0_after)
+            
+            v1_before = float(rows[before_idx]["vibration_1"])
+            v1_after = float(rows[after_idx]["vibration_1"])
+            vib_1 = interpolate_value(t1_ms, t_before, v1_before, t_after, v1_after)
+            
+            v2_before = float(rows[before_idx]["vibration_2"])
+            v2_after = float(rows[after_idx]["vibration_2"])
+            vib_2 = interpolate_value(t1_ms, t_before, v2_before, t_after, v2_after)
+        
+        # Convert from g to m/s^2
+        G = 9.81
+        accel_x = vib_0 * G
+        accel_y = vib_1 * G
+        accel_z = vib_2 * G
+        
+        magnitude = np.sqrt(accel_x**2 + accel_y**2 + accel_z**2)
+        
+        interp_mode = "exact" if before_idx == after_idx else "interpolated"
+        reasoning = (
+            f"I define t1={t1_ms}ms and computed {interp_mode} three-axis accelerometer values "
+            f"v=[{float(vib_0):.6f}, {float(vib_1):.6f}, {float(vib_2):.6f}] g. "
+            f"Converting with g=9.81 m/s² gives a=[{float(accel_x):.6f}, {float(accel_y):.6f}, {float(accel_z):.6f}] m/s², "
+            f"with magnitude {float(magnitude):.6f} m/s²."
+        )
+        return {"answer": [accel_x, accel_y, accel_z], "reasoning": reasoning}
+        
+    except (KeyError, TypeError, ValueError) as e:
+        reasoning = (
+            f"I define t1={t1_ms}ms. I attempted to read the three-axis accelerometer values around t1 but encountered missing or non-numeric values ({e}). "
+            "Answer: Unknown."
         )
         return {"answer": "Unknown", "reasoning": reasoning}
 
@@ -336,8 +383,8 @@ def answer_q4_external_force(
     detected = magnitude >= eps_3
     reasoning = (
         f"I define t={t_ms}ms. I obtained the force components at t using the {source} with {interp_mode} values: "
-        f"Fx={fx:.6f} N, Fy={fy:.6f} N, Fz={fz:.6f} N. The force magnitude is {magnitude:.6f} N. "
-        f"The threshold epsilon_3 is {eps_3}. Since the magnitude is {'greater than or equal to' if detected else 'less than'} the threshold, "
+        f"Fx={fx:.6f} N, Fy={fy:.6f} N, Fz={fz:.6f} N. The magnitude is F=√(Fx² + Fy² + Fz²)={magnitude:.6f} N. "
+        f"The threshold eps_3={eps_3} N. Since F is {'>=' if detected else '<'} eps_3, "
         f"the answer is {'Yes' if detected else 'No'}."
     )
     return {"answer": "Yes" if detected else "No", "reasoning": reasoning}
@@ -398,9 +445,8 @@ def answer_q5_joint_jerk(
     reasoning = (
         f"I define t={t_ms}ms. I found the closest timestamp to t at {t_k}ms and used two samples on each side at "
         f"{t_km2}ms, {t_km1}ms, {t_kp1}ms, and {t_kp2}ms. Any common derivative estimation is acceptable; here I use central differences. "
-        f"I computed acceleration at the earlier side as a_minus={accel_km1:.6f} rad/s^2 using velocities v_k={v_k:.6f} and v_km2={v_km2:.6f}, "
-        f"and at the later side as a_plus={accel_kp1:.6f} rad/s^2 using v_kp2={v_kp2:.6f} and v_k={v_k:.6f}. I then computed jerk as "
-        f"j={jerk:.6f} rad/s^3 using the time gap between {t_km1}ms and {t_kp1}ms."
+        f"I computed a₋={accel_km1:.6f} rad/s² = (v_k - v_km2) / Δt_-, and a₊={accel_kp1:.6f} rad/s² = (v_kp2 - v_k) / Δt_+. "
+        f"Then jerk j = (a₊ - a₋) / Δt = {jerk:.6f} rad/s³."
     )
     return {"answer": jerk, "reasoning": reasoning}
 
@@ -427,58 +473,10 @@ def answer_q6_torque_magnitude(
     torque = values[0]
     magnitude = abs(torque)
     reasoning = (
-        f"I define t={t_ms}ms. I obtained the torque component about axis {axis_label} at t using the {source} with {interp_mode} values. "
-        f"The torque component is {torque:.6f} Nm, so the magnitude is {magnitude:.6f} Nm."
+        f"I define t={t_ms}ms. I obtained the torque component about axis {axis_label} at t using the {source} with {interp_mode} values: "
+        f"τ={torque:.6f} Nm, |τ|={magnitude:.6f} Nm."
     )
     return {"answer": magnitude, "reasoning": reasoning}
-    
-    try:
-        if before_idx == after_idx:
-            # Exact sample
-            vib_0 = float(rows[before_idx]["vibration_0"])
-            vib_1 = float(rows[before_idx]["vibration_1"])
-            vib_2 = float(rows[before_idx]["vibration_2"])
-        else:
-            # Interpolate each axis
-            t_before = float(rows[before_idx]["timestamp_ms"])
-            t_after = float(rows[after_idx]["timestamp_ms"])
-            
-            v0_before = float(rows[before_idx]["vibration_0"])
-            v0_after = float(rows[after_idx]["vibration_0"])
-            vib_0 = interpolate_value(t1_ms, t_before, v0_before, t_after, v0_after)
-            
-            v1_before = float(rows[before_idx]["vibration_1"])
-            v1_after = float(rows[after_idx]["vibration_1"])
-            vib_1 = interpolate_value(t1_ms, t_before, v1_before, t_after, v1_after)
-            
-            v2_before = float(rows[before_idx]["vibration_2"])
-            v2_after = float(rows[after_idx]["vibration_2"])
-            vib_2 = interpolate_value(t1_ms, t_before, v2_before, t_after, v2_after)
-        
-        # Convert from g to m/s^2
-        G = 9.81
-        accel_x = vib_0 * G
-        accel_y = vib_1 * G
-        accel_z = vib_2 * G
-        
-        magnitude = np.sqrt(accel_x**2 + accel_y**2 + accel_z**2)
-        
-        interp_mode = "exact" if before_idx == after_idx else "interpolated"
-        reasoning = (
-            f"I read the three-axis accelerometer signal in g around time 1={t1_ms}ms and computed {interp_mode} values "
-            f"v=[{float(vib_0):.6f}, {float(vib_1):.6f}, {float(vib_2):.6f}] g. "
-            f"Converting with 9.81 meters per second squared per g gives a=[{float(accel_x):.6f}, {float(accel_y):.6f}, {float(accel_z):.6f}] m/s^2, "
-            f"with magnitude {float(magnitude):.6f} m/s^2."
-        )
-        return {"answer": [accel_x, accel_y, accel_z], "reasoning": reasoning}
-        
-    except (KeyError, TypeError, ValueError) as e:
-        reasoning = (
-            f"I attempted to read the three-axis accelerometer values around time 1={t1_ms}ms but encountered missing or non-numeric values ({e}). "
-            "Answer: Unknown."
-        )
-        return {"answer": "Unknown", "reasoning": reasoning}
-
 
 
 def pick_time_window(rows: List[Dict[str, Any]], min_dt_ms: int, max_dt_ms: int) -> Tuple[int, int]:
