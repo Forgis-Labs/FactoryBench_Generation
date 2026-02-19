@@ -1,0 +1,24 @@
+{
+  "timestamp_ms": ["timestamp"],
+
+  "setpoint_pos_{axis}": ["targetq{axis}"],
+  "setpoint_speed_{axis}": ["targetqd{axis}"],
+  "setpoint_acc_{axis}": ["targetqdd{axis}"],
+
+  "feedback_pos_{axis}": ["actualq{axis}"],
+  "feedback_speed_{axis}": ["actualqd{axis}"],
+  "effort_current_{axis}": ["actual current{axis}"],
+
+  "setpoint_tcp_{i}": ["targetTCPpose{i}"],
+
+  "est_contact_force_{i}": ["actualTCPforce{i}"],
+
+  "vibration_{k}": ["actual toolaccelerometer{k}"],
+
+  "joint_temp_{axis}": ["jointtemperatures{axis}"],
+
+  "main_voltage": ["actualmainvoltage"],
+  "safety_mode": ["safetymode"],
+
+  "fault_label": ["label"]
+}
