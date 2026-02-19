@@ -473,7 +473,7 @@ def answer_q6_torque_magnitude(
     torque = values[0]
     magnitude = abs(torque)
     reasoning = (
-        f"I define t={t_ms}ms. I obtained the torque component about axis {axis_label} at t using the {source} with {interp_mode} values: "
+        f"I define t={t_ms}ms. Axis {axis_label} corresponds to wrench {idx}. I obtained the torque component about axis {axis_label} at t using the {source} with {interp_mode} values: "
         f"τ={torque:.6f} Nm, |τ|={magnitude:.6f} Nm."
     )
     return {"answer": magnitude, "reasoning": reasoning}
