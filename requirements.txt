@@ -52,6 +52,7 @@ multiprocess==0.70.18
 munkres==1.1.4
 mypy @ file:///D:/bld/mypy-split_1765794562378/work
 mypy_extensions @ file:///home/conda/feedstock_root/build_artifacts/mypy_extensions_1745776566517/work
+numexpr @ file:///D:/bld/numexpr_1764766595726/work
 numpy @ file:///D:/bld/bld/rattler-build_numpy_1770098414/work/dist/numpy-2.4.2-cp314-cp314-win_amd64.whl#sha256=0d51b3d051edbd39a4738031c2ace384a9830899342594bc789136230a789926
 openai==2.21.0
 openpyxl @ file:///D:/bld/openpyxl_1769121986488/work
@@ -63,6 +64,7 @@ pillow @ file:///D:/bld/bld/rattler-build_pillow_1770794018/work
 pluggy @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_pluggy_1764896838/work
 propcache==0.4.1
 psutil @ file:///D:/bld/bld/rattler-build_psutil_1769678167/work
+py-cpuinfo @ file:///home/conda/feedstock_root/build_artifacts/py-cpuinfo_1733236359728/work
 pyarrow==23.0.1
 pydantic @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_pydantic_1764434463/work
 pydantic-extra-types @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_pydantic-extra-types_1770023146/work
@@ -89,6 +91,7 @@ six @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_six_17
 sniffio @ file:///home/conda/feedstock_root/build_artifacts/sniffio_1762941432086/work
 starlette @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_starlette_1768919444/work
 statsmodels @ file:///D:/bld/statsmodels_1764983000779/work
+tables @ file:///D:/bld/pytables_1770023525784/work
 threadpoolctl==3.6.0
 tomli @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_tomli_1768146676/work
 tornado @ file:///D:/bld/tornado_1765836441652/work

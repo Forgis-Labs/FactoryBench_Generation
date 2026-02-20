@@ -186,6 +186,60 @@ Section 4.2 (Pipeline Overview) is marked for expansion.
 
 ---
 
+## Dataset Installation and Normalization
+
+### 1. Install AURSAD dataset (HDF5 → CSV)
+
+Download and convert the AURSAD dataset from Zenodo. By default it exports the full dataset; use `--max-timestamps` to limit:
+
+```powershell
+# Export full dataset
+python -m src.data.data_installation.install_aursad
+
+# Export first 100,000 timestamps
+python -m src.data.data_installation.install_aursad --max-timestamps 100000
+```
+
+**Note:** The download is full (~2.6M timestamps), but the CSV export respects `--max-timestamps` to cap rows without re-downloading.
+
+### 2. Normalize CSV to UR3e JSON schema
+
+Stream the CSV in chunks and write a single normalized JSON file. Each row is one timestep; use `--episode-size` to group rows into episodes:
+
+```powershell
+# Stream 100 episodes (100 rows = 100 episodes)
+python -m src.data.data_normalization.mapped_dataset_normalizer \
+  --dataset aursad \
+  --input datasets/open_datasets/aursad/AURSAD.csv \
+  --output datasets/normalized_episodes \
+  --max-episodes 100
+```
+
+```powershell
+# Stream 100 episodes with 10 rows per episode
+python -m src.data.data_normalization.mapped_dataset_normalizer \
+  --dataset aursad \
+  --input datasets/open_datasets/aursad/AURSAD.csv \
+  --output datasets/normalized_episodes \
+  --max-episodes 100 \
+  --episode-size 10
+```
+
+### How normalization works
+
+- **Without `--episode-column`**: Streams CSV in 10K-row batches, groups rows by `--episode-size` (default: 1), writes single `<dataset>.json` file.
+- **With `--episode-column`**: Streams chunks and groups by unique values in the column, writes separate JSON per episode group.
+- Mapping files live in `datasets/mappings_of_features/<dataset>.json`—define source→target column mappings.
+- Output JSON matches UR3e schema: `[{col1: val, col2: val, ...}, ...]`.
+- Use `--no-metadata` to skip `_metadata.json`.
+- Use `-v` for verbose logging.
+
+### Supported datasets
+
+- **aursad** (raw: Zenodo HDF5, mapping: `datasets/mappings_of_features/aursad.json`)
+
+---
+
 ## Dataset Normalization (CSV → JSON)
 
 Use the mapper to convert a raw CSV into the UR3e schema. When `--episode-column` is provided, the CSV is streamed in chunks and grouped into episodes.
