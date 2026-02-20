@@ -1,0 +1,10 @@
+{
+  "episode_id": "aursad",
+  "source_file": "AURSAD.csv",
+  "num_samples": 100,
+  "num_episodes": 100,
+  "schema": "ur3e_v1",
+  "first_timestamp_ms": null,
+  "last_timestamp_ms": null,
+  "duration_ms": null
+}
