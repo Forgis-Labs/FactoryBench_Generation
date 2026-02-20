@@ -62,6 +62,7 @@ yarn-error.log*
 
 # data
 datasets/open_datasets/*
+datasets/questions/*
 
 #simulation files
 sim/*
