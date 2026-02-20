@@ -49,14 +49,25 @@ def download(url: str, out_path: Path) -> None:
                         pbar.update(len(chunk))
 
 
-def dataset_to_dataframe(ds: h5py.Dataset, prefix: str) -> pd.DataFrame:
-    data = ds[...]
+def dataset_to_dataframe(
+    ds: h5py.Dataset,
+    prefix: str,
+    target_rows: Optional[int],
+) -> pd.DataFrame:
+    if target_rows is not None and ds.shape and len(ds.shape) > 0:
+        data = ds[:target_rows]
+    else:
+        data = ds[...]
 
     if np.isscalar(data):
+        if target_rows is not None:
+            return pd.DataFrame({f"{prefix}__value": [data] * target_rows})
         return pd.DataFrame({f"{prefix}__value": [data]})
 
     if data.dtype.fields is not None:
         df = pd.DataFrame(data)
+        if target_rows is not None:
+            df = df.iloc[:target_rows]
         return df.add_prefix(f"{prefix}__")
 
     if data.ndim == 1:
@@ -97,7 +108,18 @@ def main() -> None:
         default=None,
         help="Optional CSV path (default: <out-dir>/AURSAD.csv)",
     )
-    ap.add_argument("--max-rows", type=int, default=None, help="Optional row limit per dataset")
+    ap.add_argument(
+        "--max-timestamps",
+        type=int,
+        default=None,
+        help="Optional limit on number of timestamps (rows) to export",
+    )
+    ap.add_argument(
+        "--max-rows",
+        type=int,
+        default=None,
+        help="(Deprecated) Use --max-timestamps instead",
+    )
     ap.add_argument("--skip-md5", action="store_true", help="Skip checksum verification")
     args = ap.parse_args()
 
@@ -105,7 +127,10 @@ def main() -> None:
     h5_path = out_dir / "AURSAD.h5"
     csv_path = Path(args.csv_path).resolve() if args.csv_path else out_dir / "aursad.csv"
 
-    download(AURSAD_H5_URL, h5_path)
+    if h5_path.exists():
+        print(f"Found existing dataset: {h5_path}")
+    else:
+        download(AURSAD_H5_URL, h5_path)
 
     if not args.skip_md5:
         got = md5sum(h5_path)
@@ -117,37 +142,67 @@ def main() -> None:
                 "Delete the file and rerun to re-download."
             )
 
+    if args.max_timestamps is not None and args.max_timestamps < 1:
+        raise ValueError("--max-timestamps must be >= 1")
+
+    max_timestamps = args.max_timestamps
+    if max_timestamps is None and args.max_rows is not None:
+        max_timestamps = args.max_rows
+
     metadata: Dict[str, Dict[str, Any]] = {}
-    frames: List[pd.DataFrame] = []
 
-    with h5py.File(h5_path, "r") as f:
-        datasets = collect_datasets(f)
-        for ds in tqdm(datasets, desc="Converting datasets", unit="dataset"):
-            h5_dataset_path = ds.name
-            prefix = h5_dataset_path.strip("/").replace("/", "__")
-            df = dataset_to_dataframe(ds, prefix)
+    data_frame: Optional[pd.DataFrame] = None
+    with pd.HDFStore(h5_path, mode="r") as store:
+        if "/complete_data" in store.keys():
+            storer = store.get_storer("complete_data")
+            if storer is not None and storer.is_table and max_timestamps is not None:
+                data_frame = store.select("complete_data", stop=max_timestamps)
+            else:
+                data_frame = store["complete_data"]
+                if max_timestamps is not None:
+                    data_frame = data_frame.head(max_timestamps)
 
-            if args.max_rows is not None:
-                df = df.head(args.max_rows)
-
-            frames.append(df)
-            metadata[h5_dataset_path] = {
-                "prefix": prefix,
-                "shape": list(ds.shape),
-                "dtype": str(ds.dtype),
+            metadata["/complete_data"] = {
+                "rows_exported": int(len(data_frame)),
+                "columns": list(data_frame.columns),
+                "dtypes": {col: str(dtype) for col, dtype in data_frame.dtypes.items()},
             }
 
-    if frames:
-        combined = pd.concat(frames, axis=1)
+    if data_frame is None:
+        frames: List[pd.DataFrame] = []
+        with h5py.File(h5_path, "r") as f:
+            datasets = collect_datasets(f)
+            lengths: List[int] = []
+            for ds in datasets:
+                if ds.shape and len(ds.shape) > 0 and ds.shape[0] > 1:
+                    lengths.append(ds.shape[0])
+
+            base_len = min(lengths) if lengths else 1
+            target_rows = base_len if max_timestamps is None else min(max_timestamps, base_len)
+
+            for ds in tqdm(datasets, desc="Converting datasets", unit="dataset"):
+                h5_dataset_path = ds.name
+                prefix = h5_dataset_path.strip("/").replace("/", "__")
+                df = dataset_to_dataframe(ds, prefix, target_rows)
+
+                frames.append(df)
+                metadata[h5_dataset_path] = {
+                    "prefix": prefix,
+                    "shape": list(ds.shape),
+                    "dtype": str(ds.dtype),
+                    "rows_exported": target_rows,
+                }
+
+        if frames:
+            data_frame = pd.concat(frames, axis=1)
+
+    if data_frame is not None:
         csv_path.parent.mkdir(parents=True, exist_ok=True)
-        combined.to_csv(csv_path, index=False)
+        data_frame.to_csv(csv_path, index=False)
 
     index_path = csv_path.with_suffix(".index.json")
     with index_path.open("w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)
-
-    if h5_path.exists():
-        h5_path.unlink()
 
     print(f"OK: {h5_path}")
     print(f"CSV: {csv_path}")

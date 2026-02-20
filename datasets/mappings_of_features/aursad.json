@@ -2,24 +2,52 @@
   "mapping": {
     "timestamp_ms": "timestamp",
 
-    "setpoint_pos_{axis}": "targetq{axis}",
-    "setpoint_speed_{axis}": "targetqd{axis}",
-    "setpoint_acc_{axis}": "targetqdd{axis}",
+    "setpoint_pos_{axis}": "target_q_{axis}",
+    "setpoint_speed_{axis}": "target_qd_{axis}",
+    "setpoint_acc_{axis}": "target_qdd_{axis}",
 
-    "feedback_pos_{axis}": "actualq{axis}",
-    "feedback_speed_{axis}": "actualqd{axis}",
-    "effort_current_{axis}": "actual current{axis}",
+    "feedback_pos_{axis}": "actual_q_{axis}",
+    "feedback_speed_{axis}": "actual_qd_{axis}",
 
-    "setpoint_tcp_{i}": "targetTCPpose{i}",
+    "effort_current_{axis}": "actual_current_{axis}",
+    "effort_target_current_{axis}": "target_current_{axis}",
+    "effort_target_torque_{axis}": "target_moment_{axis}",
 
-    "est_contact_force_{i}": "actualTCPforce{i}",
+    "control_output_{axis}": "joint_control_output_{axis}",
 
-    "vibration_{k}": "actual toolaccelerometer{k}",
+    "setpoint_tcp_{i}": "target_TCP_pose_{i}",
+    "setpoint_tcp_speed_{i}": "target_TCP_speed_{i}",
 
-    "joint_temp_{axis}": "jointtemperatures{axis}",
+    "feedback_tcp_{i}": "actual_TCP_pose_{i}",
+    "feedback_tcp_speed_{i}": "actual_TCP_speed_{i}",
 
-    "main_voltage": "actualmainvoltage",
-    "safety_mode": "safetymode",
+    "est_contact_force_{i}": "actual_TCP_force_{i}",
+
+    "vibration_{k}": "actual_tool_accelerometer_{k}",
+
+    "joint_temp_{axis}": "joint_temperatures_{axis}",
+
+    "execution_time": "actual_execution_time",
+
+    "robot_mode": "robot_mode",
+    "joint_mode_{axis}": "joint_mode_{axis}",
+    "safety_mode": "safety_mode",
+
+    "tool_momentum": "actual_momentum",
+
+    "main_voltage": "actual_main_voltage",
+    "robot_voltage": "actual_robot_voltage",
+    "robot_current": "actual_robot_current",
+
+    "joint_voltage_{axis}": "actual_joint_voltage_{axis}",
+
+    "speed_scaling": "speed_scaling",
+    "target_speed_fraction": "target_speed_fraction",
+
+    "digital_input_bits": "actual_digital_input_bits",
+    "digital_output_bits": "actual_digital_output_bits",
+
+    "runtime_state": "runtime_state",
 
     "fault_label": "label"
   },
