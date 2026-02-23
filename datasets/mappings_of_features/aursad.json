@@ -147,7 +147,7 @@
 
     "fault_label": "label"
   },
-
+  "machine_id": 0,
   "faults": {
     "0": 0,
     "1": 16,

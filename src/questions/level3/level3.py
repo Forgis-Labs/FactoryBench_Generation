@@ -104,7 +104,7 @@ def generate_level3_questions(
 	root_causes_path: Path,
 	anomalies_path: Path,
 	min_len: int = 32,
-	max_len: int = 128,
+	max_len: int = 64,
 	samples_per_episode: int = 1,
 	seed: Optional[int] = None,
 ) -> None:
@@ -126,6 +126,12 @@ def generate_level3_questions(
 		if not isinstance(rows, list):
 			logger.warning(f"Skipping non-list episode: {episode_path}")
 			continue
+
+		# Load metadata if it exists
+		metadata_path = episode_path.parent / f"{episode_path.stem}_metadata.json"
+		metadata = None
+		if metadata_path.exists():
+			metadata = load_json(metadata_path)
 
 		# Extract experiment number from filename (e.g., "experiment_1.json" -> "1")
 		episode_stem = episode_path.stem
@@ -155,8 +161,9 @@ def generate_level3_questions(
 				"question": question,
 				"time_series": strip_null_features(subseries),
 				"root_cause": root_cause,
-				"anomalies": anomalies_list,
+				"possible_anomalies": anomalies_list,
 				"source_episode": episode_path.name,
+				"metadata": metadata,
 			}
 			with out_file.open("w", encoding="utf-8") as f:
 				json.dump(item, f, indent=2)
@@ -187,7 +194,7 @@ def main() -> None:
 	parser.add_argument(
 		"--max-len",
 		type=int,
-		default=128,
+		default=64,
 		help="Maximum subseries length",
 	)
 	parser.add_argument(
