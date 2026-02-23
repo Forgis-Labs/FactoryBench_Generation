@@ -47,7 +47,7 @@ def expand_mapping(mapping: Dict[str, str]) -> Dict[str, str]:
     return expanded
 
 
-def load_mapping(dataset_name: str, repo_root: Path) -> Tuple[Dict[str, str], List[str], Dict[str, Any]]:
+def load_mapping(dataset_name: str, repo_root: Path) -> Tuple[Dict[str, str], List[str], Dict[str, Any], Optional[int]]:
     mapping_path = repo_root / "datasets" / "mappings_of_features" / f"{dataset_name}.json"
     if not mapping_path.exists():
         raise FileNotFoundError(f"Mapping file not found: {mapping_path}")
@@ -58,7 +58,8 @@ def load_mapping(dataset_name: str, repo_root: Path) -> Tuple[Dict[str, str], Li
     mapping = expand_mapping(config.get("mapping", {}))
     absent = config.get("absent", [])
     faults = config.get("faults", {})
-    return mapping, absent, faults
+    machine_id = config.get("machine_id")
+    return mapping, absent, faults, machine_id
 
 
 def find_input_csvs(dataset_name: str, repo_root: Path, input_path: Optional[Path]) -> List[Path]:
@@ -168,6 +169,7 @@ def write_episode(
     episode_id: str,
     source_file: str,
     include_metadata: bool,
+    machine_id: Optional[int] = None,
 ) -> str:
     output_dir.mkdir(parents=True, exist_ok=True)
     episode_rows = remove_null_features(episode_rows)
@@ -178,7 +180,6 @@ def write_episode(
     if include_metadata:
         first_ts = episode_rows[0].get("timestamp_ms") if episode_rows else None
         last_ts = episode_rows[-1].get("timestamp_ms") if episode_rows else None
-        machine_id = episode_rows[0].get("machine_id") if episode_rows else None
         metadata = {
             "episode_id": episode_id,
             "source_file": source_file,
@@ -202,6 +203,7 @@ def write_episode_streaming(
     episode_id: str,
     source_file: str,
     include_metadata: bool,
+    machine_id: Optional[int] = None,
 ) -> str:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f"{episode_id}.json"
@@ -231,7 +233,6 @@ def write_episode_streaming(
         f.write("\n]\n")
 
     if include_metadata:
-        machine_id = all_rows[0].get("machine_id") if all_rows else None
         metadata = {
             "episode_id": episode_id,
             "source_file": source_file,
@@ -260,7 +261,7 @@ def normalize_dataset(
     output_basename: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     repo_root = Path(__file__).resolve().parents[3]
-    mapping, absent, faults = load_mapping(dataset_name, repo_root)
+    mapping, absent, faults, machine_id = load_mapping(dataset_name, repo_root)
     schema_fields = build_schema_fields(mapping, absent)
 
     results: List[Dict[str, str]] = []
@@ -277,7 +278,6 @@ def normalize_dataset(
                 self.num_samples = 0
                 self.first_ts = None
                 self.last_ts = None
-                self.machine_id = None
 
             def write_row(self, row_dict: Dict[str, Any]) -> None:
                 if not self.first:
@@ -290,8 +290,6 @@ def normalize_dataset(
                     if self.first_ts is None:
                         self.first_ts = ts
                     self.last_ts = ts
-                if self.machine_id is None:
-                    self.machine_id = row_dict.get("machine_id")
 
             def close(self) -> None:
                 self.handle.write("\n]\n")
@@ -343,7 +341,7 @@ def normalize_dataset(
                     "duration_ms": (writer.last_ts - writer.first_ts)
                     if (writer.first_ts is not None and writer.last_ts is not None)
                     else None,
-                    "machine_id": writer.machine_id,
+                    "machine_id": machine_id,
                 }
                 metadata_file = output_dir / f"{writer.episode_id}_metadata.json"
                 with metadata_file.open("w", encoding="utf-8") as f:
@@ -399,7 +397,6 @@ def normalize_dataset(
         if include_metadata:
             first_ts = all_rows[0].get("timestamp_ms") if all_rows else None
             last_ts = all_rows[-1].get("timestamp_ms") if all_rows else None
-            machine_id = all_rows[0].get("machine_id") if all_rows else None
             metadata = {
                 "episode_id": output_name,
                 "source_file": input_csv.name,

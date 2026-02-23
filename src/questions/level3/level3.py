@@ -58,6 +58,17 @@ def load_anomalies(path: Path) -> Dict[str, Dict[str, Any]]:
 	return by_name
 
 
+def load_machines(path: Path) -> Dict[int, Dict[str, Any]]:
+	machines = load_json(path)
+	by_id: Dict[int, Dict[str, Any]] = {}
+	if isinstance(machines, list):
+		for item in machines:
+			mid = item.get("machine_id")
+			if isinstance(mid, int):
+				by_id[mid] = item
+	return by_id
+
+
 def pick_fault_label(rows: List[Dict[str, Any]]) -> int:
 	labels: List[int] = []
 	for row in rows:
@@ -81,7 +92,22 @@ def sample_subseries(rows: List[Dict[str, Any]], min_len: int, max_len: int) -> 
 	if size <= 0:
 		return rows
 	start = random.randint(0, length - size)
-	return rows[start : start + size]
+	subseries = rows[start : start + size]
+	
+	# Normalize timestamp_ms to start at 0
+	if subseries and "timestamp_ms" in subseries[0]:
+		first_ts = subseries[0].get("timestamp_ms")
+		if first_ts is not None:
+			try:
+				first_ts = float(first_ts)
+				subseries = [
+					{**row, "timestamp_ms": float(row.get("timestamp_ms", 0)) - first_ts if row.get("timestamp_ms") is not None else None}
+					for row in subseries
+				]
+			except (TypeError, ValueError):
+				pass
+	
+	return subseries
 
 
 def strip_null_features(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -103,6 +129,7 @@ def generate_level3_questions(
 	phrases_path: Path,
 	root_causes_path: Path,
 	anomalies_path: Path,
+	machines_path: Path,
 	min_len: int = 32,
 	max_len: int = 64,
 	samples_per_episode: int = 1,
@@ -114,6 +141,7 @@ def generate_level3_questions(
 	phrases = load_phrases(phrases_path)
 	root_causes = load_root_causes(root_causes_path)
 	anomalies = load_anomalies(anomalies_path)
+	machines = load_machines(machines_path)
 
 	output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -157,6 +185,14 @@ def generate_level3_questions(
 			question = random.choice(phrases)
 
 			out_file = output_dir / f"experiment_{exp_id}_prompt_{sample_idx}.json"
+			
+			# Get the machine object corresponding to the machine_id from metadata
+			machine_obj = None
+			if metadata:
+				machine_id = metadata.get("machine_id")
+				if isinstance(machine_id, int) and machine_id in machines:
+					machine_obj = machines[machine_id]
+			
 			item = {
 				"question": question,
 				"time_series": strip_null_features(subseries),
@@ -164,6 +200,7 @@ def generate_level3_questions(
 				"possible_anomalies": anomalies_list,
 				"source_episode": episode_path.name,
 				"metadata": metadata,
+				"machine": machine_obj,
 			}
 			with out_file.open("w", encoding="utf-8") as f:
 				json.dump(item, f, indent=2)
@@ -216,6 +253,7 @@ def main() -> None:
 	phrases_path = Path(__file__).with_name("phrases_level3.json")
 	root_causes_path = repo_root / "datasets" / "rca" / "root_causes.json"
 	anomalies_path = repo_root / "datasets" / "rca" / "anomalies.json"
+	machines_path = repo_root / "datasets" / "machines" / "machines.json"
 
 	generate_level3_questions(
 		input_dir=args.input,
@@ -223,6 +261,7 @@ def main() -> None:
 		phrases_path=phrases_path,
 		root_causes_path=root_causes_path,
 		anomalies_path=anomalies_path,
+		machines_path=machines_path,
 		min_len=args.min_len,
 		max_len=args.max_len,
 		samples_per_episode=args.samples_per_episode,
