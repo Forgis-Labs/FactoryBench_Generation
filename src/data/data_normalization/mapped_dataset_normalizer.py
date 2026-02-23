@@ -60,15 +60,24 @@ def load_mapping(dataset_name: str, repo_root: Path) -> Tuple[Dict[str, str], Li
     return mapping, absent
 
 
-def find_input_csv(dataset_name: str, repo_root: Path, input_path: Optional[Path]) -> Path:
+def find_input_csvs(dataset_name: str, repo_root: Path, input_path: Optional[Path]) -> List[Path]:
     if input_path:
-        return input_path
+        if input_path.is_dir():
+            csv_files = sorted(input_path.glob("experiment_*.csv"))
+            if not csv_files:
+                csv_files = sorted(input_path.glob("*.csv"))
+            if not csv_files:
+                raise FileNotFoundError(f"No CSV files found in {input_path}")
+            return csv_files
+        return [input_path]
 
     dataset_dir = repo_root / "datasets" / "open_datasets" / dataset_name
-    csv_files = sorted(dataset_dir.glob("*.csv"))
+    csv_files = sorted(dataset_dir.glob("experiment_*.csv"))
+    if not csv_files:
+        csv_files = sorted(dataset_dir.glob("*.csv"))
     if not csv_files:
         raise FileNotFoundError(f"No CSV files found in {dataset_dir}")
-    return csv_files[0]
+    return csv_files
 
 
 def build_schema_fields(mapping: Dict[str, str], absent: List[str]) -> List[str]:
@@ -194,6 +203,7 @@ def normalize_dataset(
     max_episodes: Optional[int],
     episode_size: int,
     include_metadata: bool,
+    output_basename: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     repo_root = Path(__file__).resolve().parents[3]
     mapping, absent = load_mapping(dataset_name, repo_root)
@@ -234,6 +244,8 @@ def normalize_dataset(
         episode_order: List[str] = []
         stop_reading = False
 
+        episode_prefix = output_basename or dataset_name
+
         for chunk in pd.read_csv(input_csv, chunksize=10000, low_memory=False):
             if episode_column not in chunk.columns:
                 raise ValueError(f"Episode column '{episode_column}' not found in CSV")
@@ -248,7 +260,7 @@ def normalize_dataset(
                     if max_episodes is not None and len(episode_order) >= max_episodes:
                         stop_reading = True
                         break
-                    ep_id = f"{dataset_name}_{ep_key}"
+                    ep_id = f"{episode_prefix}_{ep_key}"
                     writers[ep_key] = EpisodeWriter(ep_id)
                     episode_order.append(ep_key)
 
@@ -313,14 +325,15 @@ def normalize_dataset(
                 break
 
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / f"{dataset_name}.json"
+        output_name = output_basename or dataset_name
+        output_file = output_dir / f"{output_name}.json"
         with output_file.open("w", encoding="utf-8") as f:
             json.dump(all_rows, f, indent=2)
 
         json_path = str(output_file)
         results.append({
             "dataset": dataset_name,
-            "episode_id": dataset_name,
+            "episode_id": output_name,
             "json_file": json_path,
         })
 
@@ -328,7 +341,7 @@ def normalize_dataset(
             first_ts = all_rows[0].get("timestamp_ms") if all_rows else None
             last_ts = all_rows[-1].get("timestamp_ms") if all_rows else None
             metadata = {
-                "episode_id": dataset_name,
+                "episode_id": output_name,
                 "source_file": input_csv.name,
                 "num_samples": len(all_rows),
                 "num_episodes": episode_count if row_in_episode == 0 else episode_count + 1,
@@ -339,7 +352,7 @@ def normalize_dataset(
                 if (first_ts is not None and last_ts is not None)
                 else None,
             }
-            metadata_file = output_dir / f"{dataset_name}_metadata.json"
+            metadata_file = output_dir / f"{output_name}_metadata.json"
             with metadata_file.open("w", encoding="utf-8") as f:
                 json.dump(metadata, f, indent=2)
 
@@ -389,17 +402,28 @@ def main() -> int:
     )
 
     repo_root = Path(__file__).resolve().parents[3]
-    input_csv = find_input_csv(args.dataset, repo_root, args.input)
+    input_csvs = find_input_csvs(args.dataset, repo_root, args.input)
 
-    results = normalize_dataset(
-        dataset_name=args.dataset,
-        input_csv=input_csv,
-        output_root=args.output,
-        episode_column=args.episode_column,
-        max_episodes=args.max_episodes,
-        episode_size=args.episode_size,
-        include_metadata=not args.no_metadata,
-    )
+    results: List[Dict[str, str]] = []
+    multi_input = len(input_csvs) > 1
+
+    for csv_path in input_csvs:
+        output_basename = None
+        if multi_input or csv_path.stem.startswith("experiment_"):
+            output_basename = csv_path.stem
+
+        results.extend(
+            normalize_dataset(
+                dataset_name=args.dataset,
+                input_csv=csv_path,
+                output_root=args.output,
+                episode_column=args.episode_column,
+                max_episodes=args.max_episodes,
+                episode_size=args.episode_size,
+                include_metadata=not args.no_metadata,
+                output_basename=output_basename,
+            )
+        )
 
     if not results:
         logger.warning("No episodes were normalized.")
