@@ -140,12 +140,13 @@ def generate_level3_questions(
 			root_cause = root_causes.get(fault_label)
 			root_cause = remove_fault_id(root_cause)
 
-			anomaly_obj = None
+			anomalies_list = []
 			if root_cause:
 				possible = root_cause.get("possible_anomalies", [])
-				if possible:
-					choice = random.choice(possible)
-					anomaly_obj = anomalies.get(choice)
+				for anomaly_name in possible:
+					anomaly_obj = anomalies.get(anomaly_name)
+					if anomaly_obj:
+						anomalies_list.append(anomaly_obj)
 
 			question = random.choice(phrases)
 
@@ -154,7 +155,7 @@ def generate_level3_questions(
 				"question": question,
 				"time_series": strip_null_features(subseries),
 				"root_cause": root_cause,
-				"anomaly": anomaly_obj,
+				"anomalies": anomalies_list,
 				"source_episode": episode_path.name,
 			}
 			with out_file.open("w", encoding="utf-8") as f:
