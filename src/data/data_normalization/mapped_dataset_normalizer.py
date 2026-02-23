@@ -85,6 +85,17 @@ def build_schema_fields(mapping: Dict[str, str], absent: List[str]) -> List[str]
     return sorted(fields)
 
 
+def normalize_fault_id(value: Any) -> Any:
+    if value is None:
+        return 0
+    if isinstance(value, str) and not value.strip():
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return value
+
+
 def build_row_dict(
     row: pd.Series,
     mapping: Dict[str, str],
@@ -132,6 +143,7 @@ def write_episode(
     if include_metadata:
         first_ts = episode_rows[0].get("timestamp_ms") if episode_rows else None
         last_ts = episode_rows[-1].get("timestamp_ms") if episode_rows else None
+        first_fault = episode_rows[0].get("fault_id") if episode_rows else None
         metadata = {
             "episode_id": episode_id,
             "source_file": source_file,
@@ -139,6 +151,7 @@ def write_episode(
             "schema": "ur3e_v1",
             "first_timestamp_ms": first_ts,
             "last_timestamp_ms": last_ts,
+            "fault_id": normalize_fault_id(first_fault),
             "duration_ms": (last_ts - first_ts) if (first_ts is not None and last_ts is not None) else None,
         }
         metadata_file = output_dir / f"{episode_id}_metadata.json"
@@ -161,6 +174,7 @@ def write_episode_streaming(
     num_samples = 0
     first_ts = None
     last_ts = None
+    first_fault = None
 
     with output_file.open("w", encoding="utf-8") as f:
         f.write("[\n")
@@ -176,6 +190,8 @@ def write_episode_streaming(
                 if first_ts is None:
                     first_ts = ts
                 last_ts = ts
+            if first_fault is None:
+                first_fault = row.get("fault_id")
         f.write("\n]\n")
 
     if include_metadata:
@@ -186,6 +202,7 @@ def write_episode_streaming(
             "schema": "ur3e_v1",
             "first_timestamp_ms": first_ts,
             "last_timestamp_ms": last_ts,
+            "fault_id": normalize_fault_id(first_fault),
             "duration_ms": (last_ts - first_ts) if (first_ts is not None and last_ts is not None) else None,
         }
         metadata_file = output_dir / f"{episode_id}_metadata.json"
@@ -223,6 +240,7 @@ def normalize_dataset(
                 self.num_samples = 0
                 self.first_ts = None
                 self.last_ts = None
+                self.first_fault = None
 
             def write_row(self, row_dict: Dict[str, Any]) -> None:
                 if not self.first:
@@ -235,6 +253,8 @@ def normalize_dataset(
                     if self.first_ts is None:
                         self.first_ts = ts
                     self.last_ts = ts
+                if self.first_fault is None:
+                    self.first_fault = row_dict.get("fault_id")
 
             def close(self) -> None:
                 self.handle.write("\n]\n")
@@ -283,6 +303,7 @@ def normalize_dataset(
                     "schema": "ur3e_v1",
                     "first_timestamp_ms": writer.first_ts,
                     "last_timestamp_ms": writer.last_ts,
+                    "fault_id": normalize_fault_id(writer.first_fault),
                     "duration_ms": (writer.last_ts - writer.first_ts)
                     if (writer.first_ts is not None and writer.last_ts is not None)
                     else None,
@@ -340,6 +361,7 @@ def normalize_dataset(
         if include_metadata:
             first_ts = all_rows[0].get("timestamp_ms") if all_rows else None
             last_ts = all_rows[-1].get("timestamp_ms") if all_rows else None
+            first_fault = all_rows[0].get("fault_id") if all_rows else None
             metadata = {
                 "episode_id": output_name,
                 "source_file": input_csv.name,
@@ -348,6 +370,7 @@ def normalize_dataset(
                 "schema": "ur3e_v1",
                 "first_timestamp_ms": first_ts,
                 "last_timestamp_ms": last_ts,
+                "fault_id": normalize_fault_id(first_fault),
                 "duration_ms": (last_ts - first_ts)
                 if (first_ts is not None and last_ts is not None)
                 else None,
