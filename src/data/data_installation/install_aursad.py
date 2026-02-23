@@ -101,6 +101,7 @@ def export_by_experiments(
     """
     Export DataFrame organized by experiments based on 'sample_nr' column.
     Each experiment is written as experiment_{i}.csv in the output directory.
+    Multiplies any timestamp columns by 1000 to convert to milliseconds.
     """
     if "sample_nr" not in data_frame.columns:
         print("⚠ 'sample_nr' column not found. Exporting as single CSV instead.")
@@ -110,6 +111,12 @@ def export_by_experiments(
         return
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Multiply timestamp columns by 1000 to convert to milliseconds
+    for col in data_frame.columns:
+        if "timestamp" in col.lower():
+            # Convert to float first if needed, then multiply and convert to int
+            data_frame[col] = (data_frame[col] * 1000).astype('int64')
     
     # Group by sample_nr (experiment ID)
     grouped = data_frame.groupby("sample_nr", sort=True)
