@@ -47,7 +47,7 @@ def expand_mapping(mapping: Dict[str, str]) -> Dict[str, str]:
     return expanded
 
 
-def load_mapping(dataset_name: str, repo_root: Path) -> Tuple[Dict[str, str], List[str]]:
+def load_mapping(dataset_name: str, repo_root: Path) -> Tuple[Dict[str, str], List[str], Dict[str, Any]]:
     mapping_path = repo_root / "datasets" / "mappings_of_features" / f"{dataset_name}.json"
     if not mapping_path.exists():
         raise FileNotFoundError(f"Mapping file not found: {mapping_path}")
@@ -57,7 +57,8 @@ def load_mapping(dataset_name: str, repo_root: Path) -> Tuple[Dict[str, str], Li
 
     mapping = expand_mapping(config.get("mapping", {}))
     absent = config.get("absent", [])
-    return mapping, absent
+    faults = config.get("faults", {})
+    return mapping, absent, faults
 
 
 def find_input_csvs(dataset_name: str, repo_root: Path, input_path: Optional[Path]) -> List[Path]:
@@ -85,6 +86,26 @@ def build_schema_fields(mapping: Dict[str, str], absent: List[str]) -> List[str]
     return sorted(fields)
 
 
+def remove_null_features(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+	"""Remove any feature (key) that is null in all rows."""
+	if not rows:
+		return rows
+	
+	# Identify features that have at least one non-null value
+	features_with_values: set = set()
+	for row in rows:
+		for key, value in row.items():
+			if value is not None:
+				features_with_values.add(key)
+	
+	# Filter rows to keep only features with at least one non-null value
+	cleaned_rows: List[Dict[str, Any]] = []
+	for row in rows:
+		cleaned_rows.append({k: v for k, v in row.items() if k in features_with_values})
+	
+	return cleaned_rows
+
+
 def normalize_fault_id(value: Any) -> Any:
     if value is None:
         return 0
@@ -96,10 +117,20 @@ def normalize_fault_id(value: Any) -> Any:
         return value
 
 
+def map_fault_label(value: Any, faults: Dict[str, Any]) -> Any:
+    if value is None or not faults:
+        return value
+    key = str(value)
+    if key in faults:
+        return faults[key]
+    return value
+
+
 def build_row_dict(
     row: pd.Series,
     mapping: Dict[str, str],
     schema_fields: List[str],
+    faults: Dict[str, Any],
 ) -> Dict[str, Any]:
     row_dict: Dict[str, Any] = {}
     for out_field in schema_fields:
@@ -108,6 +139,8 @@ def build_row_dict(
             value = row.get(src_field, None)
             if pd.isna(value):
                 value = None
+            if out_field == "fault_label":
+                value = map_fault_label(value, faults)
             row_dict[out_field] = value
         else:
             row_dict[out_field] = None
@@ -119,11 +152,12 @@ def build_episode_rows(
     mapping: Dict[str, str],
     absent: List[str],
     schema_fields: List[str],
+    faults: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
 
     for _, row in df.iterrows():
-        rows.append(build_row_dict(row, mapping, schema_fields))
+        rows.append(build_row_dict(row, mapping, schema_fields, faults))
 
     return rows
 
@@ -136,6 +170,7 @@ def write_episode(
     include_metadata: bool,
 ) -> str:
     output_dir.mkdir(parents=True, exist_ok=True)
+    episode_rows = remove_null_features(episode_rows)
     output_file = output_dir / f"{episode_id}.json"
     with output_file.open("w", encoding="utf-8") as f:
         json.dump(episode_rows, f, indent=2)
@@ -143,7 +178,6 @@ def write_episode(
     if include_metadata:
         first_ts = episode_rows[0].get("timestamp_ms") if episode_rows else None
         last_ts = episode_rows[-1].get("timestamp_ms") if episode_rows else None
-        first_fault = episode_rows[0].get("fault_id") if episode_rows else None
         metadata = {
             "episode_id": episode_id,
             "source_file": source_file,
@@ -151,7 +185,6 @@ def write_episode(
             "schema": "ur3e_v1",
             "first_timestamp_ms": first_ts,
             "last_timestamp_ms": last_ts,
-            "fault_id": normalize_fault_id(first_fault),
             "duration_ms": (last_ts - first_ts) if (first_ts is not None and last_ts is not None) else None,
         }
         metadata_file = output_dir / f"{episode_id}_metadata.json"
@@ -171,15 +204,18 @@ def write_episode_streaming(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f"{episode_id}.json"
 
+    # Collect all rows first to identify null features
+    all_rows = list(episode_rows)
+    all_rows = remove_null_features(all_rows)
+
     num_samples = 0
     first_ts = None
     last_ts = None
-    first_fault = None
 
     with output_file.open("w", encoding="utf-8") as f:
         f.write("[\n")
         first = True
-        for row in episode_rows:
+        for row in all_rows:
             if not first:
                 f.write(",\n")
             json.dump(row, f, indent=2)
@@ -190,8 +226,6 @@ def write_episode_streaming(
                 if first_ts is None:
                     first_ts = ts
                 last_ts = ts
-            if first_fault is None:
-                first_fault = row.get("fault_id")
         f.write("\n]\n")
 
     if include_metadata:
@@ -202,7 +236,6 @@ def write_episode_streaming(
             "schema": "ur3e_v1",
             "first_timestamp_ms": first_ts,
             "last_timestamp_ms": last_ts,
-            "fault_id": normalize_fault_id(first_fault),
             "duration_ms": (last_ts - first_ts) if (first_ts is not None and last_ts is not None) else None,
         }
         metadata_file = output_dir / f"{episode_id}_metadata.json"
@@ -223,7 +256,7 @@ def normalize_dataset(
     output_basename: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     repo_root = Path(__file__).resolve().parents[3]
-    mapping, absent = load_mapping(dataset_name, repo_root)
+    mapping, absent, faults = load_mapping(dataset_name, repo_root)
     schema_fields = build_schema_fields(mapping, absent)
 
     results: List[Dict[str, str]] = []
@@ -240,7 +273,6 @@ def normalize_dataset(
                 self.num_samples = 0
                 self.first_ts = None
                 self.last_ts = None
-                self.first_fault = None
 
             def write_row(self, row_dict: Dict[str, Any]) -> None:
                 if not self.first:
@@ -253,8 +285,6 @@ def normalize_dataset(
                     if self.first_ts is None:
                         self.first_ts = ts
                     self.last_ts = ts
-                if self.first_fault is None:
-                    self.first_fault = row_dict.get("fault_id")
 
             def close(self) -> None:
                 self.handle.write("\n]\n")
@@ -284,7 +314,7 @@ def normalize_dataset(
                     writers[ep_key] = EpisodeWriter(ep_id)
                     episode_order.append(ep_key)
 
-                row_dict = build_row_dict(row, mapping, schema_fields)
+                row_dict = build_row_dict(row, mapping, schema_fields, faults)
                 writers[ep_key].write_row(row_dict)
 
             if stop_reading:
@@ -303,7 +333,6 @@ def normalize_dataset(
                     "schema": "ur3e_v1",
                     "first_timestamp_ms": writer.first_ts,
                     "last_timestamp_ms": writer.last_ts,
-                    "fault_id": normalize_fault_id(writer.first_fault),
                     "duration_ms": (writer.last_ts - writer.first_ts)
                     if (writer.first_ts is not None and writer.last_ts is not None)
                     else None,
@@ -332,7 +361,7 @@ def normalize_dataset(
                     break
 
                 row_in_episode += 1
-                row_dict = build_row_dict(row, mapping, schema_fields)
+                row_dict = build_row_dict(row, mapping, schema_fields, faults)
                 all_rows.append(row_dict)
 
                 if row_in_episode >= episode_size:
@@ -346,6 +375,7 @@ def normalize_dataset(
                 break
 
         output_dir.mkdir(parents=True, exist_ok=True)
+        all_rows = remove_null_features(all_rows)
         output_name = output_basename or dataset_name
         output_file = output_dir / f"{output_name}.json"
         with output_file.open("w", encoding="utf-8") as f:
@@ -361,7 +391,6 @@ def normalize_dataset(
         if include_metadata:
             first_ts = all_rows[0].get("timestamp_ms") if all_rows else None
             last_ts = all_rows[-1].get("timestamp_ms") if all_rows else None
-            first_fault = all_rows[0].get("fault_id") if all_rows else None
             metadata = {
                 "episode_id": output_name,
                 "source_file": input_csv.name,
@@ -370,7 +399,6 @@ def normalize_dataset(
                 "schema": "ur3e_v1",
                 "first_timestamp_ms": first_ts,
                 "last_timestamp_ms": last_ts,
-                "fault_id": normalize_fault_id(first_fault),
                 "duration_ms": (last_ts - first_ts)
                 if (first_ts is not None and last_ts is not None)
                 else None,

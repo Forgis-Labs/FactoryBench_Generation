@@ -12,15 +12,6 @@
     {
       "id": 2,
       "level": 3,
-      "difficulty": "easy",
-      "question_text": "Which feature affects the most feature {i}?",
-      "answer_options": [
-        "The feature isn't affected in any meaningful way by any of the given options."
-      ]
-    },
-    {
-      "id": 3,
-      "level": 3,
       "difficulty": "medium",
       "question_text": "The machine is behaving abnormally. Determine the cause.",
       "answer_options": [

@@ -148,6 +148,15 @@
     "fault_label": "label"
   },
 
+  "faults": {
+    "0": 0,
+    "1": 16,
+    "2": 17,
+    "3": 18,
+    "4": 19,
+    "5": 20
+  },
+
   "absent": [
     "gripper_command",
     "protective_stop_state",
