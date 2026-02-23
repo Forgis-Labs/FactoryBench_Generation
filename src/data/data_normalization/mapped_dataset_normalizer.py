@@ -178,6 +178,7 @@ def write_episode(
     if include_metadata:
         first_ts = episode_rows[0].get("timestamp_ms") if episode_rows else None
         last_ts = episode_rows[-1].get("timestamp_ms") if episode_rows else None
+        machine_id = episode_rows[0].get("machine_id") if episode_rows else None
         metadata = {
             "episode_id": episode_id,
             "source_file": source_file,
@@ -186,6 +187,7 @@ def write_episode(
             "first_timestamp_ms": first_ts,
             "last_timestamp_ms": last_ts,
             "duration_ms": (last_ts - first_ts) if (first_ts is not None and last_ts is not None) else None,
+            "machine_id": machine_id,
         }
         metadata_file = output_dir / f"{episode_id}_metadata.json"
         with metadata_file.open("w", encoding="utf-8") as f:
@@ -229,6 +231,7 @@ def write_episode_streaming(
         f.write("\n]\n")
 
     if include_metadata:
+        machine_id = all_rows[0].get("machine_id") if all_rows else None
         metadata = {
             "episode_id": episode_id,
             "source_file": source_file,
@@ -237,6 +240,7 @@ def write_episode_streaming(
             "first_timestamp_ms": first_ts,
             "last_timestamp_ms": last_ts,
             "duration_ms": (last_ts - first_ts) if (first_ts is not None and last_ts is not None) else None,
+            "machine_id": machine_id,
         }
         metadata_file = output_dir / f"{episode_id}_metadata.json"
         with metadata_file.open("w", encoding="utf-8") as f:
@@ -273,6 +277,7 @@ def normalize_dataset(
                 self.num_samples = 0
                 self.first_ts = None
                 self.last_ts = None
+                self.machine_id = None
 
             def write_row(self, row_dict: Dict[str, Any]) -> None:
                 if not self.first:
@@ -285,6 +290,8 @@ def normalize_dataset(
                     if self.first_ts is None:
                         self.first_ts = ts
                     self.last_ts = ts
+                if self.machine_id is None:
+                    self.machine_id = row_dict.get("machine_id")
 
             def close(self) -> None:
                 self.handle.write("\n]\n")
@@ -336,6 +343,7 @@ def normalize_dataset(
                     "duration_ms": (writer.last_ts - writer.first_ts)
                     if (writer.first_ts is not None and writer.last_ts is not None)
                     else None,
+                    "machine_id": writer.machine_id,
                 }
                 metadata_file = output_dir / f"{writer.episode_id}_metadata.json"
                 with metadata_file.open("w", encoding="utf-8") as f:
@@ -391,6 +399,7 @@ def normalize_dataset(
         if include_metadata:
             first_ts = all_rows[0].get("timestamp_ms") if all_rows else None
             last_ts = all_rows[-1].get("timestamp_ms") if all_rows else None
+            machine_id = all_rows[0].get("machine_id") if all_rows else None
             metadata = {
                 "episode_id": output_name,
                 "source_file": input_csv.name,
@@ -402,6 +411,7 @@ def normalize_dataset(
                 "duration_ms": (last_ts - first_ts)
                 if (first_ts is not None and last_ts is not None)
                 else None,
+                "machine_id": machine_id,
             }
             metadata_file = output_dir / f"{output_name}_metadata.json"
             with metadata_file.open("w", encoding="utf-8") as f:

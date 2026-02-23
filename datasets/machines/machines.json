@@ -1,0 +1,58 @@
+[
+  {
+    "machine_id": 0,
+    "machine_model": "UR3e",
+    "manufacturer": "Universal Robots",
+    "series": "E-series",
+    "machine_type": "Collaborative robot (cobot)",
+    "weight_kg": 11,
+    "payload_kg": 3,
+    "degrees_of_freedom": 6,
+    "joint_rotation": {
+      "wrist_joints": "360_degree_rotation",
+      "end_joint": "infinite_rotation"
+    },
+    "typical_applications": [
+      "light assembly tasks",
+      "automated workbench scenarios"
+    ],
+    "control_interfaces": [
+      "UR PolyScope (teach pendant)",
+      "UrScript",
+      "TCP/IP socket connection",
+      "RTDE (Real-Time Data Exchange)"
+    ],
+    "minimum_polyscope_version_for_screwdriver": "5.4",
+    "used_in_paper_for": "Automated screwdriving anomaly detection dataset collection (AURSAD)"
+  },
+  {
+    "machine_id": 1,
+    "machine_type": "CNC milling machine",
+    "manufacturer": null,
+    "model": null,
+    "origin": "University of Michigan Smart Lab experiments",
+    "machine_category": "Computer Numerical Control (CNC) milling machine",
+    "axes": [
+      {
+        "name": "X-axis",
+        "sensor_data": "position, velocity, acceleration"
+      },
+      {
+        "name": "Y-axis",
+        "sensor_data": "position, velocity, acceleration"
+      },
+      {
+        "name": "Z-axis",
+        "sensor_data": "position, velocity, acceleration"
+      }
+    ],
+    "spindle": {
+      "sensor_data": "motor readings"
+    },
+    "workpiece_material": "wax",
+    "experiment_count": 18,
+    "purpose": "Tool wear detection data collection for machine learning",
+    "data_source": "Kaggle dataset (tool-wear-detection-in-cnc-mill)",
+    "notes": "Exact CNC machine make/model not specified in dataset documentation"
+  }
+]

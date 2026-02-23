@@ -88,5 +88,6 @@
     "gripper_command",
 
     "fault_label"
-  ]
+  ],
+  "machine_id": 1
 }
