@@ -1,0 +1,187 @@
+[
+  {
+    "fault_id": 0,
+    "root_cause": "normal",
+    "description": "Nothing is wrong with the machine.",
+    "severity_levels": ["low"],
+    "possible_anomalies": []
+  },
+  {
+    "fault_id": 1,
+    "root_cause": "misaligned_screw",
+    "description": "The screw is inserted at an incorrect angle relative to the threaded hole.",
+    "severity_levels": ["medium", "high"],
+    "possible_anomalies": [
+      "tcp_force_spike",
+      "sustained_contact_force",
+      "high_current_low_motion",
+      "acoustic_spike_without_force",
+      "persistent_tracking_error"
+    ]
+  },
+  {
+    "fault_id": 2,
+    "root_cause": "cross_threading",
+    "description": "The screw engages incorrectly with the plate thread, damaging threads during tightening.",
+    "severity_levels": ["medium", "high", "critical"],
+    "possible_anomalies": [
+      "gradual_current_force_temperature_rise",
+      "sustained_contact_force",
+      "acoustic_spike_without_force",
+      "protective_stop_event"
+    ]
+  },
+  {
+    "fault_id": 3,
+    "root_cause": "incorrect_screw_type",
+    "description": "The screw used does not match the expected thread type or length.",
+    "severity_levels": ["medium", "high"],
+    "possible_anomalies": [
+      "persistent_tracking_error",
+      "sustained_contact_force",
+      "high_current_low_motion",
+      "reduced_contact_force"
+    ]
+  },
+  {
+    "fault_id": 4,
+    "root_cause": "incorrect_screw_length",
+    "description": "The screw is too long or too short for the threaded hole.",
+    "severity_levels": ["low", "medium", "high"],
+    "possible_anomalies": [
+      "tcp_force_spike",
+      "sustained_contact_force",
+      "unexpected_low_current_during_tightening",
+      "protective_stop_event"
+    ]
+  },
+  {
+    "fault_id": 5,
+    "root_cause": "obstructed_hole",
+    "description": "Foreign material or debris is present inside the threaded hole.",
+    "severity_levels": ["medium", "high"],
+    "possible_anomalies": [
+      "high_current_low_motion",
+      "sustained_contact_force",
+      "acoustic_spike_without_force",
+      "gradual_current_force_temperature_rise"
+    ]
+  },
+  {
+    "fault_id": 6,
+    "root_cause": "double_screw_pick",
+    "description": "The gripper accidentally picks up two screws instead of one.",
+    "severity_levels": ["medium", "high"],
+    "possible_anomalies": [
+      "tcp_force_spike",
+      "misalignment_signature",
+      "persistent_tracking_error",
+      "protective_stop_event"
+    ]
+  },
+  {
+    "fault_id": 7,
+    "root_cause": "partial_screw_pick",
+    "description": "The screw is not properly seated in the tool before insertion.",
+    "severity_levels": ["low", "medium"],
+    "possible_anomalies": [
+      "gripper_close_no_force",
+      "reduced_contact_force",
+      "unexpected_low_current_during_tightening"
+    ]
+  },
+  {
+    "fault_id": 8,
+    "root_cause": "plate_misalignment",
+    "description": "The target plate is shifted or rotated relative to its expected position.",
+    "severity_levels": ["medium", "high"],
+    "possible_anomalies": [
+      "tcp_force_spike",
+      "persistent_tracking_error",
+      "sustained_contact_force",
+      "speed_drop_with_force_spike"
+    ]
+  },
+  {
+    "fault_id": 9,
+    "root_cause": "incorrect_part_variant",
+    "description": "A wrong part variant is present at the assembly station.",
+    "severity_levels": ["medium", "high"],
+    "possible_anomalies": [
+      "persistent_tracking_error",
+      "sustained_contact_force",
+      "unexpected_low_current_during_tightening",
+      "protective_stop_event"
+    ]
+  },
+  {
+    "fault_id": 10,
+    "root_cause": "missing_plate",
+    "description": "The expected plate or component is absent from the workstation.",
+    "severity_levels": ["low", "medium"],
+    "possible_anomalies": [
+      "gripper_close_no_force",
+      "unexpected_low_current_during_tightening",
+      "persistent_tracking_error"
+    ]
+  },
+  {
+    "fault_id": 11,
+    "root_cause": "fixture_instability",
+    "description": "The workpiece fixture is loose or unstable during tightening.",
+    "severity_levels": ["medium", "high"],
+    "possible_anomalies": [
+      "vibration_burst",
+      "sustained_contact_force",
+      "oscillation_around_setpoint",
+      "protective_stop_event"
+    ]
+  },
+  {
+    "fault_id": 12,
+    "root_cause": "over_tightening",
+    "description": "The screw is tightened beyond the specified torque limit.",
+    "severity_levels": ["medium", "high", "critical"],
+    "possible_anomalies": [
+      "gradual_current_force_temperature_rise",
+      "sustained_contact_force",
+      "joint_overheating",
+      "protective_stop_event"
+    ]
+  },
+  {
+    "fault_id": 13,
+    "root_cause": "under_tightening",
+    "description": "The screw is not tightened sufficiently to reach target torque.",
+    "severity_levels": ["low", "medium"],
+    "possible_anomalies": [
+      "unexpected_low_current_during_tightening",
+      "reduced_contact_force",
+      "persistent_tracking_error"
+    ]
+  },
+  {
+    "fault_id": 14,
+    "root_cause": "tool_slippage",
+    "description": "The screwdriver bit slips on the screw head during tightening.",
+    "severity_levels": ["medium", "high"],
+    "possible_anomalies": [
+      "acoustic_spike_without_force",
+      "vibration_burst",
+      "sustained_contact_force",
+      "persistent_tracking_error"
+    ]
+  },
+  {
+    "fault_id": 15,
+    "root_cause": "worn_screwdriver_bit",
+    "description": "The screwdriver bit is worn, reducing torque transmission efficiency.",
+    "severity_levels": ["low", "medium", "high"],
+    "possible_anomalies": [
+      "gradual_current_force_temperature_rise",
+      "acoustic_spike_without_force",
+      "sustained_contact_force",
+      "under_tightening_signature"
+    ]
+  }
+]
