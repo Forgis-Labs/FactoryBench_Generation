@@ -200,34 +200,86 @@ python -m src.data.data_installation.install_aursad
 python -m src.data.data_installation.install_aursad --max-timestamps 100000
 ```
 
-**Note:** The download is full (~2.6M timestamps), but the CSV export respects `--max-timestamps` to cap rows without re-downloading.
+**Output:** One CSV per experiment in the same folder:
 
-### 2. Normalize CSV to UR3e JSON schema
-
-Stream the CSV in chunks and write a single normalized JSON file. Each row is one timestep; use `--episode-size` to group rows into episodes:
-
-```powershell
-# Stream 100 episodes (100 rows = 100 episodes)
-python -m src.data.data_normalization.mapped_dataset_normalizer \
-  --dataset aursad \
-  --input datasets/open_datasets/aursad/AURSAD.csv \
-  --output datasets/normalized_episodes \
-  --max-episodes 100
+```
+datasets/open_datasets/aursad/
+  experiment_1.csv
+  experiment_2.csv
+  ...
 ```
 
+Each experiment is grouped by `sample_nr` from the HDF5 dataset.
+
+### 2. Install CNC Mill dataset (Kaggle)
+
+**First-time setup (interactive):**
+
 ```powershell
-# Stream 100 episodes with 10 rows per episode
+# Sets up Kaggle credentials interactively
+python -m src.data.data_installation.install_cnc --setup
+
+# Then download and extract
+python -m src.data.data_installation.install_cnc
+```
+
+**Subsequent runs (skip if already downloaded):**
+
+```powershell
+# Smart: skips download if already extracted
+python -m src.data.data_installation.install_cnc
+
+# Force re-download
+python -m src.data.data_installation.install_cnc --force
+```
+
+**Features:**
+
+- Defaults to `datasets/open_datasets/cnc/`
+- Skips re-download if dataset already extracted
+- Interactive Kaggle setup on first run (no manual file editing)
+- Adds `timestamp_ms` column (0, 100, 200, ...) to all experiment CSVs
+- Renames `experiment_0i.csv` → `experiment_i.csv`
+- Environment variable support for CI/CD: `KAGGLE_USERNAME` and `KAGGLE_KEY`
+
+**Setup instructions for new team members:**
+
+Just run the command—the script guides you through setup interactively:
+
+```powershell
+python -m src.data.data_installation.install_cnc --setup
+```
+
+The script will:
+
+1. Prompt for your Kaggle username and API key
+2. Create `~/.kaggle/` and save credentials securely
+3. You're done—future runs just work!
+
+(No manual file editing needed.)
+
+### 3. Normalize CSV to UR3e JSON schema
+
+Normalize all `experiment_*.csv` files in a folder. Each CSV becomes a JSON file with the same name:
+
+```powershell
+# Normalize all AURSAD experiments
 python -m src.data.data_normalization.mapped_dataset_normalizer \
   --dataset aursad \
-  --input datasets/open_datasets/aursad/AURSAD.csv \
-  --output datasets/normalized_episodes \
-  --max-episodes 100 \
-  --episode-size 10
+  --input datasets/open_datasets/aursad \
+  --output datasets/normalized_episodes
+
+# Normalize all CNC experiments
+python -m src.data.data_normalization.mapped_dataset_normalizer \
+  --dataset cnc \
+  --input datasets/open_datasets/cnc \
+  --output datasets/normalized_episodes
 ```
 
 ### How normalization works
 
-- **Without `--episode-column`**: Streams CSV in 10K-row batches, groups rows by `--episode-size` (default: 1), writes single `<dataset>.json` file.
+- **Directory input**: Reads all `experiment_*.csv` files and outputs matching `experiment_*.json` files.
+- **Single file input**: Normalizes the file to a JSON file with the same base name.
 - **With `--episode-column`**: Streams chunks and groups by unique values in the column, writes separate JSON per episode group.
 - Mapping files live in `datasets/mappings_of_features/<dataset>.json`—define source→target column mappings.
 - Output JSON matches UR3e schema: `[{col1: val, col2: val, ...}, ...]`.
@@ -237,46 +289,7 @@ python -m src.data.data_normalization.mapped_dataset_normalizer \
 ### Supported datasets
 
 - **aursad** (raw: Zenodo HDF5, mapping: `datasets/mappings_of_features/aursad.json`)
-
----
-
-## Dataset Normalization (CSV → JSON)
-
-Use the mapper to convert a raw CSV into the UR3e schema. When `--episode-column` is provided, the CSV is streamed in chunks and grouped into episodes.
-
-### Stream 100 episodes from AURSAD
-
-```powershell
-python -m src.data.data_normalization.mapped_dataset_normalizer \
-  --dataset aursad \
-  --input datasets/open_datasets/aursad/AURSAD.csv \
-  --output datasets/normalized_episodes \
-  --max-episodes 100
-```
-
-### Stream 100 episodes with 10 rows per episode
-
-```powershell
-python -m src.data.data_normalization.mapped_dataset_normalizer \
-  --dataset aursad \
-  --input datasets/open_datasets/aursad/AURSAD.csv \
-  --output datasets/normalized_episodes \
-  --max-episodes 100 \
-  --episode-size 10
-```
-
-### How it works
-
-- **Without `--episode-column`**: Each episode contains `--episode-size` rows (default: 1 row = 1 episode).
-- **With `--episode-column`**: Episodes are grouped by the specified column's unique values.
-- Mapping files live in `datasets/mappings_of_features/<dataset>.json`.
-- Output JSON is written to `datasets/normalized_episodes/<dataset>/`.
-- Use `--no-metadata` to skip the `_metadata.json` file per episode.
-- Use `-v` for verbose logging to track progress.
-
-### Supported datasets (current)
-
-- **aursad** (mapping: `datasets/mappings_of_features/aursad.json`)
+- **cnc** (raw: Kaggle, mapping: `datasets/mappings_of_features/cnc.json`)
 
 ---
 

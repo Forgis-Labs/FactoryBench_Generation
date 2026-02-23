@@ -2,6 +2,23 @@
 
 This directory contains scripts to normalize various dataset formats into standardized schemas for FactoryBench.
 
+## Dataset Installers & Normalizer (AURSAD / CNC)
+
+For AURSAD and CNC datasets, use the installer and normalizer scripts in `src/data`:
+
+```bash
+# AURSAD: download + export experiment_*.csv
+python -m src.data.data_installation.install_aursad --max-timestamps 100000
+
+# CNC: download + extract + add timestamp_ms
+python -m src.data.data_installation.install_cnc --setup
+python -m src.data.data_installation.install_cnc
+
+# Normalize all experiment_*.csv to JSON
+python -m src.data.data_normalization.mapped_dataset_normalizer \
+    --dataset aursad --input datasets/open_datasets/aursad --output datasets/normalized_episodes
+```
+
 ## Tools Available
 
 ### 1. CWRU Bearing Dataset Converter (`cwru_converter.py`)

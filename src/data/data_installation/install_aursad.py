@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import h5py
 import numpy as np
@@ -92,8 +92,41 @@ def collect_datasets(h5_file: h5py.File) -> List[h5py.Dataset]:
     h5_file.visititems(visitor)
     return datasets
 
+
+def export_by_experiments(
+    data_frame: pd.DataFrame,
+    out_dir: Path,
+    max_timestamps: Optional[int] = None,
+) -> None:
+    """
+    Export DataFrame organized by experiments based on 'sample_nr' column.
+    Each experiment is written as experiment_{i}.csv in the output directory.
+    """
+    if "sample_nr" not in data_frame.columns:
+        print("⚠ 'sample_nr' column not found. Exporting as single CSV instead.")
+        csv_path = out_dir / "AURSAD.csv"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        data_frame.to_csv(csv_path, index=False)
+        return
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Group by sample_nr (experiment ID)
+    grouped = data_frame.groupby("sample_nr", sort=True)
+    
+    print(f"\nExporting {len(grouped)} experiments to subfolders...")
+    
+    for sample_nr, group_df in grouped:
+        exp_num = int(sample_nr) if isinstance(sample_nr, (int, np.integer)) else sample_nr
+        csv_path = out_dir / f"experiment_{exp_num}.csv"
+        group_df.to_csv(csv_path, index=False)
+        
+        print(f"  ✓ experiment_{exp_num}: {len(group_df)} rows")
+    
+    print(f"✓ All experiments exported to {out_dir}\n")
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Download AURSAD and export a combined CSV")
+    ap = argparse.ArgumentParser(description="Download AURSAD and export experiments to separate CSVs")
     repo_root = Path(__file__).resolve().parents[3]
     default_out_dir = repo_root / "datasets" / "open_datasets" / "aursad"
     ap.add_argument(
@@ -101,12 +134,6 @@ def main() -> None:
         type=str,
         default=str(default_out_dir),
         help="Where to store dataset files",
-    )
-    ap.add_argument(
-        "--csv-path",
-        type=str,
-        default=None,
-        help="Optional CSV path (default: <out-dir>/AURSAD.csv)",
     )
     ap.add_argument(
         "--max-timestamps",
@@ -125,7 +152,7 @@ def main() -> None:
 
     out_dir = Path(args.out_dir).resolve()
     h5_path = out_dir / "AURSAD.h5"
-    csv_path = Path(args.csv_path).resolve() if args.csv_path else out_dir / "aursad.csv"
+    index_path = out_dir / "aursad.index.json"
 
     if h5_path.exists():
         print(f"Found existing dataset: {h5_path}")
@@ -197,15 +224,12 @@ def main() -> None:
             data_frame = pd.concat(frames, axis=1)
 
     if data_frame is not None:
-        csv_path.parent.mkdir(parents=True, exist_ok=True)
-        data_frame.to_csv(csv_path, index=False)
-
-    index_path = csv_path.with_suffix(".index.json")
+        # Export by experiments into experiment_{i}/ subfolders
+        export_by_experiments(data_frame, out_dir, max_timestamps)
     with index_path.open("w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)
 
     print(f"OK: {h5_path}")
-    print(f"CSV: {csv_path}")
     print(f"Index: {index_path}")
 
 if __name__ == "__main__":
