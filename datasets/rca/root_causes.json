@@ -3,7 +3,7 @@
     "fault_id": 0,
     "root_cause": "normal",
     "description": "Nothing is wrong with the machine.",
-    "severity_levels": ["low"],
+    "severity_levels": ["none"],
     "possible_anomalies": []
   },
   {
@@ -182,6 +182,70 @@
       "acoustic_spike_without_force",
       "sustained_contact_force",
       "under_tightening_signature"
+    ]
+  },
+  {
+    "fault_id": 16,
+    "root_cause": "damaged_screw_thread",
+    "description": "The screw thread itself is physically damaged, preventing proper engagement during tightening.",
+    "severity_levels": ["medium", "high"],
+    "possible_anomalies": [
+      "sustained_contact_force",
+      "gradual_current_force_temperature_rise",
+      "high_current_low_motion",
+      "persistent_tracking_error",
+      "acoustic_spike_without_force"
+    ]
+  },
+  {
+    "fault_id": 17,
+    "root_cause": "extra_assembly_component",
+    "description": "An unexpected object such as a washer is present in the assembly location, altering contact geometry.",
+    "severity_levels": ["low", "medium", "high"],
+    "possible_anomalies": [
+      "tcp_force_spike",
+      "sustained_contact_force",
+      "persistent_tracking_error",
+      "speed_drop_with_force_spike",
+      "protective_stop_event"
+    ]
+  },
+  {
+    "fault_id": 18,
+    "root_cause": "missing_screw",
+    "description": "The robot attempts tightening but no screw is present, often due to pick failure or skipped step.",
+    "severity_levels": ["low", "medium"],
+    "possible_anomalies": [
+      "gripper_close_no_force",
+      "reduced_contact_force",
+      "persistent_tracking_error",
+      "unexpected_low_current_during_tightening"
+    ]
+  },
+  {
+    "fault_id": 19,
+    "root_cause": "damaged_plate_thread",
+    "description": "The threaded hole in the plate is damaged, preventing proper screw engagement.",
+    "severity_levels": ["medium", "high", "critical"],
+    "possible_anomalies": [
+      "sustained_contact_force",
+      "gradual_current_force_temperature_rise",
+      "high_current_low_motion",
+      "acoustic_spike_without_force",
+      "protective_stop_event"
+    ]
+  },
+  {
+    "fault_id": 20,
+    "root_cause": "loosening_phase",
+    "description": "Robot is performing a screw loosening operation rather than tightening. This is a normal operational phase but may appear anomalous if only tightening behavior is expected.",
+    "severity_levels": ["none", "low"],
+    "possible_anomalies": [
+      "reduced_contact_force",
+      "unexpected_low_current_during_tightening",
+      "persistent_tracking_error",
+      "spurious_force_spike",
+      "spurious_current_spike"
     ]
   }
 ]
