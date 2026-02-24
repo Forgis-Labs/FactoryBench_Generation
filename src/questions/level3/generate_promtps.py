@@ -21,6 +21,9 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+INACTIVE_CONSTANT_THRESHOLD = 55
+MAX_RESAMPLE_ATTEMPTS = 5
+
 
 def load_json(path: Path) -> Any:
 	with path.open("r", encoding="utf-8") as f:
@@ -133,6 +136,24 @@ def sort_feature_keys(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 	for row in rows:
 		sorted_rows.append({k: row[k] for k in sorted(row.keys())})
 	return sorted_rows
+
+
+def _count_constant_feature_keys(constant_features: Dict[str, Any]) -> int:
+	count = 0
+	for key in constant_features.keys():
+		if key == "joint_modes":
+			count += 4
+		else:
+			count += 1
+	return count
+
+
+def is_inactive_prompt(item: Dict[str, Any], threshold: int = INACTIVE_CONSTANT_THRESHOLD) -> bool:
+	notes = item.get("notes", {}) or {}
+	constant_features = notes.get("constant_features", {})
+	if not isinstance(constant_features, dict) or not constant_features:
+		return False
+	return _count_constant_feature_keys(constant_features) >= threshold
 
 
 def format_note_value(value: Any) -> Any:
@@ -275,6 +296,97 @@ def remove_fault_id(root_cause: Optional[Dict[str, Any]]) -> Optional[Dict[str, 
 	return {k: v for k, v in root_cause.items() if k != "fault_id"}
 
 
+def generate_prompt(
+	subseries: List[Dict[str, Any]],
+	metadata: Optional[Dict[str, Any]],
+	question_text: str,
+	root_causes: Dict[int, Dict[str, Any]],
+	anomalies: Dict[str, Dict[str, Any]],
+	machines: Dict[int, Dict[str, Any]],
+) -> Dict[str, Any]:
+	"""
+	Generate a single prompt dict from a subseries of time series data.
+	
+	Args:
+		subseries: List of time series data points
+		metadata: Optional metadata containing machine_id
+		question_text: The question text to include in the prompt
+		root_causes: Dictionary mapping fault_id to root cause objects
+		anomalies: Dictionary mapping anomaly_name to anomaly objects
+		machines: Dictionary mapping machine_id to machine objects
+	
+	Returns:
+		Dictionary containing the complete prompt structure with:
+		- question
+		- root_cause (with embedded possible_anomalies)
+		- machine
+		- notes (if there are constant features)
+		- time_series
+	"""
+	fault_label = pick_fault_label(subseries)
+	root_cause = root_causes.get(fault_label)
+	root_cause = remove_fault_id(root_cause)
+
+	# Populate possible_anomalies in root_cause with full anomaly objects
+	if root_cause:
+		possible_names = root_cause.get("possible_anomalies", [])
+		anomalies_list = []
+		for anomaly_name in possible_names:
+			anomaly_obj = anomalies.get(anomaly_name)
+			if anomaly_obj:
+				anomalies_list.append(anomaly_obj)
+		root_cause = {**root_cause, "possible_anomalies": anomalies_list}
+
+	# Get the machine object and extract mode enums for expansion
+	machine_obj = None
+	safety_modes_enum = None
+	joint_modes_enum = None
+	robot_modes_enum = None
+	if metadata:
+		machine_id = metadata.get("machine_id")
+		if isinstance(machine_id, int) and machine_id in machines:
+			raw_machine = machines[machine_id]
+			safety_modes_enum = raw_machine.get("safety_modes", {}).get("enum")
+			joint_modes_enum = raw_machine.get("joint_modes", {}).get("enum")
+			robot_modes_enum = raw_machine.get("robot_modes", {}).get("enum")
+			# Remove mode definitions from machine_obj for prompt
+			machine_obj = {k: v for k, v in raw_machine.items() 
+			               if k not in ["safety_modes", "joint_modes", "robot_modes"]}
+	
+	full_time_series = strip_null_features(subseries)
+	full_time_series = sort_feature_keys(full_time_series)
+	full_time_series = expand_mode_feature(full_time_series, "safety_mode", safety_modes_enum)
+	for i in range(6):
+		full_time_series = expand_mode_feature(full_time_series, f"joint_mode_{i}", joint_modes_enum)
+	full_time_series = expand_mode_feature(full_time_series, "robot_mode", robot_modes_enum)
+	
+	time_series = remove_feature(full_time_series, "fault_label")
+	time_series, constant_features = remove_constant_features(time_series)
+	constant_features = expand_constant_mode_feature(constant_features, "safety_mode", safety_modes_enum)
+	for i in range(6):
+		constant_features = expand_constant_mode_feature(constant_features, f"joint_mode_{i}", joint_modes_enum)
+	constant_features = expand_constant_mode_feature(constant_features, "robot_mode", robot_modes_enum)
+	constant_features = consolidate_joint_modes(constant_features)
+	time_series = sort_feature_keys(time_series)
+
+	item = {
+		"question": question_text,
+		"root_cause": root_cause,
+		"machine": machine_obj,
+	}
+	if constant_features:
+		item["notes"] = {
+			"disclaimer": "these features stayed constant at the following values",
+			"constant_features": {
+				k: format_note_value(constant_features[k])
+				for k in sorted(constant_features.keys())
+			},
+		}
+	item["time_series"] = time_series
+	
+	return item
+
+
 def generate_level3_questions(
 	input_dir: Path,
 	output_dir: Path,
@@ -302,6 +414,7 @@ def generate_level3_questions(
 	if not episode_files:
 		raise FileNotFoundError(f"No episode JSON files found in {input_dir}")
 
+	episode_data: List[Dict[str, Any]] = []
 	for episode_path in episode_files:
 		rows = load_json(episode_path)
 		if not isinstance(rows, list):
@@ -321,72 +434,63 @@ def generate_level3_questions(
 		else:
 			exp_id = episode_stem
 
+		episode_data.append({
+			"exp_id": exp_id,
+			"rows": rows,
+			"metadata": metadata,
+		})
+
+	if not episode_data:
+		raise FileNotFoundError(f"No valid episode JSON files found in {input_dir}")
+
+	def _pick_other_episode(excluded: set[str]) -> Optional[Dict[str, Any]]:
+		candidates = [ep for ep in episode_data if ep["exp_id"] not in excluded]
+		if not candidates:
+			return None
+		return random.choice(candidates)
+
+	for episode in episode_data:
 		for sample_idx in range(samples_per_episode):
-			subseries = sample_subseries(rows, min_len, max_len)
-			fault_label = pick_fault_label(subseries)
-			root_cause = root_causes.get(fault_label)
-			root_cause = remove_fault_id(root_cause)
+			current_episode = episode
+			excluded_ids = {current_episode["exp_id"]}
+			attempts = 0
+			subseries: List[Dict[str, Any]] = []
+			item: Dict[str, Any] = {}
 
-			# Populate possible_anomalies in root_cause with full anomaly objects
-			if root_cause:
-				possible_names = root_cause.get("possible_anomalies", [])
-				anomalies_list = []
-				for anomaly_name in possible_names:
-					anomaly_obj = anomalies.get(anomaly_name)
-					if anomaly_obj:
-						anomalies_list.append(anomaly_obj)
-				root_cause = {**root_cause, "possible_anomalies": anomalies_list}
+			while True:
+				attempts += 1
+				rows = current_episode["rows"]
+				metadata = current_episode["metadata"]
+				exp_id = current_episode["exp_id"]
 
-			question = random.choice(phrases)
+				subseries = sample_subseries(rows, min_len, max_len)
+				question = random.choice(phrases)
+
+				# Generate the prompt using the modular function
+				item = generate_prompt(
+					subseries=subseries,
+					metadata=metadata,
+					question_text=question,
+					root_causes=root_causes,
+					anomalies=anomalies,
+					machines=machines,
+				)
+
+				if not is_inactive_prompt(item, INACTIVE_CONSTANT_THRESHOLD):
+					break
+
+				if attempts >= MAX_RESAMPLE_ATTEMPTS:
+					next_episode = _pick_other_episode(excluded_ids)
+					if next_episode is None:
+						logger.warning(
+							f"All episodes inactive for prompt {sample_idx}; keeping last inactive sample"
+						)
+						break
+					current_episode = next_episode
+					excluded_ids.add(current_episode["exp_id"])
+					attempts = 0
 
 			out_file = output_dir / f"experiment_{exp_id}_prompt_{sample_idx}.json"
-			
-			# Get the machine object and extract mode enums for expansion
-			machine_obj = None
-			safety_modes_enum = None
-			joint_modes_enum = None
-			robot_modes_enum = None
-			if metadata:
-				machine_id = metadata.get("machine_id")
-				if isinstance(machine_id, int) and machine_id in machines:
-					raw_machine = machines[machine_id]
-					safety_modes_enum = raw_machine.get("safety_modes", {}).get("enum")
-					joint_modes_enum = raw_machine.get("joint_modes", {}).get("enum")
-					robot_modes_enum = raw_machine.get("robot_modes", {}).get("enum")
-					# Remove mode definitions from machine_obj for prompt
-					machine_obj = {k: v for k, v in raw_machine.items() 
-					               if k not in ["safety_modes", "joint_modes", "robot_modes"]}
-			
-			full_time_series = strip_null_features(subseries)
-			full_time_series = sort_feature_keys(full_time_series)
-			full_time_series = expand_mode_feature(full_time_series, "safety_mode", safety_modes_enum)
-			for i in range(6):
-				full_time_series = expand_mode_feature(full_time_series, f"joint_mode_{i}", joint_modes_enum)
-			full_time_series = expand_mode_feature(full_time_series, "robot_mode", robot_modes_enum)
-			
-			time_series = remove_feature(full_time_series, "fault_label")
-			time_series, constant_features = remove_constant_features(time_series)
-			constant_features = expand_constant_mode_feature(constant_features, "safety_mode", safety_modes_enum)
-			for i in range(6):
-				constant_features = expand_constant_mode_feature(constant_features, f"joint_mode_{i}", joint_modes_enum)
-			constant_features = expand_constant_mode_feature(constant_features, "robot_mode", robot_modes_enum)
-			constant_features = consolidate_joint_modes(constant_features)
-			time_series = sort_feature_keys(time_series)
-
-			item = {
-				"question": question,
-				"root_cause": root_cause,
-				"machine": machine_obj,
-			}
-			if constant_features:
-				item["notes"] = {
-					"disclaimer": "these features stayed constant at the following values",
-					"constant_features": {
-						k: format_note_value(constant_features[k])
-						for k in sorted(constant_features.keys())
-					},
-				}
-			item["time_series"] = time_series
 			with out_file.open("w", encoding="utf-8") as f:
 				json.dump(item, f, indent=2)
 
@@ -395,10 +499,31 @@ def generate_level3_questions(
 			# Export CSV if test mode is enabled
 			if test_mode:
 				csv_file = out_file.with_suffix(".csv")
+				# Reconstruct full_time_series for CSV export
+				full_time_series = strip_null_features(subseries)
+				full_time_series = sort_feature_keys(full_time_series)
+				# Expand modes for CSV
+				if metadata:
+					machine_id = metadata.get("machine_id")
+					if isinstance(machine_id, int) and machine_id in machines:
+						raw_machine = machines[machine_id]
+						safety_modes_enum = raw_machine.get("safety_modes", {}).get("enum")
+						joint_modes_enum = raw_machine.get("joint_modes", {}).get("enum")
+						robot_modes_enum = raw_machine.get("robot_modes", {}).get("enum")
+						full_time_series = expand_mode_feature(full_time_series, "safety_mode", safety_modes_enum)
+						for i in range(6):
+							full_time_series = expand_mode_feature(full_time_series, f"joint_mode_{i}", joint_modes_enum)
+						full_time_series = expand_mode_feature(full_time_series, "robot_mode", robot_modes_enum)
+				
 				csv_rows = full_time_series
 				if csv_rows:
-					# Get all field names from the first row
-					fieldnames = sorted(csv_rows[0].keys())
+					# Get all field names and put timestamp_ms first
+					all_keys = sorted(csv_rows[0].keys())
+					if "timestamp_ms" in all_keys:
+						all_keys.remove("timestamp_ms")
+						fieldnames = ["timestamp_ms"] + all_keys
+					else:
+						fieldnames = all_keys
 					with csv_file.open("w", encoding="utf-8", newline="") as csvf:
 						writer = csv.DictWriter(csvf, fieldnames=fieldnames)
 						writer.writeheader()
