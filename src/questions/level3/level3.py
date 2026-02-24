@@ -144,6 +144,78 @@ def format_note_value(value: Any) -> Any:
 	return value
 
 
+def expand_mode_feature(
+	rows: List[Dict[str, Any]],
+	feature_name: str,
+	modes_enum: Optional[List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+	if not modes_enum or not rows or feature_name not in rows[0]:
+		return rows
+	
+	# Build lookup from value to full object
+	lookup: Dict[Any, Dict[str, Any]] = {}
+	for mode in modes_enum:
+		value = mode.get("value")
+		if value is not None:
+			lookup[value] = mode
+	
+	expanded: List[Dict[str, Any]] = []
+	for row in rows:
+		new_row = {**row}
+		mode_val = row.get(feature_name)
+		if mode_val is not None and mode_val in lookup:
+			new_row[feature_name] = lookup[mode_val]
+		expanded.append(new_row)
+	return expanded
+
+
+def expand_constant_mode_feature(
+	constant_features: Dict[str, Any],
+	feature_name: str,
+	modes_enum: Optional[List[Dict[str, Any]]],
+) -> Dict[str, Any]:
+	if not modes_enum or feature_name not in constant_features:
+		return constant_features
+	
+	mode_val = constant_features.get(feature_name)
+	# Skip if already expanded (is a dict)
+	if isinstance(mode_val, dict):
+		return constant_features
+	
+	# Build lookup from value to full object
+	lookup: Dict[Any, Dict[str, Any]] = {}
+	for mode in modes_enum:
+		value = mode.get("value")
+		if value is not None:
+			lookup[value] = mode
+	
+	if mode_val is not None and mode_val in lookup:
+		return {**constant_features, feature_name: lookup[mode_val]}
+	return constant_features
+
+
+def consolidate_joint_modes(constant_features: Dict[str, Any]) -> Dict[str, Any]:
+	"""If all 6 joint modes have the same constant value, consolidate to single joint_modes key."""
+	joint_mode_keys = [f"joint_mode_{i}" for i in range(6)]
+	
+	# Check if all 6 joint modes are present in constants
+	if not all(key in constant_features for key in joint_mode_keys):
+		return constant_features
+	
+	# Get all joint mode values
+	joint_values = [constant_features[key] for key in joint_mode_keys]
+	
+	# Check if all are equal (works for both int and dict)
+	first_value = joint_values[0]
+	if all(v == first_value for v in joint_values[1:]):
+		# All same - consolidate
+		result = {k: v for k, v in constant_features.items() if k not in joint_mode_keys}
+		result["joint_modes"] = first_value
+		return result
+	
+	return constant_features
+
+
 def remove_constant_features(
 	rows: List[Dict[str, Any]],
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
@@ -269,17 +341,36 @@ def generate_level3_questions(
 
 			out_file = output_dir / f"experiment_{exp_id}_prompt_{sample_idx}.json"
 			
-			# Get the machine object corresponding to the machine_id from metadata
+			# Get the machine object and extract mode enums for expansion
 			machine_obj = None
+			safety_modes_enum = None
+			joint_modes_enum = None
+			robot_modes_enum = None
 			if metadata:
 				machine_id = metadata.get("machine_id")
 				if isinstance(machine_id, int) and machine_id in machines:
-					machine_obj = machines[machine_id]
+					raw_machine = machines[machine_id]
+					safety_modes_enum = raw_machine.get("safety_modes", {}).get("enum")
+					joint_modes_enum = raw_machine.get("joint_modes", {}).get("enum")
+					robot_modes_enum = raw_machine.get("robot_modes", {}).get("enum")
+					# Remove mode definitions from machine_obj for prompt
+					machine_obj = {k: v for k, v in raw_machine.items() 
+					               if k not in ["safety_modes", "joint_modes", "robot_modes"]}
 			
 			full_time_series = strip_null_features(subseries)
 			full_time_series = sort_feature_keys(full_time_series)
+			full_time_series = expand_mode_feature(full_time_series, "safety_mode", safety_modes_enum)
+			for i in range(6):
+				full_time_series = expand_mode_feature(full_time_series, f"joint_mode_{i}", joint_modes_enum)
+			full_time_series = expand_mode_feature(full_time_series, "robot_mode", robot_modes_enum)
+			
 			time_series = remove_feature(full_time_series, "fault_label")
 			time_series, constant_features = remove_constant_features(time_series)
+			constant_features = expand_constant_mode_feature(constant_features, "safety_mode", safety_modes_enum)
+			for i in range(6):
+				constant_features = expand_constant_mode_feature(constant_features, f"joint_mode_{i}", joint_modes_enum)
+			constant_features = expand_constant_mode_feature(constant_features, "robot_mode", robot_modes_enum)
+			constant_features = consolidate_joint_modes(constant_features)
 			time_series = sort_feature_keys(time_series)
 
 			item = {
