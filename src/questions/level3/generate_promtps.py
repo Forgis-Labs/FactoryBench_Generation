@@ -22,7 +22,8 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 INACTIVE_CONSTANT_THRESHOLD = 55
-MAX_RESAMPLE_ATTEMPTS = 5
+MAX_RESAMPLE_ATTEMPTS = 10
+INACTIVITY_TRIM = 5
 
 
 def load_json(path: Path) -> Any:
@@ -148,10 +149,59 @@ def _count_constant_feature_keys(constant_features: Dict[str, Any]) -> int:
 	return count
 
 
-def is_inactive_prompt(item: Dict[str, Any], threshold: int = INACTIVE_CONSTANT_THRESHOLD) -> bool:
-	notes = item.get("notes", {}) or {}
-	constant_features = notes.get("constant_features", {})
-	if not isinstance(constant_features, dict) or not constant_features:
+def _trim_for_inactivity(rows: List[Dict[str, Any]], trim: int = INACTIVITY_TRIM) -> List[Dict[str, Any]]:
+	if len(rows) <= trim * 2:
+		return rows
+	return rows[trim:-trim]
+
+
+def _constant_features_for_inactivity(
+	rows: List[Dict[str, Any]],
+	metadata: Optional[Dict[str, Any]],
+	machines: Dict[int, Dict[str, Any]],
+) -> Dict[str, Any]:
+	# Get the machine object and extract mode enums for expansion
+	machine_obj = None
+	safety_modes_enum = None
+	joint_modes_enum = None
+	robot_modes_enum = None
+	if metadata:
+		machine_id = metadata.get("machine_id")
+		if isinstance(machine_id, int) and machine_id in machines:
+			raw_machine = machines[machine_id]
+			safety_modes_enum = raw_machine.get("safety_modes", {}).get("enum")
+			joint_modes_enum = raw_machine.get("joint_modes", {}).get("enum")
+			robot_modes_enum = raw_machine.get("robot_modes", {}).get("enum")
+			machine_obj = {k: v for k, v in raw_machine.items()
+			               if k not in ["safety_modes", "joint_modes", "robot_modes"]}
+
+	full_time_series = strip_null_features(rows)
+	full_time_series = sort_feature_keys(full_time_series)
+	full_time_series = expand_mode_feature(full_time_series, "safety_mode", safety_modes_enum)
+	for i in range(6):
+		full_time_series = expand_mode_feature(full_time_series, f"joint_mode_{i}", joint_modes_enum)
+	full_time_series = expand_mode_feature(full_time_series, "robot_mode", robot_modes_enum)
+
+	time_series = remove_feature(full_time_series, "fault_label")
+	_, constant_features = remove_constant_features(time_series)
+	constant_features = expand_constant_mode_feature(constant_features, "safety_mode", safety_modes_enum)
+	for i in range(6):
+		constant_features = expand_constant_mode_feature(constant_features, f"joint_mode_{i}", joint_modes_enum)
+	constant_features = expand_constant_mode_feature(constant_features, "robot_mode", robot_modes_enum)
+	constant_features = consolidate_joint_modes(constant_features)
+
+	return constant_features
+
+
+def is_inactive_subseries(
+	rows: List[Dict[str, Any]],
+	metadata: Optional[Dict[str, Any]],
+	machines: Dict[int, Dict[str, Any]],
+	threshold: int = INACTIVE_CONSTANT_THRESHOLD,
+) -> bool:
+	trimmed = _trim_for_inactivity(rows)
+	constant_features = _constant_features_for_inactivity(trimmed, metadata, machines)
+	if not constant_features:
 		return False
 	return _count_constant_feature_keys(constant_features) >= threshold
 
@@ -466,17 +516,16 @@ def generate_level3_questions(
 				subseries = sample_subseries(rows, min_len, max_len)
 				question = random.choice(phrases)
 
-				# Generate the prompt using the modular function
-				item = generate_prompt(
-					subseries=subseries,
-					metadata=metadata,
-					question_text=question,
-					root_causes=root_causes,
-					anomalies=anomalies,
-					machines=machines,
-				)
-
-				if not is_inactive_prompt(item, INACTIVE_CONSTANT_THRESHOLD):
+				if not is_inactive_subseries(subseries, metadata, machines, INACTIVE_CONSTANT_THRESHOLD):
+					# Generate the prompt using the modular function
+					item = generate_prompt(
+						subseries=subseries,
+						metadata=metadata,
+						question_text=question,
+						root_causes=root_causes,
+						anomalies=anomalies,
+						machines=machines,
+					)
 					break
 
 				if attempts >= MAX_RESAMPLE_ATTEMPTS:
