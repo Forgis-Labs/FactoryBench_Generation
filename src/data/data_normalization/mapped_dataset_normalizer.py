@@ -18,6 +18,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -132,6 +133,7 @@ def build_row_dict(
     mapping: Dict[str, str],
     schema_fields: List[str],
     faults: Dict[str, Any],
+    round_floats: bool = False,
 ) -> Dict[str, Any]:
     row_dict: Dict[str, Any] = {}
     for out_field in schema_fields:
@@ -142,6 +144,12 @@ def build_row_dict(
                 value = None
             if out_field == "fault_label":
                 value = map_fault_label(value, faults)
+            # Round floats if requested
+            if round_floats and value is not None and isinstance(value, (float, np.floating)):
+                value = round(value, 2)
+                # Remove trailing zeros
+                if value == int(value):
+                    value = int(value)
             row_dict[out_field] = value
         else:
             row_dict[out_field] = None
@@ -154,11 +162,12 @@ def build_episode_rows(
     absent: List[str],
     schema_fields: List[str],
     faults: Dict[str, Any],
+    round_floats: bool = False,
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
 
     for _, row in df.iterrows():
-        rows.append(build_row_dict(row, mapping, schema_fields, faults))
+        rows.append(build_row_dict(row, mapping, schema_fields, faults, round_floats))
 
     return rows
 
@@ -259,13 +268,18 @@ def normalize_dataset(
     episode_size: int,
     include_metadata: bool,
     output_basename: Optional[str] = None,
+    round_floats: bool = False,
 ) -> List[Dict[str, str]]:
     repo_root = Path(__file__).resolve().parents[3]
     mapping, absent, faults, machine_id = load_mapping(dataset_name, repo_root)
     schema_fields = build_schema_fields(mapping, absent)
 
     results: List[Dict[str, str]] = []
-    output_dir = output_root / dataset_name
+    # Check if output_root already ends with dataset_name to avoid double nesting
+    if output_root.name == dataset_name:
+        output_dir = output_root
+    else:
+        output_dir = output_root / dataset_name
 
     if episode_column:
         class EpisodeWriter:
@@ -319,7 +333,7 @@ def normalize_dataset(
                     writers[ep_key] = EpisodeWriter(ep_id)
                     episode_order.append(ep_key)
 
-                row_dict = build_row_dict(row, mapping, schema_fields, faults)
+                row_dict = build_row_dict(row, mapping, schema_fields, faults, round_floats)
                 writers[ep_key].write_row(row_dict)
 
             if stop_reading:
@@ -367,7 +381,7 @@ def normalize_dataset(
                     break
 
                 row_in_episode += 1
-                row_dict = build_row_dict(row, mapping, schema_fields, faults)
+                row_dict = build_row_dict(row, mapping, schema_fields, faults, round_floats)
                 all_rows.append(row_dict)
 
                 if row_in_episode >= episode_size:
@@ -450,6 +464,16 @@ def main() -> int:
         action="store_true",
         help="Skip metadata file generation",
     )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Test mode: keep only 2 samples per fault_label",
+    )
+    parser.add_argument(
+        "--round",
+        action="store_true",
+        help="Round float values to 2 decimals and remove trailing zeros",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
@@ -465,6 +489,42 @@ def main() -> int:
     results: List[Dict[str, str]] = []
     multi_input = len(input_csvs) > 1
 
+    # In test mode, filter which experiment CSVs to process
+    if args.test:
+        # Detect fault label column
+        fault_col = None
+        sample_data = pd.read_csv(input_csvs[0], nrows=1, low_memory=False)
+        if "fault_label" in sample_data.columns:
+            fault_col = "fault_label"
+        elif "label" in sample_data.columns:
+            fault_col = "label"
+        
+        if fault_col:
+            # For each experiment, get its fault label
+            exp_labels: Dict[Path, Any] = {}
+            for csv_path in input_csvs:
+                df = pd.read_csv(csv_path, usecols=[fault_col], low_memory=False)
+                if not df.empty:
+                    label = df[fault_col].iloc[0]
+                    exp_labels[csv_path] = label
+            
+            # Keep only 2 experiments per label
+            label_counts: Dict[Any, int] = {}
+            csvs_to_process = []
+            for csv_path in input_csvs:
+                label = exp_labels.get(csv_path)
+                if label is not None:
+                    count = label_counts.get(label, 0)
+                    if count < 2:
+                        csvs_to_process.append(csv_path)
+                        label_counts[label] = count + 1
+            
+            logger.info(f"Test mode: selected {len(csvs_to_process)} experiments (2 per label)")
+            input_csvs = csvs_to_process
+        else:
+            logger.warning(f"No fault_label or label column found")
+    
+    # Process selected CSVs through normal pipeline
     for csv_path in input_csvs:
         output_basename = None
         if multi_input or csv_path.stem.startswith("experiment_"):
@@ -480,6 +540,7 @@ def main() -> int:
                 episode_size=args.episode_size,
                 include_metadata=not args.no_metadata,
                 output_basename=output_basename,
+                round_floats=args.round,
             )
         )
 

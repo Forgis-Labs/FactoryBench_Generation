@@ -9,11 +9,15 @@ maps fault_label to a root cause and anomaly, and writes question items to:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import logging
+import math
 import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +121,82 @@ def strip_null_features(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 	return cleaned
 
 
+def remove_feature(rows: List[Dict[str, Any]], feature: str) -> List[Dict[str, Any]]:
+	cleaned: List[Dict[str, Any]] = []
+	for row in rows:
+		cleaned.append({k: v for k, v in row.items() if k != feature})
+	return cleaned
+
+
+def sort_feature_keys(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+	sorted_rows: List[Dict[str, Any]] = []
+	for row in rows:
+		sorted_rows.append({k: row[k] for k in sorted(row.keys())})
+	return sorted_rows
+
+
+def format_note_value(value: Any) -> Any:
+	if isinstance(value, (int, float, np.floating)):
+		rounded = round(float(value), 2)
+		if rounded.is_integer():
+			return int(rounded)
+		return rounded
+	return value
+
+
+def remove_constant_features(
+	rows: List[Dict[str, Any]],
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+	if not rows:
+		return rows, {}
+
+	constants: Dict[str, Any] = {}
+	keys = set(rows[0].keys())
+	for key in keys:
+		values: List[Any] = []
+		for row in rows:
+			value = row.get(key)
+			if value is None:
+				continue
+			values.append(value)
+
+		if not values:
+			continue
+
+		# Numeric features: treat small relative variation as constant
+		if all(isinstance(v, (int, float, np.floating)) for v in values):
+			series = np.array([float(v) for v in values], dtype=float)
+			if series.size < 2:
+				constants[key] = float(series.mean())
+				continue
+			min_val = float(series.min())
+			max_val = float(series.max())
+			mean_val = float(series.mean())
+			if math.isclose(max_val, min_val):
+				constants[key] = mean_val
+				continue
+			std_val = float(series.std())
+			eps = 1e-9
+			rel_range = (max_val - min_val) / (abs(mean_val) + eps)
+			cv = std_val / (abs(mean_val) + eps)
+			if rel_range < 0.02 or cv < 0.01:
+				constants[key] = mean_val
+			continue
+
+		# Non-numeric features: treat exact-constant values as constant
+		first_value = values[0]
+		if all(value == first_value for value in values[1:]):
+			constants[key] = first_value
+
+	if not constants:
+		return rows, {}
+
+	filtered: List[Dict[str, Any]] = []
+	for row in rows:
+		filtered.append({k: v for k, v in row.items() if k not in constants})
+	return filtered, constants
+
+
 def remove_fault_id(root_cause: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 	if root_cause is None:
 		return None
@@ -134,6 +214,7 @@ def generate_level3_questions(
 	max_len: int = 64,
 	samples_per_episode: int = 1,
 	seed: Optional[int] = None,
+	test_mode: bool = False,
 ) -> None:
 	if seed is not None:
 		random.seed(seed)
@@ -174,13 +255,15 @@ def generate_level3_questions(
 			root_cause = root_causes.get(fault_label)
 			root_cause = remove_fault_id(root_cause)
 
-			anomalies_list = []
+			# Populate possible_anomalies in root_cause with full anomaly objects
 			if root_cause:
-				possible = root_cause.get("possible_anomalies", [])
-				for anomaly_name in possible:
+				possible_names = root_cause.get("possible_anomalies", [])
+				anomalies_list = []
+				for anomaly_name in possible_names:
 					anomaly_obj = anomalies.get(anomaly_name)
 					if anomaly_obj:
 						anomalies_list.append(anomaly_obj)
+				root_cause = {**root_cause, "possible_anomalies": anomalies_list}
 
 			question = random.choice(phrases)
 
@@ -193,19 +276,43 @@ def generate_level3_questions(
 				if isinstance(machine_id, int) and machine_id in machines:
 					machine_obj = machines[machine_id]
 			
+			full_time_series = strip_null_features(subseries)
+			full_time_series = sort_feature_keys(full_time_series)
+			time_series = remove_feature(full_time_series, "fault_label")
+			time_series, constant_features = remove_constant_features(time_series)
+			time_series = sort_feature_keys(time_series)
+
 			item = {
 				"question": question,
-				"time_series": strip_null_features(subseries),
 				"root_cause": root_cause,
-				"possible_anomalies": anomalies_list,
-				"source_episode": episode_path.name,
-				"metadata": metadata,
 				"machine": machine_obj,
 			}
+			if constant_features:
+				item["notes"] = {
+					"disclaimer": "these features stayed constant at the following values",
+					"constant_features": {
+						k: format_note_value(constant_features[k])
+						for k in sorted(constant_features.keys())
+					},
+				}
+			item["time_series"] = time_series
 			with out_file.open("w", encoding="utf-8") as f:
 				json.dump(item, f, indent=2)
 
 			logger.info(f"✓ Wrote {out_file}")
+
+			# Export CSV if test mode is enabled
+			if test_mode:
+				csv_file = out_file.with_suffix(".csv")
+				csv_rows = full_time_series
+				if csv_rows:
+					# Get all field names from the first row
+					fieldnames = sorted(csv_rows[0].keys())
+					with csv_file.open("w", encoding="utf-8", newline="") as csvf:
+						writer = csv.DictWriter(csvf, fieldnames=fieldnames)
+						writer.writeheader()
+						writer.writerows(csv_rows)
+					logger.info(f"✓ Wrote CSV {csv_file}")
 
 
 def main() -> None:
@@ -241,6 +348,7 @@ def main() -> None:
 		help="Number of questions to sample per episode",
 	)
 	parser.add_argument("--seed", type=int, default=None, help="Random seed")
+	parser.add_argument("--test", action="store_true", help="Export time series as CSV files")
 	parser.add_argument("-v", "--verbose", action="store_true")
 
 	args = parser.parse_args()
@@ -266,6 +374,7 @@ def main() -> None:
 		max_len=args.max_len,
 		samples_per_episode=args.samples_per_episode,
 		seed=args.seed,
+		test_mode=args.test,
 	)
 
 
