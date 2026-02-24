@@ -182,6 +182,11 @@ def main() -> None:
     max_timestamps = args.max_timestamps
     if max_timestamps is None and args.max_rows is not None:
         max_timestamps = args.max_rows
+    
+    # Multiply by 10 to account for downsampling (keep every 10th row)
+    hdf5_read_limit = None
+    if max_timestamps is not None:
+        hdf5_read_limit = max_timestamps * 10
 
     metadata: Dict[str, Dict[str, Any]] = {}
 
@@ -189,12 +194,12 @@ def main() -> None:
     with pd.HDFStore(h5_path, mode="r") as store:
         if "/complete_data" in store.keys():
             storer = store.get_storer("complete_data")
-            if storer is not None and storer.is_table and max_timestamps is not None:
-                data_frame = store.select("complete_data", stop=max_timestamps)
+            if storer is not None and storer.is_table and hdf5_read_limit is not None:
+                data_frame = store.select("complete_data", stop=hdf5_read_limit)
             else:
                 data_frame = store["complete_data"]
-                if max_timestamps is not None:
-                    data_frame = data_frame.head(max_timestamps)
+                if hdf5_read_limit is not None:
+                    data_frame = data_frame.head(hdf5_read_limit)
 
             metadata["/complete_data"] = {
                 "rows_exported": int(len(data_frame)),
@@ -212,7 +217,7 @@ def main() -> None:
                     lengths.append(ds.shape[0])
 
             base_len = min(lengths) if lengths else 1
-            target_rows = base_len if max_timestamps is None else min(max_timestamps, base_len)
+            target_rows = base_len if hdf5_read_limit is None else min(hdf5_read_limit, base_len)
 
             for ds in tqdm(datasets, desc="Converting datasets", unit="dataset"):
                 h5_dataset_path = ds.name
@@ -231,6 +236,13 @@ def main() -> None:
             data_frame = pd.concat(frames, axis=1)
 
     if data_frame is not None:
+        # Downsample: keep every 10th row to decrease frequency
+        data_frame = data_frame.iloc[::10].reset_index(drop=True)
+        
+        # Apply max_timestamps limit after downsampling
+        if max_timestamps is not None and len(data_frame) > max_timestamps:
+            data_frame = data_frame.head(max_timestamps)
+        
         # Export by experiments into experiment_{i}/ subfolders
         export_by_experiments(data_frame, out_dir, max_timestamps)
     with index_path.open("w", encoding="utf-8") as f:
