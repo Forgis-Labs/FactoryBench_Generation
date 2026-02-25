@@ -261,6 +261,36 @@
           "description": "Robot arm firmware is being updated."
         }
       ]
+    },
+
+    "runtime_states": {
+      "variable": "runtime_state",
+      "enum": [
+        {
+          "name": "STOPPING",
+          "value": 0
+        },
+        {
+          "name": "STOPPED",
+          "value": 1
+        },
+        {
+          "name": "PLAYING",
+          "value": 2
+        },
+        {
+          "name": "PAUSING",
+          "value": 3
+        },
+        {
+          "name": "PAUSED",
+          "value": 4
+        },
+        {
+          "name": "RESUMING",
+          "value": 5
+        }
+      ]
     }
   },
   {
@@ -294,6 +324,7 @@
     "notes": "Exact CNC machine make/model not specified in dataset documentation",
     "safety_modes": {},
     "joint_modes": {},
-    "robot_modes": {}
+    "robot_modes": {},
+    "runtime_states": {}
   }
 ]

@@ -139,6 +139,121 @@ def sort_feature_keys(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 	return sorted_rows
 
 
+def _create_feature_acronyms(feature_names: List[str]) -> Dict[str, str]:
+	"""
+	Create short acronyms for feature names by taking the first letter of each word.
+	For numbered features (ending in _N), the number is appended to the acronym.
+	E.g., feedback_speed_0 -> 'fs0'
+	
+	If collisions occur, expand by adding more letters from the last word.
+	"""
+	import re
+	
+	def make_acronym(name: str, expansion: int = 0) -> str:
+		"""expansion: how many extra letters to add from the last word beyond the first."""
+		match = re.match(r"^(.+?)_(\d+)$", name)
+		if match:
+			base_name = match.group(1)
+			number = match.group(2)
+			words = base_name.split("_")
+		else:
+			words = name.split("_")
+			number = ""
+		
+		# Start with first letter of each word
+		acro = "".join(word[0].lower() for word in words if word)
+		
+		# Add extra letters from last word if needed
+		last_word = words[-1] if words else ""
+		if expansion > 0 and len(last_word) > 1:
+			for i in range(1, min(1 + expansion, len(last_word))):
+				acro += last_word[i].lower()
+		
+		return f"{acro}{number}" if number else acro
+	
+	# Try with increasing expansion until no collisions
+	expansion = 0
+	acronyms = {}
+	while True:
+		acronyms = {}
+		for name in feature_names:
+			acronyms[name] = make_acronym(name, expansion)
+		
+		# Check for collisions
+		acro_set = set(acronyms.values())
+		if len(acro_set) == len(feature_names):
+			break  # No collisions
+		
+		expansion += 1
+		if expansion > 10:  # Safety limit
+			logger.warning(f"Could not resolve all acronym collisions after {expansion} attempts")
+			break
+	
+	return acronyms
+
+
+def _encode_timestep(row: Dict[str, Any], acronyms: Dict[str, str]) -> str:
+	"""Encode a single timestep as a string with format: 'tm_value|aco_value|...'.
+	Timestamp goes first, followed by other features in sorted order."""
+	parts = []
+	
+	# Handle timestamp_ms first if present
+	if "timestamp_ms" in row:
+		value = row["timestamp_ms"]
+		if value is not None and isinstance(value, (int, float, np.floating)):
+			acronym = acronyms.get("timestamp_ms", "timestamp_ms")
+			parts.append(f"{acronym}_{round(float(value), 2)}")
+	
+	# Then handle all other features in sorted order
+	for feature_name in sorted(row.keys()):
+		if feature_name == "timestamp_ms":
+			continue  # Already handled
+		value = row[feature_name]
+		if value is None:
+			continue
+		
+		acronym = acronyms.get(feature_name, feature_name)
+		
+		# Handle numeric features
+		if isinstance(value, (int, float, np.floating)):
+			parts.append(f"{acronym}_{round(float(value), 2)}")
+		# Handle string features (e.g., expanded runtime_state or mode names)
+		elif isinstance(value, str):
+			parts.append(f"{acronym}_{value}")
+		# Handle dict features (e.g., expanded mode objects) - convert to JSON
+		elif isinstance(value, dict):
+			parts.append(f"{acronym}_{json.dumps(value)}")
+	
+	return "|".join(parts)
+
+
+def encode_time_series(rows: List[Dict[str, Any]]) -> tuple[List[str], Dict[str, str]]:
+	"""Convert time series rows to encoded strings with acronym mapping."""
+	if not rows:
+		return [], {}
+
+	# Get all feature names from first row
+	feature_names = sorted(rows[0].keys())
+
+	acronyms = _create_feature_acronyms(feature_names)
+	
+	# Validate: number of acronyms should match number of features
+	if len(acronyms) != len(feature_names):
+		logger.warning(f"Acronym count mismatch: {len(acronyms)} acronyms for {len(feature_names)} features")
+
+	# Encode each timestep
+	encoded = []
+	for row in rows:
+		encoded.append(_encode_timestep(row, acronyms))
+
+	# Create reverse mapping (acronym -> feature name)
+	reverse_mapping = {v: k for k, v in acronyms.items()}
+	return encoded, reverse_mapping
+
+
+
+
+
 def _count_constant_feature_keys(constant_features: Dict[str, Any]) -> int:
 	count = 0
 	for key in constant_features.keys():
@@ -165,6 +280,7 @@ def _constant_features_for_inactivity(
 	safety_modes_enum = None
 	joint_modes_enum = None
 	robot_modes_enum = None
+	runtime_states_enum = None
 	if metadata:
 		machine_id = metadata.get("machine_id")
 		if isinstance(machine_id, int) and machine_id in machines:
@@ -172,8 +288,9 @@ def _constant_features_for_inactivity(
 			safety_modes_enum = raw_machine.get("safety_modes", {}).get("enum")
 			joint_modes_enum = raw_machine.get("joint_modes", {}).get("enum")
 			robot_modes_enum = raw_machine.get("robot_modes", {}).get("enum")
+			runtime_states_enum = raw_machine.get("runtime_states", {}).get("enum")
 			machine_obj = {k: v for k, v in raw_machine.items()
-			               if k not in ["safety_modes", "joint_modes", "robot_modes"]}
+			               if k not in ["safety_modes", "joint_modes", "robot_modes", "runtime_states"]}
 
 	full_time_series = strip_null_features(rows)
 	full_time_series = sort_feature_keys(full_time_series)
@@ -181,6 +298,7 @@ def _constant_features_for_inactivity(
 	for i in range(6):
 		full_time_series = expand_mode_feature(full_time_series, f"joint_mode_{i}", joint_modes_enum)
 	full_time_series = expand_mode_feature(full_time_series, "robot_mode", robot_modes_enum)
+	full_time_series = expand_runtime_state_feature(full_time_series, runtime_states_enum)
 
 	time_series = remove_feature(full_time_series, "fault_label")
 	_, constant_features = remove_constant_features(time_series)
@@ -188,6 +306,7 @@ def _constant_features_for_inactivity(
 	for i in range(6):
 		constant_features = expand_constant_mode_feature(constant_features, f"joint_mode_{i}", joint_modes_enum)
 	constant_features = expand_constant_mode_feature(constant_features, "robot_mode", robot_modes_enum)
+	constant_features = expand_constant_runtime_state_feature(constant_features, runtime_states_enum)
 	constant_features = consolidate_joint_modes(constant_features)
 
 	return constant_features
@@ -223,12 +342,14 @@ def expand_mode_feature(
 	if not modes_enum or not rows or feature_name not in rows[0]:
 		return rows
 	
-	# Build lookup from value to full object
+	# Build lookup from value to full object (without "value" field)
 	lookup: Dict[Any, Dict[str, Any]] = {}
 	for mode in modes_enum:
 		value = mode.get("value")
 		if value is not None:
-			lookup[value] = mode
+			# Remove the "value" field from the mode object
+			mode_obj = {k: v for k, v in mode.items() if k != "value"}
+			lookup[value] = mode_obj
 	
 	expanded: List[Dict[str, Any]] = []
 	for row in rows:
@@ -253,15 +374,72 @@ def expand_constant_mode_feature(
 	if isinstance(mode_val, dict):
 		return constant_features
 	
-	# Build lookup from value to full object
+	# Build lookup from value to full object (without "value" field)
 	lookup: Dict[Any, Dict[str, Any]] = {}
 	for mode in modes_enum:
 		value = mode.get("value")
 		if value is not None:
-			lookup[value] = mode
+			# Remove the "value" field from the mode object
+			mode_obj = {k: v for k, v in mode.items() if k != "value"}
+			lookup[value] = mode_obj
 	
 	if mode_val is not None and mode_val in lookup:
 		return {**constant_features, feature_name: lookup[mode_val]}
+	return constant_features
+
+
+def expand_runtime_state_feature(
+	rows: List[Dict[str, Any]],
+	runtime_states_enum: Optional[List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+	"""Map runtime_state numeric values to their name strings."""
+	if not runtime_states_enum or not rows:
+		return rows
+	
+	# Build lookup from value to name
+	lookup: Dict[Any, str] = {}
+	for state in runtime_states_enum:
+		value = state.get("value")
+		name = state.get("name")
+		if value is not None and name is not None:
+			lookup[value] = name
+	
+	if not lookup:
+		return rows
+	
+	expanded: List[Dict[str, Any]] = []
+	for row in rows:
+		new_row = {**row}
+		state_val = row.get("runtime_state")
+		if state_val is not None and state_val in lookup:
+			new_row["runtime_state"] = lookup[state_val]
+		expanded.append(new_row)
+	return expanded
+
+
+def expand_constant_runtime_state_feature(
+	constant_features: Dict[str, Any],
+	runtime_states_enum: Optional[List[Dict[str, Any]]],
+) -> Dict[str, Any]:
+	"""Map constant runtime_state numeric values to their name strings."""
+	if not runtime_states_enum or "runtime_state" not in constant_features:
+		return constant_features
+	
+	state_val = constant_features.get("runtime_state")
+	# Skip if already expanded (is a string)
+	if isinstance(state_val, str):
+		return constant_features
+	
+	# Build lookup from value to name
+	lookup: Dict[Any, str] = {}
+	for state in runtime_states_enum:
+		value = state.get("value")
+		name = state.get("name")
+		if value is not None and name is not None:
+			lookup[value] = name
+	
+	if state_val is not None and state_val in lookup:
+		return {**constant_features, "runtime_state": lookup[state_val]}
 	return constant_features
 
 
@@ -296,6 +474,10 @@ def remove_constant_features(
 	constants: Dict[str, Any] = {}
 	keys = set(rows[0].keys())
 	for key in keys:
+		# Always preserve timestamp_ms - never treat as constant
+		if key == "timestamp_ms":
+			continue
+			
 		values: List[Any] = []
 		for row in rows:
 			value = row.get(key)
@@ -392,6 +574,7 @@ def generate_prompt(
 	safety_modes_enum = None
 	joint_modes_enum = None
 	robot_modes_enum = None
+	runtime_states_enum = None
 	if metadata:
 		machine_id = metadata.get("machine_id")
 		if isinstance(machine_id, int) and machine_id in machines:
@@ -399,9 +582,10 @@ def generate_prompt(
 			safety_modes_enum = raw_machine.get("safety_modes", {}).get("enum")
 			joint_modes_enum = raw_machine.get("joint_modes", {}).get("enum")
 			robot_modes_enum = raw_machine.get("robot_modes", {}).get("enum")
+			runtime_states_enum = raw_machine.get("runtime_states", {}).get("enum")
 			# Remove mode definitions from machine_obj for prompt
 			machine_obj = {k: v for k, v in raw_machine.items() 
-			               if k not in ["safety_modes", "joint_modes", "robot_modes"]}
+			               if k not in ["safety_modes", "joint_modes", "robot_modes", "runtime_states"]}
 	
 	full_time_series = strip_null_features(subseries)
 	full_time_series = sort_feature_keys(full_time_series)
@@ -409,6 +593,7 @@ def generate_prompt(
 	for i in range(6):
 		full_time_series = expand_mode_feature(full_time_series, f"joint_mode_{i}", joint_modes_enum)
 	full_time_series = expand_mode_feature(full_time_series, "robot_mode", robot_modes_enum)
+	full_time_series = expand_runtime_state_feature(full_time_series, runtime_states_enum)
 	
 	time_series = remove_feature(full_time_series, "fault_label")
 	time_series, constant_features = remove_constant_features(time_series)
@@ -416,8 +601,22 @@ def generate_prompt(
 	for i in range(6):
 		constant_features = expand_constant_mode_feature(constant_features, f"joint_mode_{i}", joint_modes_enum)
 	constant_features = expand_constant_mode_feature(constant_features, "robot_mode", robot_modes_enum)
+	constant_features = expand_constant_runtime_state_feature(constant_features, runtime_states_enum)
 	constant_features = consolidate_joint_modes(constant_features)
 	time_series = sort_feature_keys(time_series)
+
+	# Debug: check if timestamp_ms is in all rows
+	has_ts_in_all = all("timestamp_ms" in row for row in time_series)
+	has_ts_in_any = any("timestamp_ms" in row for row in time_series)
+	if has_ts_in_any and not has_ts_in_all:
+		logger.warning(f"timestamp_ms in some but not all rows! {sum(1 for row in time_series if 'timestamp_ms' in row)}/{len(time_series)}")
+	elif has_ts_in_any:
+		logger.debug(f"timestamp_ms in all {len(time_series)} rows")
+	else:
+		logger.warning(f"timestamp_ms NOT in any row after remove_constant_features!")
+	
+	# Encode time series and create format description
+	encoded_time_series, acronym_mapping = encode_time_series(time_series)
 
 	item = {
 		"question": question_text,
@@ -432,7 +631,13 @@ def generate_prompt(
 				for k in sorted(constant_features.keys())
 			},
 		}
-	item["time_series"] = time_series
+	
+	# Add time series format description
+	item["time_series_format"] = {
+		"description": "Each timestep is encoded as a string with features in format 'acronym_value' separated by '|'.",
+		"acronym_mapping": acronym_mapping,
+	}
+	item["time_series"] = encoded_time_series
 	
 	return item
 
@@ -559,41 +764,56 @@ def generate_level3_questions(
 						safety_modes_enum = raw_machine.get("safety_modes", {}).get("enum")
 						joint_modes_enum = raw_machine.get("joint_modes", {}).get("enum")
 						robot_modes_enum = raw_machine.get("robot_modes", {}).get("enum")
+						runtime_states_enum = raw_machine.get("runtime_states", {}).get("enum")
 						full_time_series = expand_mode_feature(full_time_series, "safety_mode", safety_modes_enum)
 						for i in range(6):
 							full_time_series = expand_mode_feature(full_time_series, f"joint_mode_{i}", joint_modes_enum)
 						full_time_series = expand_mode_feature(full_time_series, "robot_mode", robot_modes_enum)
+						full_time_series = expand_runtime_state_feature(full_time_series, runtime_states_enum)
 				
 				csv_rows = full_time_series
 				if csv_rows:
-					# Get all field names and put timestamp_ms first
+					# Identify constant features (excluding fault_label) for column ordering
+					csv_time_series = remove_feature(full_time_series, "fault_label")
+					_, csv_constant_features = remove_constant_features(csv_time_series)
+					constant_keys = sorted(csv_constant_features.keys())
+
+					# Build fieldnames: timestamp_ms leftmost, constants rightmost
 					all_keys = sorted(csv_rows[0].keys())
 					if "timestamp_ms" in all_keys:
 						all_keys.remove("timestamp_ms")
-						fieldnames = ["timestamp_ms"] + all_keys
+						timestamp_keys = ["timestamp_ms"]
 					else:
-						fieldnames = all_keys
-					with csv_file.open("w", encoding="utf-8", newline="") as csvf:
-						writer = csv.DictWriter(csvf, fieldnames=fieldnames)
-						writer.writeheader()
-						writer.writerows(csv_rows)
-					logger.info(f"✓ Wrote CSV {csv_file}")
+						timestamp_keys = []
+
+					non_constant_keys = [
+						key for key in all_keys
+						if key not in constant_keys
+					]
+
+					fieldnames = timestamp_keys + non_constant_keys + constant_keys
+				
+				# Convert dict values (like mode objects) to JSON strings for CSV export
+				csv_rows_serialized = []
+				for row in csv_rows:
+					serialized_row = {}
+					for key, value in row.items():
+						if isinstance(value, dict):
+							serialized_row[key] = json.dumps(value)
+						else:
+							serialized_row[key] = value
+					csv_rows_serialized.append(serialized_row)
+				
+				with csv_file.open("w", encoding="utf-8", newline="") as csvf:
+					writer = csv.DictWriter(csvf, fieldnames=fieldnames)
+					writer.writeheader()
+					writer.writerows(csv_rows_serialized)
 
 
 def main() -> None:
-	parser = argparse.ArgumentParser(description="Generate Level 3 root-cause questions")
-	parser.add_argument(
-		"--input",
-		type=Path,
-		default=Path("datasets/normalized_episodes/aursad"),
-		help="Directory of normalized episode JSON files",
-	)
-	parser.add_argument(
-		"--output",
-		type=Path,
-		default=Path("datasets/questions/level3/prompts"),
-		help="Output directory for generated questions",
-	)
+	parser = argparse.ArgumentParser(description="Generate Level 3 RCA questions from normalized episodes.")
+	parser.add_argument("input", type=Path, help="Input directory with normalized episode JSON files")
+	parser.add_argument("output", type=Path, help="Output directory for question JSON files")
 	parser.add_argument(
 		"--min-len",
 		type=int,
