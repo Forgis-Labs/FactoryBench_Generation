@@ -24,6 +24,9 @@ from openai import OpenAI
 
 from generate_promtps import (
     generate_prompt,
+    is_inactive_subseries,
+    INACTIVE_CONSTANT_THRESHOLD,
+    MAX_RESAMPLE_ATTEMPTS,
     load_json,
     load_phrases,
     load_root_causes,
@@ -48,16 +51,16 @@ def create_batch_request(
 ) -> Dict[str, Any]:
     """Create a single batch request line for the Batch API (Responses endpoint)."""
 
-    combined_prompt = (
-        f"{system_prompt}\n\n"
-        f"{json.dumps({  # keep prompt deterministic
-            'question': prompt_data.get('question'),
-            'root_cause': prompt_data.get('root_cause'),
-            'machine': prompt_data.get('machine'),
-            'notes': prompt_data.get('notes'),
-            'time_series': prompt_data.get('time_series'),
-        }, ensure_ascii=False)}"
-    )
+    prompt_obj = {
+        'question': prompt_data.get('question'),
+        'root_cause': prompt_data.get('root_cause'),
+        'machine': prompt_data.get('machine'),
+        'notes': prompt_data.get('notes'),
+        'time_series_format': prompt_data.get('time_series_format'),
+        'time_series': prompt_data.get('time_series'),
+    }
+    
+    combined_prompt = f"{system_prompt}\n\n{json.dumps(prompt_obj, ensure_ascii=False)}"
 
     return {
         "custom_id": custom_id,
@@ -144,15 +147,36 @@ def create_batch_file(
     # Generate prompts by randomly sampling episodes until we reach total_prompts
     prompt_idx = 0
     while prompt_idx < total_prompts:
-        episode_path, rows, metadata = random.choice(episodes)
-        episode_stem = episode_path.stem
-        exp_id = episode_stem.replace("experiment_", "") if episode_stem.startswith("experiment_") else episode_stem
+        current_episode = random.choice(episodes)
+        excluded_ids: set[str] = set()
+        attempts = 0
+
+        while True:
+            episode_path, rows, metadata = current_episode
+            episode_stem = episode_path.stem
+            exp_id = episode_stem.replace("experiment_", "") if episode_stem.startswith("experiment_") else episode_stem
+
+            attempts += 1
+            subseries = sample_subseries(rows, min_len, max_len)
+
+            if not is_inactive_subseries(subseries, metadata, machines, INACTIVE_CONSTANT_THRESHOLD):
+                break
+
+            if attempts >= MAX_RESAMPLE_ATTEMPTS:
+                excluded_ids.add(exp_id)
+                candidates = [ep for ep in episodes if (ep[0].stem.replace("experiment_", "") if ep[0].stem.startswith("experiment_") else ep[0].stem) not in excluded_ids]
+                if not candidates:
+                    logger.warning(
+                        f"All episodes inactive for prompt {prompt_idx}; keeping last inactive sample"
+                    )
+                    break
+                current_episode = random.choice(candidates)
+                attempts = 0
 
         # Only emit prompts that fall in this batch slice
         in_this_batch = (prompt_idx >= batch_start) and (prompt_idx < batch_end)
 
         if in_this_batch:
-            subseries = sample_subseries(rows, min_len, max_len)
             question = random.choice(phrases)
 
             prompt_data = generate_prompt(
