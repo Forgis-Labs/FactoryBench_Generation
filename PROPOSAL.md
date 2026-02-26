@@ -27,10 +27,15 @@ Questions about the current state of the robot or environment.
 Examples:
 
 - Based on the provided timeseries, describe the kinematic state of the robot at t=2.3s. Which specific parts of the arm are in motion?
+
   A: The robot is actively moving its lower arm structure while keeping its wrist orientation fixed. Specifically, joints 0, 1, and 2 exhibit non-zero velocity. Joints 3, 4, and 5 are completely stationary (zero velocity).
+
 - Analyze the trajectory from t=1.0s to t=3.0s. What phase of a pick-and-place operation does this represent, and what is the physical evidence in the joint behavior?
+
   A: This represents the approach phase. The physical evidence is that joints 0, 1, and 2 have active setpoint velocities to translate the tool center point (TCP) through space, while joints 3, 4, and 5 maintain a constant position, indicating the wrist is holding a fixed orientation as it approaches the target.
+
 - The metadata states the robot is moving unloaded. Does the physical data support this? Explain your reasoning.
+
   A: No, the physical data contradicts the metadata. The effort (current) on joint 1 and joint 2 is elevated by approximately 18% compared to an unloaded baseline for this specific pose. This constant gravitational torque offset indicates the robot is carrying an undeclared load of approximately 2kg.
 
 Focus:
@@ -57,6 +62,7 @@ Focus:
 Example:
 
 - Q: What will be the output rate if a screw comes unloose now?
+
   A: Output rate would drop to 50 g/s.
 
 ---
@@ -82,6 +88,7 @@ Focus:
 Example:
 
 - Q: What would be the output rate if a screw had come unloose at time t=30ms?
+
   A: Output rate would be to 30 g/s.
 
 ---
@@ -96,12 +103,6 @@ Structure on data generation:
 - The root cause is mapped to a predefined set of valid next steps
 - These steps are used as ground truth
 
-Focus:
-
-- Diagnostic reasoning
-- Action selection
-- Planning under fault conditions
-
 ---
 
 ## 3. Answer Formats
@@ -114,7 +115,19 @@ Each question belongs to one of five answer types:
 4. Ranking
 5. Free form
 
-Evaluation:
+### Answer Format by Level
+
+| Answer Format | Level 1: State | Level 2: Intervention | Level 3: Counterfactual | Level 4: Decision |
+| ------------- | -------------- | --------------------- | ----------------------- | ----------------- |
+| Multi select  | ✓              | ✓                     | ✓                       | ✓                 |
+| Scalar        | ✓              | ✓                     | ✓                       | -                 |
+| Tensor        | ✓              | ✓                     | ✓                       | -                 |
+| Ranking       | ✓              | ✓                     | ✓                       | ✓                 |
+| Free form     | ✓              | ✓                     | ✓                       | ✓                 |
+
+Aiming for 4-5 question templates on average per cell.
+
+### Evaluation
 
 - Multi select, scalar, tensor, and ranking are easily evaluated, but remain way harder than TF and MC (used in TSAQA)
 - Free form is evaluated using a voting mechanism:
@@ -127,17 +140,10 @@ Evaluation:
 
 Questions are generated using:
 
-- Prebuilt templates
-- Level specific question formats
+- Prebuilt templates (level specific)
 - Variable placeholders (time, axis, thresholds, intervals, etc.)
 
-This ensures:
-
-- Structural consistency
-- Controlled difficulty
-- Automatic scalability
-
-We might use LLMs to reformulate the questions rather than raw synthetic format, which I've seen affect negatively finetuning of LLM models in some paper.
+We might use LLMs to reformulate the questions rather than raw synthetic format, which I've seen affect negatively finetuning of LLM models in some papers.
 
 ---
 
@@ -161,6 +167,25 @@ While the metadata we have on open datasets is limited, FactoryCellData (which i
 
 ### 5.2 Intervention Pipeline
 
+#### Visual Representation
+
+```
+Robot Execution Timeline:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          Pre-Event Data              Post-Event Data
+├────────────────────────────┤  ├────────────────────┤
+0                           T  │                    End
+                               ▼
+                         Event Injection
+                      (e.g., screw loosens)
+
+         ┌─────────────────────┴───────────────────┐
+         │                                         │
+         ▼                                         ▼
+  Question Generation                    Ground Truth Extraction
+  "What will happen?"                    "Output drops to 50 g/s"
+```
+
 Procedure:
 
 1. Run robot execution
@@ -170,14 +195,36 @@ Procedure:
    - Data before event → question generation
    - Data after event → ground truth
 
-Requirement:
-
-- Precise tracking of event timestamps
-- Logging of event type and severity
-
 ---
 
 ### 5.3 Counterfactual Pipeline
+
+#### Visual Representation
+
+```
+Benchmark Execution (no event):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                            T
+                            │
+
+Repetition 1 (event at T):
+━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━
+                            ▼ Event     KL(pre) = 0.023  ← Selected!
+
+Repetition 2 (event at T):
+━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━
+                            ▼ Event     KL(pre) = 0.087
+
+Repetition 3 (event at T):
+━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━
+                            ▼ Event     KL(pre) = 0.045
+
+        Compare pre-event distributions
+                    ↓
+        Select minimum KL divergence
+                    ↓
+            Use as ground truth
+```
 
 Procedure:
 
@@ -196,15 +243,44 @@ Rationale:
 - Minimizes confounding variability
 - Isolates effect of injected event
 
-Requirement:
-
-- Event timestamp tracking
-- Sub series extraction
-- Distribution comparison
-
 ---
 
 ### 5.4 Decision Pipeline
+
+#### Visual Representation
+
+```
+Execution with Root Cause:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Normal Operation    │    Fault Manifests
+├──────────────────────────────┤├───────────────────┤
+0                            Inject                End
+                         Root Cause
+             (e.g., physical contact with machine)
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │   Full Trajectory    │
+                    │      Recording       │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │  Root Cause Mapping  │
+                    │    Database/Rules    │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │  Valid Action Steps  │
+                    │   (Ground Truth)     │
+                    └──────────────────────┘
+                               │
+                      • Check compressor
+                      • Inspect lines
+                      • Verify regulator
+                      • Replace sensor
+```
 
 Procedure:
 
