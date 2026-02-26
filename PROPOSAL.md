@@ -1,4 +1,4 @@
-# FactoryBench: Q&A Pipeline for Machine Understanding
+# FactoryBench: Q&A Benchmark towards general Machine Understanding
 
 ## 1. Project Overview
 
@@ -7,7 +7,7 @@ The goal is to evaluate machine understanding across increasing levels of reason
 
 The dataset is constructed from:
 
-- **Primary source**: FactoryCell, a dense robotics dataset
+- **Primary source**: FactoryCellData, a dense robotics dataset
 - **Secondary source**: Open datasets when suitable
   - Currently: AURSAD
 - **Simulation data**: Used for scalability, control, and precise intervention
@@ -20,15 +20,18 @@ The benchmark evaluates models on progressively harder reasoning tasks grounded 
 
 We define four levels of understanding:
 
-### Level 1: State Understanding
+### Level 1: State
 
 Questions about the current state of the robot or environment.
 
 Examples:
 
-- What is the velocity of end at time T?
-- Is the behaviour of the machine abnormal?
-- What features of the machine are behaving abnormally?
+- Based on the provided timeseries, describe the kinematic state of the robot at t=2.3s. Which specific parts of the arm are in motion?
+  A: The robot is actively moving its lower arm structure while keeping its wrist orientation fixed. Specifically, joints 0, 1, and 2 exhibit non-zero velocity. Joints 3, 4, and 5 are completely stationary (zero velocity).
+- Analyze the trajectory from t=1.0s to t=3.0s. What phase of a pick-and-place operation does this represent, and what is the physical evidence in the joint behavior?
+  A: This represents the approach phase. The physical evidence is that joints 0, 1, and 2 have active setpoint velocities to translate the tool center point (TCP) through space, while joints 3, 4, and 5 maintain a constant position, indicating the wrist is holding a fixed orientation as it approaches the target.
+- The metadata states the robot is moving unloaded. Does the physical data support this? Explain your reasoning.
+  A: No, the physical data contradicts the metadata. The effort (current) on joint 1 and joint 2 is elevated by approximately 18% compared to an unloaded baseline for this specific pose. This constant gravitational torque offset indicates the robot is carrying an undeclared load of approximately 2kg.
 
 Focus:
 
@@ -36,7 +39,7 @@ Focus:
 
 ---
 
-### Level 2: Intervention Reasoning (IR)
+### Level 2: Intervention
 
 Understanding consequences of an observed intervention.
 
@@ -51,17 +54,18 @@ Focus:
 - Causal reasoning from intervention
 - Event conditioned behavior analysis
 
-Examples:
+Example:
 
-- What will be the output rate if a screw comes unloose now?
+- Q: What will be the output rate if a screw comes unloose now?
+  A: Output rate would drop to 50 g/s.
 
 ---
 
-### Level 3: Counterfactual Reasoning (CF)
+### Level 3: Counterfactual
 
 Reasoning about alternative outcomes under controlled variations.
 
-Structure for data generation in FactoryCell:
+Structure for data generation in FactoryCellData:
 
 - A benchmark time series of a robot performing a movement
 - The same movement is repeated 3 to 5 times
@@ -75,9 +79,14 @@ Focus:
 - Distribution matching before intervention
 - Isolation of event effects
 
+Example:
+
+- Q: What would be the output rate if a screw had come unloose at time t=30ms?
+  A: Output rate would be to 30 g/s.
+
 ---
 
-### Level 4: Decision Making (DM)
+### Level 4: Decision
 
 Generally under the format data+prompt -> output steps. In our dataset, we are currently focusing on troubleshooting steps, and maybe optimization eventually.
 
@@ -146,11 +155,11 @@ Ground truth is generated automatically using:
   - Robot movement type
   - (Maybe) image data or manual knowledge
 
-While the metadata we have on open datasets is limited, FactoryCell (which is quite dense) should hopefully close the gaps. Simulations are the most controllable and scalable but data quality isn't as good as real data.
+While the metadata we have on open datasets is limited, FactoryCellData (which is quite dense) should hopefully close the gaps. Simulations are the most controllable and scalable but data quality isn't as good as real data.
 
 ---
 
-### 5.2 Intervention Reasoning Pipeline
+### 5.2 Intervention Pipeline
 
 Procedure:
 
@@ -195,7 +204,7 @@ Requirement:
 
 ---
 
-### 5.4 Decision Making Pipeline
+### 5.4 Decision Pipeline
 
 Procedure:
 
@@ -232,7 +241,7 @@ Without precise timing control, causal evaluation becomes invalid.
 FactoryBench is a structured Q&A benchmark for robotic machine understanding that:
 
 - Combines real datasets, open datasets, and simulation
-- Covers four reasoning levels from state to decision making
+- Covers four reasoning levels from state to decision
 - Supports five answer formats
 - Uses deterministic evaluation wherever possible
 - Applies model voting for free form evaluation
