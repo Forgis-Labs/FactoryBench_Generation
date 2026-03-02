@@ -140,7 +140,10 @@ def build_row_dict(
         if out_field in mapping:
             src_field = mapping[out_field]
             value = row.get(src_field, None)
-            if pd.isna(value):
+            if isinstance(value, pd.Series):
+                print(f"⚠ Skipping row: duplicate column '{src_field}' found (got {len(value)} values).")
+                return None
+            if value is not None and pd.isna(value):
                 value = None
             if out_field == "fault_label":
                 value = map_fault_label(value, faults)
@@ -167,7 +170,9 @@ def build_episode_rows(
     rows: List[Dict[str, Any]] = []
 
     for _, row in df.iterrows():
-        rows.append(build_row_dict(row, mapping, schema_fields, faults, round_floats))
+        row_dict = build_row_dict(row, mapping, schema_fields, faults, round_floats)
+        if row_dict is not None:
+            rows.append(row_dict)
 
     return rows
 

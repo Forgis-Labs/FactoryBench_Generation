@@ -302,5 +302,146 @@
       "vibration_1",
       "vibration_2"
     ]
+  },
+  {
+    "anomaly_name": "torque_sensor_elevation",
+    "description": "Torque sensor readings at one or more axes are persistently elevated above the expected profile for the commanded motion, indicating increased mechanical resistance or external loading.",
+    "relevant_features_from_schema": [
+      "torque_sensor_a_{axis}",
+      "torque_sensor_b_{axis}",
+      "motor_torque_{axis}",
+      "motor_iq_{axis}",
+      "target_torque_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "motor_iq_elevation",
+    "description": "The torque-forming current component Iq at one or more axes is elevated above the expected level for the given commanded motion, indicating increased mechanical load or friction.",
+    "relevant_features_from_schema": [
+      "motor_iq_{axis}",
+      "torque_sensor_a_{axis}",
+      "target_velocity_{axis}",
+      "joint_velocity_{axis}",
+      "power_motor_el_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "motor_electrical_power_elevation",
+    "description": "Electrical power consumption at one or more axes is elevated without a proportional increase in mechanical output power, indicating reduced motor efficiency.",
+    "relevant_features_from_schema": [
+      "power_motor_el_{axis}",
+      "power_motor_mech_{axis}",
+      "motor_iq_{axis}",
+      "motor_id_{axis}",
+      "motor_voltage_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "motor_id_elevation",
+    "description": "The magnetizing current component Id at one or more axes is elevated, indicating a shift in the commutation phase that reduces torque-forming efficiency without necessarily increasing measured torque.",
+    "relevant_features_from_schema": [
+      "motor_id_{axis}",
+      "motor_iq_{axis}",
+      "power_motor_el_{axis}",
+      "motor_voltage_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "iq_id_ratio_anomaly",
+    "description": "The ratio between the torque-forming current Iq and the magnetizing current Id deviates from the expected value, indicating commutation misalignment. In normal operation Id should be near zero; elevation relative to Iq is the key signature.",
+    "relevant_features_from_schema": [
+      "motor_iq_{axis}",
+      "motor_id_{axis}",
+      "motor_torque_{axis}",
+      "power_motor_el_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "increased_computed_inertia",
+    "description": "Computed inertia at one or more axes is elevated above the nominal range for the current joint configuration, indicating an unexpected additional mass in the kinematic chain.",
+    "relevant_features_from_schema": [
+      "computed_inertia_{axis}",
+      "computed_torque_{axis}",
+      "target_acceleration_{axis}",
+      "torque_sensor_a_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "payload_torque_absence",
+    "description": "Torque profiles during the transport phase show no evidence of payload loading. Expected gravity and inertia contributions from the carried object are absent across all axes.",
+    "relevant_features_from_schema": [
+      "torque_sensor_a_{axis}",
+      "torque_sensor_b_{axis}",
+      "computed_torque_{axis}",
+      "motor_torque_{axis}",
+      "motor_iq_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "abrupt_torque_drop",
+    "description": "A sudden sharp decrease in torque sensor readings at one or more axes occurring mid-motion, indicating an abrupt loss of payload or contact force.",
+    "relevant_features_from_schema": [
+      "torque_sensor_a_{axis}",
+      "torque_sensor_b_{axis}",
+      "motor_torque_{axis}",
+      "joint_velocity_{axis}",
+      "computed_torque_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "sustained_low_torque",
+    "description": "Torque sensor readings remain consistently below the expected level for a given motion phase over an extended period, indicating absence of expected payload or contact load.",
+    "relevant_features_from_schema": [
+      "torque_sensor_a_{axis}",
+      "torque_sensor_b_{axis}",
+      "motor_torque_{axis}",
+      "computed_torque_{axis}",
+      "target_torque_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "torque_deviation_from_nominal",
+    "description": "Torque profiles across one or more axes deviate from the expected distribution for the commanded motion. Deviation may be positive or negative depending on whether the payload is heavier or lighter than nominal.",
+    "relevant_features_from_schema": [
+      "torque_sensor_a_{axis}",
+      "torque_sensor_b_{axis}",
+      "motor_torque_{axis}",
+      "computed_torque_{axis}",
+      "target_torque_{axis}",
+      "motor_iq_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "pose_dependent_torque_anomaly",
+    "description": "Torque elevation at affected axes that varies with joint angle configuration rather than being constant, indicating a load whose effect depends on arm pose such as a cable applying varying tension as the arm moves.",
+    "relevant_features_from_schema": [
+      "torque_sensor_a_{axis}",
+      "torque_sensor_b_{axis}",
+      "joint_position_{axis}",
+      "motor_iq_{axis}",
+      "computed_torque_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "torque_profile_temporal_shift",
+    "description": "The expected torque patterns for each motion phase occur at different times than nominal, indicating that the robot is executing an atypical joint trajectory due to an unusual approach or gripping configuration.",
+    "relevant_features_from_schema": [
+      "torque_sensor_a_{axis}",
+      "torque_sensor_b_{axis}",
+      "joint_position_{axis}",
+      "target_position_{axis}",
+      "motor_iq_{axis}"
+    ]
+  },
+  {
+    "anomaly_name": "broadband_torque_noise",
+    "description": "Torque sensor and joint velocity signals exhibit elevated noise across all frequency bands, consistent with mechanical vibrations transmitted from an unstable mounting surface into the robot structure.",
+    "relevant_features_from_schema": [
+      "torque_sensor_a_{axis}",
+      "torque_sensor_b_{axis}",
+      "joint_velocity_{axis}",
+      "motor_velocity_{axis}",
+      "motor_iq_{axis}"
+    ]
   }
 ]
