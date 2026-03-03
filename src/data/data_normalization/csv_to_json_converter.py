@@ -178,8 +178,8 @@ def main():
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("datasets/normalized_episodes"),
-        help="Output directory for normalized JSON (default: datasets/normalized_episodes)",
+        default=Path("data/normalized_episodes"),
+        help="Output directory for normalized JSON (default: data/normalized_episodes)",
     )
     
     parser.add_argument(

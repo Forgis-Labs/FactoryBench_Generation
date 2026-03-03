@@ -1,0 +1,64 @@
+[
+  {
+    "id": 1,
+    "type": "signal_segment_ranking",
+    "template": "Given the sensor stream up to timestep T={t}ms (provided below), {event} occurs at T+1. Rank the following signal segments in the order you would expect them to appear after the event.\n\nSegment A: {chunk_a}\nSegment B: {chunk_b}\nSegment C: {chunk_c}\nSegment D: {chunk_d}",
+    "answer_format": {
+      "type": "ranking",
+      "n_items": 4,
+      "notes": "Model must output a permutation of [A, B, C, D]. Chunks should be kept short (<=5 timesteps) to limit token cost. The correct ordering reflects causal propagation delay across signals."
+    }
+  },
+  {
+    "id": 2,
+    "type": "intervention_outcome",
+    "template": "If {event} happened at the current timestep (T={t}ms), what would most likely happen next?",
+    "answer_format": {
+      "type": "multiple_choice_multi_select",
+      "n_choices": 4,
+      "notes": "One correct consequence, one plausible-but-wrong distractor, one unrelated distractor, and one 'nothing extraordinary happens' option. Target ~30% of generated instances where the correct answer IS 'nothing extraordinary happens'."
+    }
+  },
+  {
+    "id": 3,
+    "type": "saturation_prediction",
+    "template": "An operator just applied a {override_pct}% speed override while the robot was mid-{action}. The current joint velocity is {velocity} rad/s and torque is {torque} Nm. Which signal do you expect to saturate first?",
+    "answer_format": {
+      "type": "multiple_choice_multi_select",
+      "n_choices": 4,
+      "notes": "Single correct answer. Choices are signal names (e.g. 'motor_iq', 'joint_velocity', 'effort_target_torque', 'joint_temp'). Distractors should be plausible signals that would be affected but not the first to saturate."
+    }
+  },
+  {
+    "id": 4,
+    "type": "trajectory_outcome_multiselect",
+    "template": "{event} just occurred at T={t}ms. Select all statements that apply:\n\n{choices}",
+    "answer_format": {
+      "type": "multiple_choice_multi_select",
+      "fixed_statements": [
+        "The current sensor stream suggests this will self-correct.",
+        "The current sensor stream suggests this will escalate."
+      ],
+      "notes": "Always include both fixed statements (one or both may be correct depending on the scenario). Add 2 random additional statements with a 50/50 correct/incorrect split. For self-correcting scenarios (~50% of instances), the escalation statement is incorrect and vice versa. Both statements may be simultaneously false (ambiguous scenario) or simultaneously true (bifurcation scenario) in rare cases."
+    }
+  },
+  {
+    "id": 5,
+    "type": "signal_value_prediction",
+    "template": "Following {event} at T={t}ms, what is the expected value of {signal} at T+{n}ms?",
+    "answer_format": {
+      "type": "numerical",
+      "notes": "Single float value with unit. Accept answers within a tolerance band."
+    }
+  },
+  {
+    "id": 6,
+    "type": "signal_value_prediction",
+    "template": "Following {event} at T={t}ms, what is the expected value of {signal} at T+{n}ms?",
+    "answer_format": {
+      "type": "tensor",
+      "shape": [6],
+      "notes": "A 6-element vector of floats, one per joint axis (0-indexed). Format as a JSON array."
+    }
+  }
+]

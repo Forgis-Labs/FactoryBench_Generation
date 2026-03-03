@@ -139,7 +139,7 @@ def main() -> None:
         description="Download voraus-AD and export experiments to separate CSVs"
     )
     repo_root = Path(__file__).resolve().parents[3]
-    default_out_dir = repo_root / "datasets" / "open_datasets" / "vorausad"
+    default_out_dir = repo_root / "data" / "open_datasets" / "vorausad"
     ap.add_argument(
         "--out-dir",
         type=str,

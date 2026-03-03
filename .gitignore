@@ -61,9 +61,9 @@ yarn-debug.log*
 yarn-error.log*
 
 # data
-datasets/open_datasets/*
-datasets/questions/*
-datasets/normalized_episodes/*
+data/open_datasets/*
+data/questions/*
+data/normalized_episodes/*
 
 #simulation files
 sim/*

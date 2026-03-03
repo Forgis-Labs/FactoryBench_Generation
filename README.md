@@ -90,6 +90,8 @@ In addition, we explore tool-augmented agent configurations, wherein the best-pe
 
 # 9 Appendix
 
+Source for safety, robot, joint modes: https://docs.universal-robots.com/tutorials/communication-protocol-tutorials/rtde-guide.html
+
 ---
 
 # References

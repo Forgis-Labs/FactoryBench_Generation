@@ -1,9 +1,0 @@
-{
-  "episode_id": "ABB",
-  "source_file": "ABB.csv",
-  "num_samples": 10,
-  "schema": "ur3e_v1",
-  "first_timestamp_ms": 0.0,
-  "last_timestamp_ms": 90.0,
-  "duration_ms": 90.0
-}

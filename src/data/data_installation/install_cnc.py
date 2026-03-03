@@ -192,7 +192,7 @@ def main() -> None:
         epilog="First time? Run: python -m src.data.data_installation.install_cnc --setup",
     )
     repo_root = Path(__file__).resolve().parents[3]
-    default_out_dir = repo_root / "datasets" / "open_datasets" / "cnc"
+    default_out_dir = repo_root / "data" / "open_datasets" / "cnc"
     
     ap.add_argument(
         "--out",

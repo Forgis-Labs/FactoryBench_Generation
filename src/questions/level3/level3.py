@@ -1,14 +1,22 @@
 """
-Level 2 question generator: Intervention Reasoning.
+Level 3 question generator: Root Cause Analysis.
 
 Reads normalized episode JSON files from aursad or vorausad datasets,
-samples random sub-series, and fills Level 2 question templates.
+samples random sub-series, and fills Level 3 question templates.
 Answers are left null (to be filled by annotation).
 
-Output: datasets/questions/level2/level2_{NNNN}.json
+Output: datasets/questions/level3/level3_{NNNN}.json
 
 Usage:
-    python -m src.questions.level2.level2 -n 100 --seed 42
+    python -m src.questions.level3.level3 -n 100 --seed 42
+
+Template IDs (from question_template.json):
+  1 - signal_segment_ranking        chunks embedded in text + options dict
+  2 - intervention_outcome          MC, options null
+  3 - saturation_prediction         no event; velocity/torque/override from data
+  4 - trajectory_outcome_multiselect choices embedded in text, options null
+  5 - signal_value_prediction       numerical
+  6 - signal_value_prediction       tensor (6-element)
 """
 from __future__ import annotations
 
@@ -30,6 +38,7 @@ from src.questions.common.template import (
     fill,
     fill_event_description,
     get_last_timestamp,
+    pick_joint_velocity_and_torque,
     pick_scalar_signal,
     sample_chunks,
 )
@@ -42,6 +51,8 @@ from src.questions.common.time_series import (
 logger = logging.getLogger(__name__)
 
 VALID_DATASETS = ["aursad", "vorausad"]
+OVERRIDE_PCTS = [110, 120, 130, 150, 175, 200]
+ROBOT_ACTIONS = ["pick", "place", "screwing", "move", "approach", "retract"]
 PREDICTION_HORIZONS_MS = [50, 100, 250, 500, 1000]
 
 TRAJECTORY_EXTRA_STATEMENTS = [
@@ -57,7 +68,7 @@ TRAJECTORY_EXTRA_STATEMENTS = [
 
 
 # ---------------------------------------------------------------------------
-# Template filling  (level 2 specific)
+# Template filling  (level 3 specific)
 # ---------------------------------------------------------------------------
 
 
@@ -68,7 +79,7 @@ def fill_template(
     events: List[Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
     """
-    Fill a Level 2 question template.
+    Fill a Level 3 question template.
 
     post_event_rows: rows from the episode after the subseries end
                      (used for ranking chunks).
@@ -76,21 +87,20 @@ def fill_template(
     Returns dict with question/options/answer_format/event_id, or None on failure.
 
     Template IDs:
-      1 - signal_segment_ranking   : options = {A/B/C/D: encoded chunk}
-      2 - intervention_outcome     : MC T/F, options = null (for now)
-      3 - trajectory_outcome_multiselect: MC T/F, options = null (for now)
-      4 - signal_value_prediction (numerical)
-      5 - signal_value_prediction (tensor)
+      1 - signal_segment_ranking        : chunks in both text and options
+      2 - intervention_outcome          : MC, options null
+      3 - saturation_prediction         : no event; data-derived velocity/torque
+      4 - trajectory_outcome_multiselect: choices embedded in text, options null
+      5 - signal_value_prediction (numerical)
+      6 - signal_value_prediction (tensor)
     """
     tid = template["id"]
     tmpl_text: str = template["template"]
     answer_format: Dict[str, Any] = template["answer_format"]
     t = get_last_timestamp(subseries)
 
-    event_obj = random.choice(events)
-    event_desc = fill_event_description(event_obj, subseries, t)
-
     options = None
+    event_id = None
 
     if tid == 1:
         chunks = sample_chunks(post_event_rows, n_chunks=4, min_chunk=5, max_chunk=7)
@@ -98,16 +108,63 @@ def fill_template(
             return None
         random.shuffle(chunks)
         labels = ["A", "B", "C", "D"]
-        options = {label: encode_chunk(chunks[i]) for i, label in enumerate(labels)}
-        question = fill(tmpl_text, t=t, event=event_desc)
+        encoded = [encode_chunk(chunks[i]) for i in range(4)]
+        options = {label: encoded[i] for i, label in enumerate(labels)}
+
+        event_obj = random.choice(events)
+        event_id = event_obj["id"]
+        event_desc = fill_event_description(event_obj, subseries, t)
+        question = fill(
+            tmpl_text,
+            t=t,
+            event=event_desc,
+            chunk_a=encoded[0],
+            chunk_b=encoded[1],
+            chunk_c=encoded[2],
+            chunk_d=encoded[3],
+        )
 
     elif tid == 2:
+        event_obj = random.choice(events)
+        event_id = event_obj["id"]
+        event_desc = fill_event_description(event_obj, subseries, t)
         question = fill(tmpl_text, event=event_desc, t=t)
 
     elif tid == 3:
-        question = fill(tmpl_text, event=event_desc, t=t)
+        # saturation_prediction — no event, uses kinematic data from subseries
+        override_pct = random.choice(OVERRIDE_PCTS)
+        action = random.choice(ROBOT_ACTIONS)
+        velocity, torque = pick_joint_velocity_and_torque(subseries)
+        if velocity is None:
+            velocity = round(random.uniform(0.1, 2.0), 3)
+        if torque is None:
+            torque = round(random.uniform(0.5, 50.0), 3)
+        question = fill(
+            tmpl_text,
+            override_pct=override_pct,
+            action=action,
+            velocity=velocity,
+            torque=torque,
+        )
 
-    elif tid in (4, 5):
+    elif tid == 4:
+        event_obj = random.choice(events)
+        event_id = event_obj["id"]
+        event_desc = fill_event_description(event_obj, subseries, t)
+        fixed = answer_format.get("fixed_statements", [])
+        extra = random.sample(
+            TRAJECTORY_EXTRA_STATEMENTS,
+            min(2, len(TRAJECTORY_EXTRA_STATEMENTS)),
+        )
+        all_statements = fixed + extra
+        random.shuffle(all_statements)
+        choices_str = "\n".join(f"- {s}" for s in all_statements)
+        question = fill(tmpl_text, event=event_desc, t=t, choices=choices_str)
+
+    elif tid in (5, 6):
+        event_obj = random.choice(events)
+        event_id = event_obj["id"]
+        event_desc = fill_event_description(event_obj, subseries, t)
         signal = pick_scalar_signal(subseries)
         if signal is None:
             return None
@@ -122,7 +179,7 @@ def fill_template(
         "question": question,
         "answer_format": answer_format,
         "options": options,
-        "event_id": event_obj["id"],
+        "event_id": event_id,
     }
 
 
@@ -131,7 +188,7 @@ def fill_template(
 # ---------------------------------------------------------------------------
 
 
-def generate_level2_questions(
+def generate_level3_questions(
     datasets_dir: Path,
     output_dir: Path,
     templates: List[Dict[str, Any]],
@@ -194,7 +251,7 @@ def generate_level2_questions(
 
         item = {
             "id": str(uuid.uuid4()),
-            "level": 2,
+            "level": 3,
             "template_id": template["id"],
             "template_type": template["type"],
             "question": filled["question"],
@@ -210,7 +267,7 @@ def generate_level2_questions(
             "context": build_context(subseries),
         }
 
-        out_path = output_dir / f"level2_{generated:04d}.json"
+        out_path = output_dir / f"level3_{generated:04d}.json"
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(item, f, indent=2)
 
@@ -233,7 +290,7 @@ def generate_level2_questions(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Generate Level 2 (Intervention Reasoning) Q&A pairs."
+        description="Generate Level 3 (Root Cause Analysis) Q&A pairs."
     )
     repo_root = Path(__file__).resolve().parents[3]
 
@@ -246,8 +303,8 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=repo_root / "data" / "questions" / "level2",
-        help="Output directory (default: <repo>/data/questions/level2)",
+        default=repo_root / "data" / "questions" / "level3",
+        help="Output directory (default: <repo>/data/questions/level3)",
     )
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
     parser.add_argument("--min-len", type=int, default=32, help="Min subseries length")
@@ -265,7 +322,7 @@ def main() -> None:
     root_causes = load_root_causes(args.datasets_dir / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "events" / "events.json")
 
-    generate_level2_questions(
+    generate_level3_questions(
         datasets_dir=args.datasets_dir,
         output_dir=args.output,
         templates=templates,

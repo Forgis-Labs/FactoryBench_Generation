@@ -49,7 +49,7 @@ def expand_mapping(mapping: Dict[str, str]) -> Dict[str, str]:
 
 
 def load_mapping(dataset_name: str, repo_root: Path) -> Tuple[Dict[str, str], List[str], Dict[str, Any], Optional[int]]:
-    mapping_path = repo_root / "datasets" / "mappings_of_features" / f"{dataset_name}.json"
+    mapping_path = repo_root / "data" / "mappings_of_features" / f"{dataset_name}.json"
     if not mapping_path.exists():
         raise FileNotFoundError(f"Mapping file not found: {mapping_path}")
 
@@ -74,7 +74,7 @@ def find_input_csvs(dataset_name: str, repo_root: Path, input_path: Optional[Pat
             return csv_files
         return [input_path]
 
-    dataset_dir = repo_root / "datasets" / "open_datasets" / dataset_name
+    dataset_dir = repo_root / "data" / "open_datasets" / dataset_name
     csv_files = sorted(dataset_dir.glob("experiment_*.csv"))
     if not csv_files:
         csv_files = sorted(dataset_dir.glob("*.csv"))
@@ -438,12 +438,12 @@ def normalize_dataset(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Normalize dataset using feature mapping")
-    parser.add_argument("--dataset", required=True, help="Dataset name (mapping file in datasets/mappings_of_features)")
-    parser.add_argument("--input", type=Path, help="Path to input CSV (defaults to datasets/open_datasets/<dataset>/*.csv)")
+    parser.add_argument("--dataset", required=True, help="Dataset name (mapping file in data/mappings_of_features)")
+    parser.add_argument("--input", type=Path, help="Path to input CSV (defaults to data/open_datasets/<dataset>/*.csv)")
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("datasets/normalized_episodes"),
+        default=Path("data/normalized_episodes"),
         help="Output directory for normalized JSON",
     )
     parser.add_argument(
