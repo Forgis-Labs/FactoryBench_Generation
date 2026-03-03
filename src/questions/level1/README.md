@@ -97,8 +97,8 @@ All answers are **computed directly from sensor data** with no ambiguity—suita
 
 ```bash
 python -m src.questions.cli level1 \
-  --input datasets/normalized_episodes/dummy/ABB.json \
-  --output datasets/questions/dummy/sample_questions.json \
+  --input data/normalized_episodes/dummy/ABB.json \
+  --output data/questions/dummy/sample_questions.json \
   --n 5
 ```
 
@@ -106,8 +106,8 @@ python -m src.questions.cli level1 \
 
 ```bash
 python -m src.questions.cli level1 \
-  --input datasets/normalized_episodes/dummy/ABB.json \
-  --output datasets/questions/dummy/questions_configured.json \
+  --input data/normalized_episodes/dummy/ABB.json \
+  --output data/questions/dummy/questions_configured.json \
   --n 100 \
   --eps-1 0.05 \
   --eps-2 15 \
@@ -144,8 +144,8 @@ from pathlib import Path
 from src.questions.level1 import generate_level1_questions
 
 questions = generate_level1_questions(
-    episode_json=Path("datasets/normalized_episodes/dummy/ABB.json"),
-    out_json=Path("datasets/questions/dummy/my_questions.json"),
+    episode_json=Path("data/normalized_episodes/dummy/ABB.json"),
+    out_json=Path("data/questions/dummy/my_questions.json"),
     n_questions=50,
     eps_1=0.05,       # Position threshold (rad)
     eps_2=15.0,       # Friction threshold (%)
@@ -214,7 +214,7 @@ Questions are written as JSON array:
       "type": 1
     },
     "context": {
-      "episode": "datasets/normalized_episodes/dummy/ABB.json",
+      "episode": "data/normalized_episodes/dummy/ABB.json",
       "time_window": [0.0, 90.0],
       "joint": 3,
       "template_index": 0

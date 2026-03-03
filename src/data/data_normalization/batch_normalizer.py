@@ -329,8 +329,8 @@ def main():
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("datasets/open_datasets/normalized"),
-        help="Output directory for all normalized data (default: datasets/open_datasets/normalized)",
+        default=Path("data/open_datasets/normalized"),
+        help="Output directory for all normalized data (default: data/open_datasets/normalized)",
     )
     
     parser.add_argument(

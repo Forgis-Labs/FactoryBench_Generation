@@ -135,7 +135,7 @@ def export_by_experiments(
 def main() -> None:
     ap = argparse.ArgumentParser(description="Download AURSAD and export experiments to separate CSVs")
     repo_root = Path(__file__).resolve().parents[3]
-    default_out_dir = repo_root / "datasets" / "open_datasets" / "aursad"
+    default_out_dir = repo_root / "data" / "open_datasets" / "aursad"
     ap.add_argument(
         "--out-dir",
         type=str,
