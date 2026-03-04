@@ -823,6 +823,19 @@ def generate_level3_questions(
             f"for cf datasets: {CF_DATASET_FOLDERS}"
         )
 
+    pairs_by_dataset: Dict[str, List[Dict[str, Any]]] = {}
+    for pair in cf_pairs:
+        dataset_name = str(pair.get("cf_dataset", ""))
+        if not dataset_name:
+            continue
+        pairs_by_dataset.setdefault(dataset_name, []).append(pair)
+
+    available_cf_datasets = [ds for ds, plist in pairs_by_dataset.items() if plist]
+    if not available_cf_datasets:
+        raise FileNotFoundError(
+            f"No usable cf dataset pairs found under {datasets_dir / 'normalized_episodes'}"
+        )
+
     episode_cache: Dict[str, List[Dict[str, Any]]] = {}
 
     def load_episode(path: Path) -> List[Dict[str, Any]]:
@@ -838,7 +851,8 @@ def generate_level3_questions(
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
-        pair = random.choice(cf_pairs)
+        sampled_dataset = random.choice(available_cf_datasets)
+        pair = random.choice(pairs_by_dataset[sampled_dataset])
         non_alt_path = cast(Path, pair["non_alt_path"])
         alt_path = cast(Path, pair["alt_path"])
 

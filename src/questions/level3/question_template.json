@@ -23,7 +23,7 @@
   {
     "id": 3,
     "type": "trajectory_outcome_multiselect",
-    "template": "Had {event} occurred at time {t2}ms, select all statements in the 'options' field that would apply under this counterfactual scenario. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
+    "template": "Had {event} occurred at time {t2}ms, select all statements that would apply under this counterfactual scenario. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "fixed_options": ["mc_001", "mc_002"],
