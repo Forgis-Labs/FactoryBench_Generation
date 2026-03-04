@@ -42,7 +42,7 @@ from src.questions.level2.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statem
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["test_aursad", "test_vorausad"]
+VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
 PREDICTION_HORIZONS_MS = [50, 100, 250, 500, 1000]
 
 TRAJECTORY_EXTRA_STATEMENTS = [
@@ -156,6 +156,40 @@ def get_row_at_or_after_timestamp(
     return None
 
 
+def _first_timestamp_ms(rows: List[Dict[str, Any]]) -> int:
+    """Return first valid timestamp_ms in rows, or 0 if missing."""
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        ts = row.get("timestamp_ms")
+        try:
+            if ts is not None:
+                return int(float(ts))
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def normalize_timestamps(
+    rows: List[Dict[str, Any]],
+    base_timestamp_ms: int,
+) -> List[Dict[str, Any]]:
+    """Return a copy of rows with timestamp_ms shifted by base_timestamp_ms."""
+    normalized: List[Dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        out_row = dict(row)
+        ts = out_row.get("timestamp_ms")
+        try:
+            if ts is not None:
+                out_row["timestamp_ms"] = int(float(ts)) - int(base_timestamp_ms)
+        except (TypeError, ValueError):
+            pass
+        normalized.append(out_row)
+    return normalized
+
+
 def split_event_segment(
     post_event_rows: List[Dict[str, Any]],
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -205,15 +239,24 @@ def is_escalated_by_safety_mode(rows: List[Dict[str, Any]]) -> bool:
 
 
 def normalize_mc_option_id(value: str) -> str:
-    """Normalize IDs like l2_mc_19 -> l2_mc_019."""
+    """Normalize IDs like mc_19/l2_mc_19 -> mc_019."""
     text = str(value).strip()
-    match = re.match(r"^l2_mc_(\d+)$", text, re.IGNORECASE)
+    match = re.match(r"^(?:mc|l2_mc)_(\d+)$", text, re.IGNORECASE)
     if not match:
         return text
+    return f"mc_{int(match.group(1)):03d}"
+
+
+def _legacy_mc_option_id(value: str) -> str:
+    """Convert normalized mc_* IDs to legacy l2_mc_* IDs used by current rules."""
+    normalized = normalize_mc_option_id(value)
+    match = re.match(r"^mc_(\d+)$", normalized, re.IGNORECASE)
+    if not match:
+        return normalized
     return f"l2_mc_{int(match.group(1)):03d}"
 
 
-def load_mc_option_lookup(path: Path) -> Dict[str, str]:
+def load_mc_option_lookup(path: Path, level: int) -> Dict[str, str]:
     """
     Load MC options as a map: id -> statement.
     Returns empty map if file is missing/invalid.
@@ -232,6 +275,26 @@ def load_mc_option_lookup(path: Path) -> Dict[str, str]:
     for item in raw:
         if not isinstance(item, dict):
             continue
+
+        allowed_levels = item.get("usable_levels")
+        if isinstance(allowed_levels, list):
+            parsed_levels: List[int] = []
+            for value in allowed_levels:
+                try:
+                    parsed_levels.append(int(value))
+                except (TypeError, ValueError):
+                    continue
+            if parsed_levels and level not in parsed_levels:
+                continue
+        else:
+            legacy_level = item.get("applicable_level")
+            if legacy_level is not None:
+                try:
+                    if int(legacy_level) != level:
+                        continue
+                except (TypeError, ValueError):
+                    continue
+
         option_id = item.get("id")
         statement = item.get("statement")
         if isinstance(option_id, str) and isinstance(statement, str) and statement.strip():
@@ -262,7 +325,7 @@ def _sample_ratio(mean: float, rel_std: float = 0.20, min_value: float = 0.0, ma
 
 
 def sample_thresholds_for_statement(statement_id: str) -> Dict[str, float]:
-    sid = str(statement_id)
+    sid = _legacy_mc_option_id(str(statement_id))
     if sid == "l2_mc_003":
         return {"speed_drop_ratio": _sample_ratio(DEFAULT_THRESHOLDS["speed_drop_ratio"])}
     if sid == "l2_mc_004":
@@ -329,7 +392,7 @@ def render_statement_with_thresholds(
     default_statement: str,
     thresholds: Dict[str, float],
 ) -> str:
-    sid = str(statement_id)
+    sid = _legacy_mc_option_id(str(statement_id))
     if sid == "l2_mc_003":
         return (
             "Following the event, at least one joint speed drops sharply "
@@ -678,6 +741,11 @@ def generate_level2_questions(
         )
         if not subseries:
             continue
+
+        base_timestamp_ms = _first_timestamp_ms(subseries)
+        subseries = normalize_timestamps(subseries, base_timestamp_ms)
+        post_event_rows = normalize_timestamps(post_event_rows, base_timestamp_ms)
+
         event_segment_rows, post_after_event_rows = split_event_segment(post_event_rows)
         if not event_segment_rows:
             continue
@@ -764,7 +832,10 @@ def main() -> None:
     templates = load_templates(Path(__file__).with_name("question_template.json"))
     root_causes = load_root_causes(args.datasets_dir / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "events" / "events.json")
-    mc_option_lookup = load_mc_option_lookup(args.datasets_dir / "mc_options" / "mc_options.json")
+    mc_option_lookup = load_mc_option_lookup(
+        args.datasets_dir / "mc_options" / "mc_options.json",
+        level=2,
+    )
 
     generate_level2_questions(
         datasets_dir=args.datasets_dir,
