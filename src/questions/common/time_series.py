@@ -10,12 +10,32 @@ import json
 import math
 import random
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
 INACTIVE_CONSTANT_THRESHOLD = 55
 INACTIVITY_TRIM = 5
+
+
+def parse_event_id(value: Any) -> int:
+    """
+    Parse an event identifier from either:
+    - integer-like value (e.g., 0, 3, "4")
+    - formatted string "i_v1_v2_..." where i is the event id
+    """
+    if value is None:
+        return 0
+    if isinstance(value, (int, np.integer)):
+        return int(value)
+    s = str(value).strip()
+    if not s:
+        return 0
+    head = s.split("_", 1)[0]
+    try:
+        return int(head)
+    except ValueError:
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -171,12 +191,34 @@ def encode_time_series(
 # ---------------------------------------------------------------------------
 
 
+def _normalize_timestamps(
+    rows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Shift timestamps so the first row starts at 0."""
+    if not rows or "timestamp_ms" not in rows[0]:
+        return rows
+    first_ts = rows[0].get("timestamp_ms")
+    if first_ts is None:
+        return rows
+    try:
+        first_ts = float(first_ts)
+        return [
+            {
+                **row,
+                "timestamp_ms": float(row.get("timestamp_ms", 0)) - first_ts
+                if row.get("timestamp_ms") is not None
+                else None,
+            }
+            for row in rows
+        ]
+    except (TypeError, ValueError):
+        return rows
+
+
 def sample_subseries(
     rows: List[Dict[str, Any]], min_len: int, max_len: int
 ) -> List[Dict[str, Any]]:
-    """
-    Sample a random contiguous subseries and normalize its timestamps to start at 0.
-    """
+    """Sample a random contiguous subseries and normalize its timestamps to start at 0."""
     if not rows:
         return []
     length = len(rows)
@@ -184,31 +226,14 @@ def sample_subseries(
     if size <= 0:
         return rows
     start = random.randint(0, length - size)
-    subseries = rows[start : start + size]
-    if subseries and "timestamp_ms" in subseries[0]:
-        first_ts = subseries[0].get("timestamp_ms")
-        if first_ts is not None:
-            try:
-                first_ts = float(first_ts)
-                subseries = [
-                    {
-                        **row,
-                        "timestamp_ms": float(row.get("timestamp_ms", 0)) - first_ts
-                        if row.get("timestamp_ms") is not None
-                        else None,
-                    }
-                    for row in subseries
-                ]
-            except (TypeError, ValueError):
-                pass
-    return subseries
+    return _normalize_timestamps(rows[start : start + size])
 
 
 def sample_subseries_with_remainder(
     rows: List[Dict[str, Any]], min_len: int, max_len: int
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
-    Like sample_subseries but also returns the rows that come after the sampled window.
+    Sample a random subseries and return the rows that follow it.
     Returns (subseries, post_event_rows).
     """
     if not rows:
@@ -216,25 +241,72 @@ def sample_subseries_with_remainder(
     length = len(rows)
     size = random.randint(min_len, min(max_len, length))
     start = random.randint(0, length - size)
-    post_event_rows = rows[start + size :]
-    subseries = rows[start : start + size]
-    if subseries and "timestamp_ms" in subseries[0]:
-        first_ts = subseries[0].get("timestamp_ms")
-        if first_ts is not None:
-            try:
-                first_ts = float(first_ts)
-                subseries = [
-                    {
-                        **row,
-                        "timestamp_ms": float(row.get("timestamp_ms", 0)) - first_ts
-                        if row.get("timestamp_ms") is not None
-                        else None,
-                    }
-                    for row in subseries
-                ]
-            except (TypeError, ValueError):
-                pass
-    return subseries, post_event_rows
+    return _normalize_timestamps(rows[start : start + size]), rows[start + size :]
+
+
+def find_event_starts(rows: List[Dict[str, Any]]) -> List[int]:
+    """
+    Return indices where the 'event' field transitions from 0 (or absent) to non-zero.
+    """
+    starts = []
+    for i, row in enumerate(rows):
+        ev = parse_event_id(row.get("event", 0))
+        prev_ev = parse_event_id(rows[i - 1].get("event", 0)) if i > 0 else 0
+        if ev != 0 and prev_ev == 0:
+            starts.append(i)
+    return starts
+
+
+def sample_subseries_before_event(
+    rows: List[Dict[str, Any]],
+    min_len: int,
+    max_len: int,
+    min_post_event_after: int = 0,
+    return_metadata: bool = False,
+) -> Union[
+    Tuple[List[Dict[str, Any]], List[Dict[str, Any]]],
+    Tuple[List[Dict[str, Any]], List[Dict[str, Any]], int, int],
+]:
+    """
+    Pick a random event start (where 'event' goes from 0 to non-zero), then
+    sample a subseries of length in [min_len, max_len] ending just before it.
+
+    Returns (subseries, post_event_rows) where post_event_rows starts at the
+    event onset.  Returns ([], []) if no valid event exists or if the chosen
+    event does not have enough preceding rows (caller should retry).
+    """
+    starts = find_event_starts(rows)
+    if not starts:
+        if return_metadata:
+            return [], [], -1, 0
+        return [], []
+
+    valid_starts = [
+        idx
+        for idx in starts
+        if idx >= min_len and (len(rows) - idx - 1) >= max(0, int(min_post_event_after))
+    ]
+    if not valid_starts:
+        if return_metadata:
+            return [], [], -1, 0
+        return [], []
+
+    event_start = random.choice(valid_starts)
+    if event_start < min_len:
+        if return_metadata:
+            return [], [], -1, 0
+        return [], []
+
+    length = random.randint(min_len, min(max_len, event_start))
+    start_idx = event_start - length
+    subseries = _normalize_timestamps(rows[start_idx:event_start])
+    post_event_rows = rows[event_start:]
+    if return_metadata:
+        return subseries, post_event_rows, start_idx, length
+    return (
+        subseries,
+        post_event_rows,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +327,7 @@ def is_inactive_subseries(
     )
     ts = strip_null_features(trimmed)
     ts = remove_feature(ts, "fault_label")
+    ts = remove_feature(ts, "event")
     _, constants = remove_constant_features(ts)
     return len(constants) >= threshold
 

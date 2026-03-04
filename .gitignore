@@ -65,5 +65,8 @@ data/open_datasets/*
 data/questions/*
 data/normalized_episodes/*
 
+# output
+output/*
+
 #simulation files
 sim/*

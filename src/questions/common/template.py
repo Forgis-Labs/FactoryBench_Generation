@@ -187,6 +187,7 @@ def fill_event_description(
     event: Dict[str, Any],
     subseries: List[Dict[str, Any]],
     t: int,
+    post_event_rows: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """
     Fill an event's description template with values derived from the subseries.
@@ -200,9 +201,102 @@ def fill_event_description(
       rate       → (end - start) / len(subseries)
       x          → random payload weight
       T          → the last timestamp of the subseries
+      L          → number of consecutive timesteps the event persists in post_event_rows
+
+    If post_event_rows carries encoded event labels in the form
+    "id_v1_v2_...", values are parsed and used directly (in variable order)
+    for consistency between encoded events and generated question text.
     """
     desc: str = event["description"]
     variables: Dict[str, str] = event.get("variables", {})
+
+    def _to_int_if_possible(value: str) -> Any:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return value
+
+    def _to_float_if_possible(value: str) -> Any:
+        try:
+            x = float(value)
+            if x.is_integer():
+                return int(x)
+            return x
+        except (TypeError, ValueError):
+            return value
+
+    def _parse_event_variable_values() -> Optional[Dict[str, Any]]:
+        if not post_event_rows:
+            return None
+        raw_event = post_event_rows[0].get("event", 0)
+        if raw_event in (None, 0, "0"):
+            return None
+
+        text = str(raw_event)
+        parts = text.split("_")
+        if len(parts) < 2:
+            return None
+
+        var_items = list(variables.items())
+        if not var_items:
+            return {}
+
+        tokens = parts[1:]
+        parsed: Dict[str, Any] = {}
+
+        # Parse from right to left for numeric/integer vars, then assign the
+        # remaining left-side tokens to string vars (e.g., feature_i).
+        right = len(tokens)
+        for var_name, var_type in reversed(var_items):
+            if var_type in {"numeric", "integer"}:
+                if right <= 0:
+                    return None
+                tok = tokens[right - 1]
+                right -= 1
+                if var_type == "integer":
+                    parsed[var_name] = _to_int_if_possible(tok)
+                else:
+                    parsed[var_name] = _to_float_if_possible(tok)
+
+        string_vars = [name for name, typ in var_items if typ == "string"]
+        if string_vars:
+            # Current event schema effectively has a single string variable
+            # (feature_i). Join all remaining tokens to preserve underscores.
+            for i, var_name in enumerate(string_vars):
+                if i == 0:
+                    parsed[var_name] = "_".join(tokens[:right])
+                else:
+                    parsed[var_name] = ""
+
+        # Rebuild dict in template variable order for deterministic behavior.
+        ordered: Dict[str, Any] = {}
+        for var_name in variables.keys():
+            if var_name in parsed:
+                ordered[var_name] = parsed[var_name]
+        return ordered
+
+    encoded_values = _parse_event_variable_values()
+
+    if encoded_values is not None:
+        kwargs: Dict[str, Any] = {}
+        for var_name in variables.keys():
+            if var_name in encoded_values:
+                kwargs[var_name] = encoded_values[var_name]
+
+        # Keep T/L available even if not encoded explicitly in event labels
+        # or missing in events.json variable schema.
+        if ("T" in variables or "{T}" in desc) and "T" not in kwargs:
+            kwargs["T"] = t
+        if ("L" in variables or "{L}" in desc) and "L" not in kwargs:
+            L = 0
+            onset_val = post_event_rows[0].get("event", 0)
+            for r in post_event_rows:
+                if r.get("event", 0) == onset_val:
+                    L += 1
+                else:
+                    break
+            kwargs["L"] = L
+        return fill(desc, **kwargs)
 
     signal = pick_scalar_signal(subseries) or "joint_velocity_0"
 
@@ -219,7 +313,10 @@ def fill_event_description(
             end_val = round(float(v), 3)
             break
 
-    kwargs: Dict[str, Any] = {"T": t}
+    kwargs: Dict[str, Any] = {}
+
+    if "T" in variables or "{T}" in desc:
+        kwargs["T"] = t
 
     if "feature_i" in variables:
         kwargs["feature_i"] = signal
@@ -236,6 +333,16 @@ def fill_event_description(
         kwargs["rate"] = round(((end_val or 0.0) - (start_val or 0.0)) / n, 4)
     if "x" in variables:
         kwargs["x"] = random.choice([0.5, 1.0, 1.5, 2.0, 2.5])
+    if "L" in variables or "{L}" in desc:
+        L = 0
+        if post_event_rows:
+            onset_val = post_event_rows[0].get("event", 0)
+            for r in post_event_rows:
+                if r.get("event", 0) == onset_val:
+                    L += 1
+                else:
+                    break
+        kwargs["L"] = L
 
     return fill(desc, **kwargs)
 
