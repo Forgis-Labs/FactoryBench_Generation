@@ -32,7 +32,7 @@
   {
     "id": 4,
     "name": "Monotonic Increase",
-    "description": "a continual increase of {feature_i} lasting {X} timesteps",
+    "description": "a continual increase of {feature_i} lasting {L} timesteps",
     "variables": {
       "feature_i": "string",
       "rate": "numeric"
@@ -41,7 +41,7 @@
   {
     "id": 5,
     "name": "Monotonic Decrease",
-    "description": "a continual decrease of {feature_i} lasting {X} timesteps",
+    "description": "a continual decrease of {feature_i} lasting {L} timesteps",
     "variables": {
       "feature_i": "string",
       "rate": "numeric"
@@ -50,7 +50,7 @@
   {
     "id": 6,
     "name": "Payload Addition",
-    "description": "an additional {x} kg were added to the payload at timestep {T}",
+    "description": "an increase of {x} kg to the payload",
     "variables": {
       "x": "numeric"
     }

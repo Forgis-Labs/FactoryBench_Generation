@@ -44,13 +44,14 @@ from src.questions.common.template import (
 )
 from src.questions.common.time_series import (
     is_inactive_subseries,
+    parse_event_id,
     pick_fault_label,
-    sample_subseries_with_remainder,
+    sample_subseries_before_event,
 )
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["aursad", "vorausad"]
+VALID_DATASETS = ["test_aursad", "test_vorausad"]
 OVERRIDE_PCTS = [110, 120, 130, 150, 175, 200]
 ROBOT_ACTIONS = ["pick", "place", "screwing", "move", "approach", "retract"]
 PREDICTION_HORIZONS_MS = [50, 100, 250, 500, 1000]
@@ -99,8 +100,12 @@ def fill_template(
     answer_format: Dict[str, Any] = template["answer_format"]
     t = get_last_timestamp(subseries)
 
+    onset_id = parse_event_id(post_event_rows[0].get("event", 0)) if post_event_rows else 0
+    event_obj = next((e for e in events if e["id"] == onset_id), random.choice(events))
+    event_id = event_obj["id"]
+    event_desc = fill_event_description(event_obj, subseries, t, post_event_rows)
+
     options = None
-    event_id = None
 
     if tid == 1:
         chunks = sample_chunks(post_event_rows, n_chunks=4, min_chunk=5, max_chunk=7)
@@ -110,10 +115,6 @@ def fill_template(
         labels = ["A", "B", "C", "D"]
         encoded = [encode_chunk(chunks[i]) for i in range(4)]
         options = {label: encoded[i] for i, label in enumerate(labels)}
-
-        event_obj = random.choice(events)
-        event_id = event_obj["id"]
-        event_desc = fill_event_description(event_obj, subseries, t)
         question = fill(
             tmpl_text,
             t=t,
@@ -125,9 +126,6 @@ def fill_template(
         )
 
     elif tid == 2:
-        event_obj = random.choice(events)
-        event_id = event_obj["id"]
-        event_desc = fill_event_description(event_obj, subseries, t)
         question = fill(tmpl_text, event=event_desc, t=t)
 
     elif tid == 3:
@@ -148,9 +146,6 @@ def fill_template(
         )
 
     elif tid == 4:
-        event_obj = random.choice(events)
-        event_id = event_obj["id"]
-        event_desc = fill_event_description(event_obj, subseries, t)
         fixed = answer_format.get("fixed_statements", [])
         extra = random.sample(
             TRAJECTORY_EXTRA_STATEMENTS,
@@ -162,9 +157,6 @@ def fill_template(
         question = fill(tmpl_text, event=event_desc, t=t, choices=choices_str)
 
     elif tid in (5, 6):
-        event_obj = random.choice(events)
-        event_id = event_obj["id"]
-        event_desc = fill_event_description(event_obj, subseries, t)
         signal = pick_scalar_signal(subseries)
         if signal is None:
             return None
@@ -234,7 +226,7 @@ def generate_level3_questions(
         if not isinstance(rows, list) or len(rows) < min_len:
             continue
 
-        subseries, post_event_rows = sample_subseries_with_remainder(rows, min_len, max_len)
+        subseries, post_event_rows = sample_subseries_before_event(rows, min_len, max_len)
         if not subseries:
             continue
 
