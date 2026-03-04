@@ -706,7 +706,12 @@ def generate_level2_questions(
             f"{datasets_dir / 'normalized_episodes'} for datasets: {VALID_DATASETS}"
         )
 
-    available_datasets = list(by_dataset.keys())
+    episodes_by_dataset = {ds: paths for ds, paths in by_dataset.items() if paths}
+    available_datasets = list(episodes_by_dataset.keys())
+    if not available_datasets:
+        raise FileNotFoundError(
+            f"No usable datasets with episodes found under {datasets_dir / 'normalized_episodes'}"
+        )
     episode_cache: Dict[str, List[Dict[str, Any]]] = {}
 
     def load_episode(path: Path) -> List[Dict[str, Any]]:
@@ -723,7 +728,7 @@ def generate_level2_questions(
         attempts += 1
 
         ds = random.choice(available_datasets)
-        ep_path = random.choice(by_dataset[ds])
+        ep_path = random.choice(episodes_by_dataset[ds])
         rows = load_episode(ep_path)
         if not isinstance(rows, list) or len(rows) < min_len:
             continue
