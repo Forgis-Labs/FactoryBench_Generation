@@ -16,7 +16,7 @@
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "n_choices": 4,
-      "fixed_options": ["l2_mc_0019"],
+      "fixed_options": ["mc_0019"],
       "notes": "One correct consequence, one plausible-but-wrong distractor, one unrelated distractor, and one 'nothing extraordinary happens' option. Target ~30% of generated instances where the correct answer IS 'nothing extraordinary happens'."
     }
   },
@@ -26,7 +26,7 @@
     "template": "{event} just occurred at T={t}ms. Select all statements that apply in the 'options' field. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
-      "fixed_options": ["l2_mc_001", "l2_mc_002"],
+      "fixed_options": ["mc_001", "mc_002"],
       "notes": "Always include both fixed statements (one or both may be correct depending on the scenario). Add 2 random additional statements with a 50/50 correct/incorrect split. For self-correcting scenarios (~50% of instances), the escalation statement is incorrect and vice versa. Both statements may be simultaneously false (ambiguous scenario) or simultaneously true (bifurcation scenario) in rare cases."
     }
   },
