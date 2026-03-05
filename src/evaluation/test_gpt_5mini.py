@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Generate reasoning traces for prompt files using direct OpenAI Responses API calls.
+Generate answers for prompt files using direct OpenAI Responses API calls.
 
 This script:
 1. Loads pre-generated prompt JSON files from a folder
-2. Calls OpenAI GPT-5.1 per prompt (Responses endpoint)
+2. Calls the model per prompt (Responses endpoint)
 3. Saves one output JSON per prompt with the generated answer
 """
 
@@ -92,6 +92,22 @@ def save_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+
+
+def build_ground_truth_index(questions_dir: Optional[Path]) -> Dict[str, Any]:
+    """Build a mapping of filename stem -> answer from a questions directory."""
+    if questions_dir is None or not questions_dir.is_dir():
+        return {}
+    index: Dict[str, Any] = {}
+    for path in questions_dir.rglob("*.json"):
+        try:
+            payload = load_json(path)
+        except Exception:
+            continue
+        if isinstance(payload, dict) and "answer" in payload:
+            index[path.stem] = payload["answer"]
+    logger.info(f"Loaded {len(index)} ground truth entries from {questions_dir}")
+    return index
 
 
 def load_prompt_entries(
@@ -191,8 +207,8 @@ def run_direct_requests(
     output_dir: Path,
     model: str,
     max_output_tokens: int,
-    temperature: float,
     overwrite: bool,
+    ground_truth_index: Dict[str, Any],
 ) -> tuple[int, int, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -201,7 +217,7 @@ def run_direct_requests(
     skipped = 0
 
     for prompt_path, prompt_text, prompt_idx, custom_id in entries:
-        out_path = output_dir / f"{custom_id}_reasoning.json"
+        out_path = output_dir / f"{custom_id}_answer.json"
         fail_path = output_dir / f"{custom_id}_failed.json"
 
         if not overwrite and (out_path.exists() or fail_path.exists()):
@@ -209,26 +225,32 @@ def run_direct_requests(
             logger.info(f"- Skipping existing result: {custom_id}")
             continue
 
+        ground_truth = ground_truth_index.get(prompt_path.stem)
+        if ground_truth is None:
+            skipped += 1
+            logger.warning(f"- Skipping (no ground truth): {custom_id}")
+            continue
+
         try:
             response = client.responses.create(
                 model=model,
                 input=prompt_text,
                 max_output_tokens=max_output_tokens,
-                temperature=temperature,
             )
             body = _to_dict(response)
-            reasoning = _extract_output_text_from_responses_body(body)
-
+            answer = _extract_output_text_from_responses_body(body)
             save_json(out_path, {
                 "custom_id": custom_id,
                 "prompt_index": prompt_idx,
                 "prompt_file": str(prompt_path),
-                "reasoning": reasoning,
+                "prompt": prompt_text,
+                "answer": answer,
+                "ground_truth": ground_truth,
                 "model": body.get("model"),
                 "usage": body.get("usage"),
             })
             completed += 1
-            logger.info(f"✓ [{completed + failed + skipped}/{len(entries)}] Saved reasoning: {custom_id}")
+            logger.info(f"✓ [{completed + failed + skipped}/{len(entries)}] Saved answer: {custom_id}")
         except Exception as exc:
             failed += 1
             save_json(fail_path, {
@@ -243,7 +265,7 @@ def run_direct_requests(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate reasoning via direct OpenAI Responses API calls")
+    parser = argparse.ArgumentParser(description="Generate answers via direct OpenAI Responses API calls")
     parser.add_argument(
         "--input",
         type=Path,
@@ -253,8 +275,8 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("data/questions/level3/reasoning"),
-        help="Directory to save reasoning outputs",
+        default=Path("output/replies/level3"),
+        help="Directory to save answer outputs",
     )
     parser.add_argument("--api-key", type=str, default=None, help="OpenAI API key (overrides .env)")
     parser.add_argument(
@@ -265,7 +287,6 @@ def main() -> None:
     )
     parser.add_argument("--model", type=str, default=None, help="Model name (default from env or gpt-5.1)")
     parser.add_argument("--max-output-tokens", type=int, default=2000, help="Max output tokens")
-    parser.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing result files")
     parser.add_argument(
         "--total-prompts",
@@ -285,6 +306,12 @@ def main() -> None:
         default=1000,
         help="How many prompts per batch slice",
     )
+    parser.add_argument(
+        "--questions",
+        type=Path,
+        default=None,
+        help="Directory containing Q&A pair JSON files (for ground truth lookup)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -296,6 +323,12 @@ def main() -> None:
     load_dotenv_file(args.env_file)
     client, model, provider = create_client_and_model(args.api_key, args.model)
     logger.info(f"Using provider={provider}, model={model}")
+
+    if args.questions is None:
+        logger.error("--questions not provided; all prompts will be skipped. Pass the Q&A directory to enable ground truth lookup.")
+        return
+
+    ground_truth_index = build_ground_truth_index(args.questions)
 
     entries = load_prompt_entries(
         input_dir=args.input,
@@ -319,8 +352,8 @@ def main() -> None:
         output_dir=args.output_dir,
         model=model,
         max_output_tokens=args.max_output_tokens,
-        temperature=args.temperature,
         overwrite=args.overwrite,
+        ground_truth_index=ground_truth_index,
     )
     logger.info(
         f"Done. Completed={completed}, Failed={failed}, Skipped={skipped}, OutputDir={args.output_dir}"
