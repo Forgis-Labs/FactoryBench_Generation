@@ -56,6 +56,8 @@ In addition to physical experiments, we simulate the same robotic systems to gen
 
 # 4 Q&A generation
 
+![Figure 1: Chain structure for generation of unique synthetic questions at scale.](figures/f1.png)
+
 ## Levels of Understanding
 
 To systematically evaluate machine understanding, we organize question-answering tasks according to a four-tier hierarchy, each probing distinct reasoning capabilities:
