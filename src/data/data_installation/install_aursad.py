@@ -193,19 +193,23 @@ def main() -> None:
     data_frame: Optional[pd.DataFrame] = None
     with pd.HDFStore(h5_path, mode="r") as store:
         if "/complete_data" in store.keys():
-            storer = store.get_storer("complete_data")
-            if storer is not None and storer.is_table and hdf5_read_limit is not None:
-                data_frame = store.select("complete_data", stop=hdf5_read_limit)
-            else:
-                data_frame = store["complete_data"]
-                if hdf5_read_limit is not None:
+            try:
+                result = store["complete_data"]
+                if not isinstance(result, pd.DataFrame):
+                    result = result.to_frame()
+                data_frame = result
+                
+                if data_frame is not None and hdf5_read_limit is not None:
                     data_frame = data_frame.head(hdf5_read_limit)
 
-            metadata["/complete_data"] = {
-                "rows_exported": int(len(data_frame)),
-                "columns": list(data_frame.columns),
-                "dtypes": {col: str(dtype) for col, dtype in data_frame.dtypes.items()},
-            }
+                if data_frame is not None:
+                    metadata["/complete_data"] = {
+                        "rows_exported": int(len(data_frame)),
+                        "columns": list(data_frame.columns),
+                        "dtypes": {col: str(dtype) for col, dtype in data_frame.dtypes.items()},
+                    }
+            except Exception:
+                data_frame = None
 
     if data_frame is None:
         frames: List[pd.DataFrame] = []
