@@ -1,14 +1,14 @@
 """
-Level 2 question generator: Intervention Reasoning.
+Level 3 question generator: Counterfactual Reasoning.
 
-Reads normalized episode JSON files from aursad or vorausad datasets,
-samples random sub-series, and fills Level 2 question templates.
+Reads normalized episode JSON files from paired counterfactual datasets,
+samples random sub-series, and fills Level 3 question templates.
 Answers are generated when determinable from episode readings.
 
-Output: datasets/questions/level2/level2_{NNNN}.json
+Output: datasets/questions/level3/level3_{NNNN}.json
 
 Usage:
-    python -m src.questions.level2.level2 -n 100 --seed 42
+    python -m src.questions.level3.level3 -n 100 --seed 42
 """
 from __future__ import annotations
 
@@ -36,29 +36,20 @@ from src.question_generation.utils.template import (
 from src.question_generation.utils.time_series import (
     parse_event_id,
     pick_fault_label,
-    sample_subseries_before_event,
 )
-from src.question_generation.level2.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
+from src.question_generation.level3.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
 
 logger = logging.getLogger(__name__)
 
 VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
 PREDICTION_HORIZONS_MS = [50, 100, 250, 500, 1000]
 
-TRAJECTORY_EXTRA_STATEMENTS = [
-    "The robot arm is operating within its nominal torque limits.",
-    "At least one joint has exceeded its velocity setpoint.",
-    "The TCP force is below detection threshold.",
-    "The motor current has stabilized.",
-    "A protective stop is imminent.",
-    "The control loop has lost tracking.",
-    "Vibration levels are within normal range.",
-    "The gripper command is mismatched with the current phase.",
-]
+
 
 EXCLUDED_JOINT_SIGNALS = {"joint_voltage", "joint_temp", "joint_mode"}
 JOINT_INDEX_RANGE = set(range(6))
 MIN_POST_EVENT_TIMESTAMPS_AFTER = 5
+CF_DATASET_FOLDERS = ["cf_aursad", "cf_vorausad"]
 
 
 def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]]) -> Optional[str]:
@@ -302,6 +293,119 @@ def load_mc_option_lookup(path: Path, level: int) -> Dict[str, str]:
     return lookup
 
 
+def discover_cf_episode_pairs(
+    datasets_dir: Path,
+    cf_dataset_folders: List[str],
+) -> List[Dict[str, Any]]:
+    """
+    Discover paired episode files inside cf dataset folders.
+
+    For each cf folder (e.g., cf_aursad), expects one alt subfolder and one
+    non-alt subfolder. Sampling uses non-alt as context source and alt as
+    the counterfactual source containing the event.
+    """
+    normalized_root = datasets_dir / "normalized_episodes"
+    pairs: List[Dict[str, Any]] = []
+
+    for cf_name in cf_dataset_folders:
+        cf_root = normalized_root / cf_name
+        if not cf_root.exists() or not cf_root.is_dir():
+            continue
+
+        subfolders = sorted([p for p in cf_root.iterdir() if p.is_dir()])
+        if len(subfolders) < 2:
+            continue
+
+        alt_candidates = [p for p in subfolders if p.name.lower().startswith("alt")]
+        non_alt_candidates = [p for p in subfolders if p not in alt_candidates]
+        if not alt_candidates or not non_alt_candidates:
+            continue
+
+        alt_folder = alt_candidates[0]
+        preferred_normal_name = cf_name[3:] if cf_name.lower().startswith("cf_") else cf_name
+        preferred_normal = next((p for p in non_alt_candidates if p.name == preferred_normal_name), None)
+        non_alt_folder = preferred_normal or non_alt_candidates[0]
+
+        def _episode_map(folder: Path) -> Dict[str, Path]:
+            episode_files = [
+                p for p in folder.glob("*.json")
+                if not p.name.endswith("_metadata.json")
+            ]
+            return {p.stem: p for p in episode_files}
+
+        alt_map = _episode_map(alt_folder)
+        non_alt_map = _episode_map(non_alt_folder)
+        common = sorted(set(alt_map.keys()) & set(non_alt_map.keys()))
+        if not common:
+            continue
+
+        for stem in common:
+            pairs.append(
+                {
+                    "cf_dataset": cf_name,
+                    "non_alt_subfolder": non_alt_folder.name,
+                    "alt_subfolder": alt_folder.name,
+                    "non_alt_path": non_alt_map[stem],
+                    "alt_path": alt_map[stem],
+                    "episode": stem,
+                }
+            )
+
+    return pairs
+
+
+def find_event_onset_index(rows: List[Dict[str, Any]]) -> Optional[int]:
+    """Return the first index where an event starts (event id becomes non-zero)."""
+    prev_event_id = 0
+    for idx, row in enumerate(rows):
+        current_event_id = parse_event_id(row.get("event", 0))
+        if current_event_id != 0 and prev_event_id == 0:
+            return idx
+        prev_event_id = current_event_id
+    return None
+
+
+def sample_window_around_index(
+    rows: List[Dict[str, Any]],
+    center_index: int,
+    min_len: int,
+    max_len: int,
+    margin: int = 5,
+) -> Optional[Tuple[List[Dict[str, Any]], int, int]]:
+    """
+    Sample one contiguous subseries containing center_index with at least
+    `margin` timesteps from the subseries borders.
+    Returns (subseries, start_index, length) or None when impossible.
+    """
+    n_rows = len(rows)
+    if n_rows <= 0 or center_index < 0 or center_index >= n_rows:
+        return None
+
+    min_required_len = max(min_len, 2 * margin + 1)
+    max_allowed_len = min(max_len, n_rows)
+    if max_allowed_len < min_required_len:
+        return None
+
+    possible_lengths: List[int] = []
+    for length in range(min_required_len, max_allowed_len + 1):
+        start_low = max(0, center_index + margin - (length - 1))
+        start_high = min(center_index - margin, n_rows - length)
+        if start_low <= start_high:
+            possible_lengths.append(length)
+
+    if not possible_lengths:
+        return None
+
+    chosen_len = random.choice(possible_lengths)
+    start_low = max(0, center_index + margin - (chosen_len - 1))
+    start_high = min(center_index - margin, n_rows - chosen_len)
+    if start_low > start_high:
+        return None
+
+    start_idx = random.randint(start_low, start_high)
+    return rows[start_idx : start_idx + chosen_len], start_idx, chosen_len
+
+
 def resolve_fixed_option(
     token: Any,
     mc_option_lookup: Dict[str, str],
@@ -490,7 +594,7 @@ def render_statement_with_thresholds(
 
 def build_multiselect_options_and_answer(
     answer_format: Dict[str, Any],
-    subseries: List[Dict[str, Any]],
+    baseline_subseries: List[Dict[str, Any]],
     post_event_rows: List[Dict[str, Any]],
     mc_option_lookup: Dict[str, str],
 ) -> Tuple[Dict[str, str], str]:
@@ -528,7 +632,7 @@ def build_multiselect_options_and_answer(
         )
         truth = evaluate_mc_statement(
             opt_id,
-            subseries=subseries,
+            subseries=baseline_subseries,
             post_event_rows=post_event_rows,
             thresholds=sampled_thresholds,
         )
@@ -550,7 +654,7 @@ def build_multiselect_options_and_answer(
 
 
 # ---------------------------------------------------------------------------
-# Template filling  (level 2 specific)
+# Template filling  (level 3 specific)
 # ---------------------------------------------------------------------------
 
 
@@ -560,9 +664,11 @@ def fill_template(
     post_event_rows: List[Dict[str, Any]],
     events: List[Dict[str, Any]],
     mc_option_lookup: Dict[str, str],
+    t2_ms: Optional[int] = None,
+    answer_subseries: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Fill a Level 2 question template.
+    Fill a Level 3 question template.
 
     post_event_rows: rows from the episode after the subseries end
                      (used for ranking chunks).
@@ -580,10 +686,12 @@ def fill_template(
     tmpl_text: str = template["template"]
     answer_format: Dict[str, Any] = template["answer_format"]
     t = get_last_timestamp(subseries)
+    baseline_rows = answer_subseries if answer_subseries is not None else subseries
 
     onset_id = parse_event_id(post_event_rows[0].get("event", 0)) if post_event_rows else 0
     event_obj = next((e for e in events if e["id"] == onset_id), random.choice(events))
     event_desc = fill_event_description(event_obj, subseries, t, post_event_rows)
+    event_time = t if t2_ms is None else int(t2_ms)
 
     options: Dict[str, Any] = {}
     answer = None
@@ -604,25 +712,25 @@ def fill_template(
         chunk_to_label = {id(chunks[i]): labels[i] for i in range(len(chunks))}
         answer = "".join(chunk_to_label[id(chunk)] for chunk in ordered_chunks)
 
-        question = fill(tmpl_text, t=t, event=event_desc)
+        question = fill(tmpl_text, t=t, t2=event_time, event=event_desc)
 
     elif tid == 2:
         options, answer = build_multiselect_options_and_answer(
             answer_format=answer_format,
-            subseries=subseries,
+            baseline_subseries=baseline_rows,
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
         )
-        question = fill(tmpl_text, event=event_desc, t=t)
+        question = fill(tmpl_text, event=event_desc, t=t, t2=event_time)
 
     elif tid == 3:
         options, answer = build_multiselect_options_and_answer(
             answer_format=answer_format,
-            subseries=subseries,
+            baseline_subseries=baseline_rows,
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
         )
-        question = fill(tmpl_text, event=event_desc, t=t)
+        question = fill(tmpl_text, event=event_desc, t=t, t2=event_time)
 
     elif tid == 4:
         signal = pick_scalar_signal(subseries)
@@ -637,7 +745,7 @@ def fill_template(
         if not isinstance(signal_value, (int, float, np.floating)):
             return None
         answer = round(float(signal_value), 6)
-        question = fill(tmpl_text, event=event_desc, t=t, signal=signal, n=n_ms)
+        question = fill(tmpl_text, event=event_desc, t=t, t2=event_time, signal=signal, n=n_ms)
 
     elif tid == 5:
         joint_signal = pick_joint_indexed_signal_base(subseries)
@@ -658,7 +766,7 @@ def fill_template(
             tensor_values.append(round(float(value), 6))
 
         answer = "_".join(str(v) for v in tensor_values)
-        question = fill(tmpl_text, event=event_desc, t=t, joint_signal=joint_signal, n=n_ms)
+        question = fill(tmpl_text, event=event_desc, t=t, t2=event_time, joint_signal=joint_signal, n=n_ms)
 
     else:
         logger.warning(f"Unknown template id: {tid}")
@@ -678,7 +786,7 @@ def fill_template(
 # ---------------------------------------------------------------------------
 
 
-def generate_level2_questions(
+def generate_level3_questions(
     datasets_dir: Path,
     output_dir: Path,
     templates: List[Dict[str, Any]],
@@ -699,19 +807,26 @@ def generate_level2_questions(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    by_dataset = discover_episodes_by_dataset(datasets_dir, VALID_DATASETS)
-    if not by_dataset:
+    cf_pairs = discover_cf_episode_pairs(datasets_dir, CF_DATASET_FOLDERS)
+    if not cf_pairs:
         raise FileNotFoundError(
-            f"No normalized episode JSON files found under "
-            f"{datasets_dir / 'normalized_episodes'} for datasets: {VALID_DATASETS}"
+            f"No paired episodes found under {datasets_dir / 'normalized_episodes'} "
+            f"for cf datasets: {CF_DATASET_FOLDERS}"
         )
 
-    episodes_by_dataset = {ds: paths for ds, paths in by_dataset.items() if paths}
-    available_datasets = list(episodes_by_dataset.keys())
-    if not available_datasets:
+    pairs_by_dataset: Dict[str, List[Dict[str, Any]]] = {}
+    for pair in cf_pairs:
+        dataset_name = str(pair.get("cf_dataset", ""))
+        if not dataset_name:
+            continue
+        pairs_by_dataset.setdefault(dataset_name, []).append(pair)
+
+    available_cf_datasets = [ds for ds, plist in pairs_by_dataset.items() if plist]
+    if not available_cf_datasets:
         raise FileNotFoundError(
-            f"No usable datasets with episodes found under {datasets_dir / 'normalized_episodes'}"
+            f"No usable cf dataset pairs found under {datasets_dir / 'normalized_episodes'}"
         )
+
     episode_cache: Dict[str, List[Dict[str, Any]]] = {}
 
     def load_episode(path: Path) -> List[Dict[str, Any]]:
@@ -727,28 +842,51 @@ def generate_level2_questions(
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
-        ds = random.choice(available_datasets)
-        ep_path = random.choice(episodes_by_dataset[ds])
-        rows = load_episode(ep_path)
-        if not isinstance(rows, list) or len(rows) < min_len:
+        sampled_dataset = random.choice(available_cf_datasets)
+        pair = random.choice(pairs_by_dataset[sampled_dataset])
+        non_alt_path = cast(Path, pair["non_alt_path"])
+        alt_path = cast(Path, pair["alt_path"])
+
+        normal_rows = load_episode(non_alt_path)
+        alt_rows = load_episode(alt_path)
+
+        if not isinstance(normal_rows, list) or not isinstance(alt_rows, list):
+            continue
+        if not normal_rows or not alt_rows:
             continue
 
-        sampled = sample_subseries_before_event(
-            rows,
-            min_len,
-            max_len,
-            min_post_event_after=MIN_POST_EVENT_TIMESTAMPS_AFTER,
-            return_metadata=True,
+        event_onset_idx = find_event_onset_index(alt_rows)
+        if event_onset_idx is None:
+            continue
+
+        sampled_window = sample_window_around_index(
+            normal_rows,
+            center_index=event_onset_idx,
+            min_len=min_len,
+            max_len=max_len,
+            margin=5,
         )
-        subseries, post_event_rows, subseries_start_index, subseries_length = cast(
-            Tuple[List[Dict[str, Any]], List[Dict[str, Any]], int, int],
-            sampled,
-        )
+        if sampled_window is None:
+            continue
+
+        subseries, subseries_start_index, subseries_length = sampled_window
         if not subseries:
+            continue
+
+        alt_start_idx = event_onset_idx - subseries_length + 1
+        if alt_start_idx < 0:
+            continue
+        alt_answer_subseries = alt_rows[alt_start_idx : event_onset_idx + 1]
+        if len(alt_answer_subseries) != subseries_length:
+            continue
+
+        post_event_rows = alt_rows[event_onset_idx:]
+        if not post_event_rows:
             continue
 
         base_timestamp_ms = _first_timestamp_ms(subseries)
         subseries = normalize_timestamps(subseries, base_timestamp_ms)
+        alt_answer_subseries = normalize_timestamps(alt_answer_subseries, base_timestamp_ms)
         post_event_rows = normalize_timestamps(post_event_rows, base_timestamp_ms)
 
         event_segment_rows, post_after_event_rows = split_event_segment(post_event_rows)
@@ -757,39 +895,52 @@ def generate_level2_questions(
         if len(post_after_event_rows) < MIN_POST_EVENT_TIMESTAMPS_AFTER:
             continue
 
+        event_time_ms = get_last_timestamp(post_event_rows[:1])
+
         template = random.choice(templates)
 
-        filled = fill_template(template, subseries, post_event_rows, events, mc_option_lookup)
+        filled = fill_template(
+            template,
+            subseries,
+            post_event_rows,
+            events,
+            mc_option_lookup,
+            t2_ms=event_time_ms,
+            answer_subseries=alt_answer_subseries,
+        )
         if filled is None:
             continue
 
-        subseries_with_event = subseries + event_segment_rows
-        context = build_context(subseries_with_event)
+        context = build_context(subseries)
 
         item = {
             "id": str(uuid.uuid4()),
-            "level": 2,
+            "level": 3,
             "template_id": template["id"],
             "template_type": template["type"],
             "question": filled["question"],
             "options": filled["options"],
             "answer": filled["answer"],
             "provenance": {
-                "dataset": ds,
-                "episode": ep_path.stem,
+                "dataset": pair["cf_dataset"],
+                "sampled_subfolder": pair["non_alt_subfolder"],
+                "counterpart_subfolder": pair["alt_subfolder"],
+                "episode": non_alt_path.stem,
                 "subseries_start_index": subseries_start_index,
-                "subseries_length": len(subseries_with_event),
+                "subseries_length": subseries_length,
+                "event_index_alt": event_onset_idx,
+                "event_time_ms": event_time_ms,
             },
             "context": context,
         }
 
-        out_path = output_dir / f"level2_{generated:04d}.json"
+        out_path = output_dir / f"level3_{generated:04d}.json"
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(item, f, indent=2)
 
         logger.info(
             f"✓ [{generated + 1}/{n}] {out_path.name} "
-            f"(template {template['id']}, {ds})"
+            f"(template {template['id']}, {pair['cf_dataset']}/{pair['non_alt_subfolder']})"
         )
         generated += 1
 
@@ -806,7 +957,7 @@ def generate_level2_questions(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Generate Level 2 (Intervention Reasoning) Q&A pairs."
+        description="Generate Level 3 (Counterfactual Reasoning) Q&A pairs."
     )
     repo_root = Path(__file__).resolve().parents[3]
 
@@ -819,8 +970,8 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=repo_root / "output" / "questions" / "level2",
-        help="Output directory (default: <repo>/output/questions/level2)",
+        default=repo_root / "output" / "questions" / "level3",
+        help="Output directory (default: <repo>/output/questions/level3)",
     )
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
     parser.add_argument("--min-len", type=int, default=32, help="Min subseries length")
@@ -834,17 +985,15 @@ def main() -> None:
         format="%(levelname)s: %(message)s",
     )
 
-    templates = load_templates(
-        repo_root / "src" / "question_generation" / "level2" / "question_template.json"
-    )
+    templates = load_templates(Path(__file__).with_name("question_template.json"))
     root_causes = load_root_causes(args.datasets_dir / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "events" / "events.json")
     mc_option_lookup = load_mc_option_lookup(
         args.datasets_dir / "mc_options" / "mc_options.json",
-        level=2,
+        level=3,
     )
 
-    generate_level2_questions(
+    generate_level3_questions(
         datasets_dir=args.datasets_dir,
         output_dir=args.output,
         templates=templates,

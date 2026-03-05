@@ -171,7 +171,11 @@ def build_context(subseries: List[Dict[str, Any]]) -> Dict[str, Any]:
             },
         }
     ctx["time_series_format"] = {
-        "description": "Each timestep is encoded as a string with features in format 'acronym_value' separated by '|'.",
+        "description": (
+            "Each row in time_series is one timestep encoded as "
+            "'t=<timestamp>: acronym=value, ...'. "
+            "Feature names use acronyms defined in provenance.feature_mapping."
+        ),
         "acronym_mapping": acronym_mapping,
     }
     ctx["time_series"] = encoded

@@ -45,16 +45,7 @@ logger = logging.getLogger(__name__)
 VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
 PREDICTION_HORIZONS_MS = [50, 100, 250, 500, 1000]
 
-TRAJECTORY_EXTRA_STATEMENTS = [
-    "The robot arm is operating within its nominal torque limits.",
-    "At least one joint has exceeded its velocity setpoint.",
-    "The TCP force is below detection threshold.",
-    "The motor current has stabilized.",
-    "A protective stop is imminent.",
-    "The control loop has lost tracking.",
-    "Vibration levels are within normal range.",
-    "The gripper command is mismatched with the current phase.",
-]
+
 
 EXCLUDED_JOINT_SIGNALS = {"joint_voltage", "joint_temp", "joint_mode"}
 JOINT_INDEX_RANGE = set(range(6))
@@ -834,9 +825,7 @@ def main() -> None:
         format="%(levelname)s: %(message)s",
     )
 
-    templates = load_templates(
-        repo_root / "src" / "question_generation" / "level2" / "question_template.json"
-    )
+    templates = load_templates(Path(__file__).with_name("question_template.json"))
     root_causes = load_root_causes(args.datasets_dir / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "events" / "events.json")
     mc_option_lookup = load_mc_option_lookup(

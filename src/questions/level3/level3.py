@@ -23,8 +23,8 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
 
-from src.questions.common.io import load_events, load_json, load_root_causes, load_templates
-from src.questions.common.template import (
+from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
+from src.question_generation.utils.template import (
     build_context,
     discover_episodes_by_dataset,
     encode_chunk,
@@ -33,11 +33,11 @@ from src.questions.common.template import (
     get_last_timestamp,
     pick_scalar_signal,
 )
-from src.questions.common.time_series import (
+from src.question_generation.utils.time_series import (
     parse_event_id,
     pick_fault_label,
 )
-from src.questions.level3.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
+from src.question_generation.level3.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
 
 logger = logging.getLogger(__name__)
 
@@ -994,7 +994,9 @@ def main() -> None:
         format="%(levelname)s: %(message)s",
     )
 
-    templates = load_templates(Path(__file__).with_name("question_template.json"))
+    templates = load_templates(
+        repo_root / "src" / "question_generation" / "level3" / "question_template.json"
+    )
     root_causes = load_root_causes(args.datasets_dir / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "events" / "events.json")
     mc_option_lookup = load_mc_option_lookup(

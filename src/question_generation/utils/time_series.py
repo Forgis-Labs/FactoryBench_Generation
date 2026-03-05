@@ -148,12 +148,15 @@ def _create_feature_acronyms(feature_names: List[str]) -> Dict[str, str]:
 
 
 def _encode_timestep(row: Dict[str, Any], acronyms: Dict[str, str]) -> str:
+    timestamp_part = ""
     parts = []
     if "timestamp_ms" in row:
         value = row["timestamp_ms"]
         if value is not None and isinstance(value, (int, float, np.floating)):
-            acro = acronyms.get("timestamp_ms", "timestamp_ms")
-            parts.append(f"{acro}_{round(float(value), 2)}")
+            rounded = round(float(value), 2)
+            if rounded.is_integer():
+                rounded = int(rounded)
+            timestamp_part = f"t={rounded}"
     for feature_name in sorted(row.keys()):
         if feature_name == "timestamp_ms":
             continue
@@ -162,12 +165,20 @@ def _encode_timestep(row: Dict[str, Any], acronyms: Dict[str, str]) -> str:
             continue
         acro = acronyms.get(feature_name, feature_name)
         if isinstance(value, (int, float, np.floating)):
-            parts.append(f"{acro}_{round(float(value), 2)}")
+            rounded = round(float(value), 2)
+            if rounded.is_integer():
+                rounded = int(rounded)
+            parts.append(f"{acro}={rounded}")
         elif isinstance(value, str):
-            parts.append(f"{acro}_{value}")
+            parts.append(f"{acro}={value}")
         elif isinstance(value, dict):
-            parts.append(f"{acro}_{json.dumps(value)}")
-    return "|".join(parts)
+            parts.append(f"{acro}={json.dumps(value)}")
+
+    if timestamp_part and parts:
+        return f"{timestamp_part}: " + ", ".join(parts)
+    if timestamp_part:
+        return timestamp_part
+    return ", ".join(parts)
 
 
 def encode_time_series(

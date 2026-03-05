@@ -31,7 +31,7 @@ def main():
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s: %(message)s")
 
     if args.cmd == "level1":
-        from src.questions.level1 import generate_level1_questions
+        from src.question_generation.level1 import generate_level1_questions
 
         generate_level1_questions(
             episode_json=args.input,
