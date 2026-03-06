@@ -1,0 +1,158 @@
+[
+  {
+    "id": "pattern_001",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+    "values": [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
+    "domain": "synthetic",
+    "subtype": "square_wave",
+    "statistics": {
+      "mean": 0.5,
+      "std": 0.5,
+      "min": 0.0,
+      "max": 1.0
+    }
+  },
+  {
+    "id": "pattern_002",
+    "timestamps": [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0],
+    "values": [0.0, 0.707, 1.0, 0.707, 0.0, -0.707, -1.0, -0.707, 0.0],
+    "domain": "synthetic",
+    "subtype": "sine_wave",
+    "statistics": {
+      "mean": 0.0,
+      "std": 0.666667,
+      "min": -1.0,
+      "max": 1.0
+    }
+  },
+  {
+    "id": "pattern_003",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0],
+    "values": [0.0, 5.0, 10.0, 15.0, 20.0, 15.0, 10.0, 5.0, 0.0, 5.0, 10.0, 15.0],
+    "domain": "synthetic",
+    "subtype": "sawtooth_wave",
+    "statistics": {
+      "mean": 9.166667,
+      "std": 6.204837,
+      "min": 0.0,
+      "max": 20.0
+    }
+  },
+  {
+    "id": "pattern_004",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+    "values": [10.0, 12.0, 11.5, 13.0, 12.5, 14.0, 13.5, 15.0, 14.5, 16.0],
+    "domain": "synthetic",
+    "subtype": "noisy_trend",
+    "statistics": {
+      "mean": 13.2,
+      "std": 1.6733201,
+      "min": 10.0,
+      "max": 16.0
+    }
+  },
+  {
+    "id": "pattern_005",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+    "values": [50.0, 55.0, 45.0, 60.0, 40.0, 65.0, 35.0, 70.0, 30.0, 75.0, 25.0],
+    "domain": "synthetic",
+    "subtype": "diverging_oscillation",
+    "statistics": {
+      "mean": 50.0,
+      "std": 15.811388,
+      "min": 25.0,
+      "max": 75.0
+    }
+  },
+  {
+    "id": "pattern_006",
+    "timestamps": [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5],
+    "values": [100.0, 90.0, 82.0, 76.0, 71.0, 67.5, 64.5, 62.0, 60.0, 58.5, 57.5],
+    "domain": "synthetic",
+    "subtype": "exponential_decay",
+    "statistics": {
+      "mean": 71.727272,
+      "std": 13.540064,
+      "min": 57.5,
+      "max": 100.0
+    }
+  },
+  {
+    "id": "pattern_007",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0],
+    "values": [1.0, 3.0, 2.0, 6.0, 4.0, 12.0, 8.0, 24.0, 16.0, 48.0, 32.0, 64.0],
+    "domain": "synthetic",
+    "subtype": "chaotic_growth",
+    "statistics": {
+      "mean": 18.333333,
+      "std": 19.720265,
+      "min": 1.0,
+      "max": 64.0
+    }
+  },
+  {
+    "id": "pattern_008",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+    "values": [20.0, 25.0, 22.0, 27.0, 24.0, 29.0, 26.0, 31.0, 28.0],
+    "domain": "synthetic",
+    "subtype": "periodic_with_drift",
+    "statistics": {
+      "mean": 25.777778,
+      "std": 3.193744,
+      "min": 20.0,
+      "max": 31.0
+    }
+  },
+  {
+    "id": "pattern_009",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+    "values": [5.0, 10.0, 5.0, 15.0, 5.0, 20.0, 5.0, 25.0, 5.0, 30.0, 5.0],
+    "domain": "synthetic",
+    "subtype": "impulse_train",
+    "statistics": {
+      "mean": 12.272727,
+      "std": 8.771754,
+      "min": 5.0,
+      "max": 30.0
+    }
+  },
+  {
+    "id": "pattern_010",
+    "timestamps": [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0],
+    "values": [40.0, 42.0, 45.0, 49.0, 54.0, 60.0, 67.0, 75.0, 84.0, 94.0, 105.0],
+    "domain": "synthetic",
+    "subtype": "accelerating_growth",
+    "statistics": {
+      "mean": 65.0,
+      "std": 22.360679,
+      "min": 40.0,
+      "max": 105.0
+    }
+  },
+  {
+    "id": "pattern_011",
+    "timestamps": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+    "values": [15.0, 18.0, 16.0, 19.0, 17.0, 20.0, 18.0, 21.0, 19.0, 22.0],
+    "domain": "synthetic",
+    "subtype": "seasonal_pattern",
+    "statistics": {
+      "mean": 18.5,
+      "std": 2.0,
+      "min": 15.0,
+      "max": 22.0
+    }
+  },
+  {
+    "id": "pattern_012",
+    "timestamps": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4],
+    "values": [100.0, 98.0, 95.0, 91.0, 86.0, 80.0, 73.0, 65.0, 56.0, 46.0, 35.0, 23.0, 10.0],
+    "domain": "synthetic",
+    "subtype": "decelerating_decrease",
+    "statistics": {
+      "mean": 65.230769,
+      "std": 28.983046,
+      "min": 10.0,
+      "max": 100.0
+    }
+  }
+]
