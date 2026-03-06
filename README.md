@@ -113,16 +113,19 @@ In addition, we explore tool-augmented agent configurations, wherein the best-pe
 ## Models to Evaluate
 
 **Frontier LLMs:**
+
 - GPT-4o, GPT-4-Turbo
 - Gemini-2.5-Pro, Gemini-2.5-Flash
 - Claude-3.5-Sonnet, Claude-3-Opus
 
 **Specialized Methods:**
+
 - Time-series encoders + LLM (Chronos, Moirai)
 - Multimodal industrial models (FD-LLM)
 - RAG with manual retrieval
 
 **Baselines:**
+
 - Random
 - Rule-based (threshold detection)
 - Human expert (ceiling)

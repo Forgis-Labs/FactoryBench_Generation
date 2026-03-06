@@ -1,7 +1,0 @@
-{
-  "n_questions": 100,
-  "min_dt_ms": 100,
-  "max_dt_ms": 2000,
-  "eps_q": 0.001,
-  "seed": null
-}
