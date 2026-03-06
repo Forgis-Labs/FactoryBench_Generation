@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import random
 import re
 import uuid
@@ -40,8 +39,6 @@ from src.question_generation.utils.time_series import (
 )
 from src.question_generation.level2.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
 
-logger = logging.getLogger(__name__)
-
 VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
 PREDICTION_HORIZONS_MS = [50, 100, 250, 500, 1000]
 
@@ -59,6 +56,10 @@ TRAJECTORY_EXTRA_STATEMENTS = [
 EXCLUDED_JOINT_SIGNALS = {"joint_voltage", "joint_temp", "joint_mode"}
 JOINT_INDEX_RANGE = set(range(6))
 MIN_POST_EVENT_TIMESTAMPS_AFTER = 5
+# Multiplier applied to the signal variance to compute acceptance margin.
+# A coefficient of 2 keeps the window proportional to signal spread while
+# staying tight enough to meaningfully penalise large prediction errors.
+ACCEPTANCE_VARIANCE_COEFF = 2.0
 
 
 def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]]) -> Optional[str]:
@@ -263,12 +264,10 @@ def load_mc_option_lookup(path: Path, level: int) -> Dict[str, str]:
     """
     try:
         raw = load_json(path)
-    except Exception as exc:
-        logger.warning(f"Could not load MC options from {path}: {exc}")
+    except Exception:
         return {}
 
     if not isinstance(raw, list):
-        logger.warning(f"MC options file has unexpected format (expected list): {path}")
         return {}
 
     lookup: Dict[str, str] = {}
@@ -588,6 +587,7 @@ def fill_template(
     options: Dict[str, Any] = {}
     answer = None
 
+    acceptance_bounds = None
     if tid == 1:
         chunks = sample_subsequent_chunks(post_event_rows, n_chunks=4, min_chunk=5, max_chunk=7)
         if len(chunks) < 4:
@@ -638,6 +638,11 @@ def fill_template(
             return None
         answer = round(float(signal_value), 6)
         question = fill(tmpl_text, event=event_desc, t=t, signal=signal, n=n_ms)
+        all_values: List[float] = [float(v) for row in subseries if isinstance(v := row.get(signal), (int, float, np.floating))]
+        if all_values:
+            mean_val = float(np.mean(all_values))
+            margin = ACCEPTANCE_VARIANCE_COEFF * float(np.var(all_values))
+            acceptance_bounds = {"mean": mean_val, "margin": margin}
 
     elif tid == 5:
         joint_signal = pick_joint_indexed_signal_base(subseries)
@@ -650,27 +655,43 @@ def fill_template(
             return None
 
         tensor_values: List[float] = []
+        all_means = []
+        all_variances: List[Optional[float]] = []
         for joint_idx in range(6):
             key = f"{joint_signal}_{joint_idx}"
             value = target_row.get(key)
             if not isinstance(value, (int, float, np.floating)):
                 return None
             tensor_values.append(round(float(value), 6))
+            joint_vals: List[float] = [float(v) for row in subseries if isinstance(v := row.get(key), (int, float, np.floating))]
+            if joint_vals:
+                all_means.append(float(np.mean(joint_vals)))
+                all_variances.append(float(np.var(joint_vals)))
+            else:
+                all_means.append(None)
+                all_variances.append(None)
 
         answer = "_".join(str(v) for v in tensor_values)
         question = fill(tmpl_text, event=event_desc, t=t, joint_signal=joint_signal, n=n_ms)
+        # Compute acceptance bounds for tensor
+        if (all_means and all(x is not None for x in all_means)
+                and all_variances and all(x is not None for x in all_variances)):
+            margin = [ACCEPTANCE_VARIANCE_COEFF * v for v in all_variances]
+            acceptance_bounds = {"mean": all_means, "margin": margin}
 
     else:
-        logger.warning(f"Unknown template id: {tid}")
         return None
 
-    return {
+    out = {
         "question": question,
         "answer_format": answer_format,
         "options": options,
         "event_id": event_obj["id"],
         "answer": answer,
     }
+    if acceptance_bounds is not None:
+        out["acceptance_bounds"] = acceptance_bounds
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -782,21 +803,14 @@ def generate_level2_questions(
             },
             "context": context,
         }
+        if "acceptance_bounds" in filled:
+            item["acceptance_bounds"] = filled["acceptance_bounds"]
 
         out_path = output_dir / f"level2_{generated:04d}.json"
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(item, f, indent=2)
 
-        logger.info(
-            f"✓ [{generated + 1}/{n}] {out_path.name} "
-            f"(template {template['id']}, {ds})"
-        )
         generated += 1
-
-    if generated < n:
-        logger.warning(f"Only generated {generated}/{n} questions after {attempts} attempts")
-    else:
-        logger.info(f"Done: {generated} questions written to {output_dir}")
 
 
 # ---------------------------------------------------------------------------
@@ -826,13 +840,8 @@ def main() -> None:
     parser.add_argument("--min-len", type=int, default=32, help="Min subseries length")
     parser.add_argument("--max-len", type=int, default=64, help="Max subseries length")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
-    parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
 
     templates = load_templates(
         repo_root / "src" / "question_generation" / "level2" / "question_template.json"

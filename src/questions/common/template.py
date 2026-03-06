@@ -335,7 +335,7 @@ def fill_event_description(
         kwargs["x"] = random.choice([0.5, 1.0, 1.5, 2.0, 2.5])
     if "L" in variables or "{L}" in desc:
         L = 0
-        if post_event_rows:
+        if post_event_rows is not None:
             onset_val = post_event_rows[0].get("event", 0)
             for r in post_event_rows:
                 if r.get("event", 0) == onset_val:
