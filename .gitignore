@@ -61,4 +61,9 @@ yarn-debug.log*
 yarn-error.log*
 
 # data
-datasets/open_datasets/*
+data/open_datasets/*
+data/normalized_episodes/*
+
+#output
+output/*
+
