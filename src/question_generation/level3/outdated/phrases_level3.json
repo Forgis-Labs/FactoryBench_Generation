@@ -1,0 +1,22 @@
+{
+  "mcq_templates": [
+    {
+      "id": 1,
+      "level": 3,
+      "difficulty": "hard",
+      "question_text": "Detect if the behavior of the machine here is showing signs of anomaly, and determine its cause.",
+      "answer_options": [
+        "The cause of this anomaly isn't listed in the options."
+      ]
+    },
+    {
+      "id": 2,
+      "level": 3,
+      "difficulty": "medium",
+      "question_text": "The machine is behaving abnormally. Determine the cause.",
+      "answer_options": [
+        "The cause of this anomaly isn't listed in the options."
+      ]
+    }
+  ]
+}
