@@ -66,6 +66,14 @@ In addition to physical experiments, we simulate the same robotic systems to gen
 
 ## Levels of Understanding
 
+| Answer Format | Level 1: State | Level 2: Intervention | Level 3: Counterfactual | Level 4: Decision |
+| ------------- | -------------- | --------------------- | ----------------------- | ----------------- |
+| Multi select  | ✓              | ✓                     | ✓                       | ✓                 |
+| Scalar        | ✓              | ✓                     | ✓                       | -                 |
+| Tensor        | ✓              | ✓                     | ✓                       | -                 |
+| Ranking       | ✓              | ✓                     | ✓                       | ✓                 |
+| Free form     | ✓              | ✓                     | ✓                       | ✓                 |
+
 To systematically evaluate machine understanding, we organize question-answering tasks according to a four-tier hierarchy, each probing distinct reasoning capabilities:
 
 **Level 1: State.** This tier assesses the agent’s ability to interpret the current state of the machine, including detection of anomalies, identification of operational modes, and recognition of sensor patterns. Questions at this level require accurate extraction and interpretation of time series features.
@@ -77,6 +85,18 @@ To systematically evaluate machine understanding, we organize question-answering
 **Level 4: Decision Making.** The highest tier encompasses complex decision-making tasks, where the agent must generate a sequence of actions or recommendations based on the time series and a prompt. This includes troubleshooting, optimization, and planning, requiring integration of state interpretation, causal reasoning, and goal-directed synthesis.
 
 By structuring Q&A tasks along these four levels, FactoryBench enables rigorous and granular assessment of machine understanding, from basic state recognition to advanced decision support.
+
+## Dataset Diversity & Quality Assurance
+
+A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine understanding, we utilize the **Vendi Score** on the embeddings of our Q&A pairs to measure and maximize effective population diversity.
+
+We iteratively evaluate dataset diversity across three primary axes during generation:
+
+- **Low Diversity (Parameter Variation):** Varying only parameters like time windows and joint indices yields a low Vendi Score, confirming that simple parameter randomization is insufficient.
+- **Moderate Diversity (Format Variation):** Semantically identical questions expressed across different formats (Open-ended, Multiple Choice, True/False) measurably increase the effective diversity.
+- **High Diversity (Template & Type Variation):** Introducing mixed reasoning templates across levels (e.g., kinematic comparison, derivative estimation such as friction and acceleration, anomaly detection) drives the highest Vendi Score.
+
+By enforcing high Vendi Scores across our generated subsets, we ensure the benchmark tests versatile analytical capabilities rather than surface-level pattern matching.
 
 # 5 Experiment
 
@@ -90,6 +110,23 @@ To further investigate the impact of domain adaptation, we optionally finetune t
 
 In addition, we explore tool-augmented agent configurations, wherein the best-performing model is granted access to external time series prediction and anomaly detection modules. This setup allows the agent to query specialized models for numerical reasoning, anomaly localization, and forecasting, thereby testing the synergy between LLM reasoning and domain-specific computation.
 
+## Models to Evaluate
+
+**Frontier LLMs:**
+- GPT-4o, GPT-4-Turbo
+- Gemini-2.5-Pro, Gemini-2.5-Flash
+- Claude-3.5-Sonnet, Claude-3-Opus
+
+**Specialized Methods:**
+- Time-series encoders + LLM (Chronos, Moirai)
+- Multimodal industrial models (FD-LLM)
+- RAG with manual retrieval
+
+**Baselines:**
+- Random
+- Rule-based (threshold detection)
+- Human expert (ceiling)
+
 # 6 Result
 
 # 7 Analysis
@@ -99,6 +136,15 @@ POTENTIAL TODO: organize human study on free form answers checked by LLM voting.
 # 8 Conclusion
 
 # 9 Appendix
+
+## A.1 Four Levels of Machine Understanding
+
+| Level | Task           | Example Question                                                              | Ground Truth Source        | Commercial Value               |
+| ----- | -------------- | ----------------------------------------------------------------------------- | -------------------------- | ------------------------------ |
+| **1** | State          | "What's the current of joint 3 now?"                                          | Sensor data                | Fleet monitoring               |
+| **2** | Intervention   | "If force in joint 3 suddenly increases _now_ to X, what happens?"            | Simulation (present state) | Diagnostic intervention        |
+| **3** | Counterfactual | "If force had suddenly increased to X _at t=20ms_, what would have happened?" | Simulation (past state)    | Root cause / Capacity planning |
+| **4** | Decision       | "Robot stopped with error C203A. What to do?"                                 | Manual + sensor fusion     | Expert-free recovery           |
 
 Source for safety, robot, joint modes: https://docs.universal-robots.com/tutorials/communication-protocol-tutorials/rtde-guide.html
 
