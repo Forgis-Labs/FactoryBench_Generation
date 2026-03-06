@@ -17,7 +17,11 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from openai import AzureOpenAI, OpenAI
+try:
+    from openai import AzureOpenAI, OpenAI
+except ImportError:
+    AzureOpenAI = None
+    OpenAI = None
 
 logger = logging.getLogger(__name__)
 
@@ -225,11 +229,16 @@ def run_direct_requests(
             logger.info(f"- Skipping existing result: {custom_id}")
             continue
 
-        ground_truth = ground_truth_index.get(prompt_path.stem)
-        if ground_truth is None:
-            skipped += 1
-            logger.warning(f"- Skipping (no ground truth): {custom_id}")
-            continue
+
+        # Load full Q&A object for scoring (not just answer)
+        try:
+            qa_payload = load_json(prompt_path)
+        except Exception:
+            qa_payload = {}
+
+        answer_format = qa_payload.get("answer_format", {})
+        q_type = answer_format.get("type") or qa_payload.get("template_type")
+        acceptance_bounds = qa_payload.get("acceptance_bounds")
 
         try:
             response = client.responses.create(
@@ -239,13 +248,78 @@ def run_direct_requests(
             )
             body = _to_dict(response)
             answer = _extract_output_text_from_responses_body(body)
+
+            # --- Scoring logic ---
+            score = None
+            gt = ground_truth
+            pred = answer
+            try:
+                if q_type in ("numerical", "tensor"):
+                    # Numerical: float, Tensor: underscore-separated floats
+                    if q_type == "numerical":
+                        try:
+                            gt_val = float(gt)
+                            pred_val = float(pred)
+                        except Exception:
+                            score = 0
+                        else:
+                            if acceptance_bounds:
+                                margin = acceptance_bounds.get("margin", 0)
+                                mean = acceptance_bounds.get("mean", 0)
+                                score = int(abs(pred_val - gt_val) <= margin)
+                            else:
+                                score = int(abs(pred_val - gt_val) < 1e-4)
+                    elif q_type == "tensor":
+                        try:
+                            gt_vals = [float(x) for x in str(gt).split("_")]
+                            pred_vals = [float(x) for x in str(pred).split("_")]
+                        except Exception:
+                            score = 0
+                        else:
+                            if acceptance_bounds and "margin" in acceptance_bounds:
+                                margins = acceptance_bounds["margin"]
+                                if len(gt_vals) == len(pred_vals) == len(margins):
+                                    n = len(gt_vals)
+                                    n_correct = sum(abs(p - g) <= m for p, g, m in zip(pred_vals, gt_vals, margins))
+                                    score = n_correct / n
+                                else:
+                                    score = 0.0
+                            else:
+                                score = float(gt_vals == pred_vals)
+                elif q_type == "multiple_choice_multi_select":
+                    # Multi-select MCQ: string of T/F, e.g., TFFT
+                    gt_str = str(gt).strip().upper()
+                    pred_str = str(pred).strip().upper()
+                    if len(gt_str) == len(pred_str) and set(gt_str) <= {"T", "F"} and set(pred_str) <= {"T", "F"}:
+                        n = len(gt_str)
+                        n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
+                        if n_correct == n:
+                            score = 1.0
+                        elif n_correct >= n - 1:
+                            score = 0.5
+                        else:
+                            score = 0.0
+                    else:
+                        score = 0.0
+                elif q_type == "ranking":
+                    # Ranking: permutation of A-D, e.g., DCAB
+                    gt_str = str(gt).strip().upper()
+                    pred_str = str(pred).strip().upper()
+                    score = float(gt_str == pred_str)
+                else:
+                    # Fallback: exact match
+                    score = float(str(gt) == str(pred))
+            except Exception:
+                score = None
+
             save_json(out_path, {
                 "custom_id": custom_id,
                 "prompt_index": prompt_idx,
                 "prompt_file": str(prompt_path),
                 "prompt": prompt_text,
                 "answer": answer,
-                "ground_truth": ground_truth,
+                "ground_truth": gt,
+                "score": score,
                 "model": body.get("model"),
                 "usage": body.get("usage"),
             })

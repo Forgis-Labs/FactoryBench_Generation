@@ -38,13 +38,19 @@ Causal frameworks provide formal tools for interventions and counterfactuals [27
 
 # 3 Time Series Data
 
-## ICO Schema
+## SCE Schema
 
-To systematically represent machine state, we propose the ICO schema, which decomposes each episode into three principal components: Intentions, Context, and Outcomes. Intentions encode the underlying goals or commands driving the robot’s behavior. Context comprises both environmental variables and semantic priors, capturing the physical setting and task-specific knowledge. Outcomes record the observed results, including sensor feedback and task completion signals. This schema provides a unified and extensible framework for encoding both real and simulated industrial episodes.
+We propose that the dataset structure itself must encode causality. Every episode answers: _"What was the machine told to do, and what did it actually do?"_ FactoryNet organizes all signals into three causal groups:
+
+- **Setpoint:** The controller’s command — target position, velocity, and acceleration per axis.
+- **Context:** Physical conditions affecting behavior — payload, temperature, material properties. Split into _static_ (episode metadata) and _dynamic_ (time-series columns).
+- **Effort + Feedback:** The machine’s response — motor current (effort), actual position (feedback), vibration, and acoustic emission.
+
+This structure enables a universal fault definition: under healthy operation, Effort is a lawful function of Setpoint. Faults manifest as deviations in the `f(Setpoint) vs Effort` relationship. The dataset provides the paired signals that make this comparison possible; the specific comparison method is what downstream models and benchmarks evaluate.
 
 ## Open Source Datasets
 
-To ensure broad applicability and reproducibility, FactoryBench adapts open-source datasets to the ICO schema. In particular, we utilize the Aursad dataset (hopefully more as we go on), which offers diverse industrial scenarios and rich sensor streams, along with anomaly labels (4 classes). All data are preprocessed to conform to the unified episode structure, facilitating cross-dataset evaluation and benchmarking.
+To ensure broad applicability and reproducibility, FactoryBench adapts open-source datasets to the SCE schema. In particular, we utilize the Aursad and Vorausad dataset (hopefully more as we go on), which offers diverse industrial scenarios and rich sensor streams, along with anomaly labels (4 and 12 classes respectively). All data are preprocessed to conform to the unified episode structure, facilitating cross-dataset evaluation and benchmarking.
 
 ## FactoryWave
 
@@ -52,7 +58,7 @@ FactoryWave is a custom dataset generated from one-arm robotic platforms executi
 
 ## Simulations
 
-In addition to physical experiments, we simulate the same robotic systems to generate synthetic time series data. These simulations enable controlled experimentation, ablation studies, and validation of reasoning capabilities across both physical and virtual domains. All simulated episodes are encoded using the ICO schema to ensure consistency with real-world data.
+In addition to physical experiments, we simulate the same robotic systems to generate synthetic time series data. These simulations enable controlled experimentation, ablation studies, and validation of reasoning capabilities across both physical and virtual domains. All simulated episodes are encoded using the SCE schema to ensure consistency with real-world data.
 
 # 4 Q&A generation
 
@@ -87,6 +93,8 @@ In addition, we explore tool-augmented agent configurations, wherein the best-pe
 # 6 Result
 
 # 7 Analysis
+
+POTENTIAL TODO: organize human study on free form answers checked by LLM voting.
 
 # 8 Conclusion
 
