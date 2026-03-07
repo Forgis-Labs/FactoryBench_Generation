@@ -13,7 +13,7 @@ Can AI systems truly _understand_ industrial machines—not just detect anomalie
 
 **Core contributions:**
 
-1. **5-Level Q&A Framework**: Hierarchical difficulty from state identification to procedure+prior reasoning
+1. **4-Level Q&A Framework**: Hierarchical difficulty from state identification to decision making
 2. **Reliable Upscaling Pipeline**: Methods for generating 200k+ Q&A pairs with verified ground-truth answers
 3. **LLM-Match Evaluation**: Open-ended answer scoring with 0.91 human correlation
 4. **Physical Validation**: 220 trials on FactoryCell hardware closing the loop from benchmark to reality
@@ -59,7 +59,7 @@ Current benchmarks test only pieces of this reasoning chain. Anomaly detection b
 
 ### 1.3 Contributions
 
-1. **5-Level Q&A Framework** — State → Anomaly → Root Cause → Counterfactual → Procedure
+1. **4-Level Q&A Framework** — State → Intervention → Counterfactual → Decision Making
 2. **Reliable Answer Generation** — Pipeline for creating verified ground-truth from simulation, physics, and expert consensus
 3. **200k Q&A Pairs** — Single machine family (cobots), unprecedented depth
 4. **Physical Validation** — FactoryCell experiments testing benchmark-to-reality correlation
@@ -114,40 +114,75 @@ We focus on **one machine family deeply** rather than many shallowly:
 
 **Why cobots?** Ubiquitous, well-documented, safety-critical, rich sensor data.
 
-### 3.2 Five Levels of Machine Understanding
+### 3.2 Four Levels of Machine Understanding
 
-| Level | Task                 | Example                                                     | Requires               | Commercial Value       |
-| ----- | -------------------- | ----------------------------------------------------------- | ---------------------- | ---------------------- |
-| **1** | State Identification | "Is joint 3 moving?"                                        | Sensor reading         | Fleet monitoring       |
-| **2** | Anomaly Detection    | "Is joint 3 friction increasing?"                           | Pattern recognition    | Predictive maintenance |
-| **3** | Root Cause Analysis  | "Why did cycle time increase 15%?"                          | Causal reasoning       | Downtime reduction     |
-| **4** | Counterfactual       | "If we run 25% faster, when will thermal throttling occur?" | Simulation             | Capacity planning      |
-| **5** | Procedure + Prior    | "The robot stopped. What happened and how do we recover?"   | Manual + sensor fusion | Expert-free recovery   |
+| Level | Task | Example Question | Ground Truth Source | Commercial Value |
+|-------|------|------------------|---------------------|------------------|
+| **1** | State | "What's the current of joint 3 now?" | Sensor data | Fleet monitoring |
+| **2** | Intervention | "If force in joint 3 increases *now* to X, what happens?" | Simulation (present state) | Diagnostic intervention |
+| **3** | Counterfactual | "If force had increased to X *at t=20ms*, what would have happened?" | Simulation (past state) | Root cause / Capacity planning |
+| **4** | Decision | "Robot stopped with error C203A. What to do?" | Manual + sensor fusion | Expert-free recovery |
 
 **Design principle:** Each level builds on previous. Failure at Level N implies failure at Level N+1.
 
 ### 3.3 Q&A Pair Structure
 
+**Level 1 Example (State Identification):**
 ```yaml
 question:
-  text: "Joint 3 shows increasing current draw over the last hour. What is the most likely cause?"
-  level: 3 # Root Cause Analysis
+  text: "Is joint 4 at the same position in 210.5ms and 500.2ms (threshold of 0.001 rad)?"
+  level: 1 # State Identification
   requires_prior: false
 
 context:
   episode_id: "ur5e_episode_00127"
-  time_window: [3600, 7200] # seconds
+  time_window: [0, 1000] # milliseconds
+  signals: ["joint_position.4"]
+
+answer:
+  ground_truth: "Yes"
+  provenance: "deterministic_extraction" 
+  confidence: 1.0
+  evidence:
+    - "Direct data extraction from temporal windows shows no position change."
+```
+
+**Level 2 Example (Intervention):**
+```yaml
+question:
+  text: "If force in joint 3 increases now to X, what happens?"
+  level: 2 # Intervention
+  requires_prior: false
+
+context:
+  episode_id: "ur5e_episode_00127"
+  time_window: [3600, 7200] # milliseconds
   signals: ["joint_current.3", "joint_temp.3", "joint_velocity.3"]
 
 answer:
-  ground_truth: "Increasing friction in joint 3 gearbox, likely due to insufficient lubrication or early wear."
-  provenance: "simulation" # or: physics, expert, consensus
+  ground_truth: "Protective stop triggers within 50ms due to torque limits"
+  provenance: "simulation"
   confidence: 0.95
   evidence:
-    - "Current increase of 12% without velocity change indicates resistive load"
-    - "Temperature increase of 8°C correlates with friction hypothesis"
-    - "Manual section 4.3.2: 'Gradual current increase indicates mechanical degradation'"
+    - "Inverse dynamics: computed torque exceeds 150Nm threshold"
 ```
+
+---
+
+### 3.4 Time Series Data and Causal Schema (SCE)
+
+To ensure that the dataset structure itself encodes causality, FactoryBench organizes all time-series signals into three causal groups, answering the core question: _"What was the machine told to do, and what did it actually do?"_
+
+- **Setpoint:** The controller’s command — target position, velocity, and acceleration per axis.
+- **Context:** Physical conditions affecting behavior — payload, temperature, material properties. Split into _static_ (episode metadata) and _dynamic_ (time-series columns).
+- **Effort + Feedback:** The machine’s response — motor current (effort), actual position (feedback), vibration, and acoustic emission.
+
+This structure enables a universal fault definition: under healthy operation, Effort is a lawful function of Setpoint. Faults manifest as deviations in the `f(Setpoint) vs Effort` relationship. The dataset provides the paired signals that make this comparison possible.
+
+This data is sourced from:
+- **FactoryWave:** A custom dataset generated from one-arm robotic platforms executing canonical industrial tasks (e.g., screwing, pick-and-place) under varied conditions and systematically injected anomalies.
+- **Open Source Datasets:** Adapted datasets such as Aursad and Vorausad, offering diverse industrial scenarios and preprocessed to conform to the unified episode structure.
+- **Simulations:** Synthetic time-series data generated from simulated robotic systems to enable controlled experimentation, ablation studies, and validation across both physical and virtual domains.
 
 ---
 
@@ -166,29 +201,28 @@ The core challenge: **How do we generate ground-truth answers at scale?**
 
 ### 4.2 Pipeline Overview
 
-```
-[To be expanded by Coral]
+To ensure high quality and scalability, our pipeline is structured as follows:
 
 1. Episode Generation (FactoryNet subset)
    - Real: FactoryCell recordings
    - Synthetic: Isaac Sim with fault injection
    - Adapted: CWRU, Paderborn (transfer learning)
 
-2. Question Templating
-   - Level-specific templates
-   - Parameter randomization
+2. Question Templating (Deterministic Generation for L1/L2)
+   - Level-specific templates (e.g., State Reading, Prediction)
+   - Parameter randomization (joint selection, time windows)
    - Constraint satisfaction (answerable from context)
+   - Fast scaling by extracting data directly from time-series windows
 
 3. Answer Generation
-   - Level 1-2: Deterministic from sensor data
-   - Level 3-4: Simulation + physics validation
-   - Level 5: Expert annotation + manual grounding
+   - Level 1: Deterministic evaluation and statistical analysis of temporal windows
+   - Level 2-3: Simulation + physics validation
+   - Level 4: Expert annotation + manual grounding
 
 4. Quality Assurance
    - Cross-validation with held-out experts
    - LLM disagreement flagging
    - Physical validation sampling
-```
 
 ### 4.3 Scaling Strategy
 
@@ -199,7 +233,16 @@ The core challenge: **How do we generate ground-truth answers at scale?**
 | Scale     | 50,000    | Consensus + validation | Month 3  |
 | Full      | 200,000   | Pipeline automation    | Month 4  |
 
-**Critical insight:** Level 1-2 questions scale easily (deterministic). Level 3-5 require careful validation but smaller quantities are acceptable for benchmark purposes.
+**Critical insight:** Level 1 questions scale easily (deterministic). Levels 2-4 require careful validation but smaller quantities are acceptable for benchmark purposes.
+
+### 4.4 Dataset Diversity & Quality Assurance
+
+A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine understanding, we utilize the **Vendi Score** on the embeddings of our Q&A pairs to measure and maximize effective population diversity.
+
+We iteratively evaluate dataset diversity across three primary axes during generation:
+- **Low Diversity (Parameter Variation):** Varying only parameters like time windows and joint indices yields a low Vendi Score, confirming that simple parameter randomization is insufficient.
+- **Moderate Diversity (Format Variation):** Semantically identical questions expressed across different formats (Open-ended, Multiple Choice, True/False) measurably increase the effective diversity.
+- **High Diversity (Template & Type Variation):** Introducing mixed reasoning templates across levels (e.g., kinematic comparison, derivative estimation like friction/acceleration, anomaly detection) drives the highest Vendi Score. By enforcing high Vendi Scores across our generated subsets, we ensure the benchmark tests versatile analytical capabilities.
 
 ---
 
@@ -256,10 +299,9 @@ This multidimensional framework enables FactoryBench to measure not only correct
 | Level | Primary Metric        | Secondary Metrics                    |
 | ----- | --------------------- | ------------------------------------ |
 | 1     | Accuracy              | Response latency                     |
-| 2     | F1 (anomaly)          | Localization IoU                     |
-| 3     | LLM-Match (1-5)       | Causal correctness                   |
-| 4     | Prediction error      | Temporal accuracy                    |
-| 5     | LLM-Match + Grounding | Procedure safety, hallucination rate |
+| 2     | F1 / LLM-Match        | Localization IoU / Causal correctness|
+| 3     | LLM-Match (1-5)       | Counterfactual correctness           |
+| 4     | LLM-Match + Grounding | Procedure safety, hallucination rate |
 
 ### 5.3 Physical Validation Protocol
 
@@ -267,10 +309,10 @@ For each difficulty level, we run **physical experiments on FactoryCell**:
 
 | Level | Validation Method                                    |
 | ----- | ---------------------------------------------------- |
-| 1-2   | Sensor ground truth comparison                       |
-| 3     | Intervene on predicted cause, measure effect         |
-| 4     | Execute predicted scenario, compare outcome          |
-| 5     | Follow generated procedure, measure recovery success |
+| 1     | Sensor ground truth comparison                       |
+| 2     | Intervene on predicted cause, measure effect         |
+| 3     | Execute predicted scenario, compare outcome          |
+| 4     | Follow generated procedure, measure recovery success |
 
 **Research question:** Does Q&A benchmark performance predict real-world utility?
 
@@ -305,10 +347,15 @@ For each difficulty level, we run **physical experiments on FactoryCell**:
 | 1     | 50%    | 85-95%       | 98%               | 99%          |
 | 2     | 20%    | 60-75%       | 85%               | 95%          |
 | 3     | 10%    | 35-50%       | 70%               | 90%          |
-| 4     | 5%     | 20-35%       | 55%               | 85%          |
-| 5     | 2%     | 15-30%       | 45%               | 80%          |
+| 4     | 5%     | 15-30%       | 45%               | 80%          |
 
-**Hypothesis:** Semantic priors (ManualsGraph) will show largest gains at Level 5.
+**Hypothesis:** Semantic priors (ManualsGraph) will show largest gains at Level 4.
+
+### 6.3 Experimental Configurations
+
+Beyond out-of-the-box evaluation, we investigate how different interventions improve performance:
+- **Finetuning:** We optionally finetune open-source models on the FactoryBench Q&A dataset to establish the limit of specialized training versus general reasoning.
+- **Tool-Augmented Agents:** The best-performing foundational models are granted access to external time-series prediction and anomaly detection modules, testing the synergy between LLM reasoning and domain-specific computation.
 
 ---
 
@@ -340,37 +387,12 @@ This benchmark evaluates on a **subset** of FactoryNet. The full dataset (50k+ e
 
 ## 8. Conclusion
 
-FactoryBench introduces a systematic approach to evaluating machine understanding via Q&A. By focusing deeply on one machine family and providing reliable answer generation at scale, we enable rigorous comparison of methods across five levels of reasoning—from basic state identification to procedure generation grounded in technical manuals.
+FactoryBench introduces a systematic approach to evaluating machine understanding via Q&A. By focusing deeply on one machine family and providing reliable answer generation at scale, we enable rigorous comparison of methods across four levels of reasoning—from basic state identification to procedure generation grounded in technical manuals.
 
 Our physical validation protocol closes the loop from benchmark to reality, addressing the fundamental question: can AI systems that excel at industrial Q&A actually help in the real world?
 
 ---
 
-## Appendix: Research Directions for Coral
-
-This is a **deliberately brief** draft. Key areas to develop:
-
-### A.1 Methodological Gaps to Fill
-
-- [ ] Exact templating strategy for each level
-- [ ] Consensus algorithm (which LLMs, what threshold?)
-- [ ] Handling ambiguous questions
-- [ ] Calibration of LLM-Match across annotators
-- [ ] Sim-to-real transfer validation
-
-### A.2 State of the Art to Research
-
-- [ ] LLM post-training procedures (could inform answer generation?)
-- [ ] Chain-of-thought for industrial reasoning
-- [ ] Tool use for sensor data retrieval
-- [ ] Knowledge graph integration for priors
-
-### A.3 Open Questions
-
-1. What is the minimum number of Level 5 Q&A pairs needed for meaningful evaluation?
-2. Can we detect when a model is "guessing" vs. "reasoning"?
-3. How do we handle questions with multiple valid answers?
-4. Should we include adversarial questions (unanswerable from context)?
 
 ### A.4 TSAQA Differentiation Strategy
 
@@ -382,8 +404,72 @@ This is a **deliberately brief** draft. Key areas to develop:
 | **Physical validation**  | None           | FactoryCell            |
 | **Commercial grounding** | Implicit       | Explicit ($ per level) |
 
+# References
+
+[1] Wei, J. et al. (2022). _[Chain-of-Thought Prompting Elicits Reasoning in Large Language Models](https://arxiv.org/abs/2201.11903)_.
+
+[2] Yao, S. et al. (2023). _[Tree of Thoughts: Deliberate Problem Solving with Large Language Models](https://arxiv.org/abs/2305.10601)_.
+
+[3] Vaswani, A. et al. (2017). _[Attention Is All You Need](https://arxiv.org/abs/1706.03762)_.
+
+[4] Zhou, H. et al. (2021). _[Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting](https://arxiv.org/abs/2012.07436)_.
+
+[5] Wu, H. et al. (2021). _[Autoformer: Decomposition Transformers with Auto-Correlation for Long-Term Series Forecasting](https://arxiv.org/abs/2106.13008)_.
+
+[6] Zhou, T. et al. (2022). _[FEDformer: Frequency Enhanced Decomposed Transformer for Long-term Series Forecasting](https://arxiv.org/abs/2201.12740)_.
+
+[7] Nie, Y. et al. (2023). _[A Time Series is Worth 64 Words: Long-term Forecasting with Transformers (PatchTST)](https://arxiv.org/abs/2211.14730)_.
+
+[8] Woo, G. et al. (2024). _[Chronos: Learning the Language of Time Series](https://arxiv.org/abs/2403.07815)_.
+
+[9] Das, A. et al. (2024). _[Time Series Foundation Models and Forecasting: A Survey](https://arxiv.org/abs/2405.08493)_.
+
+[10] Schick, T. et al. (2023). _[Toolformer: Language Models Can Teach Themselves to Use Tools](https://arxiv.org/abs/2302.04761)_.
+
+[11] Yao, S. et al. (2023). _[ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629)_.
+
+[12] Qin, Y. et al. (2023). _[Tool Learning with Foundation Models](https://arxiv.org/abs/2304.08354)_.
+
+[13] Hendrycks, D. et al. (2021). _[Measuring Massive Multitask Language Understanding (MMLU)](https://arxiv.org/abs/2009.03300)_.
+
+[14] Srivastava, A. et al. (2023). _[Beyond the Imitation Game: Quantifying and Extrapolating the Capabilities of Language Models (BIG-bench)](https://arxiv.org/abs/2206.04615)_.
+
+[15] Yue, X. et al. (2024). _[MMMU: A Massive Multi-discipline Multimodal Understanding and Reasoning Benchmark for Expert AGI](https://arxiv.org/abs/2311.16502)_.
+
+[16] Laptev, N., Amizadeh, S., and Flint, I. (2015). _[Generic and Scalable Framework for Automated Time-Series Anomaly Detection](https://dl.acm.org/doi/10.1145/2783258.2788611)_.
+
+[17] Dau, H. A. et al. (2019). _[The UCR Time Series Classification Archive](https://arxiv.org/abs/1810.07758)_.
+
+[18] Wen, Q. et al. (2022). _[Transformers in Time Series: A Survey](https://arxiv.org/abs/2202.07125)_.
+
+[19] Lim, B. et al. (2021). _[Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting](https://arxiv.org/abs/1912.09363)_.
+
+[20] Oreshkin, B. N. et al. (2020). _[N-BEATS: Neural Basis Expansion Analysis for Interpretable Time Series Forecasting](https://arxiv.org/abs/1905.10437)_.
+
+[21] Zeng, A. et al. (2023). _[Are Transformers Effective for Time Series Forecasting?](https://arxiv.org/abs/2205.13504)_.
+
+[22] Su, Y. et al. (2019). _[Robust Anomaly Detection for Multivariate Time Series through Stochastic Recurrent Neural Network (OmniAnomaly)](https://arxiv.org/abs/1909.00774)_.
+
+[23] Audibert, J. et al. (2020). _[USAD: UnSupervised Anomaly Detection on Multivariate Time Series](https://dl.acm.org/doi/10.1145/3394486.3403392)_.
+
+[24] Ruff, L. et al. (2018). _[Deep One-Class Classification](http://proceedings.mlr.press/v80/ruff18a.html)_.
+
+[25] Chalapathy, R. and Chawla, S. (2019). _[Deep Learning for Anomaly Detection: A Survey](https://arxiv.org/abs/1901.03407)_.
+
+[26] Lavin, A. and Ahmad, S. (2015). _[Evaluating Real-Time Anomaly Detection Algorithms -- The Numenta Anomaly Benchmark](https://arxiv.org/abs/1510.03336)_.
+
+[27] Pearl, J. (2009). _[Causality: Models, Reasoning, and Inference](https://doi.org/10.1017/CBO9780511803161)_ (2nd ed.). Cambridge University Press.
+
+[28] Peters, J., Janzing, D., and Schölkopf, B. (2017). _[Elements of Causal Inference](https://mitpress.mit.edu/9780262037310/elements-of-causal-inference/)_. MIT Press.
+
+[29] Rubin, D. B. (1974). _[Estimating Causal Effects of Treatments in Randomized and Nonrandomized Studies](https://doi.org/10.1037/h0037350)_. Journal of Educational Psychology.
+
+[30] Granger, C. W. J. (1969). _[Investigating Causal Relations by Econometric Models and Cross-spectral Methods](https://doi.org/10.2307/1912791)_. Econometrica.
+
+[31] Runge, J. et al. (2019). _[Detecting and Quantifying Causal Associations in Large Nonlinear Time Series Datasets](https://doi.org/10.1126/sciadv.aau4996)_. Science Advances.
+
 ---
 
 _Document version: 2.0 (fresh start)_
-_Last updated: 2026-02-07_
+_Last updated: 2026-03-07_
 _Archived: v1_causal in /archive/_
