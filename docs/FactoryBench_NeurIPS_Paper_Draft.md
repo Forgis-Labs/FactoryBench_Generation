@@ -404,6 +404,70 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 | **Physical validation**  | None           | FactoryCell            |
 | **Commercial grounding** | Implicit       | Explicit ($ per level) |
 
+# References
+
+[1] Wei, J. et al. (2022). _[Chain-of-Thought Prompting Elicits Reasoning in Large Language Models](https://arxiv.org/abs/2201.11903)_.
+
+[2] Yao, S. et al. (2023). _[Tree of Thoughts: Deliberate Problem Solving with Large Language Models](https://arxiv.org/abs/2305.10601)_.
+
+[3] Vaswani, A. et al. (2017). _[Attention Is All You Need](https://arxiv.org/abs/1706.03762)_.
+
+[4] Zhou, H. et al. (2021). _[Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting](https://arxiv.org/abs/2012.07436)_.
+
+[5] Wu, H. et al. (2021). _[Autoformer: Decomposition Transformers with Auto-Correlation for Long-Term Series Forecasting](https://arxiv.org/abs/2106.13008)_.
+
+[6] Zhou, T. et al. (2022). _[FEDformer: Frequency Enhanced Decomposed Transformer for Long-term Series Forecasting](https://arxiv.org/abs/2201.12740)_.
+
+[7] Nie, Y. et al. (2023). _[A Time Series is Worth 64 Words: Long-term Forecasting with Transformers (PatchTST)](https://arxiv.org/abs/2211.14730)_.
+
+[8] Woo, G. et al. (2024). _[Chronos: Learning the Language of Time Series](https://arxiv.org/abs/2403.07815)_.
+
+[9] Das, A. et al. (2024). _[Time Series Foundation Models and Forecasting: A Survey](https://arxiv.org/abs/2405.08493)_.
+
+[10] Schick, T. et al. (2023). _[Toolformer: Language Models Can Teach Themselves to Use Tools](https://arxiv.org/abs/2302.04761)_.
+
+[11] Yao, S. et al. (2023). _[ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629)_.
+
+[12] Qin, Y. et al. (2023). _[Tool Learning with Foundation Models](https://arxiv.org/abs/2304.08354)_.
+
+[13] Hendrycks, D. et al. (2021). _[Measuring Massive Multitask Language Understanding (MMLU)](https://arxiv.org/abs/2009.03300)_.
+
+[14] Srivastava, A. et al. (2023). _[Beyond the Imitation Game: Quantifying and Extrapolating the Capabilities of Language Models (BIG-bench)](https://arxiv.org/abs/2206.04615)_.
+
+[15] Yue, X. et al. (2024). _[MMMU: A Massive Multi-discipline Multimodal Understanding and Reasoning Benchmark for Expert AGI](https://arxiv.org/abs/2311.16502)_.
+
+[16] Laptev, N., Amizadeh, S., and Flint, I. (2015). _[Generic and Scalable Framework for Automated Time-Series Anomaly Detection](https://dl.acm.org/doi/10.1145/2783258.2788611)_.
+
+[17] Dau, H. A. et al. (2019). _[The UCR Time Series Classification Archive](https://arxiv.org/abs/1810.07758)_.
+
+[18] Wen, Q. et al. (2022). _[Transformers in Time Series: A Survey](https://arxiv.org/abs/2202.07125)_.
+
+[19] Lim, B. et al. (2021). _[Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting](https://arxiv.org/abs/1912.09363)_.
+
+[20] Oreshkin, B. N. et al. (2020). _[N-BEATS: Neural Basis Expansion Analysis for Interpretable Time Series Forecasting](https://arxiv.org/abs/1905.10437)_.
+
+[21] Zeng, A. et al. (2023). _[Are Transformers Effective for Time Series Forecasting?](https://arxiv.org/abs/2205.13504)_.
+
+[22] Su, Y. et al. (2019). _[Robust Anomaly Detection for Multivariate Time Series through Stochastic Recurrent Neural Network (OmniAnomaly)](https://arxiv.org/abs/1909.00774)_.
+
+[23] Audibert, J. et al. (2020). _[USAD: UnSupervised Anomaly Detection on Multivariate Time Series](https://dl.acm.org/doi/10.1145/3394486.3403392)_.
+
+[24] Ruff, L. et al. (2018). _[Deep One-Class Classification](http://proceedings.mlr.press/v80/ruff18a.html)_.
+
+[25] Chalapathy, R. and Chawla, S. (2019). _[Deep Learning for Anomaly Detection: A Survey](https://arxiv.org/abs/1901.03407)_.
+
+[26] Lavin, A. and Ahmad, S. (2015). _[Evaluating Real-Time Anomaly Detection Algorithms -- The Numenta Anomaly Benchmark](https://arxiv.org/abs/1510.03336)_.
+
+[27] Pearl, J. (2009). _[Causality: Models, Reasoning, and Inference](https://doi.org/10.1017/CBO9780511803161)_ (2nd ed.). Cambridge University Press.
+
+[28] Peters, J., Janzing, D., and Schölkopf, B. (2017). _[Elements of Causal Inference](https://mitpress.mit.edu/9780262037310/elements-of-causal-inference/)_. MIT Press.
+
+[29] Rubin, D. B. (1974). _[Estimating Causal Effects of Treatments in Randomized and Nonrandomized Studies](https://doi.org/10.1037/h0037350)_. Journal of Educational Psychology.
+
+[30] Granger, C. W. J. (1969). _[Investigating Causal Relations by Econometric Models and Cross-spectral Methods](https://doi.org/10.2307/1912791)_. Econometrica.
+
+[31] Runge, J. et al. (2019). _[Detecting and Quantifying Causal Associations in Large Nonlinear Time Series Datasets](https://doi.org/10.1126/sciadv.aau4996)_. Science Advances.
+
 ---
 
 _Document version: 2.0 (fresh start)_
