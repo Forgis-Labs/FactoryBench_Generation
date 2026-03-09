@@ -1,8 +1,8 @@
 [
   {
     "id": 1,
-    "type": "signal_segment_ranking",
-    "template": "Given the sensor stream up to {t}ms (provided below), {event} occurs at the next timestep. Rank the signals segments listed in the 'options' field in the order you would expect them to appear after the event. Answer only with a four letter string indicating your ranking (ie. DCAB), nothing else.",
+    "type": "predictive",
+    "template": "Given the sensor stream below, which includes {event} starting at T={t_event}ms, rank the signal segments listed in the 'options' field in the order you would expect them to appear after the event. Answer only with a four letter string indicating your ranking (ie. DCAB), nothing else.",
     "answer_format": {
       "type": "ranking",
       "n_items": 4,
@@ -11,8 +11,8 @@
   },
   {
     "id": 2,
-    "type": "intervention_outcome",
-    "template": "If {event} happened at the current timestep (T={t}ms), what would most likely happen next? Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
+    "type": "predictive",
+    "template": "The sensor stream below shows {event} occurring at T={t_event}ms. What would most likely happen next? Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "n_choices": 4,
@@ -22,8 +22,8 @@
   },
   {
     "id": 3,
-    "type": "trajectory_outcome_multiselect",
-    "template": "{event} just occurred at T={t}ms. Select all statements that apply in the 'options' field. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
+    "type": "anomaly detection",
+    "template": "{event} occurred at T={t_event}ms, as shown in the sensor stream below. Select all statements that apply in the 'options' field. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "fixed_options": ["mc_001", "mc_002"],
@@ -32,8 +32,8 @@
   },
   {
     "id": 4,
-    "type": "signal_value_prediction",
-    "template": "Following {event} at T={t}ms, what is the expected value of {signal} at T+{n}ms? Answer only with a integer or decimal number, nothing else.",
+    "type": "predictive",
+    "template": "Following {event} at T={t_event}ms, as shown in the sensor stream below, what is the expected value of {signal} at T+{n}ms? Answer only with a integer or decimal number, nothing else.",
     "answer_format": {
       "type": "numerical",
       "notes": "Single float value with unit. Accept answers within a tolerance band."
@@ -41,8 +41,8 @@
   },
   {
     "id": 5,
-    "type": "signal_value_prediction",
-    "template": "Following {event} at T={t}ms, what are the expected value of {joint_signal} at T+{n}ms? Answer only with a tensor of length 6 where each value is either integer or decimal. The values should be seperated by the '_' character (ie. 10.2_9_2.1_1_7_0.21). Do not return anything else.",
+    "type": "predictive",
+    "template": "Following {event} at T={t_event}ms, as shown in the sensor stream below, what are the expected values of {joint_signal} at T+{n}ms? Answer only with a tensor of length 6 where each value is either integer or decimal. The values should be seperated by the '_' character (ie. 10.2_9_2.1_1_7_0.21). Do not return anything else.",
     "answer_format": {
       "type": "tensor",
       "shape": [6],

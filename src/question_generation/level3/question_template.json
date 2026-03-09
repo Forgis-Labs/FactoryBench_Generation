@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "type": "signal_segment_ranking",
+    "type": "predictive",
     "template": "Given the sensor stream up to {t}ms (provided below), had {event} occurred at time {t2}ms, rank the signal segments listed in the 'options' field in the order you would expect them to appear afterward in this counterfactual scenario. Answer only with a four letter string indicating your ranking (ie. DCAB), nothing else.",
     "answer_format": {
       "type": "ranking",
@@ -11,7 +11,7 @@
   },
   {
     "id": 2,
-    "type": "intervention_outcome",
+    "type": "predictive",
     "template": "Had {event} occurred at time {t2}ms, what would most likely happen next in this counterfactual trajectory? Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
@@ -22,7 +22,7 @@
   },
   {
     "id": 3,
-    "type": "trajectory_outcome_multiselect",
+    "type": "anomaly detection",
     "template": "Had {event} occurred at time {t2}ms, select all statements that would apply under this counterfactual scenario. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
@@ -32,7 +32,7 @@
   },
   {
     "id": 4,
-    "type": "signal_value_prediction",
+    "type": "predictive",
     "template": "Had {event} occurred at time {t2}ms, what would be the expected value of {signal} at T+{n}ms in this counterfactual case? Answer only with an integer or decimal number, nothing else.",
     "answer_format": {
       "type": "numerical",
@@ -41,7 +41,7 @@
   },
   {
     "id": 5,
-    "type": "signal_value_prediction",
+    "type": "predictive",
     "template": "Had {event} occurred at time {t2}ms, what would be the expected values of {joint_signal} at T+{n}ms in this counterfactual case? Answer only with a tensor of length 6 where each value is either integer or decimal. The values should be separated by the '_' character (ie. 10.2_9_2.1_1_7_0.21). Do not return anything else.",
     "answer_format": {
       "type": "tensor",

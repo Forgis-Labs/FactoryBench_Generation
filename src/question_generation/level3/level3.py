@@ -42,7 +42,12 @@ from src.question_generation.level3.mc_truth import DEFAULT_THRESHOLDS, evaluate
 logger = logging.getLogger(__name__)
 
 VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
-PREDICTION_HORIZONS_MS = [50, 100, 250, 500, 1000]
+DIFFICULTY_CONFIGS: Dict[str, Dict[str, Any]] = {
+    "easy":   {"steps_ahead_range": (1, 2),  "context_min": 65, "context_max": 90},
+    "medium": {"steps_ahead_range": (3, 5),  "context_min": 32, "context_max": 64},
+    "hard":   {"steps_ahead_range": (6, 10), "context_min": 16, "context_max": 31},
+}
+DIFFICULTIES = list(DIFFICULTY_CONFIGS.keys())
 
 
 
@@ -666,6 +671,8 @@ def fill_template(
     mc_option_lookup: Dict[str, str],
     t2_ms: Optional[int] = None,
     answer_subseries: Optional[List[Dict[str, Any]]] = None,
+    difficulty: str = "medium",
+    steps_ahead: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 3 question template.
@@ -736,11 +743,11 @@ def fill_template(
         signal = pick_scalar_signal(subseries)
         if signal is None:
             return None
-        n_ms = random.choice(PREDICTION_HORIZONS_MS)
-        target_t = t + n_ms
-        target_row = get_row_at_or_after_timestamp(post_event_rows, target_t)
-        if target_row is None:
+        if steps_ahead is None or steps_ahead >= len(post_event_rows):
             return None
+        target_row = post_event_rows[steps_ahead]
+        t_event_ref = _first_timestamp_ms(post_event_rows)
+        n_ms = int(float(target_row.get("timestamp_ms", t_event_ref))) - t_event_ref
         signal_value = target_row.get(signal)
         if not isinstance(signal_value, (int, float, np.floating)):
             return None
@@ -751,11 +758,11 @@ def fill_template(
         joint_signal = pick_joint_indexed_signal_base(subseries)
         if joint_signal is None:
             return None
-        n_ms = random.choice(PREDICTION_HORIZONS_MS)
-        target_t = t + n_ms
-        target_row = get_row_at_or_after_timestamp(post_event_rows, target_t)
-        if target_row is None:
+        if steps_ahead is None or steps_ahead >= len(post_event_rows):
             return None
+        target_row = post_event_rows[steps_ahead]
+        t_event_ref = _first_timestamp_ms(post_event_rows)
+        n_ms = int(float(target_row.get("timestamp_ms", t_event_ref))) - t_event_ref
 
         tensor_values: List[float] = []
         for joint_idx in range(6):
@@ -778,6 +785,7 @@ def fill_template(
         "options": options,
         "event_id": event_obj["id"],
         "answer": answer,
+        "difficulty": difficulty,
     }
 
 
@@ -793,8 +801,6 @@ def generate_level3_questions(
     root_causes: Dict[int, Dict[str, Any]],
     events: List[Dict[str, Any]],
     n: int = 100,
-    min_len: int = 32,
-    max_len: int = 64,
     seed: Optional[int] = None,
     mc_option_lookup: Optional[Dict[str, str]] = None,
 ) -> None:
@@ -859,11 +865,17 @@ def generate_level3_questions(
         if event_onset_idx is None:
             continue
 
+        difficulty = random.choice(DIFFICULTIES)
+        diff_cfg = DIFFICULTY_CONFIGS[difficulty]
+        context_min = diff_cfg["context_min"]
+        context_max = diff_cfg["context_max"]
+        steps_ahead = random.randint(*diff_cfg["steps_ahead_range"])
+
         sampled_window = sample_window_around_index(
             normal_rows,
             center_index=event_onset_idx,
-            min_len=min_len,
-            max_len=max_len,
+            min_len=context_min,
+            max_len=context_max,
             margin=5,
         )
         if sampled_window is None:
@@ -907,6 +919,8 @@ def generate_level3_questions(
             mc_option_lookup,
             t2_ms=event_time_ms,
             answer_subseries=alt_answer_subseries,
+            difficulty=difficulty,
+            steps_ahead=steps_ahead,
         )
         if filled is None:
             continue
@@ -916,6 +930,7 @@ def generate_level3_questions(
         item = {
             "id": str(uuid.uuid4()),
             "level": 3,
+            "difficulty": filled["difficulty"],
             "template_id": template["id"],
             "template_type": template["type"],
             "question": filled["question"],
@@ -974,8 +989,6 @@ def main() -> None:
         help="Output directory (default: <repo>/output/questions/level3)",
     )
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
-    parser.add_argument("--min-len", type=int, default=32, help="Min subseries length")
-    parser.add_argument("--max-len", type=int, default=64, help="Max subseries length")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument("-v", "--verbose", action="store_true")
 
@@ -1001,8 +1014,6 @@ def main() -> None:
         events=events,
         mc_option_lookup=mc_option_lookup,
         n=args.n,
-        min_len=args.min_len,
-        max_len=args.max_len,
         seed=args.seed,
     )
 

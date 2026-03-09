@@ -124,5 +124,48 @@
       "force/current features"
     ],
     "verifiable_rule": "for all post_event timesteps: safety_mode == 1 and aggregate_error(post_event) <= 1.10 * aggregate_error(pre_event)"
+  },
+
+  {
+    "id": "mc_020",
+    "statement": "Those come from different robots.",
+    "usable_levels": [1],
+    "template_id": 3,
+    "verifiable_rule": "Trivial from metadata."
+  },
+  {
+    "id": "mc_021",
+    "statement": "One of the robots is mounted on the ground, the other is mounted upside down.",
+    "usable_levels": [1],
+    "template_id": 3,
+    "verifiable_rule": "Trivial from metadata."
+  },
+  {
+    "id": "mc_022",
+    "statement": "The two robots have different anomalous states. Note: this means either exactly one of them is anomalous, or they both are, but have different anomalies.",
+    "usable_levels": [1],
+    "template_id": 3,
+    "verifiable_rule": "Trivial from metadata."
+  },
+  {
+    "id": "mc_023",
+    "statement": "The two robots are performing different tasks.",
+    "usable_levels": [1],
+    "template_id": 3,
+    "verifiable_rule": "Trivial from metadata."
+  },
+  {
+    "id": "mc_024",
+    "statement": "Robot A is mounted on the ground.",
+    "usable_levels": [1],
+    "template_id": 3,
+    "verifiable_rule": "Trivial from metadata."
+  },
+  {
+    "id": "mc_025",
+    "statement": "Robot B is mounted on the ground.",
+    "usable_levels": [1],
+    "template_id": 3,
+    "verifiable_rule": "Trivial from metadata."
   }
 ]
