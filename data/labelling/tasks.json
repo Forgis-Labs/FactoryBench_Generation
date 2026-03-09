@@ -1,0 +1,144 @@
+[
+  {
+    "id": "pick_and_place",
+    "name": "Pick and Place",
+    "description": "Robot picks an object from a source location and places it at a target location.",
+    "phases": [
+      {
+        "id": "approach",
+        "label": 0,
+        "name": "Approach",
+        "description": "Robot moves end-effector above the target object.",
+        "transitions_to": "pre_grasp",
+        "transition_condition": "ee within horizontal threshold of object, above grasp height"
+      },
+      {
+        "id": "pre_grasp",
+        "label": 1,
+        "name": "Pre-Grasp",
+        "description": "Robot descends to grasp pose with gripper open.",
+        "transitions_to": "grasp",
+        "transition_condition": "ee at grasp height, gripper fully open"
+      },
+      {
+        "id": "grasp",
+        "label": 2,
+        "name": "Grasp",
+        "description": "Gripper closes around the object.",
+        "transitions_to": "lift",
+        "transition_condition": "gripper aperture below threshold, contact force detected"
+      },
+      {
+        "id": "lift",
+        "label": 3,
+        "name": "Lift",
+        "description": "Robot raises the object to a safe transport height.",
+        "transitions_to": "transport",
+        "transition_condition": "ee height above lift threshold, object height tracking ee"
+      },
+      {
+        "id": "transport",
+        "label": 4,
+        "name": "Transport",
+        "description": "Robot moves the object horizontally to above the target location.",
+        "transitions_to": "lower",
+        "transition_condition": "ee within horizontal threshold of target location"
+      },
+      {
+        "id": "lower",
+        "label": 5,
+        "name": "Lower",
+        "description": "Robot descends to place the object at the target location.",
+        "transitions_to": "release",
+        "transition_condition": "object contact with surface detected or ee at place height"
+      },
+      {
+        "id": "release",
+        "label": 6,
+        "name": "Release",
+        "description": "Gripper opens and releases the object.",
+        "transitions_to": "retreat",
+        "transition_condition": "gripper fully open"
+      },
+      {
+        "id": "retreat",
+        "label": 7,
+        "name": "Retreat",
+        "description": "Robot moves end-effector away from the placed object.",
+        "transitions_to": null,
+        "transition_condition": "ee distance from object above threshold"
+      }
+    ]
+  },
+  {
+    "id": "screwing",
+    "name": "Screwing",
+    "description": "Robot picks up a screw driver or bit, aligns it with a screw hole, and drives the screw to a target torque.",
+    "phases": [
+      {
+        "id": "approach_screw",
+        "label": 8,
+        "name": "Approach Screw",
+        "description": "Robot moves end-effector above the screw or driver tool.",
+        "transitions_to": "tool_grasp",
+        "transition_condition": "ee within horizontal threshold of tool, above grasp height"
+      },
+      {
+        "id": "tool_grasp",
+        "label": 9,
+        "name": "Tool Grasp",
+        "description": "Gripper closes around the screwdriver or bit.",
+        "transitions_to": "approach_hole",
+        "transition_condition": "gripper aperture below threshold, contact force detected"
+      },
+      {
+        "id": "approach_hole",
+        "label": 10,
+        "name": "Approach Hole",
+        "description": "Robot moves end-effector to above the target screw hole.",
+        "transitions_to": "alignment",
+        "transition_condition": "ee within horizontal threshold of hole position"
+      },
+      {
+        "id": "alignment",
+        "label": 11,
+        "name": "Alignment",
+        "description": "Robot descends and aligns tool tip axially with the screw hole.",
+        "transitions_to": "insertion",
+        "transition_condition": "tool tip within positional and angular tolerance of hole axis"
+      },
+      {
+        "id": "insertion",
+        "label": 12,
+        "name": "Insertion",
+        "description": "Robot applies downward force to seat the tool tip into the screw head.",
+        "transitions_to": "driving",
+        "transition_condition": "contact force above threshold, tool tip engaged with screw head"
+      },
+      {
+        "id": "driving",
+        "label": 13,
+        "name": "Driving",
+        "description": "Robot rotates the tool while applying axial force to drive the screw.",
+        "transitions_to": "seating",
+        "transition_condition": "screw depth nearing target or torque rising"
+      },
+      {
+        "id": "seating",
+        "label": 14,
+        "name": "Seating",
+        "description": "Robot reduces rotation speed and monitors torque as screw seats.",
+        "transitions_to": "retract",
+        "transition_condition": "measured torque reaches target torque threshold"
+      },
+      {
+        "id": "retract",
+        "label": 15,
+        "name": "Retract",
+        "description": "Robot lifts tool away from the driven screw.",
+        "transitions_to": null,
+        "transition_condition": "ee height above retract threshold, no contact force"
+      }
+    ]
+  }
+]

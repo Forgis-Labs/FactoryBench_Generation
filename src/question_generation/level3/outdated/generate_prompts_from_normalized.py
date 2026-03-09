@@ -60,9 +60,9 @@ def main() -> None:
 
     repo_root = Path(__file__).resolve().parents[3]
     phrases_path = Path(__file__).with_name("phrases_level3.json")
-    root_causes_path = repo_root / "data" / "rca" / "root_causes.json"
-    anomalies_path = repo_root / "data" / "rca" / "anomalies.json"
-    machines_path = repo_root / "data" / "machines" / "machines.json"
+    root_causes_path = repo_root / "data" / "labelling" / "rca" / "root_causes.json"
+    anomalies_path = repo_root / "data" / "labelling" / "rca" / "anomalies.json"
+    machines_path = repo_root / "data" / "labelling" / "machines.json"
 
     generate_level3_questions(
         input_dir=args.input,

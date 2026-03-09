@@ -826,8 +826,8 @@ def main() -> None:
     )
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
-    root_causes = load_root_causes(args.datasets_dir / "rca" / "root_causes.json")
-    events = load_events(args.datasets_dir / "events" / "events.json")
+    root_causes = load_root_causes(args.datasets_dir / "labelling" / "rca" / "root_causes.json")
+    events = load_events(args.datasets_dir / "labelling" / "events.json")
     mc_option_lookup = load_mc_option_lookup(
         args.datasets_dir / "mc_options" / "mc_options.json",
         level=2,

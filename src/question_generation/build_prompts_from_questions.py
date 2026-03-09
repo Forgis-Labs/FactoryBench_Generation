@@ -184,7 +184,7 @@ def detect_repo_root(start: Path) -> Path:
     if current.is_file():
         current = current.parent
     for candidate in [current, *current.parents]:
-        if (candidate / "data" / "machines" / "machines.json").exists() and (candidate / "src").exists():
+        if (candidate / "data" / "labelling" / "machines.json").exists() and (candidate / "src").exists():
             return candidate
     for candidate in [current, *current.parents]:
         if (candidate / ".git").exists():
@@ -201,7 +201,7 @@ def main() -> None:
     parser.add_argument(
         "--machines",
         type=Path,
-        default=repo_root / "data" / "machines" / "machines.json",
+        default=repo_root / "data" / "labelling" / "machines.json",
         help="Path to machines.json",
     )
 
