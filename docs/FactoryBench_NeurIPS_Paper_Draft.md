@@ -149,6 +149,8 @@ Scalable ground-truth generation is the central challenge of any Q&A benchmark g
 
 ### 4.4 Dataset Diversity & Quality Assurance
 
+(TODO: GENERATE GRAPHS AND ADD PARAGRAPHS ABOUT Q&A DISTRIBUTIONS (LEVEL, DIFFICULTY, ETC))
+
 A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine understanding, we utilize the **Vendi Score** on the embeddings of our Q&A pairs to measure and maximize effective population diversity.
 
 We iteratively evaluate dataset diversity across three primary axes during generation:
@@ -211,7 +213,7 @@ Beyond out-of-the-box evaluation, we investigate how different interventions imp
 
 **For researchers:** First rigorous evaluation of machine understanding across reasoning levels.
 
-**For practitioners:** Quantifies which AI capabilities are ready for deployment.
+**For practitioners:** Quantifies which AI capabilities are ready for deployment as AI engineers.
 
 **For the field:** Defines "machine understanding" operationally via Q&A.
 
