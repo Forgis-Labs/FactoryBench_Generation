@@ -131,7 +131,13 @@ This data is sourced from:
 
 ### 4.1 At scale generation via extensive labelling
 
-(TODO: ADD A SUBSECTION TALKING ABOUT QUESTION TEMPLATE AND LABELLING USED, IE EVENTS, ANOMALIES, ROOT CAUSES, TASKS AND HOW THAT SIMPLIFIES GROUND-TRUTH GENERATION)
+Scalable ground-truth generation is the central challenge of any Q&A benchmark grounded in raw sensor data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by PhD-level experts in robotics. Rather than annotating individual questions by hand, each template is parameterized: concrete values are filled at generation time from the episode data and its associated labels. The context time serie(s) used to fill the variables of the question is sampled uniformly by datasource (sim vs open source vs FactoryWave), dataset (if looking at open source), experiment, difficulty, length and then placement in that order. This yields a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
+
+![Question generation pipeline](../figures/question_generation.png)
+
+**Variable sampling.** Each question template contains multiple variable slots that are filled at generation time via variable-specific sampling distributions. Continuous variables — such as signal names, timestamps, prediction horizons, and numerical thresholds — are sampled directly from the episode data or drawn from predefined distributions. Discrete variables — such as tasks, anomaly types, and root causes — are sampled from curated vocabularies. These vocabularies were initially aggregated from the open-source datasets used in FactoryBench, then substantially expanded by PhD-level robotics experts to cover a broader range of operationally realistic scenarios, while remaining fully reproducible for FactoryWave episodes. This separation between template structure and sampled content is what allows a small number of hand-authored templates to generate a large and semantically diverse question pool.
+
+**Template design.** Each of the 40 question templates was manually authored to probe one specific reasoning capability at the appropriate level of the hierarchy, while remaining general enough to admit a wide range of concrete instantiations. Templates are parameterized over episode segments, signal names, event descriptions, timestamps, and predicted values. Answer options for multi-select questions are drawn from a shared pool of verifiable statements, each paired with a rule that can be evaluated deterministically against the time series, given the densely labelled data. This design ensures that ground truth is never imputed or inferred — it is computed directly from labeled episode data — making the benchmark both reliable and fully reproducible.
 
 ### 4.2 Density of FactoryWave
 
