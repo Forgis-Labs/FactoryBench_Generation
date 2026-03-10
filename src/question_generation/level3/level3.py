@@ -719,7 +719,7 @@ def fill_template(
         chunk_to_label = {id(chunks[i]): labels[i] for i in range(len(chunks))}
         answer = "".join(chunk_to_label[id(chunk)] for chunk in ordered_chunks)
 
-        question = fill(tmpl_text, t=t, t2=event_time, event=event_desc)
+        question = fill(tmpl_text, t=t, time_event=event_time, event=event_desc)
 
     elif tid == 2:
         options, answer = build_multiselect_options_and_answer(
@@ -728,7 +728,7 @@ def fill_template(
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
         )
-        question = fill(tmpl_text, event=event_desc, t=t, t2=event_time)
+        question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
 
     elif tid == 3:
         options, answer = build_multiselect_options_and_answer(
@@ -737,7 +737,7 @@ def fill_template(
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
         )
-        question = fill(tmpl_text, event=event_desc, t=t, t2=event_time)
+        question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
 
     elif tid == 4:
         signal = pick_scalar_signal(subseries)
@@ -752,7 +752,7 @@ def fill_template(
         if not isinstance(signal_value, (int, float, np.floating)):
             return None
         answer = round(float(signal_value), 6)
-        question = fill(tmpl_text, event=event_desc, t=t, t2=event_time, signal=signal, n=n_ms)
+        question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time, signal=signal, n=n_ms)
 
     elif tid == 5:
         joint_signal = pick_joint_indexed_signal_base(subseries)
@@ -773,7 +773,7 @@ def fill_template(
             tensor_values.append(round(float(value), 6))
 
         answer = "_".join(str(v) for v in tensor_values)
-        question = fill(tmpl_text, event=event_desc, t=t, t2=event_time, joint_signal=joint_signal, n=n_ms)
+        question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time, joint_signal=joint_signal, n=n_ms)
 
     else:
         logger.warning(f"Unknown template id: {tid}")

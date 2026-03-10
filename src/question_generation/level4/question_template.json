@@ -2,7 +2,7 @@
   {
     "id": 1,
     "type": "troubleshooting",
-    "template": "Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to diagnose and fix it.",
+    "template": "Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to fix it.",
     "answer_format": {
       "type": "free_form",
       "notes": "Expected answer covers three parts: (1) anomaly present or not, (2) root cause identification if anomalous, (3) ordered remediation steps. Scalable via troubleshooting instruction databases and root-cause-to-action mappings. Evaluated with LLM-as-Judge against a reference answer derived from the root cause and anomaly labels."
