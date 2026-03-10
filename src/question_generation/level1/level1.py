@@ -45,10 +45,10 @@ logger = logging.getLogger(__name__)
 VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
 SEVERITY_ORDER: Dict[str, int] = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
-# Robot name associated with each dataset, used in template 3 provenance
-DATASET_ROBOT: Dict[str, str] = {
-    "inter_aursad": "UR3e",
-    "inter_vorausad": "UR5",
+# Maps dataset name → machine_id as defined in machines.json
+DATASET_MACHINE_ID: Dict[str, int] = {
+    "inter_aursad": 0,    # UR3e
+    "inter_vorausad": 2,  # UR5
 }
 
 # Columns kept in the context for template 6 (setpoint-only)
@@ -179,6 +179,38 @@ def load_anomaly_lookup(path: Path) -> Dict[str, str]:
     }
 
 
+def load_machines(path: Path) -> Dict[int, Dict[str, Any]]:
+    """Load machines.json as {machine_id: machine_dict}."""
+    try:
+        raw = load_json(path)
+    except Exception as exc:
+        logger.warning(f"Could not load machines from {path}: {exc}")
+        return {}
+    if not isinstance(raw, list):
+        return {}
+    return {
+        item["machine_id"]: item
+        for item in raw
+        if isinstance(item, dict) and "machine_id" in item
+    }
+
+
+def load_dataset_index(path: Path) -> Dict[str, Dict[str, Any]]:
+    """Load dataset.json as {dataset_id: dataset_dict}."""
+    try:
+        raw = load_json(path)
+    except Exception as exc:
+        logger.warning(f"Could not load dataset index from {path}: {exc}")
+        return {}
+    if not isinstance(raw, list):
+        return {}
+    return {
+        item["dataset_id"]: item
+        for item in raw
+        if isinstance(item, dict) and "dataset_id" in item
+    }
+
+
 # ---------------------------------------------------------------------------
 # Context builders
 # ---------------------------------------------------------------------------
@@ -281,28 +313,36 @@ def build_anomaly_multiselect(
 def build_comparative_single_select(
     fault_a: int,
     fault_b: int,
-    dataset_a: str,
-    dataset_b: str,
+    machine_id_a: int,
+    machine_id_b: int,
+    task_id_a: str,
+    task_id_b: str,
     mc_lookup: Dict[str, str],
 ) -> Optional[Tuple[Dict[str, str], str]]:
     """
     Build 4 single-select options + answer letter for template 3.
     Determines what actually changed between the two episodes.
+
+    Priority: different robot > different task > different anomalous state.
+    Returns None if no meaningful difference can be determined.
     """
     if not mc_lookup:
         return None
 
-    different_robots = dataset_a != dataset_b
+    different_robots = machine_id_a != machine_id_b
+    different_tasks = task_id_a != task_id_b
     different_anomalous_state = (fault_a == 0) != (fault_b == 0) or (
         fault_a != 0 and fault_b != 0 and fault_a != fault_b
     )
 
     if different_robots:
         correct_id = normalize_mc_option_id("mc_020")
+    elif different_tasks:
+        correct_id = normalize_mc_option_id("mc_023")
     elif different_anomalous_state:
         correct_id = normalize_mc_option_id("mc_022")
     else:
-        correct_id = normalize_mc_option_id("mc_022")
+        return None  # No meaningful difference — skip this pair
 
     correct_stmt = mc_lookup.get(correct_id)
     if not correct_stmt:
@@ -374,8 +414,10 @@ def fill_template(
     anomaly_lookup: Dict[str, str],
     mc_option_lookup: Dict[str, str],
     rows_b: Optional[List[Dict[str, Any]]] = None,
-    dataset: str = "",
-    dataset_b: str = "",
+    machine_id: int = -1,
+    machine_id_b: int = -1,
+    task_id: str = "",
+    task_id_b: str = "",
     severity_segments: Optional[List[Tuple[List[Dict[str, Any]], int]]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
@@ -411,7 +453,7 @@ def fill_template(
             return None
         fault_b = pick_fault_label(rows_b)
         result = build_comparative_single_select(
-            fault_label, fault_b, dataset, dataset_b, mc_option_lookup
+            fault_label, fault_b, machine_id, machine_id_b, task_id, task_id_b, mc_option_lookup
         )
         if result is None:
             return None
@@ -466,6 +508,8 @@ def generate_level1_questions(
     root_causes: Dict[int, Dict[str, Any]],
     anomaly_lookup: Dict[str, str],
     mc_option_lookup: Dict[str, str],
+    machines: Dict[int, Dict[str, Any]],
+    dataset_index: Dict[str, Dict[str, Any]],
     n: int = 100,
     seed: Optional[int] = None,
 ) -> None:
@@ -529,7 +573,7 @@ def generate_level1_questions(
 
             filled = fill_template(
                 template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
-                dataset=ds,
+                machine_id=DATASET_MACHINE_ID.get(ds, -1),
             )
             if filled is None:
                 continue
@@ -584,7 +628,11 @@ def generate_level1_questions(
 
             filled = fill_template(
                 template, sub_a, root_causes, anomaly_lookup, mc_option_lookup,
-                rows_b=sub_b, dataset=ds_a, dataset_b=ds_b,
+                rows_b=sub_b,
+                machine_id=DATASET_MACHINE_ID.get(ds_a, -1),
+                machine_id_b=DATASET_MACHINE_ID.get(ds_b, -1),
+                task_id=dataset_index.get(ds_a, {}).get("task_id", ""),
+                task_id_b=dataset_index.get(ds_b, {}).get("task_id", ""),
             )
             if filled is None:
                 continue
@@ -601,9 +649,11 @@ def generate_level1_questions(
                 "answer": filled["answer"],
                 "provenance": {
                     "dataset_a": ds_a,
+                    "machine_id_a": DATASET_MACHINE_ID.get(ds_a, -1),
                     "episode_a": ep_a.stem,
                     "subseries_start_a": start_a,
                     "dataset_b": ds_b,
+                    "machine_id_b": DATASET_MACHINE_ID.get(ds_b, -1),
                     "episode_b": ep_b.stem,
                     "subseries_start_b": start_b,
                 },
@@ -715,6 +765,8 @@ def main() -> None:
         level=1,
         template_id=3,
     )
+    machines = load_machines(args.datasets_dir / "labelling" / "machines.json")
+    dataset_index = load_dataset_index(args.datasets_dir / "labelling" / "dataset.json")
 
     generate_level1_questions(
         datasets_dir=args.datasets_dir,
@@ -723,6 +775,8 @@ def main() -> None:
         root_causes=root_causes,
         anomaly_lookup=anomaly_lookup,
         mc_option_lookup=mc_option_lookup,
+        machines=machines,
+        dataset_index=dataset_index,
         n=args.n,
         seed=args.seed,
     )
