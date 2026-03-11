@@ -1,0 +1,72 @@
+{
+  "name": "fig1_qa_pipeline",
+  "caption": "FactoryBench Q&A Generation Pipeline",
+  "context": "A publication-quality horizontal pipeline diagram for a NeurIPS 2026 benchmark paper. The pipeline shows how industrial robot telemetry is transformed into verified Q&A pairs. Five sequential stages connected by thick rightward arrows on a clean white background.",
+
+  "layout": "horizontal left-to-right, five equally-sized rounded-rectangle boxes connected by solid dark-blue arrows, centered vertically on the page. Two floating callout bubbles: one above the pipeline (between boxes 3 and 4) and one below (below box 3). All text in the diagram must be exactly as specified — do not invent or paraphrase any label or callout text.",
+
+  "boxes": [
+    {
+      "position": 1,
+      "label": "Episode\nSampler",
+      "icon": "a blue cylindrical database stack icon",
+      "subtitle": "UR5e telemetry\n(100 Hz, 6 joints)",
+      "color": "light steel blue background, dark blue border"
+    },
+    {
+      "position": 2,
+      "label": "Template\nEngine",
+      "icon": "orange curly braces { } icon",
+      "subtitle": "80 question\ntemplates × 4 levels",
+      "color": "light steel blue background, dark blue border"
+    },
+    {
+      "position": 3,
+      "label": "Variable\nInjector",
+      "icon": "teal electrocardiogram waveform icon with a spike",
+      "subtitle": "joint, timestamp,\nthreshold values",
+      "color": "light steel blue background, dark blue border"
+    },
+    {
+      "position": 4,
+      "label": "LLM\nConsensus",
+      "icon": "three overlapping speech-bubble icons labeled GPT-4o (blue), Claude (orange), Gemini (green)",
+      "subtitle": "2-of-3 majority\nvote required",
+      "color": "light steel blue background, dark blue border"
+    },
+    {
+      "position": 5,
+      "label": "Verified\nQ&A Pair",
+      "icon": "large green circle with a white checkmark inside",
+      "subtitle": "provenance:\ndeterministic",
+      "color": "light green background, dark green border"
+    }
+  ],
+
+  "callout_above": {
+    "position": "floating above, between boxes 3 and 4, connected by a downward arrow to box 4",
+    "style": "speech bubble with a light yellow background and thin gray border, rounded corners",
+    "header_label": "Example Q&A",
+    "exact_text": "Q: Has joint 3 friction increased\nbetween t=0ms and t=500ms?\n\nA: Yes  (Δcurrent/speed ratio > 15%)"
+  },
+
+  "callout_below": {
+    "position": "floating below, under box 3, connected by an upward arrow to box 3",
+    "style": "rounded rectangle with a light gray background and dashed border",
+    "exact_text": "Template: 'Has joint {axis} friction increased\nbetween {t1}ms and {t2}ms?'\n→ injected: axis=3, t1=0, t2=500"
+  },
+
+  "style": {
+    "background": "pure white",
+    "font": "Inter or Helvetica Neue, sans-serif, all text sharp and legible",
+    "arrows": "thick solid dark navy blue (#1a2e44), with filled arrowheads",
+    "color_palette": ["#1a2e44", "#3a7bd5", "#f4a261", "#2ecc71", "#f9f3e3", "#f0f4f8"],
+    "no_gradients": true,
+    "no_3d_effects": true,
+    "quality": "NeurIPS 2026 camera-ready publication figure, vector-clean flat design",
+    "do_not_hallucinate_text": "ALL text in callouts and subtitles must match exactly what is specified above. Do not add, remove, or rephrase any text."
+  },
+
+  "diagram_type": "methodology",
+  "aspect_ratio": "16:7 wide landscape"
+}
