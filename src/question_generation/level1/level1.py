@@ -8,7 +8,7 @@ Answers are generated deterministically using raw values from episode readings.
 Output: datasets/questions/level1/level1_{NNNN}.json
 
 Usage:
-    python -m src.question_generation.level1.level1 -n 100 --seed 42
+    python -m src.question_generation.level1.level1 -n 100 --seed 27
 """
 from __future__ import annotations
 
@@ -99,58 +99,138 @@ def fill_template(
     
     axis = random.randint(0, 5)
     axis_label = random.choice(["x", "y", "z"])
+    accel_threshold = round(random.uniform(0.5, 2.0), 1)
+    jerk_threshold = round(random.uniform(1.0, 10.0), 1)
+    torque_threshold = round(random.uniform(0.5, 5.0), 1)
 
     options = {}
     
-    if tid == 1:
+    if tid == 1: # Joint Position TF
         truth = answer_q1_position_check(rows, t1, t2, axis, eps_1)
         if truth["answer"] == "Unknown": return None
         answer = truth["answer"]
         question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_1=eps_1)
+        options = {"A": "Yes", "B": "No"}
         
-    elif tid == 2:
+    elif tid == 2: # Joint Position MC
+        truth = answer_q1_position_check(rows, t1, t2, axis, eps_1)
+        if truth["answer"] == "Unknown": return None
+        is_same = truth["is_true"]
+        choices = ["Remained stationary", "Moved significantly"]
+        answer = "A" if is_same else "B"
+        options = {"A": choices[0], "B": choices[1]}
+        question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_1=eps_1)
+
+    elif tid == 3: # Joint Position Open
+        truth = answer_q1_position_check(rows, t1, t2, axis, eps_1)
+        if truth["answer"] == "Unknown": return None
+        answer = str(round(truth["raw_value"], 4))
+        question = tmpl_text.format(axis=axis, t1=t1, t2=t2)
+
+    elif tid == 5: # Friction MC
+        truth = answer_q2_friction_increase(rows, t1, t2, axis, eps_2, delta_1)
+        if truth["answer"] == "Unknown": return None
+        ratio = truth["raw_value"]
+        choices = ["Increased", "Decreased", "No significant change"]
+        if ratio > 1.0 + (eps_2/100.0): answer = "A"
+        elif ratio < 1.0 - (eps_2/100.0): answer = "B"
+        else: answer = "C"
+        options = {"A": choices[0], "B": choices[1], "C": choices[2]}
+        question = tmpl_text.format(axis=axis, t1=t1, t2=t2)
+
+    elif tid == 4: # Friction TF
         truth = answer_q2_friction_increase(rows, t1, t2, axis, eps_2, delta_1)
         if truth["answer"] == "Unknown": return None
         answer = truth["answer"]
         question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_2=eps_2, delta_1=delta_1)
-        
-    elif tid == 3:
+        options = {"A": "Yes", "B": "No"}
+
+    elif tid == 6: # Friction Open
+        truth = answer_q2_friction_increase(rows, t1, t2, axis, eps_2, delta_1)
+        if truth["answer"] == "Unknown": return None
+        answer = str(round(truth["raw_value"], 4))
+        question = tmpl_text.format(t1=t1, t2=t2, axis=axis)
+
+    elif tid == 7: # EE Accel TF
+        truth = answer_q3_end_effector_accel(rows, t_ms, threshold=accel_threshold)
+        if truth["answer"] == "Unknown": return None
+        answer = "Yes" if truth["is_above_threshold"] else "No"
+        question = tmpl_text.format(t_ms=t_ms, accel_threshold=accel_threshold)
+        options = {"A": "Yes", "B": "No"}
+
+    elif tid == 8: # EE Accel MC
+        truth = answer_q3_end_effector_accel(rows, t_ms)
+        if truth["answer"] == "Unknown": return None
+        answer = truth["highest_axis"]
+        options = {"A": "X", "B": "Y", "C": "Z"}
+        question = tmpl_text.format(t_ms=t_ms)
+
+    elif tid == 9: # EE Accel Open
         truth = answer_q3_end_effector_accel(rows, t_ms)
         if truth["answer"] == "Unknown": return None
         answer = truth["answer"]
         question = tmpl_text.format(t_ms=t_ms)
-        
-    elif tid == 4:
+
+    elif tid == 10: # Force TF
         truth = answer_q4_external_force(rows, t_ms, eps_3)
         if truth["answer"] == "Unknown": return None
         answer = truth["answer"]
         question = tmpl_text.format(t_ms=t_ms, eps_3=eps_3)
+        options = {"A": "Yes", "B": "No"}
 
-    elif tid == 5:
+    elif tid == 11: # Force MC
+        truth = answer_q4_external_force(rows, t_ms, eps_3)
+        if truth["answer"] == "Unknown": return None
+        answer = "A" if truth["answer"] == "No" else "B"
+        options = {"A": "No external force detected", "B": "External force detected above threshold"}
+        question = tmpl_text.format(t_ms=t_ms)
+
+    elif tid == 12: # Force Open
+        truth = answer_q4_external_force(rows, t_ms, eps_3)
+        if truth["answer"] == "Unknown": return None
+        answer = str(round(truth["raw_value"], 4))
+        question = tmpl_text.format(t_ms=t_ms)
+
+    elif tid == 13: # Jerk TF
+        truth = answer_q5_joint_jerk(rows, t_ms, axis, threshold=jerk_threshold)
+        if truth["answer"] == "Unknown": return None
+        answer = "Yes" if truth["is_above_threshold"] else "No"
+        question = tmpl_text.format(axis=axis, t_ms=t_ms, jerk_threshold=jerk_threshold)
+        options = {"A": "Yes", "B": "No"}
+
+    elif tid == 14: # Jerk MC
         truth = answer_q5_joint_jerk(rows, t_ms, axis)
         if truth["answer"] == "Unknown": return None
-        answer = truth["answer"]
+        answer = {"Low": "A", "Medium": "B", "High": "C"}[truth["jerk_range"]]
+        options = {"A": "Low (<1 rad/s^3)", "B": "Medium (1-5 rad/s^3)", "C": "High (>5 rad/s^3)"}
         question = tmpl_text.format(axis=axis, t_ms=t_ms)
 
-    elif tid == 6:
+    elif tid == 15: # Jerk Open
+        truth = answer_q5_joint_jerk(rows, t_ms, axis)
+        if truth["answer"] == "Unknown": return None
+        answer = str(round(truth["raw_value"], 4))
+        question = tmpl_text.format(axis=axis, t_ms=t_ms)
+
+    elif tid == 16: # Torque TF
+        truth = answer_q6_torque_magnitude(rows, t_ms, axis_label, threshold=torque_threshold)
+        if truth["answer"] == "Unknown": return None
+        answer = "Yes" if truth["is_above_threshold"] else "No"
+        question = tmpl_text.format(axis_label=axis_label, t_ms=t_ms, torque_threshold=torque_threshold)
+        options = {"A": "Yes", "B": "No"}
+
+    elif tid == 17: # Torque MC
+        truth = answer_q6_torque_magnitude(rows, t_ms, axis_label, threshold=torque_threshold)
+        if truth["answer"] == "Unknown": return None
+        answer = "A" if truth["is_above_threshold"] else "B"
+        options = {"A": "Above threshold", "B": "Below threshold"}
+        question = tmpl_text.format(axis_label=axis_label, t_ms=t_ms, torque_threshold=torque_threshold)
+
+    elif tid == 18: # Torque Open
         truth = answer_q6_torque_magnitude(rows, t_ms, axis_label)
         if truth["answer"] == "Unknown": return None
-        answer = truth["answer"]
+        answer = str(round(truth["raw_value"], 4))
         question = tmpl_text.format(axis_label=axis_label, t_ms=t_ms)
 
-    elif tid == 7:
-        joints = list(range(6))
-        random.shuffle(joints)
-        chosen_joints = joints[:4] 
-        
-        truth = answer_q7_joint_speed_ranking(rows, t_ms, chosen_joints)
-        if truth["answer"] == "Unknown": return None
-        answer = truth["answer"]
-        
-        letters = ["A", "B", "C", "D"]
-        joints_list_str = ", ".join([f"{letters[i]}: Joint {chosen_joints[i]}" for i in range(4)])
-        question = tmpl_text.format(joints_list=joints_list_str, t_ms=t_ms)
-        
     else:
         logger.warning(f"Unknown template id: {tid}")
         return None
@@ -162,6 +242,7 @@ def fill_template(
         "answer": answer,
         "reasoning": truth["reasoning"]
     }
+
 
 
 def generate_level1_questions(

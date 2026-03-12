@@ -115,7 +115,13 @@ def answer_q1_position_check(
 
     delta_q = abs(val_t2 - val_t1)
     moved = delta_q > eps_1
-    return {"answer": "No" if moved else "Yes", "reasoning": f"Δq={delta_q:.6f} > {eps_1} -> {moved}"}
+    is_same = not moved
+    return {
+        "answer": "Yes" if is_same else "No", 
+        "reasoning": f"Δq={delta_q:.6f} > {eps_1} -> moved={moved}",
+        "raw_value": delta_q,
+        "is_true": is_same
+    }
 
 
 def answer_q2_friction_increase(
@@ -161,10 +167,18 @@ def answer_q2_friction_increase(
     ratio = f2 / f1 if f1 != 0 else float('inf')
     threshold_ratio = 1.0 + (eps_2 / 100.0)
     increased = ratio > threshold_ratio
-    return {"answer": "Yes" if increased else "No", "reasoning": f"f2/f1={ratio:.4f} > {threshold_ratio:.4f}"}
+    return {
+        "answer": "Yes" if increased else "No", 
+        "reasoning": f"f2/f1={ratio:.4f} > {threshold_ratio:.4f}",
+        "raw_value": ratio,
+        "f1": f1,
+        "f2": f2,
+        "is_true": increased
+    }
 
 
-def answer_q3_end_effector_accel(rows: List[Dict[str, Any]], t_ms: float) -> Dict[str, Any]:
+
+def answer_q3_end_effector_accel(rows: List[Dict[str, Any]], t_ms: float, threshold: float = 1.0) -> Dict[str, Any]:
     vib0, _ = interpolate_signal_at_time(rows, "vibration_0", t_ms)
     vib1, _ = interpolate_signal_at_time(rows, "vibration_1", t_ms)
     vib2, _ = interpolate_signal_at_time(rows, "vibration_2", t_ms)
@@ -173,9 +187,20 @@ def answer_q3_end_effector_accel(rows: List[Dict[str, Any]], t_ms: float) -> Dic
         return {"answer": "Unknown", "reasoning": "Missing vibration data"}
         
     G = 9.81
+    a_x, a_y, a_z = vib0 * G, vib1 * G, vib2 * G
+    magnitude = math.sqrt(a_x**2 + a_y**2 + a_z**2)
+    
+    axis_vals = [abs(a_x), abs(a_y), abs(a_z)]
+    highest_idx = int(np.argmax(axis_vals))
+    highest_axis = ["X", "Y", "Z"][highest_idx]
+
     return {
-        "answer": f"{vib0*G:.4f}_{vib1*G:.4f}_{vib2*G:.4f}",
-        "reasoning": "Calculated from vibration sensors."
+        "answer": f"{a_x:.4f}_{a_y:.4f}_{a_z:.4f}",
+        "reasoning": f"Magnitude {magnitude:.4f} m/s^2. Axis max: {highest_axis}",
+        "raw_value": [a_x, a_y, a_z],
+        "magnitude": magnitude,
+        "highest_axis": highest_axis,
+        "is_above_threshold": magnitude > threshold
     }
 
 
@@ -187,10 +212,15 @@ def answer_q4_external_force(rows: List[Dict[str, Any]], t_ms: float, eps_3: flo
     fx, fy, fz = values
     magnitude = math.sqrt(fx**2 + fy**2 + fz**2)
     detected = magnitude >= eps_3
-    return {"answer": "Yes" if detected else "No", "reasoning": f"Magnitude {magnitude:.4f} >= {eps_3}"}
+    return {
+        "answer": "Yes" if detected else "No", 
+        "reasoning": f"Magnitude {magnitude:.4f} >= {eps_3}",
+        "raw_value": magnitude,
+        "is_true": detected
+    }
 
 
-def answer_q5_joint_jerk(rows: List[Dict[str, Any]], t_ms: float, axis: int) -> Dict[str, Any]:
+def answer_q5_joint_jerk(rows: List[Dict[str, Any]], t_ms: float, axis: int, threshold: float = 5.0) -> Dict[str, Any]:
     valid = [(i, r.get("timestamp_ms")) for i, r in enumerate(rows) if r.get("timestamp_ms") is not None]
     if len(valid) < 5:
         return {"answer": "Unknown", "reasoning": "Insufficient elements"}
@@ -227,10 +257,24 @@ def answer_q5_joint_jerk(rows: List[Dict[str, Any]], t_ms: float, axis: int) -> 
     except (KeyError, TypeError, ValueError):
         return {"answer": "Unknown", "reasoning": "Missing features"}
 
-    return {"answer": str(round(jerk, 4)), "reasoning": "Calculated central difference"}
+    jerk_mag = abs(jerk)
+    if jerk_mag < 1.0:
+        jerk_range = "Low"
+    elif jerk_mag < 5.0:
+        jerk_range = "Medium"
+    else:
+        jerk_range = "High"
+
+    return {
+        "answer": str(round(jerk, 4)), 
+        "reasoning": f"Calculated central difference: {jerk:.4f}. Range: {jerk_range}",
+        "raw_value": jerk,
+        "jerk_range": jerk_range,
+        "is_above_threshold": jerk_mag > threshold
+    }
 
 
-def answer_q6_torque_magnitude(rows: List[Dict[str, Any]], t_ms: float, axis_label: str) -> Dict[str, Any]:
+def answer_q6_torque_magnitude(rows: List[Dict[str, Any]], t_ms: float, axis_label: str, threshold: float = 2.0) -> Dict[str, Any]:
     axis_map = {"x": 3, "y": 4, "z": 5}
     if axis_label not in axis_map:
         return {"answer": "Unknown", "reasoning": "Invalid axis"}
@@ -240,7 +284,14 @@ def answer_q6_torque_magnitude(rows: List[Dict[str, Any]], t_ms: float, axis_lab
     if values is None:
         return {"answer": "Unknown", "reasoning": "Missing data"}
 
-    return {"answer": str(round(abs(values[0]), 4)), "reasoning": "Calculated absolute torque"}
+    torque_mag = abs(values[0])
+    return {
+        "answer": str(round(torque_mag, 4)), 
+        "reasoning": f"Calculated absolute torque: {torque_mag:.4f}",
+        "raw_value": torque_mag,
+        "is_above_threshold": torque_mag > threshold
+    }
+
 
 
 def answer_q7_joint_speed_ranking(rows: List[Dict[str, Any]], t_ms: float, joints_list: List[int]) -> Dict[str, Any]:

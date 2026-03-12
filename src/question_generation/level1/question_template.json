@@ -1,79 +1,159 @@
 [
-    {
-        "id": 1,
-        "type": "state_joint_moved",
-        "template": "Is joint {axis} at the same position at {t1}ms and {t2}ms (tolerance of {eps_1} rad)? Answer only with 'Yes' or 'No'.",
-        "answer_format": {
-            "type": "multiple_choice_single_select",
-            "options": [
-                "Yes",
-                "No"
-            ],
-            "notes": "Classification based on deterministic position evaluation."
-        }
-    },
-    {
-        "id": 2,
-        "type": "state_friction_increase",
-        "template": "Has the friction proxy for joint {axis} increased from {t1}ms to {t2}ms (tolerance of {eps_2}%)? Assessed using a symmetric half-window of {delta_1}ms. Answer only with 'Yes' or 'No'.",
-        "answer_format": {
-            "type": "multiple_choice_single_select",
-            "options": [
-                "Yes",
-                "No"
-            ]
-        }
-    },
-    {
-        "id": 3,
-        "type": "state_acceleration",
-        "template": "What is the acceleration of the end effector at {t_ms}ms? Answer only with a tensor of length 3 (X, Y, Z in m/s^2), separated by '_'.",
-        "answer_format": {
-            "type": "tensor",
-            "shape": [
-                3
-            ],
-            "notes": "3-element vector of floats formatted as a string."
-        }
-    },
-    {
-        "id": 4,
-        "type": "state_external_force_detected",
-        "template": "Is an external force detected at {t_ms}ms (threshold of {eps_3} N)? Answer only with 'Yes' or 'No'.",
-        "answer_format": {
-            "type": "multiple_choice_single_select",
-            "options": [
-                "Yes",
-                "No"
-            ]
-        }
-    },
-    {
-        "id": 5,
-        "type": "state_jerk",
-        "template": "What is the jerk of joint {axis} at {t_ms}ms? Answer only with a numerical value in rad/s^3.",
-        "answer_format": {
-            "type": "numerical",
-            "notes": "Single float value."
-        }
-    },
-    {
-        "id": 6,
-        "type": "state_torque_magnitude",
-        "template": "What is the torque magnitude about the {axis_label}-axis at {t_ms}ms? Answer only with a numerical value in Nm.",
-        "answer_format": {
-            "type": "numerical",
-            "notes": "Single float value."
-        }
-    },
-    {
-        "id": 7,
-        "type": "state_joint_speed_ranking",
-        "template": "Rank the joints {joints_list} by their absolute speed at time {t_ms}ms, from highest to lowest. Answer only with a 4-letter string containing the letters A, B, C, and D in your ranked order.",
-        "answer_format": {
-            "type": "ranking",
-            "n_items": 4,
-            "notes": "Model assigns ranks. Labels A, B, C, D correspond to the 4 listed joints."
-        }
+  {
+    "id": 1,
+    "type": "state_joint_moved_tf",
+    "template": "Is joint {axis} at the same position at {t1}ms and {t2}ms (tolerance of {eps_1} rad)? Answer only with 'Yes' or 'No'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["Yes", "No"]
     }
+  },
+  {
+    "id": 2,
+    "type": "state_joint_moved_mc",
+    "template": "What is the status of the position of joint {axis} between {t1}ms and {t2}ms (tolerance of {eps_1} rad)? Answer only with the letter of the correct option.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "n_choices": 2
+    }
+  },
+  {
+    "id": 3,
+    "type": "state_joint_moved_open",
+    "template": "What is the absolute difference in position of joint {axis} between {t1}ms and {t2}ms in rad? Answer only with a numerical value.",
+    "answer_format": {
+      "type": "numerical"
+    }
+  },
+  {
+    "id": 4,
+    "type": "state_friction_increase_tf",
+    "template": "Has the friction proxy for joint {axis} increased from {t1}ms to {t2}ms (tolerance of {eps_2}%)? Assessed using a symmetric half-window of {delta_1}ms. Answer only with 'Yes' or 'No'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["Yes", "No"]
+    }
+  },
+  {
+    "id": 5,
+    "type": "state_friction_increase_mc",
+    "template": "How did the friction proxy for joint {axis} change from {t1}ms to {t2}ms? Answer only with the letter of the correct option.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "n_choices": 3
+    }
+  },
+  {
+    "id": 6,
+    "type": "state_friction_increase_open",
+    "template": "What is the ratio of the friction proxy at {t2}ms compared to {t1}ms for joint {axis}? Answer only with a numerical value.",
+    "answer_format": {
+      "type": "numerical"
+    }
+  },
+  {
+    "id": 7,
+    "type": "state_acceleration_tf",
+    "template": "Is the end-effector acceleration magnitude at {t_ms}ms greater than {accel_threshold} m/s^2? Answer only with 'Yes' or 'No'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["Yes", "No"]
+    }
+  },
+  {
+    "id": 8,
+    "type": "state_acceleration_mc",
+    "template": "Which axis (X, Y, or Z) of the end-effector has the highest absolute acceleration at {t_ms}ms? Answer only with the letter of the correct option.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "n_choices": 3
+    }
+  },
+  {
+    "id": 9,
+    "type": "state_acceleration_open",
+    "template": "What is the acceleration of the end effector at {t_ms}ms? Answer only with a tensor of length 3 (X, Y, Z in m/s^2), separated by '_'.",
+    "answer_format": {
+      "type": "tensor",
+      "shape": [3]
+    }
+  },
+  {
+    "id": 10,
+    "type": "state_external_force_detected_tf",
+    "template": "Is an external force detected at {t_ms}ms (threshold of {eps_3} N)? Answer only with 'Yes' or 'No'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["Yes", "No"]
+    }
+  },
+  {
+    "id": 11,
+    "type": "state_external_force_detected_mc",
+    "template": "What is the detected state of external forces at {t_ms}ms? Answer only with the letter of the correct option.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "n_choices": 2
+    }
+  },
+  {
+    "id": 12,
+    "type": "state_external_force_detected_open",
+    "template": "What is the magnitude of the external force detected at {t_ms}ms in N? Answer only with a numerical value.",
+    "answer_format": {
+      "type": "numerical"
+    }
+  },
+  {
+    "id": 13,
+    "type": "state_jerk_tf",
+    "template": "Does the jerk of joint {axis} at {t_ms}ms exceed {jerk_threshold} rad/s^3? Answer only with 'Yes' or 'No'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["Yes", "No"]
+    }
+  },
+  {
+    "id": 14,
+    "type": "state_jerk_mc",
+    "template": "What is the magnitude range of the jerk for joint {axis} at {t_ms}ms? Answer only with the letter of the correct option.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "n_choices": 3
+    }
+  },
+  {
+    "id": 15,
+    "type": "state_jerk_open",
+    "template": "What is the jerk of joint {axis} at {t_ms}ms in rad/s^3? Answer only with a numerical value.",
+    "answer_format": {
+      "type": "numerical"
+    }
+  },
+  {
+    "id": 16,
+    "type": "state_torque_magnitude_tf",
+    "template": "Is the torque magnitude about the {axis_label}-axis at {t_ms}ms greater than {torque_threshold} Nm? Answer only with 'Yes' or 'No'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["Yes", "No"]
+    }
+  },
+  {
+    "id": 17,
+    "type": "state_torque_magnitude_mc",
+    "template": "Compare the torque magnitude about the {axis_label}-axis at {t_ms}ms to a threshold of {torque_threshold} Nm. Answer only with the letter of the correct option.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "n_choices": 2
+    }
+  },
+  {
+    "id": 18,
+    "type": "state_torque_magnitude_open",
+    "template": "What is the torque magnitude about the {axis_label}-axis at {t_ms}ms in Nm? Answer only with a numerical value.",
+    "answer_format": {
+      "type": "numerical"
+    }
+  }
 ]
