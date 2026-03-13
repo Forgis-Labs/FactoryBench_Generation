@@ -41,6 +41,43 @@ Measures the absolute torque around a specific axis (X, Y, or Z) derived from wr
 - **MC (`state_torque_magnitude_mc`)**: "Compare the torque magnitude about the {axis}-axis at {t_ms}ms to a threshold."
 - **Open (`state_torque_magnitude_open`)**: "What is the torque magnitude about the {axis}-axis at {t_ms}ms in Nm?"
 
+### 7. Tracking Error (Position)
+Compares the commanded setpoint and the actual feedback position to identify control deviations.
+- **TF (`state_tracking_error_tf`)**: "Is the position tracking error of joint {axis} at {t}ms above {threshold} rad?"
+- **MC (`state_tracking_error_mc`)**: "How has the position tracking error of joint {axis} evolved between {t1}ms and {t2}ms?"
+- **Open (`state_tracking_error_open`)**: "What is the position tracking error of joint {axis} at {t}ms in rad?"
+
+### 8. Joint Speed (raw)
+Direct measurement of angular velocity, useful for detecting stops or erratic behavior.
+- **TF (`state_joint_speed_tf`)**: "Is the speed of joint {axis} at {t}ms below {threshold} rad/s?"
+- **MC (`state_joint_speed_mc`)**: "Which joint has the highest absolute speed at {t}ms?"
+- **Open (`state_joint_speed_open`)**: "What is the speed of joint {axis} at {t}ms in rad/s?"
+
+### 9. Raw Motor Current (Effort magnitude)
+Direct indicator of actuator effort. High values suggest overload; low values suggest free movement.
+- **TF (`state_motor_current_tf`)**: "Does the motor current of joint {axis} at {t}ms exceed {threshold} A?"
+- **MC (`state_motor_current_mc`)**: "Which joint draws the highest motor current at {t}ms?"
+- **Open (`state_motor_current_open`)**: "What is the motor current of joint {axis} at {t}ms in A?"
+
+## Data Source
+Level 1 generation is uniquely integrated with the **Hugging Face Hub**. It consumes raw **Parquet** files directly from the cloud.
+
+- **Default Repository**: `Forgis/FactoryNet_Dataset`
+- **Format**: The script downloads Parquet files, parses them via `pandas`, and splits them into monotonic segments to ensure time-series consistency.
+
+## Availability Table
+| Category | AURSAD | voraus-AD | FactoryWave |
+| :--- | :---: | :---: | :---: |
+| 1. Joint Position | ✓ | ✓ | ✓ |
+| 2. Friction Proxy | ✓ | ✓ | ✓ |
+| 3. EE Acceleration | ✓ | - | - |
+| 4. External Force | ✓ | - | ✓ |
+| 5. Joint Jerk | ✓ | ✓ | ✓ |
+| 6. Torque Magnitude | ✓ | - | ✓ |
+| 7. Tracking Error | ✓ | ✓ | ✓ |
+| 8. Joint Speed | ✓ | ✓ | ✓ |
+| 9. Motor Current | ✓ | ✓ | ✓ |
+
 ## Answer Formats
 | Type | Format |
 | :--- | :--- |
@@ -65,5 +102,6 @@ python -m src.question_generation.level1.level1 -n 100 --seed 27
 
 ### Options:
 - `-n`: Number of questions to generate (default: 100).
-- `--seed`: Random seed for reproducibility (you can use any integer, e.g., 27, 42).
-- `--test-mode`: **Fast development mode**. Instead of reading full datasets (which can be huge), it only processes the first 1000 rows of each episode. Ideal for verifying templates without waiting for downloads.
+- `--seed`: Random seed for reproducibility.
+- `--dataset-repo`: Specify a different Hugging Face repository (default: `Forgis/FactoryNet_Dataset`).
+- `--test-mode`: **Fast development mode**. Only downloads the first 5000 rows of an episode to verify logic without waiting for full dataset downloads.
