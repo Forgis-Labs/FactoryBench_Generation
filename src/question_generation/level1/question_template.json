@@ -155,5 +155,83 @@
     "answer_format": {
       "type": "numerical"
     }
+  },
+  {
+    "id": 19,
+    "type": "state_tracking_error_tf",
+    "template": "Is the position tracking error of joint {axis} at {t_ms}ms above {tracking_error_threshold} rad? Answer only with 'Yes' or 'No'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["Yes", "No"]
+    }
+  },
+  {
+    "id": 20,
+    "type": "state_tracking_error_mc",
+    "template": "How has the position tracking error of joint {axis} evolved between {t1}ms and {t2}ms? Answer only with the letter of the correct option.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "n_choices": 3
+    }
+  },
+  {
+    "id": 21,
+    "type": "state_tracking_error_open",
+    "template": "What is the position tracking error of joint {axis} at {t_ms}ms in rad? Answer only with a numerical value.",
+    "answer_format": {
+      "type": "numerical"
+    }
+  },
+  {
+    "id": 22,
+    "type": "state_joint_speed_tf",
+    "template": "Is the speed of joint {axis} at {t_ms}ms below {speed_threshold} rad/s? Answer only with 'Yes' or 'No'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["Yes", "No"]
+    }
+  },
+  {
+    "id": 23,
+    "type": "state_joint_speed_mc",
+    "template": "Which joint has the highest absolute speed at {t_ms}ms? Answer only with the letter of the correct option.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "n_choices": 6
+    }
+  },
+  {
+    "id": 24,
+    "type": "state_joint_speed_open",
+    "template": "What is the speed of joint {axis} at {t_ms}ms in rad/s? Answer only with a numerical value.",
+    "answer_format": {
+      "type": "numerical"
+    }
+  },
+  {
+    "id": 25,
+    "type": "state_motor_current_tf",
+    "template": "Does the motor current of joint {axis} at {t_ms}ms exceed {current_threshold} A? Answer only with 'Yes' or 'No'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["Yes", "No"]
+    }
+  },
+  {
+    "id": 26,
+    "type": "state_motor_current_mc",
+    "template": "Which joint draws the highest motor current at {t_ms}ms? Answer only with the letter of the correct option.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "n_choices": 6
+    }
+  },
+  {
+    "id": 27,
+    "type": "state_motor_current_open",
+    "template": "What is the motor current of joint {axis} at {t_ms}ms in A? Answer only with a numerical value.",
+    "answer_format": {
+      "type": "numerical"
+    }
   }
 ]

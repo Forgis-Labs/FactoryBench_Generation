@@ -132,7 +132,7 @@ def answer_q2_friction_increase(
     eps_2: float,
     delta_1_ms: int = 500,
 ) -> Dict[str, Any]:
-    speed_key = f"feedback_speed_{axis}"
+    speed_key = get_signal_key(rows[0], "feedback_speed_", axis)
     current_key = f"effort_current_{axis}"
     
     timestamps = [r.get("timestamp_ms") for r in rows if r.get("timestamp_ms") is not None]
@@ -235,7 +235,7 @@ def answer_q5_joint_jerk(rows: List[Dict[str, Any]], t_ms: float, axis: int, thr
     idx_kp1, t_kp1 = valid[closest_pos + 1]
     idx_kp2, t_kp2 = valid[closest_pos + 2]
 
-    speed_key = f"feedback_speed_{axis}"
+    speed_key = get_signal_key(rows[0], "feedback_speed_", axis)
     try:
         v_km2 = float(rows[idx_km2][speed_key])
         v_k = float(rows[idx_k][speed_key])
@@ -294,29 +294,152 @@ def answer_q6_torque_magnitude(rows: List[Dict[str, Any]], t_ms: float, axis_lab
 
 
 
-def answer_q7_joint_speed_ranking(rows: List[Dict[str, Any]], t_ms: float, joints_list: List[int]) -> Dict[str, Any]:
-    speeds = []
-    before_idx, after_idx = find_bracketing_indices(rows, t_ms)
-    
-    if before_idx is None or after_idx is None:
-        return {"answer": "Unknown", "reasoning": "No valid timestamps"}
 
-    for axis in joints_list:
-        speed_key = f"feedback_speed_{axis}"
-        val, _ = interpolate_signal_at_time(rows, speed_key, t_ms)
+def get_num_joints(rows: List[Dict[str, Any]], signal_prefix: str = "feedback_pos_") -> int:
+    """Detect the number of joints by inspecting columns in the first row."""
+    if not rows:
+        return 0
+    first_row = rows[0]
+    
+    # Handle aliases
+    prefixes = [signal_prefix]
+    if signal_prefix == "feedback_speed_":
+        prefixes.append("feedback_vel_")
+    
+    for pref in prefixes:
+        count = 0
+        while f"{pref}{count}" in first_row:
+            count += 1
+        if count > 0:
+            return count
+    return 0
+
+
+def get_signal_key(row: Dict[str, Any], prefix: str, axis: int) -> str:
+    """Get the key for a signal, handling aliases."""
+    key = f"{prefix}{axis}"
+    if key in row:
+        return key
+    
+    # Aliases
+    if prefix == "feedback_speed_":
+        alt_key = f"feedback_vel_{axis}"
+        if alt_key in row:
+            return alt_key
+    elif prefix == "vibration_":
+        alt_key = f"auxiliary_accel_tool_{axis}"
+        if alt_key in row:
+            return alt_key
+            
+    return key
+
+
+def answer_joint_speed(rows: List[Dict[str, Any]], t_ms: float, axis: int, threshold: float = 0.5) -> Dict[str, Any]:
+    """Cat 8: Evaluate joint speed against a threshold."""
+    speed_key = get_signal_key(rows[0], "feedback_speed_", axis)
+    val, _ = interpolate_signal_at_time(rows, speed_key, t_ms)
+    if val is None:
+        return {"answer": "Unknown", "reasoning": "Missing speed data"}
+
+    abs_speed = abs(val)
+    below = abs_speed < threshold
+    return {
+        "answer": str(round(val, 4)),
+        "reasoning": f"Speed: {val:.4f} rad/s (abs: {abs_speed:.4f}). Threshold: {threshold}",
+        "raw_value": val,
+        "is_below_threshold": below,
+        "is_true": below # For TF
+    }
+
+
+def answer_motor_current(rows: List[Dict[str, Any]], t_ms: float, axis: int, threshold: float = 1.0) -> Dict[str, Any]:
+    """Cat 9: Evaluate motor current against a threshold."""
+    current_key = f"effort_current_{axis}"
+    val, _ = interpolate_signal_at_time(rows, current_key, t_ms)
+    if val is None:
+        return {"answer": "Unknown", "reasoning": "Missing current data"}
+
+    abs_current = abs(val)
+    exceeds = abs_current > threshold
+    return {
+        "answer": str(round(val, 4)),
+        "reasoning": f"Current: {val:.4f} A (abs: {abs_current:.4f}). Threshold: {threshold}",
+        "raw_value": val,
+        "is_above_threshold": exceeds,
+        "is_true": exceeds # For TF
+    }
+
+
+
+def answer_tracking_error(rows: List[Dict[str, Any]], t_ms: float, axis: int, threshold: float = 0.01, t2_ms: Optional[float] = None) -> Dict[str, Any]:
+    """Cat 7: Evaluate tracking error (setpoint vs feedback). Supports one or two timestamps."""
+    def get_error(t):
+        sp_key = f"setpoint_pos_{axis}"
+        fb_key = f"feedback_pos_{axis}"
+        val_sp, _ = interpolate_signal_at_time(rows, sp_key, t)
+        val_fb, _ = interpolate_signal_at_time(rows, fb_key, t)
+        if val_sp is None or val_fb is None:
+            return None
+        return abs(val_sp - val_fb)
+
+    err1 = get_error(t_ms)
+    if err1 is None:
+        return {"answer": "Unknown", "reasoning": "Missing position data"}
+
+    if t2_ms is not None:
+        err2 = get_error(t2_ms)
+        if err2 is None:
+            return {"answer": "Unknown", "reasoning": "Missing position data at t2"}
+        
+        # Comparison for MC
+        diff = err2 - err1
+        eps = 1e-4 # small stability threshold
+        if diff > eps:
+            trend = "increased"
+        elif diff < -eps:
+            trend = "decreased"
+        else:
+            trend = "stable"
+        
+        return {
+            "answer": trend,
+            "reasoning": f"Error at {t_ms}ms: {err1:.4f}, at {t2_ms}ms: {err2:.4f}. Trend: {trend}",
+            "trend": trend,
+            "err1": err1,
+            "err2": err2
+        }
+
+    above = err1 > threshold
+    return {
+        "answer": str(round(err1, 4)),
+        "reasoning": f"Tracking Error: {err1:.4f}. Threshold: {threshold}",
+        "raw_value": err1,
+        "is_above_threshold": above,
+        "is_true": above # For TF
+    }
+
+
+def answer_joint_comparison(rows: List[Dict[str, Any]], t_ms: float, signal_prefix: str) -> Dict[str, Any]:
+    """Generic MC logic for 'Which joint has the highest absolute X at t?'."""
+    num_joints = get_num_joints(rows, signal_prefix)
+    if num_joints == 0:
+        return {"answer": "Unknown", "reasoning": "No joints detected"}
+    
+    values = []
+    for axis in range(num_joints):
+        key = get_signal_key(rows[0], signal_prefix, axis)
+        val, _ = interpolate_signal_at_time(rows, key, t_ms)
         if val is None:
-             return {"answer": "Unknown", "reasoning": f"Missing speed data for joint {axis}"}
-        speeds.append((axis, abs(val)))
-
-    # Sort descending by speed
-    speeds.sort(key=lambda x: x[1], reverse=True)
+            return {"answer": "Unknown", "reasoning": f"Missing data for joint {axis} (key: {key})"}
+        values.append((axis, abs(val)))
     
-    # Ranked order corresponding to indices of joints_list 
-    # For joints A, B, C, D maps to 0, 1, 2, 3
-    # e.g., if joints_list = [2, 4, 1, 5] assigned labels A, B, C, D
-    # and sorted speeds are joint 4, joint 2, joint 5, joint 1
-    # order is B, A, D, C
-    joint_to_label = {j: chr(ord('A') + i) for i, j in enumerate(joints_list)}
+    # Sort descending by absolute value
+    values.sort(key=lambda x: x[1], reverse=True)
     
-    ranking = "".join(joint_to_label[j] for j, _ in speeds)
-    return {"answer": ranking, "reasoning": f"Speeds: {speeds}"}
+    highest_joint = values[0][0]
+    return {
+        "answer": str(highest_joint),
+        "reasoning": f"Highest absolute value found at joint {highest_joint}. Values: {values}",
+        "highest_joint": highest_joint,
+        "sorted_values": values
+    }

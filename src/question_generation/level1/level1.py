@@ -32,7 +32,11 @@ from src.question_generation.level1.mc_truth import (
     answer_q4_external_force,
     answer_q5_joint_jerk,
     answer_q6_torque_magnitude,
-    answer_q7_joint_speed_ranking,
+    answer_joint_speed,
+    answer_motor_current,
+    answer_tracking_error,
+    answer_joint_comparison,
+    get_num_joints
 )
 
 logger = logging.getLogger(__name__)
@@ -97,11 +101,21 @@ def fill_template(
     t2 = float(rows[end_idx]["timestamp_ms"])
     t_ms = t1 
     
-    axis = random.randint(0, 5)
+    # Dynamic joint detection
+    num_joints = get_num_joints(rows)
+    if num_joints == 0:
+        return None
+        
+    axis = random.randint(0, num_joints - 1)
     axis_label = random.choice(["x", "y", "z"])
+    
+    # Threshold sampling
     accel_threshold = round(random.uniform(0.5, 2.0), 1)
     jerk_threshold = round(random.uniform(1.0, 10.0), 1)
     torque_threshold = round(random.uniform(0.5, 5.0), 1)
+    tracking_error_threshold = round(random.uniform(0.005, 0.05), 3)
+    speed_threshold = round(random.uniform(0.05, 0.5), 2)
+    current_threshold = round(random.uniform(0.1, 1.5), 1)
 
     options = {}
     
@@ -231,6 +245,88 @@ def fill_template(
         answer = str(round(truth["raw_value"], 4))
         question = tmpl_text.format(axis_label=axis_label, t_ms=t_ms)
 
+    elif tid == 19: # Tracking Error TF
+        truth = answer_tracking_error(rows, t_ms, axis, threshold=tracking_error_threshold)
+        if truth["answer"] == "Unknown": return None
+        answer = "Yes" if truth["is_above_threshold"] else "No"
+        question = tmpl_text.format(axis=axis, t_ms=t_ms, tracking_error_threshold=tracking_error_threshold)
+        options = {"A": "Yes", "B": "No"}
+
+    elif tid == 20: # Tracking Error MC (Evolution)
+        truth = answer_tracking_error(rows, t1, axis, t2_ms=t2)
+        if truth["answer"] == "Unknown": return None
+        trend = truth["trend"]
+        choices = ["Increased", "Decreased", "Remained stable"]
+        answer = {"increased": "A", "decreased": "B", "stable": "C"}[trend]
+        options = {"A": choices[0], "B": choices[1], "C": choices[2]}
+        question = tmpl_text.format(axis=axis, t1=t1, t2=t2)
+
+    elif tid == 21: # Tracking Error Open
+        truth = answer_tracking_error(rows, t_ms, axis)
+        if truth["answer"] == "Unknown": return None
+        answer = str(round(truth["raw_value"], 4))
+        question = tmpl_text.format(axis=axis, t_ms=t_ms)
+
+    elif tid == 22: # Joint Speed TF
+        truth = answer_joint_speed(rows, t_ms, axis, threshold=speed_threshold)
+        if truth["answer"] == "Unknown": return None
+        answer = "Yes" if truth["is_below_threshold"] else "No"
+        question = tmpl_text.format(axis=axis, t_ms=t_ms, speed_threshold=speed_threshold)
+        options = {"A": "Yes", "B": "No"}
+
+    elif tid == 23: # Joint Speed MC
+        truth = answer_joint_comparison(rows, t_ms, "feedback_speed_")
+        if truth["answer"] == "Unknown": return None
+        
+        correct_joint = int(truth["highest_joint"])
+        distractors = [i for i in range(num_joints) if i != correct_joint]
+        selected_distractors = random.sample(distractors, min(2, len(distractors)))
+        selected_joints = [correct_joint] + selected_distractors
+        random.shuffle(selected_joints)
+        
+        options = {chr(ord('A') + i): f"Joint {j}" for i, j in enumerate(selected_joints)}
+        for label, text in options.items():
+            if text == f"Joint {correct_joint}":
+                answer = label
+                break
+        question = tmpl_text.format(t_ms=t_ms)
+
+    elif tid == 24: # Joint Speed Open
+        truth = answer_joint_speed(rows, t_ms, axis)
+        if truth["answer"] == "Unknown": return None
+        answer = str(round(truth["raw_value"], 4))
+        question = tmpl_text.format(axis=axis, t_ms=t_ms)
+
+    elif tid == 25: # Motor Current TF
+        truth = answer_motor_current(rows, t_ms, axis, threshold=current_threshold)
+        if truth["answer"] == "Unknown": return None
+        answer = "Yes" if truth["is_above_threshold"] else "No"
+        question = tmpl_text.format(axis=axis, t_ms=t_ms, current_threshold=current_threshold)
+        options = {"A": "Yes", "B": "No"}
+
+    elif tid == 26: # Motor Current MC
+        truth = answer_joint_comparison(rows, t_ms, "effort_current_")
+        if truth["answer"] == "Unknown": return None
+        
+        correct_joint = int(truth["highest_joint"])
+        distractors = [i for i in range(num_joints) if i != correct_joint]
+        selected_distractors = random.sample(distractors, min(2, len(distractors)))
+        selected_joints = [correct_joint] + selected_distractors
+        random.shuffle(selected_joints)
+        
+        options = {chr(ord('A') + i): f"Joint {j}" for i, j in enumerate(selected_joints)}
+        for label, text in options.items():
+            if text == f"Joint {correct_joint}":
+                answer = label
+                break
+        question = tmpl_text.format(t_ms=t_ms)
+
+    elif tid == 27: # Motor Current Open
+        truth = answer_motor_current(rows, t_ms, axis)
+        if truth["answer"] == "Unknown": return None
+        answer = str(round(truth["raw_value"], 4))
+        question = tmpl_text.format(axis=axis, t_ms=t_ms)
+
     else:
         logger.warning(f"Unknown template id: {tid}")
         return None
@@ -289,29 +385,46 @@ def generate_level1_questions(
         
     episode_cache: Dict[str, List[Dict[str, Any]]] = {}
 
-    def load_episode(path: str) -> List[Dict[str, Any]]:
+    def load_episode(path: str) -> List[List[Dict[str, Any]]]:
         if path not in episode_cache:
             logger.info(f"Downloading/Reading from Hugging Face: {path}")
             
-            # If in test mode, only read the first 1000 rows to drastically speed up execution
+            # If in test mode, only read the first 5000 rows to drastically speed up execution
             import pyarrow.parquet as pq
             if test_mode:
-                logger.info("TEST MODE EXTRACTING 1000 ROWS ONLY")
-                import fsspec
-                # We use pandas natively with backend filters
-                df = pd.read_parquet(
-                    path,
-                    engine="pyarrow", 
-                    filters=None,
-                    storage_options=None
-                )
-                df = df.head(1000)
+                logger.info("TEST MODE EXTRACTING 5000 ROWS ONLY")
+                df = pd.read_parquet(path)
+                df = df.head(5000)
             else:
                 df = pd.read_parquet(path)
                 
             if "time_s" in df.columns and "timestamp_ms" not in df.columns:
                 df["timestamp_ms"] = df["time_s"] * 1000.0
-            episode_cache[path] = df.to_dict(orient="records")
+            
+            # Split into monotonic segments based on negative jumps in timestamp_ms
+            # This is crucial because some parquet files contain independent segments
+            # that reset time, which breaks binary search in mc_truth.
+            records = df.to_dict(orient="records")
+            segments = []
+            current_segment = []
+            last_ts = -float('inf')
+            
+            for row in records:
+                ts = row.get("timestamp_ms", 0)
+                if ts < last_ts:
+                    if len(current_segment) >= 10:
+                        segments.append(current_segment)
+                    current_segment = []
+                current_segment.append(row)
+                last_ts = ts
+            
+            if len(current_segment) >= 10:
+                segments.append(current_segment)
+            
+            if not segments:
+                segments = [records] # Fallback
+                
+            episode_cache[path] = segments
         return episode_cache[path]
 
     generated = 0
@@ -323,9 +436,14 @@ def generate_level1_questions(
 
         ds = random.choice(available_datasets)
         ep_path = random.choice(episodes_by_dataset[ds])
-        rows = load_episode(ep_path)
+        segments = load_episode(ep_path)
         
-        if not isinstance(rows, list) or len(rows) < 10:
+        if not segments:
+            continue
+            
+        rows = random.choice(segments)
+        
+        if len(rows) < 10:
             continue
 
         try:
@@ -333,7 +451,7 @@ def generate_level1_questions(
         except ValueError:
             continue
 
-        template = random.choice(templates)
+        template = random.choice([t for t in templates if t["id"] in range(19, 28)])
         
         filled = fill_template(
             template, rows, start_idx, end_idx,
@@ -404,6 +522,8 @@ def main() -> None:
         min_dt_ms=args.min_dt_ms,
         max_dt_ms=args.max_dt_ms,
         eps_q=args.eps_q,
+        dataset_repo=args.dataset_repo,
+        test_mode=args.test_mode,
     )
 
 if __name__ == "__main__":
