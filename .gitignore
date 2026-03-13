@@ -67,3 +67,5 @@ data/normalized_episodes/*
 #output
 output/*
 
+# datasets
+datasets/*
