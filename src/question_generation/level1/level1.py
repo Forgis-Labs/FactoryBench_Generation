@@ -36,12 +36,17 @@ from src.question_generation.level1.mc_truth import (
     answer_motor_current,
     answer_tracking_error,
     answer_joint_comparison,
-    get_num_joints
+    get_num_joints,
+    answer_q8_joint_speed_check,
+    answer_q9_joint_current_check,
+    answer_q10_signal_description,
+    get_machine_by_id,
+    load_machine_metadata
 )
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad", "aursad", "vorausad"]
+VALID_DATASETS = ["inter_aursad", "inter_voraus", "aursad", "voraus"]
 
 
 def pick_time_window(rows: List[Dict[str, Any]], min_dt_ms: int, max_dt_ms: int) -> Tuple[int, int]:
@@ -93,7 +98,7 @@ def fill_template(
     eps_3: float,
     delta_1: int,
 ) -> Optional[Dict[str, Any]]:
-    tid = template["id"]
+    template_type = template["type"]
     tmpl_text: str = template["template"]
     answer_format: Dict[str, Any] = template["answer_format"]
     
@@ -117,218 +122,123 @@ def fill_template(
     speed_threshold = round(random.uniform(0.05, 0.5), 2)
     current_threshold = round(random.uniform(0.1, 1.5), 1)
 
+    # Machine metadata for semantic templates
+    # We'll try to guess machine_id based on dataset name
+    # "inter_aursad" -> UR3e (id 0)
+    # "inter_vorausad" -> UR5 (id 2)
+    # For Level 1, these are the primary ones.
+    # We could also look at number of joints.
+    machine_id = 0 # Default to UR3e
+    if num_joints == 6:
+        # Check dataset stem if possible, otherwise stick to 0/2
+        pass
+        
+    machine = get_machine_by_id(machine_id)
+
     options = {}
     
-    if tid == 1: # Joint Position TF
+    if template_type == "state_joint_moved":
         truth = answer_q1_position_check(rows, t1, t2, axis, eps_1)
         if truth["answer"] == "Unknown": return None
         answer = truth["answer"]
         question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_1=eps_1)
         options = {"A": "Yes", "B": "No"}
         
-    elif tid == 2: # Joint Position MC
-        truth = answer_q1_position_check(rows, t1, t2, axis, eps_1)
-        if truth["answer"] == "Unknown": return None
-        is_same = truth["is_true"]
-        choices = ["Remained stationary", "Moved significantly"]
-        answer = "A" if is_same else "B"
-        options = {"A": choices[0], "B": choices[1]}
-        question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_1=eps_1)
-
-    elif tid == 3: # Joint Position Open
-        truth = answer_q1_position_check(rows, t1, t2, axis, eps_1)
-        if truth["answer"] == "Unknown": return None
-        answer = str(round(truth["raw_value"], 4))
-        question = tmpl_text.format(axis=axis, t1=t1, t2=t2)
-
-    elif tid == 5: # Friction MC
-        truth = answer_q2_friction_increase(rows, t1, t2, axis, eps_2, delta_1)
-        if truth["answer"] == "Unknown": return None
-        ratio = truth["raw_value"]
-        choices = ["Increased", "Decreased", "No significant change"]
-        if ratio > 1.0 + (eps_2/100.0): answer = "A"
-        elif ratio < 1.0 - (eps_2/100.0): answer = "B"
-        else: answer = "C"
-        options = {"A": choices[0], "B": choices[1], "C": choices[2]}
-        question = tmpl_text.format(axis=axis, t1=t1, t2=t2)
-
-    elif tid == 4: # Friction TF
+    elif template_type == "state_friction_increase":
         truth = answer_q2_friction_increase(rows, t1, t2, axis, eps_2, delta_1)
         if truth["answer"] == "Unknown": return None
         answer = truth["answer"]
         question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_2=eps_2, delta_1=delta_1)
         options = {"A": "Yes", "B": "No"}
 
-    elif tid == 6: # Friction Open
-        truth = answer_q2_friction_increase(rows, t1, t2, axis, eps_2, delta_1)
-        if truth["answer"] == "Unknown": return None
-        answer = str(round(truth["raw_value"], 4))
-        question = tmpl_text.format(t1=t1, t2=t2, axis=axis)
-
-    elif tid == 7: # EE Accel TF
-        truth = answer_q3_end_effector_accel(rows, t_ms, threshold=accel_threshold)
-        if truth["answer"] == "Unknown": return None
-        answer = "Yes" if truth["is_above_threshold"] else "No"
-        question = tmpl_text.format(t_ms=t_ms, accel_threshold=accel_threshold)
-        options = {"A": "Yes", "B": "No"}
-
-    elif tid == 8: # EE Accel MC
-        truth = answer_q3_end_effector_accel(rows, t_ms)
-        if truth["answer"] == "Unknown": return None
-        answer = truth["highest_axis"]
-        options = {"A": "X", "B": "Y", "C": "Z"}
-        question = tmpl_text.format(t_ms=t_ms)
-
-    elif tid == 9: # EE Accel Open
+    elif template_type == "state_acceleration":
         truth = answer_q3_end_effector_accel(rows, t_ms)
         if truth["answer"] == "Unknown": return None
         answer = truth["answer"]
         question = tmpl_text.format(t_ms=t_ms)
 
-    elif tid == 10: # Force TF
+    elif template_type == "state_external_force_detected":
         truth = answer_q4_external_force(rows, t_ms, eps_3)
         if truth["answer"] == "Unknown": return None
         answer = truth["answer"]
         question = tmpl_text.format(t_ms=t_ms, eps_3=eps_3)
         options = {"A": "Yes", "B": "No"}
 
-    elif tid == 11: # Force MC
-        truth = answer_q4_external_force(rows, t_ms, eps_3)
-        if truth["answer"] == "Unknown": return None
-        answer = "A" if truth["answer"] == "No" else "B"
-        options = {"A": "No external force detected", "B": "External force detected above threshold"}
-        question = tmpl_text.format(t_ms=t_ms)
-
-    elif tid == 12: # Force Open
-        truth = answer_q4_external_force(rows, t_ms, eps_3)
-        if truth["answer"] == "Unknown": return None
-        answer = str(round(truth["raw_value"], 4))
-        question = tmpl_text.format(t_ms=t_ms)
-
-    elif tid == 13: # Jerk TF
-        truth = answer_q5_joint_jerk(rows, t_ms, axis, threshold=jerk_threshold)
-        if truth["answer"] == "Unknown": return None
-        answer = "Yes" if truth["is_above_threshold"] else "No"
-        question = tmpl_text.format(axis=axis, t_ms=t_ms, jerk_threshold=jerk_threshold)
-        options = {"A": "Yes", "B": "No"}
-
-    elif tid == 14: # Jerk MC
-        truth = answer_q5_joint_jerk(rows, t_ms, axis)
-        if truth["answer"] == "Unknown": return None
-        answer = {"Low": "A", "Medium": "B", "High": "C"}[truth["jerk_range"]]
-        options = {"A": "Low (<1 rad/s^3)", "B": "Medium (1-5 rad/s^3)", "C": "High (>5 rad/s^3)"}
-        question = tmpl_text.format(axis=axis, t_ms=t_ms)
-
-    elif tid == 15: # Jerk Open
+    elif template_type == "state_jerk":
         truth = answer_q5_joint_jerk(rows, t_ms, axis)
         if truth["answer"] == "Unknown": return None
         answer = str(round(truth["raw_value"], 4))
         question = tmpl_text.format(axis=axis, t_ms=t_ms)
 
-    elif tid == 16: # Torque TF
-        truth = answer_q6_torque_magnitude(rows, t_ms, axis_label, threshold=torque_threshold)
-        if truth["answer"] == "Unknown": return None
-        answer = "Yes" if truth["is_above_threshold"] else "No"
-        question = tmpl_text.format(axis_label=axis_label, t_ms=t_ms, torque_threshold=torque_threshold)
-        options = {"A": "Yes", "B": "No"}
-
-    elif tid == 17: # Torque MC
-        truth = answer_q6_torque_magnitude(rows, t_ms, axis_label, threshold=torque_threshold)
-        if truth["answer"] == "Unknown": return None
-        answer = "A" if truth["is_above_threshold"] else "B"
-        options = {"A": "Above threshold", "B": "Below threshold"}
-        question = tmpl_text.format(axis_label=axis_label, t_ms=t_ms, torque_threshold=torque_threshold)
-
-    elif tid == 18: # Torque Open
+    elif template_type == "state_torque_magnitude":
         truth = answer_q6_torque_magnitude(rows, t_ms, axis_label)
         if truth["answer"] == "Unknown": return None
         answer = str(round(truth["raw_value"], 4))
         question = tmpl_text.format(axis_label=axis_label, t_ms=t_ms)
 
-    elif tid == 19: # Tracking Error TF
-        truth = answer_tracking_error(rows, t_ms, axis, threshold=tracking_error_threshold)
-        if truth["answer"] == "Unknown": return None
-        answer = "Yes" if truth["is_above_threshold"] else "No"
-        question = tmpl_text.format(axis=axis, t_ms=t_ms, tracking_error_threshold=tracking_error_threshold)
-        options = {"A": "Yes", "B": "No"}
-
-    elif tid == 20: # Tracking Error MC (Evolution)
-        truth = answer_tracking_error(rows, t1, axis, t2_ms=t2)
-        if truth["answer"] == "Unknown": return None
-        trend = truth["trend"]
-        choices = ["Increased", "Decreased", "Remained stable"]
-        answer = {"increased": "A", "decreased": "B", "stable": "C"}[trend]
-        options = {"A": choices[0], "B": choices[1], "C": choices[2]}
-        question = tmpl_text.format(axis=axis, t1=t1, t2=t2)
-
-    elif tid == 21: # Tracking Error Open
-        truth = answer_tracking_error(rows, t_ms, axis)
-        if truth["answer"] == "Unknown": return None
-        answer = str(round(truth["raw_value"], 4))
-        question = tmpl_text.format(axis=axis, t_ms=t_ms)
-
-    elif tid == 22: # Joint Speed TF
-        truth = answer_joint_speed(rows, t_ms, axis, threshold=speed_threshold)
-        if truth["answer"] == "Unknown": return None
-        answer = "Yes" if truth["is_below_threshold"] else "No"
-        question = tmpl_text.format(axis=axis, t_ms=t_ms, speed_threshold=speed_threshold)
-        options = {"A": "Yes", "B": "No"}
-
-    elif tid == 23: # Joint Speed MC
+    elif template_type == "state_joint_speed_ranking":
+        # Sample 4 random joints for ranking
+        total_joints = get_num_joints(rows)
+        joints_list = random.sample(range(total_joints), min(4, total_joints))
+        while len(joints_list) < 4:
+            joints_list.append(joints_list[-1]) # Padding if less than 4 joints
+        
         truth = answer_joint_comparison(rows, t_ms, "feedback_speed_")
         if truth["answer"] == "Unknown": return None
         
-        correct_joint = int(truth["highest_joint"])
-        distractors = [i for i in range(num_joints) if i != correct_joint]
-        selected_distractors = random.sample(distractors, min(2, len(distractors)))
-        selected_joints = [correct_joint] + selected_distractors
-        random.shuffle(selected_joints)
+        sorted_vals = truth["sorted_values"] # [(axis, abs_val), ...]
+        # Filter for our sampled joints
+        sampled_sorted = [x for x in sorted_vals if x[0] in joints_list]
+        # Map labels A, B, C, D to joints_list
+        label_map = {joint: chr(ord('A') + i) for i, joint in enumerate(joints_list)}
+        # Build ranking string
+        ranking_str = "".join([label_map[axis] for axis, val in sampled_sorted])
         
-        options = {chr(ord('A') + i): f"Joint {j}" for i, j in enumerate(selected_joints)}
-        for label, text in options.items():
-            if text == f"Joint {correct_joint}":
-                answer = label
-                break
-        question = tmpl_text.format(t_ms=t_ms)
+        answer = ranking_str
+        question = tmpl_text.format(
+            t_ms=t_ms,
+            joints_list=", ".join([str(j) for j in joints_list])
+        )
 
-    elif tid == 24: # Joint Speed Open
-        truth = answer_joint_speed(rows, t_ms, axis)
+    elif template_type == "state_joint_within_rated_speed":
+        total_joints = get_num_joints(rows)
+        joints_list = random.sample(range(total_joints), min(4, total_joints))
+        while len(joints_list) < 4:
+            joints_list.append(joints_list[-1])
+        
+        truth = answer_q8_joint_speed_check(rows, t_ms, machine_id, joints_list)
         if truth["answer"] == "Unknown": return None
-        answer = str(round(truth["raw_value"], 4))
+        
+        answer = truth["answer"]
+        question = tmpl_text.format(
+            t_ms=t_ms,
+            axis_a=joints_list[0],
+            axis_b=joints_list[1],
+            axis_c=joints_list[2],
+            axis_d=joints_list[3]
+        )
+
+    elif template_type == "state_current_within_rated":
+        truth = answer_q9_joint_current_check(rows, t_ms, axis, machine_id)
+        if truth["answer"] == "Unknown": return None
+        answer = truth["answer"]
         question = tmpl_text.format(axis=axis, t_ms=t_ms)
 
-    elif tid == 25: # Motor Current TF
-        truth = answer_motor_current(rows, t_ms, axis, threshold=current_threshold)
-        if truth["answer"] == "Unknown": return None
-        answer = "Yes" if truth["is_above_threshold"] else "No"
-        question = tmpl_text.format(axis=axis, t_ms=t_ms, current_threshold=current_threshold)
-        options = {"A": "Yes", "B": "No"}
-
-    elif tid == 26: # Motor Current MC
-        truth = answer_joint_comparison(rows, t_ms, "effort_current_")
+    elif template_type == "state_signal_description":
+        signal_choice = random.choice(["effort_current", "feedback_speed", "feedback_pos"])
+        truth = answer_q10_signal_description(rows, t1, t2, axis, signal_choice)
         if truth["answer"] == "Unknown": return None
         
-        correct_joint = int(truth["highest_joint"])
-        distractors = [i for i in range(num_joints) if i != correct_joint]
-        selected_distractors = random.sample(distractors, min(2, len(distractors)))
-        selected_joints = [correct_joint] + selected_distractors
-        random.shuffle(selected_joints)
-        
-        options = {chr(ord('A') + i): f"Joint {j}" for i, j in enumerate(selected_joints)}
-        for label, text in options.items():
-            if text == f"Joint {correct_joint}":
-                answer = label
-                break
-        question = tmpl_text.format(t_ms=t_ms)
-
-    elif tid == 27: # Motor Current Open
-        truth = answer_motor_current(rows, t_ms, axis)
-        if truth["answer"] == "Unknown": return None
-        answer = str(round(truth["raw_value"], 4))
-        question = tmpl_text.format(axis=axis, t_ms=t_ms)
+        answer = truth["answer"]
+        question = tmpl_text.format(
+            signal=signal_choice.replace("_", " "),
+            axis=axis,
+            t1=t1,
+            t2=t2
+        )
 
     else:
-        logger.warning(f"Unknown template id: {tid}")
+        logger.warning(f"Unknown template type: {template_type}")
         return None
 
     return {
@@ -368,7 +278,7 @@ def generate_level1_questions(
 
     logger.info(f"Discovering normalized episodes from Hugging Face dataset: {dataset_repo}")
     all_files = list_repo_files(dataset_repo, repo_type="dataset")
-    valid_files = [f for f in all_files if f.endswith(".parquet") and "data/normalized" in f]
+    valid_files = [f for f in all_files if f.endswith(".parquet") and ("data/normalized" in f or "data/raw" in f)]
 
     episodes_by_dataset = {ds: [] for ds in VALID_DATASETS}
     for f in valid_files:
@@ -451,7 +361,8 @@ def generate_level1_questions(
         except ValueError:
             continue
 
-        template = random.choice([t for t in templates if t["id"] in range(19, 28)])
+        valid_templates = templates
+        template = random.choice(valid_templates)
         
         filled = fill_template(
             template, rows, start_idx, end_idx,

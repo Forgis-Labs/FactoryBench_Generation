@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import json
+from pathlib import Path
 from typing import Any, Dict, List, Tuple, Optional
 
 import numpy as np
@@ -12,6 +14,32 @@ def interpolate_value(t_target: float, t1: float, v1: float, t2: float, v2: floa
         return v1
     alpha = (t_target - t1) / (t2 - t1)
     return (1 - alpha) * v1 + alpha * v2
+
+
+_MACHINE_METADATA_CACHE: List[Dict[str, Any]] = None
+
+
+def load_machine_metadata() -> List[Dict[str, Any]]:
+    """Load machines.json from the data directory."""
+    global _MACHINE_METADATA_CACHE
+    if _MACHINE_METADATA_CACHE is not None:
+        return _MACHINE_METADATA_CACHE
+
+    machines_path = Path("data/labelling/machines.json")
+    try:
+        with open(machines_path, "r", encoding="utf-8") as f:
+            _MACHINE_METADATA_CACHE = json.load(f)
+    except Exception:
+        _MACHINE_METADATA_CACHE = []
+    return _MACHINE_METADATA_CACHE
+
+
+def get_machine_by_id(machine_id: int) -> Optional[Dict[str, Any]]:
+    metadata = load_machine_metadata()
+    for m in metadata:
+        if m.get("machine_id") == machine_id:
+            return m
+    return None
 
 
 def find_bracketing_indices(rows: List[Dict[str, Any]], t_ms: float) -> Tuple[Optional[int], Optional[int]]:
@@ -442,4 +470,97 @@ def answer_joint_comparison(rows: List[Dict[str, Any]], t_ms: float, signal_pref
         "reasoning": f"Highest absolute value found at joint {highest_joint}. Values: {values}",
         "highest_joint": highest_joint,
         "sorted_values": values
+    }
+
+
+def answer_q8_joint_speed_check(rows: List[Dict[str, Any]], t_ms: float, machine_id: int, joints_list: List[int]) -> Dict[str, Any]:
+    """Cat 8 (Semantic): Multi-select speed limit check for 4 joints."""
+    machine = get_machine_by_id(machine_id)
+    if not machine or "joint_speed_limits" not in machine:
+        return {"answer": "Unknown", "reasoning": f"No speed limit metadata for machine {machine_id}"}
+
+    limits = machine["joint_speed_limits"]
+    results = []
+    reasoning_parts = []
+    
+    for axis in joints_list:
+        speed_key = get_signal_key(rows[0], "feedback_speed_", axis)
+        val, _ = interpolate_signal_at_time(rows, speed_key, t_ms)
+        if val is None:
+            return {"answer": "Unknown", "reasoning": f"Missing speed data for joint {axis}"}
+        
+        limit = limits[axis] if axis < len(limits) else 3.14
+        is_within = abs(val) <= limit
+        results.append("T" if is_within else "F")
+        reasoning_parts.append(f"J{axis}: |{val:.2f}| <= {limit}")
+
+    answer = "".join(results)
+    return {
+        "answer": answer,
+        "reasoning": "; ".join(reasoning_parts),
+        "raw_results": results
+    }
+
+
+def answer_q9_joint_current_check(rows: List[Dict[str, Any]], t_ms: float, axis: int, machine_id: int) -> Dict[str, Any]:
+    """Cat 9 (Semantic): Single-select current limit check."""
+    machine = get_machine_by_id(machine_id)
+    if not machine or "rated_current_per_joint" not in machine:
+        return {"answer": "Unknown", "reasoning": f"No current metadata for machine {machine_id}"}
+
+    limits = machine["rated_current_per_joint"]
+    limit = limits[axis] if axis < len(limits) else 2.0
+    
+    current_key = f"effort_current_{axis}"
+    val, _ = interpolate_signal_at_time(rows, current_key, t_ms)
+    if val is None:
+        return {"answer": "Unknown", "reasoning": "Missing current data"}
+
+    is_within = abs(val) <= limit
+    return {
+        "answer": "Yes" if is_within else "No",
+        "reasoning": f"Current |{val:.2f}A| <= {limit}A for joint {axis}.",
+        "is_true": is_within
+    }
+
+
+def answer_q10_signal_description(rows: List[Dict[str, Any]], t1_ms: float, t2_ms: float, axis: int, signal_name: str) -> Dict[str, Any]:
+    """Cat 10 (Semantic/Rule-based): Free-form description of signal behavior."""
+    # Deterministic characterizer
+    prefix_map = {
+        "effort_current": "effort_current_",
+        "feedback_speed": "feedback_speed_",
+        "feedback_pos": "feedback_pos_"
+    }
+    key = get_signal_key(rows[0], prefix_map.get(signal_name, "feedback_pos_"), axis)
+    
+    window_rows = [r for r in rows if r.get("timestamp_ms") is not None and t1_ms <= r["timestamp_ms"] <= t2_ms]
+    if len(window_rows) < 5:
+        return {"answer": "Unknown", "reasoning": "Too few samples in window"}
+        
+    vals = [float(r[key]) for r in window_rows if key in r]
+    if not vals:
+        return {"answer": "Unknown", "reasoning": "No valid data for signal"}
+        
+    v_start, v_end = vals[0], vals[-1]
+    v_min, v_max = min(vals), max(vals)
+    delta = v_end - v_start
+    range_val = v_max - v_min
+    
+    # Generic description logic
+    label = signal_name.replace("_", " ")
+    if abs(delta) < 0.01 * (abs(v_min) + 1e-6) or range_val < 1e-4:
+        desc = f"The {label} for joint {axis} remains stable around {v_start:.2f} units throughout the interval."
+    elif delta > 0:
+        desc = f"The {label} for joint {axis} shows an increasing trend, rising from {v_start:.2f} to {v_end:.2f} units."
+    else:
+        desc = f"The {label} for joint {axis} decreases from {v_start:.2f} down to {v_end:.2f} units across the window."
+        
+    if range_val > 5 * abs(delta) and range_val > 0.1:
+        desc += f" It exhibits significant fluctuations with a peak value of {v_max:.2f}."
+
+    return {
+        "answer": desc,
+        "reasoning": "Rule-based characterization of window statistics.",
+        "desc": desc
     }

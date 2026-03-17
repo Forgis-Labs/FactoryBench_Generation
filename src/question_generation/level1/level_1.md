@@ -47,17 +47,22 @@ Compares the commanded setpoint and the actual feedback position to identify con
 - **MC (`state_tracking_error_mc`)**: "How has the position tracking error of joint {axis} evolved between {t1}ms and {t2}ms?"
 - **Open (`state_tracking_error_open`)**: "What is the position tracking error of joint {axis} at {t}ms in rad?"
 
-### 8. Joint Speed (raw)
-Direct measurement of angular velocity, useful for detecting stops or erratic behavior.
+### 8. Joint Speed & Semantic Limits
+Evaluates joint speed against absolute values or semantic limits (from the Machine KG).
 - **TF (`state_joint_speed_tf`)**: "Is the speed of joint {axis} at {t}ms below {threshold} rad/s?"
-- **MC (`state_joint_speed_mc`)**: "Which joint has the highest absolute speed at {t}ms?"
-- **Open (`state_joint_speed_open`)**: "What is the speed of joint {axis} at {t}ms in rad/s?"
+- **Ranking (`state_joint_speed_ranking`)**: "Rank the joints {joints_list} by their absolute speed at time {t_ms}ms."
+- **Semantic (`state_joint_within_rated_speed`)**: "Which of the following joints are operating within their rated maximum speed at T={t_ms}ms?" **(Requires KG)**
 
-### 9. Raw Motor Current (Effort magnitude)
+### 9. Motor Current & Semantic Limits
 Direct indicator of actuator effort. High values suggest overload; low values suggest free movement.
 - **TF (`state_motor_current_tf`)**: "Does the motor current of joint {axis} at {t}ms exceed {threshold} A?"
-- **MC (`state_motor_current_mc`)**: "Which joint draws the highest motor current at {t}ms?"
-- **Open (`state_motor_current_open`)**: "What is the motor current of joint {axis} at {t}ms in A?"
+- **Semantic (`state_current_within_rated`)**: "Is the motor current of joint {axis} at T={t_ms}ms within the rated continuous current limit?" **(Requires KG)**
+
+### 10. Signal Description (Free-form)
+Evaluates the model's ability to provide a natural language description of signal behavior.
+- **Free-form (`state_signal_description`)**: "Describe in one sentence the behaviour of {signal} for joint {axis} over the window [T={t1}ms, T={t2}ms]."
+
+The semantic meaning is evaluated by LLM-as-a-judge technique.
 
 ## Data Source
 Level 1 generation is uniquely integrated with the **Hugging Face Hub**. It consumes raw **Parquet** files directly from the cloud.
@@ -77,13 +82,22 @@ Level 1 generation is uniquely integrated with the **Hugging Face Hub**. It cons
 | 7. Tracking Error | ✓ | ✓ | ✓ |
 | 8. Joint Speed | ✓ | ✓ | ✓ |
 | 9. Motor Current | ✓ | ✓ | ✓ |
+| 10. Signal Description | ✓ | ✓ | ✓ |
 
 ## Answer Formats
 | Type | Format |
 | :--- | :--- |
 | **TF** | Multiple Choice (Single Select) with "Yes" or "No" options. |
 | **MC** | Multiple Choice (Single Select) with 2-3 categorical options. |
+| **Ranking** | Permutation string (e.g., `BADC`) ranking joints by a signal. |
+| **Multi-Select**| Bitstring (e.g., `TFTF`) for per-joint boolean checks. |
 | **Open** | Numerical values or Tensors (e.g., `X_Y_Z`). |
+| **Free-form** | Natural language description, evaluated via LLM-as-judge. |
+
+## Semantic Priors (Machine KG)
+Advanced Level 1 questions require knowing the specific physical limits of the robot. This information is stored in `data/labelling/machines.json` (the Machine Knowledge Graph).
+- **Joint Speed Limits**: Max angular velocity (rad/s) per joint.
+- **Rated Current**: Continuous current limits (A) per motor.
 
 ## Genericity and Adaptability
 Level 1 is designed to be **robot-agnostic** by following these principles:
