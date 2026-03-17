@@ -118,7 +118,12 @@ cd frontend && npm install && npm run dev
 ### 3. Generate Q&A Pairs
 
 > ⚠️ TO BE COMPLETED
-
+```bash
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+pip install -e .
+```
 
 ## 📄 License
 
