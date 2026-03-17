@@ -1,237 +1,126 @@
 [
   {
     "id": 1,
-    "type": "state_joint_moved_tf",
+    "type": "state_joint_moved",
     "template": "Is joint {axis} at the same position at {t1}ms and {t2}ms (tolerance of {eps_1} rad)? Answer only with 'Yes' or 'No'.",
     "answer_format": {
       "type": "multiple_choice_single_select",
-      "options": ["Yes", "No"]
+      "options": [
+        "Yes",
+        "No"
+      ],
+      "notes": "Classification based on deterministic position evaluation."
     }
   },
   {
     "id": 2,
-    "type": "state_joint_moved_mc",
-    "template": "What is the status of the position of joint {axis} between {t1}ms and {t2}ms (tolerance of {eps_1} rad)? Answer only with the letter of the correct option.",
+    "type": "state_friction_increase",
+    "template": "Has the friction proxy for joint {axis} increased from {t1}ms to {t2}ms (tolerance of {eps_2}%)? Assessed using a symmetric half-window of {delta_1}ms. Answer only with 'Yes' or 'No'.",
     "answer_format": {
       "type": "multiple_choice_single_select",
-      "n_choices": 2
+      "options": [
+        "Yes",
+        "No"
+      ]
     }
   },
   {
     "id": 3,
-    "type": "state_joint_moved_open",
-    "template": "What is the absolute difference in position of joint {axis} between {t1}ms and {t2}ms in rad? Answer only with a numerical value.",
+    "type": "state_acceleration",
+    "template": "What is the acceleration of the end effector at {t_ms}ms? Answer only with a tensor of length 3 (X, Y, Z in m/s^2), separated by '_'.",
     "answer_format": {
-      "type": "numerical"
+      "type": "tensor",
+      "shape": [
+        3
+      ],
+      "notes": "3-element vector of floats formatted as a string."
     }
   },
   {
     "id": 4,
-    "type": "state_friction_increase_tf",
-    "template": "Has the friction proxy for joint {axis} increased from {t1}ms to {t2}ms (tolerance of {eps_2}%)? Assessed using a symmetric half-window of {delta_1}ms. Answer only with 'Yes' or 'No'.",
+    "type": "state_external_force_detected",
+    "template": "Is an external force detected at {t_ms}ms (threshold of {eps_3} N)? Answer only with 'Yes' or 'No'.",
     "answer_format": {
       "type": "multiple_choice_single_select",
-      "options": ["Yes", "No"]
+      "options": [
+        "Yes",
+        "No"
+      ]
     }
   },
   {
     "id": 5,
-    "type": "state_friction_increase_mc",
-    "template": "How did the friction proxy for joint {axis} change from {t1}ms to {t2}ms? Answer only with the letter of the correct option.",
+    "type": "state_jerk",
+    "template": "What is the jerk of joint {axis} at {t_ms}ms? Answer only with a numerical value in rad/s^3.",
     "answer_format": {
-      "type": "multiple_choice_single_select",
-      "n_choices": 3
+      "type": "numerical",
+      "notes": "Single float value."
     }
   },
   {
     "id": 6,
-    "type": "state_friction_increase_open",
-    "template": "What is the ratio of the friction proxy at {t2}ms compared to {t1}ms for joint {axis}? Answer only with a numerical value.",
+    "type": "state_torque_magnitude",
+    "template": "What is the torque magnitude about the {axis_label}-axis at {t_ms}ms? Answer only with a numerical value in Nm.",
     "answer_format": {
-      "type": "numerical"
+      "type": "numerical",
+      "notes": "Single float value."
     }
   },
   {
     "id": 7,
-    "type": "state_acceleration_tf",
-    "template": "Is the end-effector acceleration magnitude at {t_ms}ms greater than {accel_threshold} m/s^2? Answer only with 'Yes' or 'No'.",
+    "type": "state_joint_speed_ranking",
+    "template": "Rank the joints {joints_list} by their absolute speed at time {t_ms}ms, from highest to lowest. Answer only with a 4-letter string containing the letters A, B, C, and D in your ranked order.",
     "answer_format": {
-      "type": "multiple_choice_single_select",
-      "options": ["Yes", "No"]
+      "type": "ranking",
+      "n_items": 4,
+      "notes": "Model assigns ranks. Labels A, B, C, D correspond to the 4 listed joints."
     }
   },
   {
     "id": 8,
-    "type": "state_acceleration_mc",
-    "template": "Which axis (X, Y, or Z) of the end-effector has the highest absolute acceleration at {t_ms}ms? Answer only with the letter of the correct option.",
+    "type": "state_joint_within_rated_speed",
+    "template": "Which of the following joints are operating within their rated maximum speed at T={t_ms}ms? Answer only with a 4-letter string using T and F (e.g. TFTF), nothing else.",
     "answer_format": {
-      "type": "multiple_choice_single_select",
-      "n_choices": 3
+      "type": "multiple_choice_multi_select",
+      "n_choices": 4,
+      "options_schema": [
+        "Joint {axis_a} is within its rated maximum speed.",
+        "Joint {axis_b} is within its rated maximum speed.",
+        "Joint {axis_c} is within its rated maximum speed.",
+        "Joint {axis_d} is within its rated maximum speed."
+      ],
+      "notes": "Ground truth: for each joint i, True iff |feedback_speed_{axis_i}(t)| <= joint_speed_limit_{axis_i} from the machine KG (labelling/machines.json, keyed by machine_id). This is the simplest semantic prior question at L1: the raw signal read is trivial, but the correct threshold is only available from the KG. Without the KG, a model cannot answer reliably.",
+      "requires_kg": true,
+      "kg_fields": [
+        "joint_speed_limits"
+      ]
     }
   },
   {
     "id": 9,
-    "type": "state_acceleration_open",
-    "template": "What is the acceleration of the end effector at {t_ms}ms? Answer only with a tensor of length 3 (X, Y, Z in m/s^2), separated by '_'.",
+    "type": "state_current_within_rated",
+    "template": "Is the motor current of joint {axis} at T={t_ms}ms within the rated continuous current limit for this robot? Answer only with 'Yes' or 'No'.",
     "answer_format": {
-      "type": "tensor",
-      "shape": [3]
+      "type": "multiple_choice_single_select",
+      "options": [
+        "Yes",
+        "No"
+      ],
+      "notes": "Ground truth: True iff |effort_current_{axis}(t)| <= rated_current_{axis} from the machine KG. Complements Q8 by targeting a single joint and a different physical limit (current vs speed). A model relying purely on signal magnitude without the rated spec will guess randomly.",
+      "requires_kg": true,
+      "kg_fields": [
+        "rated_current_per_joint"
+      ]
     }
   },
   {
     "id": 10,
-    "type": "state_external_force_detected_tf",
-    "template": "Is an external force detected at {t_ms}ms (threshold of {eps_3} N)? Answer only with 'Yes' or 'No'.",
+    "type": "state_signal_description",
+    "template": "Describe in one sentence the behaviour of {signal} for joint {axis} over the window [T={t1}ms, T={t2}ms].",
     "answer_format": {
-      "type": "multiple_choice_single_select",
-      "options": ["Yes", "No"]
-    }
-  },
-  {
-    "id": 11,
-    "type": "state_external_force_detected_mc",
-    "template": "What is the detected state of external forces at {t_ms}ms? Answer only with the letter of the correct option.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "n_choices": 2
-    }
-  },
-  {
-    "id": 12,
-    "type": "state_external_force_detected_open",
-    "template": "What is the magnitude of the external force detected at {t_ms}ms in N? Answer only with a numerical value.",
-    "answer_format": {
-      "type": "numerical"
-    }
-  },
-  {
-    "id": 13,
-    "type": "state_jerk_tf",
-    "template": "Does the jerk of joint {axis} at {t_ms}ms exceed {jerk_threshold} rad/s^3? Answer only with 'Yes' or 'No'.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "options": ["Yes", "No"]
-    }
-  },
-  {
-    "id": 14,
-    "type": "state_jerk_mc",
-    "template": "What is the magnitude range of the jerk for joint {axis} at {t_ms}ms? Answer only with the letter of the correct option.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "n_choices": 3
-    }
-  },
-  {
-    "id": 15,
-    "type": "state_jerk_open",
-    "template": "What is the jerk of joint {axis} at {t_ms}ms in rad/s^3? Answer only with a numerical value.",
-    "answer_format": {
-      "type": "numerical"
-    }
-  },
-  {
-    "id": 16,
-    "type": "state_torque_magnitude_tf",
-    "template": "Is the torque magnitude about the {axis_label}-axis at {t_ms}ms greater than {torque_threshold} Nm? Answer only with 'Yes' or 'No'.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "options": ["Yes", "No"]
-    }
-  },
-  {
-    "id": 17,
-    "type": "state_torque_magnitude_mc",
-    "template": "Compare the torque magnitude about the {axis_label}-axis at {t_ms}ms to a threshold of {torque_threshold} Nm. Answer only with the letter of the correct option.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "n_choices": 2
-    }
-  },
-  {
-    "id": 18,
-    "type": "state_torque_magnitude_open",
-    "template": "What is the torque magnitude about the {axis_label}-axis at {t_ms}ms in Nm? Answer only with a numerical value.",
-    "answer_format": {
-      "type": "numerical"
-    }
-  },
-  {
-    "id": 19,
-    "type": "state_tracking_error_tf",
-    "template": "Is the position tracking error of joint {axis} at {t_ms}ms above {tracking_error_threshold} rad? Answer only with 'Yes' or 'No'.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "options": ["Yes", "No"]
-    }
-  },
-  {
-    "id": 20,
-    "type": "state_tracking_error_mc",
-    "template": "How has the position tracking error of joint {axis} evolved between {t1}ms and {t2}ms? Answer only with the letter of the correct option.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "n_choices": 3
-    }
-  },
-  {
-    "id": 21,
-    "type": "state_tracking_error_open",
-    "template": "What is the position tracking error of joint {axis} at {t_ms}ms in rad? Answer only with a numerical value.",
-    "answer_format": {
-      "type": "numerical"
-    }
-  },
-  {
-    "id": 22,
-    "type": "state_joint_speed_tf",
-    "template": "Is the speed of joint {axis} at {t_ms}ms below {speed_threshold} rad/s? Answer only with 'Yes' or 'No'.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "options": ["Yes", "No"]
-    }
-  },
-  {
-    "id": 23,
-    "type": "state_joint_speed_mc",
-    "template": "Which joint has the highest absolute speed at {t_ms}ms? Answer only with the letter of the correct option.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "n_choices": 6
-    }
-  },
-  {
-    "id": 24,
-    "type": "state_joint_speed_open",
-    "template": "What is the speed of joint {axis} at {t_ms}ms in rad/s? Answer only with a numerical value.",
-    "answer_format": {
-      "type": "numerical"
-    }
-  },
-  {
-    "id": 25,
-    "type": "state_motor_current_tf",
-    "template": "Does the motor current of joint {axis} at {t_ms}ms exceed {current_threshold} A? Answer only with 'Yes' or 'No'.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "options": ["Yes", "No"]
-    }
-  },
-  {
-    "id": 26,
-    "type": "state_motor_current_mc",
-    "template": "Which joint draws the highest motor current at {t_ms}ms? Answer only with the letter of the correct option.",
-    "answer_format": {
-      "type": "multiple_choice_single_select",
-      "n_choices": 6
-    }
-  },
-  {
-    "id": 27,
-    "type": "state_motor_current_open",
-    "template": "What is the motor current of joint {axis} at {t_ms}ms in A? Answer only with a numerical value.",
-    "answer_format": {
-      "type": "numerical"
+      "type": "free_form",
+      "evaluation": "llm_judge",
+      "notes": "Rule-based reference answer generated from data (e.g. 'Motor current rises sharply from ~1.2 A to ~4.8 A, consistent with a high-load transient'). Scored with LLM-as-judge. Signal ∈ {effort_current, feedback_speed, feedback_pos}."
     }
   }
 ]
