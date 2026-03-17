@@ -22,6 +22,22 @@
       "TCP/IP socket connection",
       "RTDE (Real-Time Data Exchange)"
     ],
+    "joint_speed_limits": [
+      3.14,
+      3.14,
+      3.14,
+      6.28,
+      6.28,
+      6.28
+    ],
+    "rated_current_per_joint": [
+      2.0,
+      2.0,
+      2.0,
+      1.2,
+      1.2,
+      1.2
+    ],
     "minimum_polyscope_version_for_screwdriver": "5.4",
     "used_in_paper_for": "Automated screwdriving anomaly detection dataset collection (AURSAD)",
     "safety_modes": {
@@ -351,6 +367,22 @@
       "UrScript",
       "TCP/IP socket connection",
       "RTDE (Real-Time Data Exchange)"
+    ],
+    "joint_speed_limits": [
+      3.14,
+      3.14,
+      3.14,
+      3.14,
+      3.14,
+      3.14
+    ],
+    "rated_current_per_joint": [
+      2.5,
+      2.5,
+      2.5,
+      1.5,
+      1.5,
+      1.5
     ],
     "minimum_polyscope_version_for_screwdriver": "3.x",
     "used_in_paper_for": "Multivariate time-series anomaly detection dataset collection (voraus-AD)",
