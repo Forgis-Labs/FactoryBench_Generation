@@ -235,10 +235,23 @@ def main() -> None:
         prompt = build_prompt(payload, machines)
         rel = in_path.relative_to(input_dir)
         out_path = output_dir / rel
-        write_json(out_path, {
+
+
+        output_payload = {
             "prompt": prompt,
-            "metadata": {"qa_pair_id": payload.get("id")},
-        })
+            "metadata": {
+                "qa_pair_id": payload.get("id"),
+                "dataset": payload.get("provenance", {}).get("dataset"),
+                "level": payload.get("level"),
+                "type": payload.get("type"),
+            },
+            "type": payload.get("type"),
+            "question": payload.get("question"),
+            "answer": payload.get("answer"),
+            "answer_format": payload.get("answer_format"),
+        }
+
+        write_json(out_path, output_payload)
         converted += 1
 
     print(f"Scanned {scanned} JSON files; converted {converted} question files to prompts in {output_dir}")
