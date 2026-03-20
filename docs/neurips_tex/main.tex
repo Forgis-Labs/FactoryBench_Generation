@@ -1,39 +1,42 @@
 \documentclass{article}
 
-% NeurIPS 2026 style - use neurips_2026 when available
-\usepackage[final]{neurips_2024}  % Use 2024 as placeholder until 2026 style released
+% to compile a preprint version, add the [preprint] option:
+%     \usepackage[preprint]{neurips_2024}
 
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{hyperref}
-\usepackage{url}
-\usepackage{booktabs}
-\usepackage{amsfonts}
-\usepackage{nicefrac}
-\usepackage{microtype}
+% to compile a camera-ready version, add the [final] option:
+\usepackage[final]{neurips_2024}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{amsmath}        % math environments
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
 \usepackage{graphicx}
-\usepackage{xcolor}
 \usepackage{multirow}
-\usepackage{array}
 
 \title{FactoryBench: Benchmarking Machine Understanding via Question-Answering}
 
-\author{
-  Coral Izquierdo Muniz\thanks{Equal contribution.} \\
-  Forgis AG \\
-  \texttt{coral@forgis.ai} \\
-  \And
-  Yanis Merzouki\footnotemark[1] \\
+\author{%
+  Yanis Merzouki \\
   ETH Zurich \\
-  \texttt{yanis@ethz.ch} \\
+  \texttt{ymerzouki@student.ethz.ch} \\
   \And
-  Jonas Petersen\footnotemark[1] \\
+  Coral Izquierdo Muniz \\
   Forgis AG \\
-  \texttt{jonas@forgis.ai} \\
+  \texttt{coral.izquierdo@forgis.com} \\
   \And
-  [Additional Authors] \\
-  [University] \\
-  \texttt{email@domain.com}
+  Matei Ignuta-Ciuncanu \\
+  Imperial College London \\
+  \texttt{mic18@imperial.ac.uk} \\
+  \And
+  Jonas Petersen \\
+  Forgis AG, ETH Zurich \\
+  \texttt{jonas.petersen@forgis.com}
 }
 
 \begin{document}
@@ -52,9 +55,9 @@ Modern industrial systems generate large volumes of multivariate time-series dat
 
 Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection. However, these models are often specialized and difficult to interpret. They typically output labels or numeric predictions without explicit reasoning or higher-level explanations and cannot do much more outside of the specific task they are trained on, which limits their direct utility for automated engineering decision-making.
 
-Large language models, on the other hand, exhibit strong general reasoning abilities and can produce structured explanations in technical contexts~\cite{wei2022chain,yao2023tree}. They can integrate textual information, follow logical chains, and generate interpretable outputs. Yet, when applied directly to dense numerical time series, general LLMs still underperform without adaptation. At the same time, transformer-based architectures have become increasingly effective for time-series forecasting and representation learning~\cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst,woo2024chronos,das2024survey}.
+Large language models, on the other hand, exhibit strong general reasoning abilities and can produce structured explanations in technical contexts \cite{wei2022chain,yao2023tree}. They can integrate textual information, follow logical chains, and generate interpretable outputs. Yet, when applied directly to dense numerical time series, general LLMs still underperform without adaptation. At the same time, transformer-based architectures have become increasingly effective for time-series forecasting and representation learning \cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst,woo2024chronos,das2024survey}.
 
-A promising paradigm is to build LLM agents equipped with specialized tools, including time-series models and signal-processing modules~\cite{schick2023toolformer,yao2023react,qin2023tool}. These agents can combine language reasoning with domain-specific computation. Nevertheless, evaluating whether such systems truly understand machine behavior remains challenging. Existing benchmarks mostly target textual reasoning, code generation, or generic multimodal understanding~\cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu}, leaving a gap in rigorous evaluation for machine-centered, time-series reasoning.
+A promising paradigm is to build LLM agents equipped with specialized tools, including time-series models and signal-processing modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These agents can combine language reasoning with domain-specific computation. Nevertheless, evaluating whether such systems truly understand machine behavior remains challenging. Existing benchmarks mostly target textual reasoning, code generation, or generic multimodal understanding \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu}, leaving a gap in rigorous evaluation for machine-centered, time-series reasoning.
 
 To address this gap, we propose FactoryBench, a benchmark designed to evaluate machine understanding in LLM agents. FactoryBench is grounded in FactoryWave, a dense multivariate time-series dataset collected from one-armed robotic systems, including collaborative and industrial manufacturing robots. The dataset captures rich dynamic behavior under diverse operational conditions.
 
@@ -62,19 +65,19 @@ We also introduce a scalable question-generation framework composed of 80 struct
 
 By bridging the gap between general language reasoning and specialized time-series modeling, FactoryBench provides a principled foundation for studying machine-centered intelligence in industrial environments.
 
-\section{Related Work}
+\section{Related work}
 
-\subsection{LLM Agents and Tool Use}
+\subsection{LLM agents and tool use}
 
-Recent advances in LLM reasoning include prompting and deliberative strategies (e.g., Chain-of-Thought and Tree-of-Thought) that improve multi-step performance~\cite{wei2022chain,yao2023tree}, alongside tool-augmented paradigms such as Toolformer and ReAct that enable grounded computation through external modules~\cite{schick2023toolformer,yao2023react,qin2023tool}. These ideas motivate industrial agent design where symbolic reasoning must be combined with numerical workflows.
+Recent advances in LLM reasoning include prompting and deliberative strategies (e.g., Chain-of-Thought and Tree-of-Thought) that improve multi-step performance \cite{wei2022chain,yao2023tree}, alongside tool-augmented paradigms such as Toolformer and ReAct that enable grounded computation through external modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These ideas motivate industrial agent design where symbolic reasoning must be combined with numerical workflows.
 
-\subsection{Time-Series Learning for Industrial Signals}
+\subsection{Time-series learning for industrial signals}
 
-Time-series modeling has advanced through transformer-based architectures (Informer, Autoformer, FEDformer, PatchTST)~\cite{zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst}, strong alternative baselines such as TFT and N-BEATS~\cite{lim2021tft,oreshkin2020nbeats}, and critical comparisons against simpler linear models~\cite{zeng2023transformers}. Foundation-model directions (e.g., Chronos) further explore transfer and zero/few-shot adaptation~\cite{woo2024chronos,das2024survey}. In parallel, anomaly and reliability monitoring literature includes OmniAnomaly, USAD, and Deep SVDD~\cite{su2019omni,audibert2020usad,ruff2018deep}, with surveys and benchmarks highlighting persistent gaps in interpretability and root-cause actionability~\cite{chalapathy2019survey,lavin2015numenta}.
+Time-series modeling has advanced through transformer-based architectures (Informer, Autoformer, FEDformer, PatchTST) \cite{zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst}, strong alternative baselines such as TFT and N-BEATS \cite{lim2021tft,oreshkin2020nbeats}, and critical comparisons against simpler linear models \cite{zeng2023transformers}. Foundation-model directions (e.g., Chronos) further explore transfer and zero/few-shot adaptation \cite{woo2024chronos,das2024survey}. In parallel, anomaly and reliability monitoring literature includes OmniAnomaly, USAD, and Deep SVDD \cite{su2019omni,audibert2020usad,ruff2018deep}, with surveys and benchmarks highlighting persistent gaps in interpretability and root-cause actionability \cite{chalapathy2019survey,lavin2015numenta}.
 
-\subsection{Causality and Benchmark Gaps}
+\subsection{Causality and benchmark gaps}
 
-Causal frameworks provide formal tools for interventions and counterfactuals~\cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series~\cite{granger1969causal,runge2019causal}. Existing broad benchmarks (MMLU, BIG-bench, MMMU)~\cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources~\cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support.
+Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969causal,runge2019causal}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support.
 
 % TODO: ADD MORE DATASETS THAT TICK COUNTERFACTUAL AND ROBOTIC BOX
 
@@ -102,9 +105,9 @@ CLEVRER & \texttimes & \texttimes & $\sim$305k & \checkmark & \texttimes & \chec
 \end{tabular}
 \end{table}
 
-\section{FactoryBench Framework}
+\section{FactoryBench framework}
 
-\subsection{Four Levels of Machine Understanding}
+\subsection{Four levels of machine understanding}
 
 % TODO: REPLACE EXAMPLES WITH MORE UP TO DATE ONES
 
@@ -139,7 +142,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
 
 \textbf{Design principle:} Each level builds on previous. Failure at Level $N$ implies failure at Level $N+1$.
 
-\subsection{Answer Formats}
+\subsection{Answer formats}
 
 FactoryBench uses three answer formats, chosen to balance evaluation rigor with scalability. Each format supports deterministic scoring (with the exception of free form), has been chosen in order to make questions very easily checkable, but also hard to answer in the absence of correct reasoning.
 
@@ -151,7 +154,7 @@ FactoryBench uses three answer formats, chosen to balance evaluation rigor with 
 
 \textbf{Free-Form.} The model produces an open-ended natural language response such as a diagnosis, recommended action sequence, or causal explanation. Because no single deterministic answer exists, evaluation is performed via an LLM-as-judge voting protocol: three independent frontier LLMs each compare the model's response against the ground-truth reference and cast a verdict of \textbf{Wrong} (0), \textbf{Neutral} (0.5), or \textbf{Correct} (1). The final score is the majority vote across the three judges, with ties broken by averaging.
 
-\subsection{Time Series Data and Causal Schema (SCE)}
+\subsection{Time series data and causal schema (SCE)}
 
 To ensure that the dataset structure itself encodes causality, FactoryBench organizes all time-series signals into three causal groups, answering the core question: \textit{``What was the machine told to do, and what did it actually do?''}
 
@@ -191,9 +194,9 @@ voraus-AD & UR5 & ? & 100/500 Hz & Pick and Place & 12 \\
 
 % TODO: INSERT TABLE TO SUMMARIZE PROPORTIONS OF DATA COMING FROM EACH SOURCE
 
-\section{Reliable Q\&A Generation (Key Contribution)}
+\section{Reliable Q\&A generation (key contribution)}
 
-\subsection{At Scale Generation via Extensive Labelling}
+\subsection{At scale generation via extensive labelling}
 
 Scalable ground-truth generation is the central challenge of any Q\&A benchmark grounded in raw sensor data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by PhD-level experts in robotics. Rather than annotating individual questions by hand, each template is parameterized: concrete values are filled at generation time from the episode data and its associated labels. The context time series used to fill the variables of the question is sampled uniformly by datasource (sim vs open source vs FactoryWave), dataset (if looking at open source), experiment, difficulty, length and then placement in that order. This yields a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
 
@@ -212,11 +215,11 @@ Scalable ground-truth generation is the central challenge of any Q\&A benchmark 
 
 % TODO: TALK ABOUT DATA GENERATION FOR ALL LEVELS (ESPECIALLY LEVEL 3), MENTION HOW LABELLING IS COLLECTED AUTOMATICALLY
 
-\subsection{Adapting Labelling to Open Datasets and Simulations}
+\subsection{Adapting labelling to open datasets and simulations}
 
 % TODO: TALK ABOUT HOW LABELLING WAS DONE ON OPEN DATASETS AND SIMULATIONS
 
-\subsection{Dataset Diversity \& Quality Assurance}
+\subsection{Dataset diversity \& quality assurance}
 
 % TODO: GENERATE GRAPHS AND ADD PARAGRAPHS ABOUT Q&A DISTRIBUTIONS (LEVEL, DIFFICULTY, ETC)
 
@@ -230,13 +233,13 @@ We iteratively evaluate dataset diversity across three primary axes during gener
     \item \textbf{High Diversity (Template \& Type Variation):} Introducing mixed reasoning templates across levels (e.g., kinematic comparison, derivative estimation like friction/acceleration, anomaly detection) drives the highest Vendi Score. By enforcing high Vendi Scores across our generated subsets, we ensure the benchmark tests versatile analytical capabilities.
 \end{itemize}
 
-\subsection{Pipeline Overview}
+\subsection{Pipeline overview}
 
 % TODO: ADD GRAPH OR SCHEMA SUMMARIZING IT
 
 \section{Experiments}
 
-\subsection{Models to Evaluate}
+\subsection{Models to evaluate}
 
 \textbf{Frontier LLMs:}
 \begin{itemize}
@@ -259,7 +262,7 @@ We iteratively evaluate dataset diversity across three primary axes during gener
     \item Human expert (ceiling)
 \end{itemize}
 
-\subsection{Experimental Configurations}
+\subsection{Experimental configurations}
 
 Beyond out-of-the-box evaluation, we investigate how different interventions improve performance:
 
@@ -268,7 +271,7 @@ Beyond out-of-the-box evaluation, we investigate how different interventions imp
     \item \textbf{Tool-Augmented Agents:} The best-performing foundational models are granted access to external time-series prediction and anomaly detection modules, testing the synergy between LLM reasoning and domain-specific computation.
 \end{itemize}
 
-\subsection{Results (Expected)}
+\subsection{Results (expected)}
 
 \begin{table}[t]
 \centering
@@ -290,7 +293,7 @@ Level & Random & Current LLMs & Target (w/ prior) & Human Expert \\
 
 \section{Discussion}
 
-\subsection{Why This Benchmark Matters}
+\subsection{Why this benchmark matters}
 
 \textbf{For researchers:} First rigorous evaluation of machine understanding across reasoning levels.
 
@@ -324,7 +327,7 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 \newpage
 \appendix
 
-\section{Q\&A Pair Structure}
+\section{Q\&A pair structure}
 
 \textbf{Level 2 Example (Intervention):}
 
