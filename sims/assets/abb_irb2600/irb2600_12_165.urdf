@@ -1,0 +1,190 @@
+<?xml version="1.0"?>
+<!-- ABB IRB 2600-12/1.65 - generated from ros-industrial/abb xacro -->
+<!-- Original source: https://github.com/ros-industrial/abb -->
+<!-- 6-DOF industrial robot, ~1650mm reach, 12kg payload -->
+<robot name="abb_irb2600_12_165">
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/base_link.stl"/></geometry>
+      <material name="abb_orange"><color rgba="1.0 0.5 0.0 1.0"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/collision/base_link.stl"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="30.0"/>
+      <origin xyz="0 0 0.22" rpy="0 0 0"/>
+      <inertia ixx="0.5" ixy="0" ixz="0" iyy="0.5" iyz="0" izz="0.3"/>
+    </inertial>
+  </link>
+
+  <link name="link_1">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/link_1.stl"/></geometry>
+      <material name="abb_orange"><color rgba="1.0 0.5 0.0 1.0"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/collision/link_1.stl"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="18.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.2" ixy="0" ixz="0" iyy="0.2" iyz="0" izz="0.1"/>
+    </inertial>
+  </link>
+
+  <link name="link_2">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/link_2.stl"/></geometry>
+      <material name="abb_orange"><color rgba="1.0 0.5 0.0 1.0"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/collision/link_2.stl"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="20.0"/>
+      <origin xyz="0 0 0.35" rpy="0 0 0"/>
+      <inertia ixx="0.5" ixy="0" ixz="0" iyy="1.0" iyz="0" izz="1.0"/>
+    </inertial>
+  </link>
+
+  <link name="link_3">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/link_3.stl"/></geometry>
+      <material name="abb_orange"><color rgba="1.0 0.5 0.0 1.0"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/collision/link_3.stl"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="8.0"/>
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>
+      <inertia ixx="0.05" ixy="0" ixz="0" iyy="0.05" iyz="0" izz="0.03"/>
+    </inertial>
+  </link>
+
+  <link name="link_4">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/link_4.stl"/></geometry>
+      <material name="abb_orange"><color rgba="1.0 0.5 0.0 1.0"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/collision/link_4.stl"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="6.0"/>
+      <origin xyz="0.4 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.04" ixy="0" ixz="0" iyy="0.15" iyz="0" izz="0.15"/>
+    </inertial>
+  </link>
+
+  <link name="link_5">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/link_5.stl"/></geometry>
+      <material name="abb_orange"><color rgba="1.0 0.5 0.0 1.0"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/collision/link_5.stl"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="2.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.003"/>
+    </inertial>
+  </link>
+
+  <link name="link_6">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/link_6.stl"/></geometry>
+      <material name="abb_gray"><color rgba="0.5 0.5 0.5 1.0"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/collision/link_6.stl"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <link name="flange"/>
+  <link name="tool0"/>
+
+  <!-- Joints -->
+  <joint name="joint_1" type="revolute">
+    <origin xyz="0 0 0.445" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="300" lower="-3.14159" upper="3.14159" velocity="3.054"/>
+  </joint>
+
+  <joint name="joint_2" type="revolute">
+    <origin xyz="0.15 0 0.0" rpy="0 0 0"/>
+    <parent link="link_1"/>
+    <child link="link_2"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="300" lower="-2.705" upper="1.658" velocity="3.054"/>
+  </joint>
+
+  <joint name="joint_3" type="revolute">
+    <origin xyz="0 0 0.7" rpy="0 0 0"/>
+    <parent link="link_2"/>
+    <child link="link_3"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="150" lower="-2.705" upper="1.309" velocity="3.054"/>
+  </joint>
+
+  <joint name="joint_4" type="revolute">
+    <origin xyz="0 0 0.115" rpy="0 0 0"/>
+    <parent link="link_3"/>
+    <child link="link_4"/>
+    <axis xyz="1 0 0"/>
+    <limit effort="50" lower="-6.981" upper="6.981" velocity="6.283"/>
+  </joint>
+
+  <joint name="joint_5" type="revolute">
+    <origin xyz="0.795 0 0" rpy="0 0 0"/>
+    <parent link="link_4"/>
+    <child link="link_5"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="50" lower="-2.094" upper="2.094" velocity="6.283"/>
+  </joint>
+
+  <joint name="joint_6" type="revolute">
+    <origin xyz="0.085 0 0" rpy="0 0 0"/>
+    <parent link="link_5"/>
+    <child link="link_6"/>
+    <axis xyz="1 0 0"/>
+    <limit effort="20" lower="-6.981" upper="6.981" velocity="8.727"/>
+  </joint>
+
+  <joint name="joint_6-flange" type="fixed">
+    <parent link="link_6"/>
+    <child link="flange"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="flange-tool0" type="fixed">
+    <parent link="flange"/>
+    <child link="tool0"/>
+    <origin xyz="0 0 0" rpy="0 1.5707963 0"/>
+  </joint>
+
+</robot>
