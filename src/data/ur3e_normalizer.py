@@ -10,6 +10,7 @@ Usage:
 """
 
 import json
+import math
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -23,6 +24,20 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
+
+
+class _NaNSafeEncoder(json.JSONEncoder):
+    def iterencode(self, o, _one_shot=False):
+        return super().iterencode(self._sanitize(o), _one_shot)
+
+    def _sanitize(self, obj):
+        if isinstance(obj, float) and math.isnan(obj):
+            return None
+        if isinstance(obj, dict):
+            return {k: self._sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._sanitize(v) for v in obj]
+        return obj
 
 
 # Mapping from Excel columns to UR3e schema columns
@@ -230,7 +245,7 @@ def normalize_dataset(
     # Save normalized data as JSON
     output_file = output_dir / f"{episode_id}.json"
     with open(output_file, "w") as f:
-        json.dump(normalized_rows, f, indent=2)
+        json.dump(normalized_rows, f, indent=2, cls=_NaNSafeEncoder)
     
     logger.info(f"✓ Saved normalized data to {output_file.name}")
     

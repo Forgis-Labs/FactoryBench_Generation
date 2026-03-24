@@ -73,6 +73,25 @@ def pick_scalar_signal(rows: List[Dict[str, Any]]) -> Optional[str]:
     return random.choice(names) if names else None
 
 
+def pick_constrained_signal(
+    rows: List[Dict[str, Any]],
+    candidates: List[str],
+) -> Optional[str]:
+    """
+    Pick a signal from candidates that is actually present and numeric in rows.
+    Returns None if no candidate is available.
+    """
+    if not rows:
+        return None
+    available = {
+        key
+        for key in rows[0].keys()
+        if isinstance(rows[0].get(key), (int, float, np.floating))
+    }
+    valid = [c for c in candidates if c in available]
+    return random.choice(valid) if valid else None
+
+
 def pick_joint_velocity_and_torque(
     rows: List[Dict[str, Any]],
 ) -> Tuple[Optional[float], Optional[float]]:
@@ -302,7 +321,15 @@ def fill_event_description(
             kwargs["L"] = L
         return fill(desc, **kwargs)
 
-    signal = pick_scalar_signal(subseries) or "joint_velocity_0"
+    feature_candidates: Optional[List[str]] = event.get("variable_constraints", {}).get("feature_i")
+    if feature_candidates:
+        signal = (
+            pick_constrained_signal(subseries, feature_candidates)
+            or pick_scalar_signal(subseries)
+            or "joint_velocity_0"
+        )
+    else:
+        signal = pick_scalar_signal(subseries) or "joint_velocity_0"
 
     start_val: Optional[float] = None
     end_val: Optional[float] = None

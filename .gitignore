@@ -63,7 +63,15 @@ yarn-error.log*
 # data
 data/open_datasets/*
 data/normalized_episodes/*
+data/simulations/*
+
 
 #output
 output/*
 
+#claude
+.claude/*
+
+sims/*.csv
+*.out
+*.log

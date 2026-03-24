@@ -143,6 +143,49 @@ Scalable ground-truth generation is the central challenge of any Q&A benchmark g
 
 (TODO: TALK ABOUT DATA GENERATION FOR ALL LEVELS (ESPECIALLY LEVEL 3), MENTION HOW LABELLING IS COLLECTED AUTOMATICALLY)
 
+#### Counterfactual Data Generation
+
+A key challenge in constructing counterfactual ground truth for time-series benchmarks is that no single run of a physical or simulated system constitutes a valid counterfactual: the alternative history must be plausible but distinct. To obtain reliable counterfactual labels without human annotation, we design an automated data generation pipeline based on controlled fault injection and distributional comparison.
+
+**Pipeline overview.** For each scenario, we collect one _baseline_ run under nominal operating conditions, followed by $N$ _fault runs_ ($N \in \{3, 5\}$) in which a single injectable event is introduced at the same fixed time $t_\text{inj}$, shared across all fault runs. Each fault run uses a different random seed, so run-to-run variability produces distinct pre-injection dynamics despite the shared injection point. The injected event is drawn from the catalogue of injectable events (see Section 4.1), with its parameters sampled from the associated variable constraints. All other conditions — robot program, task, trajectory, and initial state — are kept identical across runs.
+
+```
+Benchmark Execution (no event):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                            T
+                            │
+
+Repetition 1 (event at T):
+━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━
+                            ▼ Event     KL(pre) = 0.023  ← Selected!
+
+Repetition 2 (event at T):
+━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━
+                            ▼ Event     KL(pre) = 0.087
+
+Repetition 3 (event at T):
+━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━
+                            ▼ Event     KL(pre) = 0.045
+
+        Compare pre-event distributions
+                    ↓
+        Select minimum KL divergence
+                    ↓
+            Use as ground truth
+```
+
+**Ground truth selection via KL divergence.** To select the most faithful counterfactual baseline (i.e., the pre-injection segment of the fault run that most closely matches the baseline under nominal conditions) we compute the KL divergence between the sub-time-series of the baseline and the pre-injection segment $[0, t_\text{inj})$ of each fault run:
+
+$$D_i = D_\text{KL}\!\left(P_\text{baseline}^{[0,\, t_\text{inj})} \;\|\; P_{\text{fault}_i}^{[0,\, t_\text{inj})}\right), \quad i = 1, \ldots, N$$
+
+The fault run minimising this divergence is retained as the counterfactual reference:
+
+$$i^* = \arg\min_{i} \; D_i$$
+
+The pair $(\text{baseline}, \text{fault run}_{i^*})$ then constitutes the counterfactual sample: the baseline provides the observed history, and the post-injection segment of the winning fault run provides the ground-truth alternative outcome. This selection criterion ensures that the pre-injection dynamics are as close to the nominal baseline as possible, isolating the causal effect of the injected event and minimising confounding from run-to-run variability.
+
+**Automatic labelling.** Because the injection point $t_\text{inj}$, event type, and event parameters are all programmatically determined, every counterfactual sample is labelled without human intervention. Labels include the event identity, its onset time, its parameter values, and the identity of the winning fault run, making the full pipeline reproducible and scalable to new tasks and injection types.
+
 ### 4.3 Adapting labelling to open datasets and simulations
 
 (TODO: TALK ABOUT HOW LABELLING WAS DONE ON OPEN DATASETS AND SIMULATIONS)

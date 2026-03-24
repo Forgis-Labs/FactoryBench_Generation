@@ -42,7 +42,7 @@ from src.question_generation.level2.mc_truth import DEFAULT_THRESHOLDS, evaluate
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
+VALID_DATASETS = ["inter_aursad", "inter_vorausad", "simulations"]
 
 DIFFICULTY_CONFIGS: Dict[str, Dict[str, Any]] = {
     "easy":   {"steps_ahead_range": (1, 2),  "context_min": 65, "context_max": 90},
@@ -714,7 +714,11 @@ def generate_level2_questions(
     def load_episode(path: Path) -> List[Dict[str, Any]]:
         key = str(path)
         if key not in episode_cache:
-            episode_cache[key] = load_json(path)
+            raw = load_json(path)
+            # Combined format {"baseline": [...], "counterfactual": [...]}
+            if isinstance(raw, dict):
+                raw = raw.get("counterfactual") or raw.get("baseline", [])
+            episode_cache[key] = raw
         return episode_cache[key]
 
     generated = 0

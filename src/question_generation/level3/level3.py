@@ -317,6 +317,23 @@ def discover_cf_episode_pairs(
         if not cf_root.exists() or not cf_root.is_dir():
             continue
 
+        # Combined format: each episode file contains both baseline and counterfactual
+        combined_files = [
+            p for p in sorted(cf_root.glob("*.json"))
+            if not p.name.endswith("_metadata.json")
+        ]
+        if combined_files:
+            for p in combined_files:
+                pairs.append({
+                    "cf_dataset": cf_name,
+                    "format": "combined",
+                    "non_alt_path": p,
+                    "alt_path": p,
+                    "episode": p.stem,
+                })
+            continue
+
+        # Legacy format: separate alt / non-alt subfolders
         subfolders = sorted([p for p in cf_root.iterdir() if p.is_dir()])
         if len(subfolders) < 2:
             continue
@@ -348,6 +365,7 @@ def discover_cf_episode_pairs(
             pairs.append(
                 {
                     "cf_dataset": cf_name,
+                    "format": "split",
                     "non_alt_subfolder": non_alt_folder.name,
                     "alt_subfolder": alt_folder.name,
                     "non_alt_path": non_alt_map[stem],
@@ -835,11 +853,15 @@ def generate_level3_questions(
 
     episode_cache: Dict[str, List[Dict[str, Any]]] = {}
 
-    def load_episode(path: Path) -> List[Dict[str, Any]]:
-        key = str(path)
-        if key not in episode_cache:
-            episode_cache[key] = load_json(path)
-        return episode_cache[key]
+    def load_episode(path: Path, split: str = "flat") -> List[Dict[str, Any]]:
+        cache_key = f"{path}::{split}"
+        if cache_key not in episode_cache:
+            raw = load_json(path)
+            if isinstance(raw, dict):
+                episode_cache[cache_key] = raw.get(split, [])
+            else:
+                episode_cache[cache_key] = raw
+        return episode_cache[cache_key]
 
     generated = 0
     attempts = 0
@@ -853,8 +875,9 @@ def generate_level3_questions(
         non_alt_path = cast(Path, pair["non_alt_path"])
         alt_path = cast(Path, pair["alt_path"])
 
-        normal_rows = load_episode(non_alt_path)
-        alt_rows = load_episode(alt_path)
+        fmt = pair.get("format", "flat")
+        normal_rows = load_episode(non_alt_path, "baseline" if fmt == "combined" else "flat")
+        alt_rows = load_episode(alt_path, "counterfactual" if fmt == "combined" else "flat")
 
         if not isinstance(normal_rows, list) or not isinstance(alt_rows, list):
             continue
