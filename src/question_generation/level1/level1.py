@@ -376,7 +376,7 @@ def generate_level1_questions(
         ctx_start = max(0, start_idx - margin)
         ctx_end = min(len(rows), end_idx + margin)
         subseries = rows[ctx_start:ctx_end]
-        context = build_context(subseries)
+        context = build_context(subseries, template_type=template["type"])
 
         item = {
             "id": str(uuid.uuid4()),

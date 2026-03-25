@@ -301,6 +301,15 @@ def run_direct_requests(
             continue
 
 
+        # Token budget guard – skip prompts that are too large for the model
+        estimated_tokens = len(prompt_text) // 4
+        if estimated_tokens > 900_000:
+            logger.warning(
+                f"- Skipping {custom_id}: estimated {estimated_tokens} tokens exceeds budget"
+            )
+            skipped += 1
+            continue
+
         # Load full Q&A object for scoring (not just answer)
         try:
             qa_payload = load_json(prompt_path)

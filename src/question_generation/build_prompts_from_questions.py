@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def load_json(path: Path) -> Any:
@@ -233,9 +236,17 @@ def main() -> None:
             continue
 
         prompt = build_prompt(payload, machines)
+
+        # Token budget guard
+        estimated_tokens = len(prompt) // 4
+        if estimated_tokens > 900_000:
+            logger.warning(
+                f"Skipping {in_path.name}: estimated {estimated_tokens} tokens exceeds budget"
+            )
+            continue
+
         rel = in_path.relative_to(input_dir)
         out_path = output_dir / rel
-
 
         output_payload = {
             "prompt": prompt,
