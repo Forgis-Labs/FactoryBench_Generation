@@ -213,6 +213,7 @@ def run_direct_requests(
     max_output_tokens: int,
     overwrite: bool,
     ground_truth_index: Dict[str, Any],
+    eval_level: str = "",
 ) -> tuple[int, int, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -239,6 +240,9 @@ def run_direct_requests(
         answer_format = qa_payload.get("answer_format", {})
         q_type = answer_format.get("type") or qa_payload.get("template_type")
         acceptance_bounds = qa_payload.get("acceptance_bounds")
+        evaluation_method = str(answer_format.get("type") or "rule_based")
+        level_val = qa_payload.get("level")
+        effective_eval_level = eval_level or (f"level_{level_val}" if level_val is not None else None)
 
         try:
             response = client.responses.create(
@@ -311,6 +315,131 @@ def run_direct_requests(
                     score = float(str(gt) == str(pred))
             except Exception:
                 score = None
+
+            # --- Opik Tracing ---
+            try:
+                if os.getenv("OPIK_API_KEY"):
+                    import opik
+                    client_opik = opik.Opik(
+                        project_name=os.getenv("OPIK_PROJECT_NAME", "FactoryBench"),
+                        workspace=os.getenv("OPIK_WORKSPACE", "forgis")
+                    )
+
+                    usage_raw = body.get("usage", {}) or {}
+                    prompt_tokens: int = int(
+                        usage_raw.get("prompt_tokens")
+                        or usage_raw.get("input_tokens")
+                        or 0
+                    )
+                    completion_tokens: int = int(
+                        usage_raw.get("completion_tokens")
+                        or usage_raw.get("output_tokens")
+                        or 0
+                    )
+                    total_tokens: int = int(usage_raw.get("total_tokens") or (prompt_tokens + completion_tokens))
+
+                    model_name = (body.get("model") or model).lower()
+                    if "mini" in model_name:
+                        price_in, price_out = 0.15, 0.60
+                    else:
+                        price_in, price_out = 5.0, 15.0
+
+                    est_cost = (prompt_tokens / 1_000_000 * price_in) + (completion_tokens / 1_000_000 * price_out)
+
+                    category_tag = evaluation_method
+                    metadata_payload = qa_payload.get("metadata") or {}
+                    dataset_tag = metadata_payload.get("dataset")
+                    qa_pair_id = metadata_payload.get("qa_pair_id")
+
+                    opik_tags = [str(t) for t in [effective_eval_level, category_tag, dataset_tag] if t]
+
+                    type_tag = metadata_payload.get("type")
+                    model_tag = model_name
+
+                    if type_tag and type_tag != "unknown":
+                        opik_tags.append(str(type_tag))
+                    if evaluation_method and evaluation_method != "unknown":
+                        opik_tags.append(f"eval_{evaluation_method}")
+                    if model_tag and model_tag != "unknown":
+                        opik_tags.append(model_tag)
+                    if dataset_tag and dataset_tag != "unknown":
+                        opik_tags.append(dataset_tag)
+
+                    opik_metadata = {
+                        "model": model_tag,
+                        "evaluation_method": evaluation_method,
+                        "q_type": q_type,
+                        "qa_pair_id": qa_pair_id,
+                        "dataset": dataset_tag,
+                        "usage": {
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": total_tokens,
+                            "total_estimated_cost": f"${est_cost}",
+                        },
+                    }
+                    if isinstance(metadata_payload, dict):
+                        opik_metadata.update(metadata_payload)
+
+                    trace = client_opik.trace(
+                        name="factorybench_eval",
+                        input={"custom_id": custom_id, "prompt": prompt_text, "ground_truth": gt, "q_type": q_type},
+                        output={"answer": answer, "raw_body": body},
+                        tags=opik_tags,
+                        usage={
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": total_tokens,
+                        },
+                        metadata=opik_metadata,
+                        total_estimated_cost=est_cost,
+                        model=body.get("model") or model_name,
+                    )
+                    if score is not None:
+                        pred_str_repr = str(pred).strip() if pred is not None else "N/A"
+                        gt_str_repr = str(gt).strip() if gt is not None else "N/A"
+                        accuracy_reason = (
+                            f"Predicted: '{pred_str_repr}' | Ground truth: '{gt_str_repr}'"
+                        )
+                        trace.log_feedback_score(name="accuracy", value=float(score), reason=accuracy_reason)
+                        trace.log_feedback_score(name="exact_match", value=float(pred_str_repr == gt_str_repr), reason=accuracy_reason)
+
+                        try:
+                            f1: float | None = None
+                            if q_type in ("numerical", "ranking", "tensor"):
+                                f1 = float(score)
+                            elif q_type == "multiple_choice_multi_select":
+                                gt_labels = [1 if c == "T" else 0 for c in gt_str_repr.upper() if c in ("T", "F")]
+                                pred_labels = [1 if c == "T" else 0 for c in pred_str_repr.upper() if c in ("T", "F")]
+                                if gt_labels and len(gt_labels) == len(pred_labels):
+                                    tp = sum(g == 1 and p == 1 for g, p in zip(gt_labels, pred_labels))
+                                    fp = sum(g == 0 and p == 1 for g, p in zip(gt_labels, pred_labels))
+                                    fn = sum(g == 1 and p == 0 for g, p in zip(gt_labels, pred_labels))
+                                    denom = 2 * tp + fp + fn
+                                    f1 = (2 * tp / denom) if denom > 0 else 0.0
+                                else:
+                                    f1 = 0.0
+                            else:
+                                gt_tokens = set(gt_str_repr.lower().split())
+                                pred_tokens = set(pred_str_repr.lower().split())
+                                if gt_tokens or pred_tokens:
+                                    tp = len(gt_tokens & pred_tokens)
+                                    fp = len(pred_tokens - gt_tokens)
+                                    fn = len(gt_tokens - pred_tokens)
+                                    denom = 2 * tp + fp + fn
+                                    f1 = (2 * tp / denom) if denom > 0 else 0.0
+                                else:
+                                    f1 = 1.0
+                            if f1 is not None:
+                                trace.log_feedback_score(
+                                    name="f1_score",
+                                    value=f1,
+                                    reason=f"Token-overlap F1 for type '{q_type}' | Predicted: '{pred_str_repr}' | Ground truth: '{gt_str_repr}'",
+                                )
+                        except Exception as f1_err:
+                            logger.debug(f"F1 score computation failed: {f1_err}")
+            except Exception as e:
+                logger.warning(f"Opik logging failed: {e}")
 
             save_json(out_path, {
                 "custom_id": custom_id,
@@ -386,6 +515,12 @@ def main() -> None:
         default=None,
         help="Directory containing Q&A pair JSON files (for ground truth lookup)",
     )
+    parser.add_argument(
+        "--eval-level",
+        type=str,
+        default=None,
+        help="Evaluation level tag for Opik (e.g. level_1)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -428,6 +563,7 @@ def main() -> None:
         max_output_tokens=args.max_output_tokens,
         overwrite=args.overwrite,
         ground_truth_index=ground_truth_index,
+        eval_level=args.eval_level or "",
     )
     logger.info(
         f"Done. Completed={completed}, Failed={failed}, Skipped={skipped}, OutputDir={args.output_dir}"
