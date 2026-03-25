@@ -17,6 +17,10 @@ import numpy as np
 INACTIVE_CONSTANT_THRESHOLD = 55
 INACTIVITY_TRIM = 5
 
+# Default bounds for peak-preserving downsampling
+DEFAULT_MIN_KEEP = 32
+DEFAULT_MAX_KEEP = 64
+
 
 def parse_event_id(value: Any) -> int:
     """
@@ -318,6 +322,87 @@ def sample_subseries_before_event(
         subseries,
         post_event_rows,
     )
+
+
+# ---------------------------------------------------------------------------
+# Peak-preserving downsampling
+# ---------------------------------------------------------------------------
+
+
+def _compute_change_scores(rows: List[Dict[str, Any]]) -> List[float]:
+    """Compute per-row change scores as the sum of absolute differences
+    from the previous row across all numeric features."""
+    scores = [0.0]  # first row has no predecessor
+    for i in range(1, len(rows)):
+        score = 0.0
+        for key in rows[i]:
+            if key == "timestamp_ms":
+                continue
+            cur = rows[i].get(key)
+            prev = rows[i - 1].get(key)
+            if (
+                isinstance(cur, (int, float, np.floating))
+                and isinstance(prev, (int, float, np.floating))
+            ):
+                score += abs(float(cur) - float(prev))
+        scores.append(score)
+    return scores
+
+
+def downsample_peak_preserving(
+    rows: List[Dict[str, Any]],
+    min_keep: int = DEFAULT_MIN_KEEP,
+    max_keep: int = DEFAULT_MAX_KEEP,
+) -> List[Dict[str, Any]]:
+    """Downsample *rows* to a target between *min_keep* and *max_keep*,
+    preserving the rows where the sharpest signal changes occur.
+
+    Algorithm:
+    1. Pick target N uniformly in [min_keep, max_keep].
+    2. Always anchor the first and last rows.
+    3. Rank all interior rows by their change score (sum of absolute
+       differences from the previous row across all numeric features).
+    4. Select the top N//2 interior rows by change score (the "signal").
+    5. Fill remaining slots by uniformly sampling from the leftover
+       interior rows (temporal coverage of stable "noise" periods).
+    6. Return selected rows sorted by original index.
+    """
+    n_rows = len(rows)
+    if n_rows <= min_keep:
+        return rows
+
+    target = random.randint(min_keep, min(max_keep, n_rows))
+    if n_rows <= target:
+        return rows
+
+    # Always keep first and last
+    anchor_indices = {0, n_rows - 1}
+    budget = target - len(anchor_indices)
+
+    if budget <= 0:
+        selected = sorted(anchor_indices)
+        return [rows[i] for i in selected]
+
+    # Score interior rows
+    scores = _compute_change_scores(rows)
+    interior = list(range(1, n_rows - 1))
+
+    # Select top-scoring rows (the "signal")
+    n_signal = min(budget // 2, len(interior))
+    interior_scored = sorted(interior, key=lambda i: scores[i], reverse=True)
+    signal_indices = set(interior_scored[:n_signal])
+    anchor_indices |= signal_indices
+
+    # Fill remaining slots uniformly from non-anchor interior rows
+    remaining_budget = target - len(anchor_indices)
+    if remaining_budget > 0:
+        pool = [i for i in interior if i not in anchor_indices]
+        if pool:
+            fill = random.sample(pool, min(remaining_budget, len(pool)))
+            anchor_indices |= set(fill)
+
+    selected = sorted(anchor_indices)
+    return [rows[i] for i in selected]
 
 
 # ---------------------------------------------------------------------------
