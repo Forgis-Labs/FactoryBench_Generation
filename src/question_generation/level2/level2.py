@@ -774,6 +774,10 @@ def generate_level2_questions(
             continue
 
         subseries_with_event = subseries + event_segment_rows
+        important_features = template.get("important_features")
+        if important_features:
+            keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+            subseries_with_event = [{k: v for k, v in row.items() if k in keep} for row in subseries_with_event]
         context = build_context(subseries_with_event)
 
         item = {

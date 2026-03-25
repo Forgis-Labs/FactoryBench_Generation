@@ -948,7 +948,12 @@ def generate_level3_questions(
         if filled is None:
             continue
 
-        context = build_context(subseries)
+        important_features = template.get("important_features")
+        context_subseries = subseries
+        if important_features:
+            keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+            context_subseries = [{k: v for k, v in row.items() if k in keep} for row in subseries]
+        context = build_context(context_subseries)
 
         item = {
             "id": str(uuid.uuid4()),

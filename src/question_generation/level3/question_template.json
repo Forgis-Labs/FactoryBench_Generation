@@ -7,7 +7,15 @@
       "type": "ranking",
       "n_items": 4,
       "notes": "Model must output a permutation of [A, B, C, D]. Chunks should be kept short to limit token cost. The correct ordering reflects causal propagation delay across signals."
-    }
+    },
+    "important_features": [
+      "feedback_pos_0", "feedback_pos_1", "feedback_pos_2", "feedback_pos_3", "feedback_pos_4", "feedback_pos_5",
+      "feedback_speed_0", "feedback_speed_1", "feedback_speed_2", "feedback_speed_3", "feedback_speed_4", "feedback_speed_5",
+      "effort_target_torque_0", "effort_target_torque_1", "effort_target_torque_2", "effort_target_torque_3", "effort_target_torque_4", "effort_target_torque_5",
+      "est_contact_force_0", "est_contact_force_1", "est_contact_force_2",
+      "setpoint_tcp_0", "setpoint_tcp_1", "setpoint_tcp_2",
+      "gripper_command"
+    ]
   },
   {
     "id": 2,
@@ -18,7 +26,15 @@
       "n_choices": 4,
       "fixed_options": ["mc_0019"],
       "notes": "One correct consequence, one plausible-but-wrong distractor, one unrelated distractor, and one 'nothing extraordinary happens' option. Target ~30% of generated instances where the correct answer IS 'nothing extraordinary happens'."
-    }
+    },
+    "important_features": [
+      "feedback_pos_0", "feedback_pos_1", "feedback_pos_2", "feedback_pos_3", "feedback_pos_4", "feedback_pos_5",
+      "feedback_speed_0", "feedback_speed_1", "feedback_speed_2", "feedback_speed_3", "feedback_speed_4", "feedback_speed_5",
+      "effort_target_torque_0", "effort_target_torque_1", "effort_target_torque_2", "effort_target_torque_3", "effort_target_torque_4", "effort_target_torque_5",
+      "est_contact_force_0", "est_contact_force_1", "est_contact_force_2",
+      "setpoint_pos_0", "setpoint_pos_1", "setpoint_pos_2",
+      "gripper_command"
+    ]
   },
   {
     "id": 3,
@@ -28,7 +44,15 @@
       "type": "multiple_choice_multi_select",
       "fixed_options": ["mc_001", "mc_002"],
       "notes": "Always include both fixed statements (one or both may be correct depending on the scenario). Add 2 random additional statements with a 50/50 correct/incorrect split. For self-correcting scenarios (~50% of instances), the escalation statement is incorrect and vice versa. Both statements may be simultaneously false (ambiguous scenario) or simultaneously true (bifurcation scenario) in rare cases."
-    }
+    },
+    "important_features": [
+      "feedback_speed_0", "feedback_speed_1", "feedback_speed_2", "feedback_speed_3", "feedback_speed_4", "feedback_speed_5",
+      "effort_target_torque_0", "effort_target_torque_1", "effort_target_torque_2", "effort_target_torque_3", "effort_target_torque_4", "effort_target_torque_5",
+      "feedback_pos_0", "feedback_pos_1", "feedback_pos_2", "feedback_pos_3", "feedback_pos_4", "feedback_pos_5",
+      "est_contact_force_0", "est_contact_force_1", "est_contact_force_2",
+      "setpoint_pos_0", "setpoint_pos_1", "setpoint_pos_2",
+      "gripper_command"
+    ]
   },
   {
     "id": 4,
@@ -37,7 +61,14 @@
     "answer_format": {
       "type": "numerical",
       "notes": "Single float value with unit. Accept answers within a tolerance band."
-    }
+    },
+    "important_features": [
+      "feedback_pos_0", "feedback_pos_1", "feedback_pos_2", "feedback_pos_3", "feedback_pos_4", "feedback_pos_5",
+      "setpoint_pos_0", "setpoint_pos_1", "setpoint_pos_2", "setpoint_pos_3", "setpoint_pos_4", "setpoint_pos_5",
+      "feedback_speed_0", "feedback_speed_1", "feedback_speed_2", "feedback_speed_3", "feedback_speed_4", "feedback_speed_5",
+      "effort_target_torque_0", "effort_target_torque_1", "effort_target_torque_2", "effort_target_torque_3", "effort_target_torque_4", "effort_target_torque_5",
+      "est_contact_force_0"
+    ]
   },
   {
     "id": 5,
@@ -47,6 +78,13 @@
       "type": "tensor",
       "shape": [6],
       "notes": "A 6-element vector of floats, one per joint axis (0-indexed). Format as a JSON array."
-    }
+    },
+    "important_features": [
+      "feedback_pos_0", "feedback_pos_1", "feedback_pos_2", "feedback_pos_3", "feedback_pos_4", "feedback_pos_5",
+      "setpoint_pos_0", "setpoint_pos_1", "setpoint_pos_2", "setpoint_pos_3", "setpoint_pos_4", "setpoint_pos_5",
+      "feedback_speed_0", "feedback_speed_1", "feedback_speed_2", "feedback_speed_3", "feedback_speed_4", "feedback_speed_5",
+      "setpoint_speed_0", "setpoint_speed_1", "setpoint_speed_2", "setpoint_speed_3", "setpoint_speed_4", "setpoint_speed_5",
+      "effort_target_torque_0"
+    ]
   }
 ]
