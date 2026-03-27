@@ -57,6 +57,30 @@ EXCLUDED_JOINT_SIGNALS = {"joint_voltage", "joint_temp", "joint_mode"}
 JOINT_INDEX_RANGE = set(range(6))
 MIN_POST_EVENT_TIMESTAMPS_AFTER = 5
 
+# MC option IDs that require signals absent from simulation data
+NON_SIMULATION_EXCLUDED_MC_IDS = {
+    "mc_020",  # task_success — only available in simulation metadata
+}
+
+SIMULATION_EXCLUDED_MC_IDS = {
+    "mc_001",  # safety_mode
+    "mc_002",  # safety_mode
+    "mc_005",  # effort_current
+    "mc_010",  # vibration
+    "mc_013",  # robot_current
+    "mc_014",  # robot_current
+    "mc_017",  # joint_temp
+    "mc_019",  # safety_mode
+}
+
+# MC option IDs that use mode signals (safety_mode, joint_mode, robot_mode),
+# excluded from predictive templates where mode state is not being predicted.
+PREDICTIVE_EXCLUDED_MC_IDS = {
+    "mc_001",  # safety_mode
+    "mc_002",  # safety_mode
+    "mc_019",  # safety_mode
+}
+
 
 def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]]) -> Optional[str]:
     """
@@ -490,6 +514,7 @@ def build_multiselect_options_and_answer(
     subseries: List[Dict[str, Any]],
     post_event_rows: List[Dict[str, Any]],
     mc_option_lookup: Dict[str, str],
+    episode_metadata: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, str], str]:
     """
     Build exactly 4 multi-select options:
@@ -528,6 +553,7 @@ def build_multiselect_options_and_answer(
             subseries=subseries,
             post_event_rows=post_event_rows,
             thresholds=sampled_thresholds,
+            episode_metadata=episode_metadata,
         )
         options_data.append((opt_id, statement, truth))
 
@@ -559,6 +585,7 @@ def fill_template(
     mc_option_lookup: Dict[str, str],
     difficulty: str = "medium",
     steps_ahead: Optional[int] = None,
+    episode_metadata: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 2 question template.
@@ -587,6 +614,7 @@ def fill_template(
 
     options: Dict[str, Any] = {}
     answer = None
+    acceptance_bounds = None
 
     if tid == 1:
         chunks = sample_subsequent_chunks(post_event_rows, n_chunks=4, min_chunk=5, max_chunk=7)
@@ -612,6 +640,7 @@ def fill_template(
             subseries=subseries,
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
+            episode_metadata=episode_metadata,
         )
         question = fill(tmpl_text, event=event_desc, t_event=t_event)
 
@@ -621,6 +650,7 @@ def fill_template(
             subseries=subseries,
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
+            episode_metadata=episode_metadata,
         )
         question = fill(tmpl_text, event=event_desc, t_event=t_event)
 
@@ -637,6 +667,9 @@ def fill_template(
             return None
         answer = round(float(signal_value), 6)
         question = fill(tmpl_text, event=event_desc, t_event=t_event, signal=signal, n=n_ms)
+        vals = [float(r[signal]) for r in subseries if isinstance(r.get(signal), (int, float, np.floating))]
+        std = float(np.std(vals)) if vals else 0.0
+        acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std, 6)}
 
     elif tid == 5:
         joint_signal = pick_joint_indexed_signal_base(subseries)
@@ -648,15 +681,19 @@ def fill_template(
         n_ms = int(float(target_row.get("timestamp_ms", t_event))) - t_event
 
         tensor_values: List[float] = []
+        tensor_stds: List[float] = []
         for joint_idx in range(6):
             key = f"{joint_signal}_{joint_idx}"
             value = target_row.get(key)
             if not isinstance(value, (int, float, np.floating)):
                 return None
             tensor_values.append(round(float(value), 6))
+            vals = [float(r[key]) for r in subseries if isinstance(r.get(key), (int, float, np.floating))]
+            tensor_stds.append(round(float(np.std(vals)) if vals else 0.0, 6))
 
         answer = "_".join(str(v) for v in tensor_values)
         question = fill(tmpl_text, event=event_desc, t_event=t_event, joint_signal=joint_signal, n=n_ms)
+        acceptance_bounds = {"signal": joint_signal, "std": tensor_stds, "margin": tensor_stds}
 
     else:
         logger.warning(f"Unknown template id: {tid}")
@@ -668,6 +705,7 @@ def fill_template(
         "options": options,
         "event_id": event_obj["id"],
         "answer": answer,
+        "acceptance_bounds": acceptance_bounds,
         "difficulty": difficulty,
     }
 
@@ -686,6 +724,7 @@ def generate_level2_questions(
     n: int = 100,
     seed: Optional[int] = None,
     mc_option_lookup: Optional[Dict[str, str]] = None,
+    datasets: Optional[List[str]] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -696,11 +735,12 @@ def generate_level2_questions(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    by_dataset = discover_episodes_by_dataset(datasets_dir, VALID_DATASETS)
+    allowed = datasets if datasets else VALID_DATASETS
+    by_dataset = discover_episodes_by_dataset(datasets_dir, allowed)
     if not by_dataset:
         raise FileNotFoundError(
             f"No normalized episode JSON files found under "
-            f"{datasets_dir / 'normalized_episodes'} for datasets: {VALID_DATASETS}"
+            f"{datasets_dir / 'normalized_episodes'} for datasets: {allowed}"
         )
 
     episodes_by_dataset = {ds: paths for ds, paths in by_dataset.items() if paths}
@@ -758,17 +798,34 @@ def generate_level2_questions(
         subseries = normalize_timestamps(subseries, base_timestamp_ms)
         post_event_rows = normalize_timestamps(post_event_rows, base_timestamp_ms)
 
-        event_segment_rows, post_after_event_rows = split_event_segment(post_event_rows)
+        event_segment_rows, _post_after_event_rows = split_event_segment(post_event_rows)
         if not event_segment_rows:
-            continue
-        if len(post_after_event_rows) < MIN_POST_EVENT_TIMESTAMPS_AFTER:
             continue
 
         template = random.choice(templates)
 
+        if ds == "simulations":
+            effective_mc_lookup = {k: v for k, v in mc_option_lookup.items() if k not in SIMULATION_EXCLUDED_MC_IDS}
+        else:
+            effective_mc_lookup = {k: v for k, v in mc_option_lookup.items() if k not in NON_SIMULATION_EXCLUDED_MC_IDS}
+
+        if template.get("type") == "predictive":
+            effective_mc_lookup = {k: v for k, v in effective_mc_lookup.items() if k not in PREDICTIVE_EXCLUDED_MC_IDS}
+
+        ep_metadata: Optional[Dict[str, Any]] = None
+        if ds == "simulations":
+            meta_path = ep_path.parent / f"{ep_path.stem}_metadata.json"
+            if meta_path.exists():
+                try:
+                    with meta_path.open(encoding="utf-8") as _f:
+                        raw_meta = json.load(_f)
+                    ep_metadata = raw_meta.get("counterfactual", {})
+                except Exception:
+                    pass
+
         filled = fill_template(
-            template, subseries, post_event_rows, events, mc_option_lookup,
-            difficulty=difficulty, steps_ahead=steps_ahead,
+            template, subseries, post_event_rows, events, effective_mc_lookup,
+            difficulty=difficulty, steps_ahead=steps_ahead, episode_metadata=ep_metadata,
         )
         if filled is None:
             continue
@@ -789,6 +846,7 @@ def generate_level2_questions(
             "question": filled["question"],
             "options": filled["options"],
             "answer": filled["answer"],
+            "acceptance_bounds": filled.get("acceptance_bounds"),
             "provenance": {
                 "dataset": ds,
                 "episode": ep_path.stem,
@@ -839,6 +897,12 @@ def main() -> None:
     )
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
+    parser.add_argument(
+        "--datasets",
+        nargs="+",
+        default=None,
+        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -864,6 +928,7 @@ def main() -> None:
         mc_option_lookup=mc_option_lookup,
         n=args.n,
         seed=args.seed,
+        datasets=args.datasets,
     )
 
 

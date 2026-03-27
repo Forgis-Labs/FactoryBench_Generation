@@ -204,8 +204,18 @@ def evaluate_mc_statement(
     subseries: List[Dict[str, Any]],
     post_event_rows: List[Dict[str, Any]],
     thresholds: Optional[Dict[str, float]] = None,
+    episode_metadata: Optional[Dict[str, Any]] = None,
 ) -> Optional[bool]:
     sid = _canonical_statement_id(statement_id)
+
+    if sid == "l2_mc_020":
+        if episode_metadata is None:
+            return None
+        success = episode_metadata.get("task_success")
+        if success is None:
+            return None
+        return bool(success)
+
     baseline = _baseline_row(subseries)
     if baseline is None or not post_event_rows:
         return None

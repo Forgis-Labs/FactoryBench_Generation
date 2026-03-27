@@ -167,5 +167,12 @@
     "usable_levels": [1],
     "template_id": 3,
     "verifiable_rule": "Trivial from metadata."
+  },
+  {
+    "id": "mc_020",
+    "statement": "The task is completed successfully.",
+    "usable_levels": [2, 3],
+    "required_features": [],
+    "verifiable_rule": "check task_success field in episode metadata (baseline or counterfactual section)"
   }
 ]

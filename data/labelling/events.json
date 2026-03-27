@@ -98,11 +98,10 @@
   {
     "id": 11,
     "name": "Friction Decrease Injection",
-    "description": "a decrease of {delta} in the friction coefficient of {component}",
+    "description": "a decrease of {reduction_pct}% in the friction coefficient",
     "tasks": ["pick_and_place", "screwing"],
     "variables": {
-      "component": "string",
-      "delta": "numeric"
+      "reduction_pct": "numeric"
     }
   },
   {
@@ -137,11 +136,11 @@
   {
     "id": 16,
     "name": "Collision Injection",
-    "description": "a collision with {object} of {impact_force} N contact force",
+    "description": "a collision with {object} ({impact_impulse} N-s impact impulse)",
     "tasks": ["pick_and_place"],
     "variables": {
       "object": "string",
-      "impact_force": "numeric",
+      "impact_impulse": "numeric",
       "trajectory_fraction": "numeric"
     }
   }

@@ -14,6 +14,7 @@ import argparse
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
@@ -205,6 +206,14 @@ def _extract_output_text_from_responses_body(body: Dict[str, Any]) -> str:
     return "".join(chunks)
 
 
+def _extract_output_text_from_chat_body(body: Dict[str, Any]) -> str:
+    """Chat Completions API format: body["choices"][0]["message"]["content"]."""
+    choices = body.get("choices") or []
+    if choices:
+        return (choices[0].get("message") or {}).get("content") or ""
+    return ""
+
+
 def run_direct_requests(
     entries: list[Tuple[Path, str, int, str]],
     client: Any,
@@ -214,6 +223,7 @@ def run_direct_requests(
     overwrite: bool,
     ground_truth_index: Dict[str, Any],
     eval_level: str = "",
+    provider: str = "openai",
 ) -> tuple[int, int, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -231,31 +241,56 @@ def run_direct_requests(
             continue
 
 
-        # Load full Q&A object for scoring (not just answer)
+        # Load question JSON for scoring metadata (parallel path: prompts/ → questions/)
         try:
-            qa_payload = load_json(prompt_path)
+            q_path = Path(str(prompt_path).replace("prompts", "questions", 1))
+            qa_payload = load_json(q_path)
         except Exception:
-            qa_payload = {}
+            try:
+                qa_payload = load_json(prompt_path)
+            except Exception:
+                qa_payload = {}
 
-        answer_format = qa_payload.get("answer_format", {})
-        q_type = answer_format.get("type") or qa_payload.get("template_type")
+        answer_format = qa_payload.get("answer_format") or {}
         acceptance_bounds = qa_payload.get("acceptance_bounds")
+
+        # Infer q_type from answer format field, then from answer shape
+        q_type = answer_format.get("type") or qa_payload.get("template_type")
+        if not q_type:
+            ans_str = str(qa_payload.get("answer", "")).strip().upper()
+            if ans_str and all(c in "TF" for c in ans_str) and len(ans_str) > 1:
+                q_type = "multiple_choice_multi_select"
+            elif "_" in ans_str:
+                q_type = "tensor"
+            elif ans_str and all(c in "ABCD" for c in ans_str) and len(ans_str) > 1:
+                q_type = "ranking"
+            elif ans_str:
+                q_type = "numerical"
         evaluation_method = str(answer_format.get("type") or "rule_based")
         level_val = qa_payload.get("level")
         effective_eval_level = eval_level or (f"level_{level_val}" if level_val is not None else None)
 
         try:
-            response = client.responses.create(
-                model=model,
-                input=prompt_text,
-                max_output_tokens=max_output_tokens,
-            )
-            body = _to_dict(response)
-            answer = _extract_output_text_from_responses_body(body)
+            if provider == "azure":
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt_text}],
+                    extra_body={"max_completion_tokens": max_output_tokens},
+                )
+                body = _to_dict(response)
+                answer = _extract_output_text_from_chat_body(body)
+            else:
+                response = client.responses.create(
+                    model=model,
+                    input=prompt_text,
+                    max_output_tokens=max_output_tokens,
+                )
+                body = _to_dict(response)
+                answer = _extract_output_text_from_responses_body(body)
 
             # --- Scoring logic ---
             score = None
-            gt = ground_truth
+            gt = ground_truth_index.get(prompt_path.stem)
             pred = answer
             try:
                 if q_type in ("numerical", "tensor"):
@@ -267,9 +302,8 @@ def run_direct_requests(
                         except Exception:
                             score = 0
                         else:
-                            if acceptance_bounds:
-                                margin = acceptance_bounds.get("margin", 0)
-                                mean = acceptance_bounds.get("mean", 0)
+                            if acceptance_bounds and acceptance_bounds.get("margin") is not None:
+                                margin = float(acceptance_bounds["margin"])
                                 score = int(abs(pred_val - gt_val) <= margin)
                             else:
                                 score = int(abs(pred_val - gt_val) < 1e-4)
@@ -289,17 +323,37 @@ def run_direct_requests(
                                 else:
                                     score = 0.0
                             else:
-                                score = float(gt_vals == pred_vals)
+                                # Partial credit: fraction of elements within std-based margin
+                                if len(gt_vals) == len(pred_vals) and acceptance_bounds and "margin" in acceptance_bounds:
+                                    margins = acceptance_bounds["margin"]
+                                    if isinstance(margins, list) and len(margins) == len(gt_vals):
+                                        n = len(gt_vals)
+                                        n_correct = sum(abs(p - g) <= m for p, g, m in zip(pred_vals, gt_vals, margins))
+                                        score = n_correct / n
+                                    else:
+                                        score = 0.0
+                                elif len(gt_vals) == len(pred_vals):
+                                    # Fallback: fraction within max(0.05, 5% relative)
+                                    n = len(gt_vals)
+                                    n_correct = sum(
+                                        abs(p - g) <= max(0.05, 0.05 * abs(g))
+                                        for p, g in zip(pred_vals, gt_vals)
+                                    )
+                                    score = n_correct / n
+                                else:
+                                    score = 0.0
                 elif q_type == "multiple_choice_multi_select":
                     # Multi-select MCQ: string of T/F, e.g., TFFT
                     gt_str = str(gt).strip().upper()
-                    pred_str = str(pred).strip().upper()
+                    # Extract the first T/F-only token from the prediction (model may add explanation)
+                    _m = re.search(r"\b([TF]{2,})\b", str(pred).upper())
+                    pred_str = _m.group(1) if _m else str(pred).strip().upper()
                     if len(gt_str) == len(pred_str) and set(gt_str) <= {"T", "F"} and set(pred_str) <= {"T", "F"}:
                         n = len(gt_str)
                         n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
                         if n_correct == n:
                             score = 1.0
-                        elif n_correct >= n - 1:
+                        elif n_correct >= n - 1:  # 3/4 correct
                             score = 0.5
                         else:
                             score = 0.0
@@ -489,7 +543,7 @@ def main() -> None:
         help="Path to .env file (default: ./.env)",
     )
     parser.add_argument("--model", type=str, default=None, help="Model name (default from env or gpt-5.1)")
-    parser.add_argument("--max-output-tokens", type=int, default=2000, help="Max output tokens")
+    parser.add_argument("--max-output-tokens", type=int, default=8000, help="Max output tokens (includes reasoning tokens for thinking models)")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing result files")
     parser.add_argument(
         "--total-prompts",
@@ -564,6 +618,7 @@ def main() -> None:
         overwrite=args.overwrite,
         ground_truth_index=ground_truth_index,
         eval_level=args.eval_level or "",
+        provider=provider,
     )
     logger.info(
         f"Done. Completed={completed}, Failed={failed}, Skipped={skipped}, OutputDir={args.output_dir}"

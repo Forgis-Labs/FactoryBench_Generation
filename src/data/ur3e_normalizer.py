@@ -221,8 +221,11 @@ def normalize_dataset(
     logger.info(f"Loading dataset from {input_file.name}...")
     df = pd.read_excel(input_file)
     
+    # Halve the sampling frequency by keeping every 2nd row
+    df = df.iloc[::2].reset_index(drop=True)
+
     logger.info(f"Normalizing {len(df)} rows...")
-    
+
     # Get first timestamp for relative time calculation
     first_timestamp_ms = None
     if "Timestamp" in df.columns and len(df) > 0:

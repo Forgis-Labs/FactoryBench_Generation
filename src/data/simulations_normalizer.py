@@ -29,20 +29,6 @@ Usage:
 
 import json
 import math
-
-
-class _NaNSafeEncoder(json.JSONEncoder):
-    def iterencode(self, o, _one_shot=False):
-        return super().iterencode(self._sanitize(o), _one_shot)
-
-    def _sanitize(self, obj):
-        if isinstance(obj, float) and math.isnan(obj):
-            return None
-        if isinstance(obj, dict):
-            return {k: self._sanitize(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [self._sanitize(v) for v in obj]
-        return obj
 import logging
 import argparse
 from pathlib import Path
@@ -54,6 +40,22 @@ except ImportError:
     raise ImportError("pandas is required. Install with: pip install pandas")
 
 logger = logging.getLogger(__name__)
+
+
+class _NaNSafeEncoder(json.JSONEncoder):
+    """JSON encoder that replaces NaN with None."""
+    def iterencode(self, o, _one_shot=False):
+        return super().iterencode(self._sanitize(o), _one_shot)
+
+    def _sanitize(self, obj):
+        if isinstance(obj, float) and math.isnan(obj):
+            return None
+        if isinstance(obj, dict):
+            return {k: self._sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._sanitize(v) for v in obj]
+        return obj
+
 
 # UR5 joint order → index 0-5
 JOINTS = [
@@ -127,6 +129,9 @@ def _build_column_mapping() -> Dict[str, Optional[str]]:
 
     m["gripper_command"] = "gripper_attached"
 
+    # Add event field (critical for Level 2 generator)
+    m["event"] = "event_id"
+
     return m
 
 
@@ -138,6 +143,15 @@ def _to_float(value) -> Optional[float]:
         return None
     try:
         return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_int(value) -> Optional[int]:
+    if pd.isna(value):
+        return None
+    try:
+        return int(float(value))
     except (TypeError, ValueError):
         return None
 
@@ -157,9 +171,18 @@ def normalize_row(row: "pd.Series", first_timestamp_ms: float) -> Dict[str, Any]
         if src_col is None or src_col not in row.index:
             result[schema_col] = None
         else:
-            result[schema_col] = _to_float(row[src_col])
+            if schema_col == "event":
+                eid = _to_int(row[src_col])
+                if eid and eid != 0:
+                    ep = row.get("event_params")
+                    ep_s = str(ep).strip() if ep is not None and not pd.isna(ep) else ""
+                    result[schema_col] = f"{eid}_{ep_s}" if ep_s else eid
+                else:
+                    result[schema_col] = None
+            else:
+                result[schema_col] = _to_float(row[src_col])
 
-    # Fault label: 0 for no event, otherwise use event_id
+    # Fault label: 0 for no event, otherwise use event_id (same as event)
     event_id = row.get("event_id")
     if event_id is None or pd.isna(event_id):
         result["fault_label"] = 0
@@ -176,7 +199,7 @@ def normalize_row(row: "pd.Series", first_timestamp_ms: float) -> Dict[str, Any]
     return result
 
 
-def normalize_csv(csv_path: Path, src_hz: int = 60, target_hz: int = 10) -> List[Dict[str, Any]]:
+def normalize_csv(csv_path: Path, src_hz: int = 60, target_hz: int = 5) -> List[Dict[str, Any]]:
     df = pd.read_csv(csv_path)
     if df.empty:
         return []
@@ -187,16 +210,33 @@ def normalize_csv(csv_path: Path, src_hz: int = 60, target_hz: int = 10) -> List
 
     first_timestamp_ms = float(df.iloc[0]["sim_time_s"]) * 1000
 
+    # Build columns for the DataFrame output
     cols: Dict[str, Any] = {
         "timestamp_ms": (df["sim_time_s"] * 1000 - first_timestamp_ms).astype(int),
     }
 
     for schema_col, src_col in COLUMN_MAPPING.items():
         if src_col is not None and src_col in df.columns:
-            cols[schema_col] = pd.to_numeric(df[src_col], errors="coerce")
+            if schema_col == "event":
+                event_nums = pd.to_numeric(df[src_col], errors="coerce")
+                if "event_params" in df.columns:
+                    params_col = df["event_params"].fillna("").astype(str)
+                    tokens = []
+                    for eid, ep in zip(event_nums, params_col):
+                        if pd.isna(eid) or int(eid) == 0:
+                            tokens.append(None)
+                        else:
+                            ep_s = ep.strip()
+                            tokens.append(f"{int(eid)}_{ep_s}" if ep_s else int(eid))
+                    cols[schema_col] = tokens
+                else:
+                    cols[schema_col] = event_nums.astype("Int64")
+            else:
+                cols[schema_col] = pd.to_numeric(df[src_col], errors="coerce")
         else:
             cols[schema_col] = None
 
+    # fault_label (can be kept separately, but we already have event)
     cols["fault_label"] = (
         pd.to_numeric(df["event_id"], errors="coerce").fillna(0).astype(int)
         if "event_id" in df.columns else 0
@@ -204,7 +244,9 @@ def normalize_csv(csv_path: Path, src_hz: int = 60, target_hz: int = 10) -> List
     cols["task_phase"] = df["task_phase"].astype(str) if "task_phase" in df.columns else None
 
     out = pd.DataFrame(cols, index=df.index).astype(object)
-    return out.where(out.notna(), other=None).to_dict(orient="records")
+    # Replace NaN with None
+    out = out.where(out.notna(), None)
+    return out.to_dict(orient="records")
 
 
 def normalize_episode(ep_dir: Path, output_dir: Path) -> None:
@@ -232,12 +274,16 @@ def normalize_episode(ep_dir: Path, output_dir: Path) -> None:
 
     # Episode-level metadata
     ep_meta = {}
-    meta_csv = ep_dir / "metadata.csv"
-    if meta_csv.exists():
+    meta_json = ep_dir / "metadata.json"
+    if meta_json.exists():
         try:
-            ep_meta = pd.read_csv(meta_csv).to_dict(orient="records")
+            with open(meta_json) as f:
+                ep_meta = json.load(f)
         except Exception:
             pass
+
+    raw_baseline = ep_meta.get("baseline", {})
+    raw_cf = ep_meta.get("counterfactual", {})
 
     meta = {
         "episode_id": episode_id,
@@ -249,12 +295,14 @@ def normalize_episode(ep_dir: Path, output_dir: Path) -> None:
             "first_timestamp_ms": 0,
             "last_timestamp_ms": baseline_rows[-1]["timestamp_ms"],
             "duration_ms": baseline_rows[-1]["timestamp_ms"],
+            "task_success": bool(raw_baseline.get("success", 1)),
         },
         "counterfactual": {
             "num_samples": len(counterfactual_rows),
             "first_timestamp_ms": 0,
             "last_timestamp_ms": counterfactual_rows[-1]["timestamp_ms"],
             "duration_ms": counterfactual_rows[-1]["timestamp_ms"],
+            "task_success": bool(raw_cf.get("success", 1)),
         },
         "episode_meta": ep_meta,
     }

@@ -54,7 +54,31 @@ DIFFICULTIES = list(DIFFICULTY_CONFIGS.keys())
 EXCLUDED_JOINT_SIGNALS = {"joint_voltage", "joint_temp", "joint_mode"}
 JOINT_INDEX_RANGE = set(range(6))
 MIN_POST_EVENT_TIMESTAMPS_AFTER = 5
-CF_DATASET_FOLDERS = ["cf_aursad", "cf_vorausad"]
+CF_DATASET_FOLDERS = ["cf_aursad", "cf_vorausad", "simulations"]  # full list; filtered at runtime via --datasets
+
+# MC option IDs that require signals absent from simulation data
+NON_SIMULATION_EXCLUDED_MC_IDS = {
+    "mc_020",  # task_success — only available in simulation metadata
+}
+
+SIMULATION_EXCLUDED_MC_IDS = {
+    "mc_001",  # safety_mode
+    "mc_002",  # safety_mode
+    "mc_005",  # effort_current
+    "mc_010",  # vibration
+    "mc_013",  # robot_current
+    "mc_014",  # robot_current
+    "mc_017",  # joint_temp
+    "mc_019",  # safety_mode
+}
+
+# MC option IDs that use mode signals (safety_mode, joint_mode, robot_mode),
+# excluded from predictive templates where mode state is not being predicted.
+PREDICTIVE_EXCLUDED_MC_IDS = {
+    "mc_001",  # safety_mode
+    "mc_002",  # safety_mode
+    "mc_019",  # safety_mode
+}
 
 
 def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]]) -> Optional[str]:
@@ -620,6 +644,7 @@ def build_multiselect_options_and_answer(
     baseline_subseries: List[Dict[str, Any]],
     post_event_rows: List[Dict[str, Any]],
     mc_option_lookup: Dict[str, str],
+    episode_metadata: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, str], str]:
     """
     Build exactly 4 multi-select options:
@@ -658,6 +683,7 @@ def build_multiselect_options_and_answer(
             subseries=baseline_subseries,
             post_event_rows=post_event_rows,
             thresholds=sampled_thresholds,
+            episode_metadata=episode_metadata,
         )
         options_data.append((opt_id, statement, truth))
 
@@ -691,6 +717,7 @@ def fill_template(
     answer_subseries: Optional[List[Dict[str, Any]]] = None,
     difficulty: str = "medium",
     steps_ahead: Optional[int] = None,
+    episode_metadata: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 3 question template.
@@ -720,6 +747,7 @@ def fill_template(
 
     options: Dict[str, Any] = {}
     answer = None
+    acceptance_bounds = None
 
     if tid == 1:
         chunks = sample_subsequent_chunks(post_event_rows, n_chunks=4, min_chunk=5, max_chunk=7)
@@ -745,6 +773,7 @@ def fill_template(
             baseline_subseries=baseline_rows,
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
+            episode_metadata=episode_metadata,
         )
         question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
 
@@ -754,6 +783,7 @@ def fill_template(
             baseline_subseries=baseline_rows,
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
+            episode_metadata=episode_metadata,
         )
         question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
 
@@ -771,6 +801,9 @@ def fill_template(
             return None
         answer = round(float(signal_value), 6)
         question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time, signal=signal, n=n_ms)
+        vals = [float(r[signal]) for r in subseries if isinstance(r.get(signal), (int, float, np.floating))]
+        std = float(np.std(vals)) if vals else 0.0
+        acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std, 6)}
 
     elif tid == 5:
         joint_signal = pick_joint_indexed_signal_base(subseries)
@@ -783,15 +816,19 @@ def fill_template(
         n_ms = int(float(target_row.get("timestamp_ms", t_event_ref))) - t_event_ref
 
         tensor_values: List[float] = []
+        tensor_stds: List[float] = []
         for joint_idx in range(6):
             key = f"{joint_signal}_{joint_idx}"
             value = target_row.get(key)
             if not isinstance(value, (int, float, np.floating)):
                 return None
             tensor_values.append(round(float(value), 6))
+            vals = [float(r[key]) for r in subseries if isinstance(r.get(key), (int, float, np.floating))]
+            tensor_stds.append(round(float(np.std(vals)) if vals else 0.0, 6))
 
         answer = "_".join(str(v) for v in tensor_values)
         question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time, joint_signal=joint_signal, n=n_ms)
+        acceptance_bounds = {"signal": joint_signal, "std": tensor_stds, "margin": tensor_stds}
 
     else:
         logger.warning(f"Unknown template id: {tid}")
@@ -803,6 +840,7 @@ def fill_template(
         "options": options,
         "event_id": event_obj["id"],
         "answer": answer,
+        "acceptance_bounds": acceptance_bounds,
         "difficulty": difficulty,
     }
 
@@ -821,6 +859,7 @@ def generate_level3_questions(
     n: int = 100,
     seed: Optional[int] = None,
     mc_option_lookup: Optional[Dict[str, str]] = None,
+    datasets: Optional[List[str]] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -831,11 +870,12 @@ def generate_level3_questions(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    cf_pairs = discover_cf_episode_pairs(datasets_dir, CF_DATASET_FOLDERS)
+    allowed = datasets if datasets else CF_DATASET_FOLDERS
+    cf_pairs = discover_cf_episode_pairs(datasets_dir, allowed)
     if not cf_pairs:
         raise FileNotFoundError(
             f"No paired episodes found under {datasets_dir / 'normalized_episodes'} "
-            f"for cf datasets: {CF_DATASET_FOLDERS}"
+            f"for cf datasets: {allowed}"
         )
 
     pairs_by_dataset: Dict[str, List[Dict[str, Any]]] = {}
@@ -924,26 +964,44 @@ def generate_level3_questions(
         alt_answer_subseries = normalize_timestamps(alt_answer_subseries, base_timestamp_ms)
         post_event_rows = normalize_timestamps(post_event_rows, base_timestamp_ms)
 
-        event_segment_rows, post_after_event_rows = split_event_segment(post_event_rows)
+        event_segment_rows, _post_after_event_rows = split_event_segment(post_event_rows)
         if not event_segment_rows:
-            continue
-        if len(post_after_event_rows) < MIN_POST_EVENT_TIMESTAMPS_AFTER:
             continue
 
         event_time_ms = get_last_timestamp(post_event_rows[:1])
 
         template = random.choice(templates)
 
+        if sampled_dataset == "simulations":
+            effective_mc_lookup = {k: v for k, v in mc_option_lookup.items() if k not in SIMULATION_EXCLUDED_MC_IDS}
+        else:
+            effective_mc_lookup = {k: v for k, v in mc_option_lookup.items() if k not in NON_SIMULATION_EXCLUDED_MC_IDS}
+
+        if template.get("type") == "predictive":
+            effective_mc_lookup = {k: v for k, v in effective_mc_lookup.items() if k not in PREDICTIVE_EXCLUDED_MC_IDS}
+
+        ep_metadata: Optional[Dict[str, Any]] = None
+        if sampled_dataset == "simulations":
+            meta_path = alt_path.parent / f"{alt_path.stem}_metadata.json"
+            if meta_path.exists():
+                try:
+                    with meta_path.open(encoding="utf-8") as _f:
+                        raw_meta = json.load(_f)
+                    ep_metadata = raw_meta.get("counterfactual", {})
+                except Exception:
+                    pass
+
         filled = fill_template(
             template,
             subseries,
             post_event_rows,
             events,
-            mc_option_lookup,
+            effective_mc_lookup,
             t2_ms=event_time_ms,
             answer_subseries=alt_answer_subseries,
             difficulty=difficulty,
             steps_ahead=steps_ahead,
+            episode_metadata=ep_metadata,
         )
         if filled is None:
             continue
@@ -964,10 +1022,11 @@ def generate_level3_questions(
             "question": filled["question"],
             "options": filled["options"],
             "answer": filled["answer"],
+            "acceptance_bounds": filled.get("acceptance_bounds"),
             "provenance": {
                 "dataset": pair["cf_dataset"],
-                "sampled_subfolder": pair["non_alt_subfolder"],
-                "counterpart_subfolder": pair["alt_subfolder"],
+                "sampled_subfolder": pair.get("non_alt_subfolder", non_alt_path.stem),
+                "counterpart_subfolder": pair.get("alt_subfolder", alt_path.stem),
                 "episode": non_alt_path.stem,
                 "subseries_start_index": subseries_start_index,
                 "subseries_length": subseries_length,
@@ -983,7 +1042,7 @@ def generate_level3_questions(
 
         logger.info(
             f"✓ [{generated + 1}/{n}] {out_path.name} "
-            f"(template {template['id']}, {pair['cf_dataset']}/{pair['non_alt_subfolder']})"
+            f"(template {template['id']}, {pair['cf_dataset']}/{pair.get('non_alt_subfolder', non_alt_path.stem)})"
         )
         generated += 1
 
@@ -1018,6 +1077,12 @@ def main() -> None:
     )
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
+    parser.add_argument(
+        "--datasets",
+        nargs="+",
+        default=None,
+        help=f"Datasets to sample from (default: all). Choices: {CF_DATASET_FOLDERS}",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -1043,6 +1108,7 @@ def main() -> None:
         mc_option_lookup=mc_option_lookup,
         n=args.n,
         seed=args.seed,
+        datasets=args.datasets,
     )
 
 

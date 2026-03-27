@@ -31,10 +31,16 @@ def fill(template_str: str, **kwargs: Any) -> str:
     """
     Safe template substitution via str.replace().
     Avoids str.format() pitfalls with literal braces (e.g. {T}, {T+n}).
+    Automatically provides {Event} (sentence-start capitalised version) whenever
+    the 'event' kwarg is supplied, so templates can use {Event} when the
+    event description opens the sentence.
     """
     result = template_str
     for key, value in kwargs.items():
         result = result.replace(f"{{{key}}}", str(value))
+    if "event" in kwargs:
+        s = str(kwargs["event"])
+        result = result.replace("{Event}", s[:1].upper() + s[1:] if s else "")
     return result
 
 
@@ -256,14 +262,37 @@ def fill_event_description(
             return None
 
         text = str(raw_event)
-        parts = text.split("_")
-        if len(parts) < 2:
+        underscore_idx = text.find("_")
+        if underscore_idx < 0:
+            return None
+
+        params_str = text[underscore_idx + 1:]
+        if not params_str:
             return None
 
         var_items = list(variables.items())
         if not var_items:
             return {}
 
+        # Key=value format: "motor=motor_2;phase_offset_deg=9.87"
+        if "=" in params_str:
+            parsed_kv: Dict[str, Any] = {}
+            for pair in params_str.split(";"):
+                pair = pair.strip()
+                if "=" not in pair:
+                    continue
+                k, v = pair.split("=", 1)
+                parsed_kv[k.strip()] = _to_float_if_possible(v.strip())
+
+            result: Dict[str, Any] = {}
+            for var_name, var_type in var_items:
+                if var_name in parsed_kv:
+                    val = parsed_kv[var_name]
+                    result[var_name] = _to_int_if_possible(str(val)) if var_type == "integer" else val
+            return result if result else None
+
+        # Positional format (legacy): underscore-separated values after event_id
+        parts = text.split("_")
         tokens = parts[1:]
         parsed: Dict[str, Any] = {}
 
@@ -336,12 +365,12 @@ def fill_event_description(
     for row in subseries:
         v = row.get(signal)
         if isinstance(v, (int, float, np.floating)):
-            start_val = round(float(v), 3)
+            start_val = round(float(v), 2)
             break
     for row in reversed(subseries):
         v = row.get(signal)
         if isinstance(v, (int, float, np.floating)):
-            end_val = round(float(v), 3)
+            end_val = round(float(v), 2)
             break
 
     kwargs: Dict[str, Any] = {}
@@ -356,12 +385,12 @@ def fill_event_description(
     if "Y" in variables:
         kwargs["Y"] = end_val if end_val is not None else 0.0
     if "delta" in variables:
-        kwargs["delta"] = round(abs((end_val or 0.0) - (start_val or 0.0)), 3)
+        kwargs["delta"] = round(abs((end_val or 0.0) - (start_val or 0.0)), 2)
     if "duration" in variables:
         kwargs["duration"] = random.randint(2, 10)
     if "rate" in variables:
         n = max(1, len(subseries))
-        kwargs["rate"] = round(((end_val or 0.0) - (start_val or 0.0)) / n, 4)
+        kwargs["rate"] = round(((end_val or 0.0) - (start_val or 0.0)) / n, 2)
     if "x" in variables:
         kwargs["x"] = random.choice([0.5, 1.0, 1.5, 2.0, 2.5])
     if "L" in variables or "{L}" in desc:
