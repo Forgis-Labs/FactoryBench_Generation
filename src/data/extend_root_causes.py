@@ -1,0 +1,198 @@
+"""One-off script to extend root_causes.json with protocol-mapped fault types."""
+import json
+from pathlib import Path
+
+rc_path = Path(__file__).resolve().parents[2] / "data/labelling/rca/root_causes.json"
+rc = json.load(open(rc_path))
+
+NEW = [
+    {
+        "fault_id": 31,
+        "root_cause": "joint_encoder_fault",
+        "description": "Motor encoder index signal is missing or has drifted beyond acceptable bounds, causing joint position estimation to fail.",
+        "severity_levels": ["medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["persistent_tracking_error", "speed_drop_with_force_spike", "protective_stop_event"],
+        "related_error_codes": ["C25A", "C26A", "C27A", "C28A", "C85A"],
+    },
+    {
+        "fault_id": 32,
+        "root_cause": "joint_encoder_calibration_failure",
+        "description": "Joint encoder calibration data is invalid, missing, or has a checksum mismatch, preventing accurate position tracking.",
+        "severity_levels": ["medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["persistent_tracking_error", "high_current_low_motion"],
+        "related_error_codes": ["C20A", "C21A", "C22A", "C23A", "C24A"],
+    },
+    {
+        "fault_id": 33,
+        "root_cause": "flash_memory_corruption",
+        "description": "Flash memory storing calibration or firmware data has a checksum error or write-verify failure, leading to corrupted joint configuration.",
+        "severity_levels": ["high"],
+        "injectable": False,
+        "possible_anomalies": ["persistent_tracking_error", "protective_stop_event"],
+        "related_error_codes": ["C30A", "C33A", "C34A", "C35A"],
+    },
+    {
+        "fault_id": 34,
+        "root_cause": "serial_communication_fault",
+        "description": "Serial bus communication between joints and master controller is intermittent or corrupted, causing dropped or malformed packets.",
+        "severity_levels": ["low", "medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["persistent_tracking_error", "speed_drop_with_force_spike"],
+        "related_error_codes": ["C31A", "C32A", "C36A", "C37A", "C38A"],
+    },
+    {
+        "fault_id": 35,
+        "root_cause": "controller_communication_loss",
+        "description": "Network or internal bus communication between the robot arm and the control box is lost or heavily interfered.",
+        "severity_levels": ["medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["protective_stop_event", "persistent_tracking_error"],
+        "related_error_codes": ["C10A", "C10A1", "C10A2", "C4A1"],
+    },
+    {
+        "fault_id": 36,
+        "root_cause": "safety_board_communication_fault",
+        "description": "Communication with the Safety Control Board (uP A or B) is lost, causing the safety system to enter a fault state.",
+        "severity_levels": ["high"],
+        "injectable": False,
+        "possible_anomalies": ["protective_stop_event"],
+        "related_error_codes": ["C4A2", "C4A3", "C4A4", "C4A5"],
+    },
+    {
+        "fault_id": 37,
+        "root_cause": "teach_pendant_communication_fault",
+        "description": "Communication with the Teach Pendant (PolyScope interface) is lost, preventing operator input and status feedback.",
+        "severity_levels": ["low", "medium"],
+        "injectable": False,
+        "possible_anomalies": ["protective_stop_event"],
+        "related_error_codes": ["C4A6", "C4A7", "C4A8"],
+    },
+    {
+        "fault_id": 38,
+        "root_cause": "processor_overload",
+        "description": "The control processor is overloaded by excessive script instructions or UR+ software, causing real-time control loop violations.",
+        "severity_levels": ["low", "medium"],
+        "injectable": False,
+        "possible_anomalies": ["persistent_tracking_error", "speed_drop_with_force_spike"],
+        "related_error_codes": ["C5A", "C50A"],
+    },
+    {
+        "fault_id": 39,
+        "root_cause": "power_startup_failure",
+        "description": "Unexpected voltage levels detected on internal rails during startup or shutdown, indicating a power supply or wiring fault.",
+        "severity_levels": ["medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["protective_stop_event"],
+        "related_error_codes": ["C51A", "C52A", "C53A", "C54A", "C55A"],
+    },
+    {
+        "fault_id": 40,
+        "root_cause": "joint_thermal_overload",
+        "description": "One or more joint motors or electronics have exceeded their thermal limit (typically 80C), triggering a protective shutdown.",
+        "severity_levels": ["medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["gradual_current_force_temperature_rise", "protective_stop_event"],
+        "related_error_codes": ["C6A", "C60A", "C61A", "C62A", "C63A", "C64A", "C65A"],
+    },
+    {
+        "fault_id": 41,
+        "root_cause": "energy_surplus_fault",
+        "description": "The power supply is sending excess energy to the energy dissipation resistor, indicating regenerative braking overload.",
+        "severity_levels": ["medium"],
+        "injectable": False,
+        "possible_anomalies": ["protective_stop_event"],
+        "related_error_codes": ["C60A", "C61A"],
+    },
+    {
+        "fault_id": 42,
+        "root_cause": "gearbox_overload",
+        "description": "Joint gearbox is operating close to its shear torque limit due to excessive acceleration, deceleration, or mechanical obstruction.",
+        "severity_levels": ["medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["high_current_low_motion", "persistent_tracking_error", "protective_stop_event"],
+        "related_error_codes": ["C70A", "C71A", "C72A", "C73A", "C74A", "C75A"],
+    },
+    {
+        "fault_id": 43,
+        "root_cause": "firmware_mismatch",
+        "description": "The firmware loaded on a joint board does not match the expected hardware size or version, causing incompatible joint operation.",
+        "severity_levels": ["high"],
+        "injectable": False,
+        "possible_anomalies": ["persistent_tracking_error", "protective_stop_event"],
+        "related_error_codes": ["C76A", "C77A", "C78A", "C79A"],
+    },
+    {
+        "fault_id": 44,
+        "root_cause": "motor_encoder_stall",
+        "description": "Motor is receiving current commands but the encoder reports no position change, indicating a stalled or seized motor shaft.",
+        "severity_levels": ["high"],
+        "injectable": False,
+        "possible_anomalies": ["high_current_low_motion", "protective_stop_event"],
+        "related_error_codes": ["C85A", "C85A200"],
+    },
+    {
+        "fault_id": 45,
+        "root_cause": "protective_stop_external_trigger",
+        "description": "A protective stop was triggered by an external safety device (light curtain, safety PLC, or E-stop) rather than an internal fault.",
+        "severity_levels": ["low", "medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["protective_stop_event", "speed_drop_with_force_spike"],
+        "related_error_codes": ["C7A", "C7A1", "C7A2"],
+    },
+    {
+        "fault_id": 46,
+        "root_cause": "joint_speed_limit_violation",
+        "description": "A joint exceeded its maximum allowable speed, triggering safety system intervention. Can result from incorrect trajectory planning or encoder miscalibration.",
+        "severity_levels": ["medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["protective_stop_event", "speed_drop_with_force_spike"],
+        "related_error_codes": ["C2A", "C2A1", "C2A2"],
+    },
+    {
+        "fault_id": 47,
+        "root_cause": "joint_position_limit_violation",
+        "description": "Robot joint moved outside its configured soft or hard position limits, triggering a safety stop.",
+        "severity_levels": ["medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["protective_stop_event", "persistent_tracking_error"],
+        "related_error_codes": ["C1A", "C1A1", "C1A2"],
+    },
+    {
+        "fault_id": 48,
+        "root_cause": "force_torque_limit_exceeded",
+        "description": "Contact force or joint torque exceeded configured safety thresholds. Often caused by unexpected collisions or payload changes.",
+        "severity_levels": ["low", "medium", "high"],
+        "injectable": False,
+        "possible_anomalies": ["tcp_force_spike", "sustained_contact_force", "protective_stop_event"],
+        "related_error_codes": ["C3A", "C3A1", "C3A2"],
+    },
+    {
+        "fault_id": 49,
+        "root_cause": "controller_packet_timing_fault",
+        "description": "Control packets between joints and master arrive out of sequence or too early/late, disrupting real-time synchronisation of the control loop.",
+        "severity_levels": ["low", "medium"],
+        "injectable": False,
+        "possible_anomalies": ["persistent_tracking_error", "speed_drop_with_force_spike"],
+        "related_error_codes": ["C10A", "C10A1", "C10A2", "C11A", "C12A"],
+    },
+    {
+        "fault_id": 50,
+        "root_cause": "idle_power_overconsumption",
+        "description": "Robot is drawing significantly more power than expected during idle state, indicating an internal electrical fault, short circuit, or brake malfunction.",
+        "severity_levels": ["low", "medium"],
+        "injectable": False,
+        "possible_anomalies": ["gradual_current_force_temperature_rise"],
+        "related_error_codes": ["C61A", "C62A"],
+    },
+]
+
+# Avoid duplicates
+existing_ids = {r.get("fault_id") for r in rc}
+to_add = [r for r in NEW if r["fault_id"] not in existing_ids]
+
+rc.extend(to_add)
+json.dump(rc, open(rc_path, "w", encoding="utf-8"), indent=2)
+print(f"Added {len(to_add)} root causes (IDs {to_add[0]['fault_id']}-{to_add[-1]['fault_id']})")
+print(f"Total: {len(rc)}")

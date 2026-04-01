@@ -1,0 +1,438 @@
+"""
+Level 4 question generator: Open-Ended Reasoning.
+
+Reads normalized episode JSON files and generates questions from four templates:
+  1 - troubleshooting      : anomaly diagnosis + remediation steps (single episode subseries)
+  2 - optimization         : throughput / parameter improvement suggestions (single episode subseries)
+  3 - ranking by duration  : rank 4 trajectory-opt episodes shortest → longest
+  4 - ranking by energy    : rank 4 trajectory-opt episodes most → least energy-efficient
+
+Templates 1–2 use a random subseries of a single episode; ground truth is delegated
+to an LLM-as-Judge pipeline.
+Templates 3–4 use 4 full episodes that carry episode-level duration/energy metadata;
+ground truth is the label permutation sorted by the metric (ascending).
+
+Output: output/questions/level4/level4_{NNNN}.json
+
+Usage:
+    python -m src.question_generation.level4.level4 -n 100 --seed 42
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import random
+import uuid
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+
+from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
+from src.question_generation.utils.template import (
+    build_context,
+    discover_episodes_by_dataset,
+)
+from src.question_generation.utils.time_series import parse_event_id
+
+logger = logging.getLogger(__name__)
+
+VALID_DATASETS = ["inter_aursad", "inter_vorausad", "simulations"]
+RANKING_LABELS = ["A", "B", "C", "D"]
+RANKING_TEMPLATE_IDS = {3, 4}
+RANKING_METRIC = {3: "duration", 4: "energy"}
+
+DIFFICULTY_CONFIGS: Dict[str, Dict[str, Any]] = {
+    "easy":   {"context_min": 65, "context_max": 90},
+    "medium": {"context_min": 32, "context_max": 64},
+    "hard":   {"context_min": 16, "context_max": 31},
+}
+DIFFICULTIES = list(DIFFICULTY_CONFIGS.keys())
+
+
+# ---------------------------------------------------------------------------
+# Generation loop
+# ---------------------------------------------------------------------------
+
+
+def get_root_cause_for_subseries(
+    subseries: List[Dict[str, Any]],
+    root_causes: Dict[int, Dict[str, Any]],
+    events: List[Dict[str, Any]],
+    all_rows: Optional[List[Dict[str, Any]]] = None,
+    start_idx: int = 0,
+) -> Dict[str, Any]:
+    """
+    Determine the anomaly status, root cause, and triggering event for a subseries.
+
+    Event resolution (in priority order):
+      1. Any row inside the subseries with a non-zero, non-1 event token.
+      2. The most recent non-zero, non-1 event in rows *before* the subseries
+         (subseries is in post-event territory).
+
+    Returns a dict with:
+      - anomaly_present (bool)
+      - fault_label (int)
+      - root_cause (str)
+      - description (str)
+      - event_id (int or None)
+      - event_name (str or None)
+      - event_context (str): "in_window" | "pre_window" | None
+    """
+    # --- Fault label: dominant non-zero label in subseries ---
+    label_counts: Dict[int, int] = {}
+    for row in subseries:
+        fl = row.get("fault_label")
+        try:
+            fl_int = int(float(fl))
+            label_counts[fl_int] = label_counts.get(fl_int, 0) + 1
+        except (TypeError, ValueError):
+            pass
+    non_zero_labels = {k: v for k, v in label_counts.items() if k != 0}
+    dominant_label = max(non_zero_labels, key=lambda k: non_zero_labels[k]) if non_zero_labels else 0
+
+    # --- Event: first non-zero, non-1 event inside the subseries ---
+    event_id_in_window: Optional[int] = None
+    for row in subseries:
+        ev_id = parse_event_id(row.get("event", 0))
+        if ev_id not in (0, 1):
+            event_id_in_window = ev_id
+            break
+
+    # --- Event: most recent non-zero, non-1 event in rows before the subseries ---
+    event_id_pre_window: Optional[int] = None
+    if event_id_in_window is None and all_rows is not None and start_idx > 0:
+        for row in reversed(all_rows[:start_idx]):
+            ev_id = parse_event_id(row.get("event", 0))
+            if ev_id not in (0, 1):
+                event_id_pre_window = ev_id
+                break
+
+    dominant_event_id = event_id_in_window if event_id_in_window is not None else event_id_pre_window
+    event_context = (
+        "in_window" if event_id_in_window is not None
+        else "pre_window" if event_id_pre_window is not None
+        else None
+    )
+    event_obj = next((e for e in events if e["id"] == dominant_event_id), None) if dominant_event_id else None
+
+    if dominant_label == 0 and dominant_event_id is None:
+        return {
+            "anomaly_present": False,
+            "fault_label": 0,
+            "root_cause": "normal",
+            "description": "Normal operation — no anomaly present.",
+            "event_id": None,
+            "event_name": None,
+            "event_context": None,
+        }
+
+    rc = root_causes.get(dominant_label, {})
+    return {
+        "anomaly_present": True,
+        "fault_label": dominant_label,
+        "root_cause": rc.get("root_cause", f"fault_{dominant_label}") if dominant_label != 0 else "unknown",
+        "description": rc.get("description", ""),
+        "event_id": dominant_event_id,
+        "event_name": event_obj["name"] if event_obj else None,
+        "event_context": event_context,
+    }
+
+
+def _extract_episode_meta(raw: Any) -> Dict[str, Any]:
+    """Return the episode-level duration and energy from a raw episode dict."""
+    if isinstance(raw, dict):
+        return {"duration": raw.get("duration"), "energy": raw.get("energy")}
+    return {"duration": None, "energy": None}
+
+
+def _build_ranking_context(
+    labeled_rows: List[Tuple[str, List[Dict[str, Any]]]],
+    important_features: Optional[List[str]],
+) -> Dict[str, Any]:
+    """
+    Build a multi-stream context for ranking questions.
+
+    Each episode is padded to the common maximum length (repeating the last row)
+    then encoded independently with build_context.  The result is a dict
+    {"streams": {"A": <context>, "B": <context>, ...}}.
+    """
+    max_len = max((len(rows) for _, rows in labeled_rows), default=0)
+    keep = (set(important_features) | {"timestamp_ms", "task_phase"}) if important_features else None
+
+    streams: Dict[str, Any] = {}
+    for label, rows in labeled_rows:
+        padded: List[Dict[str, Any]] = list(rows)
+        if padded and len(padded) < max_len:
+            padded += [dict(padded[-1])] * (max_len - len(padded))
+        if keep and padded:
+            padded = [{k: v for k, v in row.items() if k in keep} for row in padded]
+        streams[label] = build_context(padded)
+
+    return {"streams": streams}
+
+
+def _try_generate_ranking_question(
+    template: Dict[str, Any],
+    episodes_by_dataset: Dict[str, List[Path]],
+    available_datasets: List[str],
+    raw_cache: Dict[str, Any],
+    difficulty: str,
+) -> Optional[Dict[str, Any]]:
+    """
+    Attempt to build a ranking question (templates 3 and 4).
+
+    Scans all available episodes for ones that carry the required metric
+    (duration for template 3, energy for template 4) in their top-level
+    metadata, then samples 4 and ranks them.
+
+    Returns None if fewer than 4 eligible episodes exist.
+    """
+    metric_key = RANKING_METRIC[template["id"]]
+
+    # Collect episodes that have the required metadata field
+    candidates: List[Tuple[str, Path]] = []
+    for ds in available_datasets:
+        for path in episodes_by_dataset[ds]:
+            key = str(path)
+            if key not in raw_cache:
+                raw_cache[key] = load_json(path)
+            meta = _extract_episode_meta(raw_cache[key])
+            if meta.get(metric_key) is not None:
+                candidates.append((ds, path))
+
+    if len(candidates) < 4:
+        return None
+
+    sampled = random.sample(candidates, 4)
+    labels = list(RANKING_LABELS)
+    random.shuffle(labels)
+
+    labeled_rows: List[Tuple[str, List[Dict[str, Any]]]] = []
+    metric_values: Dict[str, float] = {}
+    provenance_episodes = []
+
+    for (ds, path), label in zip(sampled, labels):
+        raw = raw_cache[str(path)]
+        if isinstance(raw, dict):
+            rows = raw.get("baseline", raw.get("flat", []))
+        else:
+            rows = raw
+        rows = rows if isinstance(rows, list) else []
+        if not rows:
+            return None
+        metric_values[label] = float(_extract_episode_meta(raw)[metric_key])
+        labeled_rows.append((label, rows))
+        provenance_episodes.append({"dataset": ds, "episode": path.stem, "label": label})
+
+    # Ground truth: labels sorted ascending by metric
+    # (shortest duration for template 3; lowest energy = most efficient for template 4)
+    answer = "".join(sorted(metric_values, key=lambda lbl: metric_values[lbl]))
+
+    context = _build_ranking_context(labeled_rows, template.get("important_features"))
+
+    return {
+        "id": str(uuid.uuid4()),
+        "level": 4,
+        "difficulty": difficulty,
+        "template_id": template["id"],
+        "template_type": template["type"],
+        "question": template["template"],
+        "options": {},
+        "answer": answer,
+        "acceptance_bounds": None,
+        "provenance": {"episodes": provenance_episodes},
+        "context": context,
+    }
+
+
+def generate_level4_questions(
+    datasets_dir: Path,
+    output_dir: Path,
+    templates: List[Dict[str, Any]],
+    root_causes: Dict[int, Dict[str, Any]],
+    events: List[Dict[str, Any]],
+    n: int = 100,
+    seed: Optional[int] = None,
+    datasets: Optional[List[str]] = None,
+) -> None:
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    allowed = datasets if datasets else VALID_DATASETS
+    by_dataset = discover_episodes_by_dataset(datasets_dir, allowed)
+    if not by_dataset:
+        raise FileNotFoundError(
+            f"No normalized episode JSON files found under "
+            f"{datasets_dir / 'normalized_episodes'} for datasets: {allowed}"
+        )
+
+    episodes_by_dataset = {ds: paths for ds, paths in by_dataset.items() if paths}
+    available_datasets = list(episodes_by_dataset.keys())
+    if not available_datasets:
+        raise FileNotFoundError("No usable datasets found.")
+
+    episode_cache: Dict[str, List[Dict[str, Any]]] = {}
+    raw_cache: Dict[str, Any] = {}
+
+    def load_episode(path: Path) -> List[Dict[str, Any]]:
+        key = str(path)
+        if key not in episode_cache:
+            raw = load_json(path)
+            if isinstance(raw, dict):
+                rows = raw.get("baseline", raw.get("flat", []))
+            else:
+                rows = raw
+            episode_cache[key] = rows if isinstance(rows, list) else []
+        return episode_cache[key]
+
+    generated = 0
+    attempts = 0
+    max_total_attempts = n * 20
+
+    while generated < n and attempts < max_total_attempts:
+        attempts += 1
+
+        difficulty = random.choice(DIFFICULTIES)
+        template = random.choice(templates)
+
+        # --- Templates 3 & 4: multi-episode ranking ---
+        if template["id"] in RANKING_TEMPLATE_IDS:
+            item = _try_generate_ranking_question(
+                template, episodes_by_dataset, available_datasets, raw_cache, difficulty
+            )
+            if item is None:
+                continue
+
+        # --- Templates 1 & 2: single-episode subseries ---
+        else:
+            sampled_dataset = random.choice(available_datasets)
+            ep_path = random.choice(episodes_by_dataset[sampled_dataset])
+            rows = load_episode(ep_path)
+
+            if not rows:
+                continue
+
+            diff_cfg = DIFFICULTY_CONFIGS[difficulty]
+            context_len = random.randint(diff_cfg["context_min"], diff_cfg["context_max"])
+
+            if len(rows) < context_len:
+                continue
+            start_idx = random.randint(0, len(rows) - context_len)
+            subseries = rows[start_idx : start_idx + context_len]
+
+            if not subseries:
+                continue
+
+            answer = None
+            if template["id"] == 1:
+                answer = get_root_cause_for_subseries(
+                    subseries, root_causes, events,
+                    all_rows=rows, start_idx=start_idx,
+                )
+
+            important_features = template.get("important_features")
+            context_subseries = subseries
+            if important_features:
+                keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+                context_subseries = [
+                    {k: v for k, v in row.items() if k in keep} for row in subseries
+                ]
+            context = build_context(context_subseries)
+
+            item = {
+                "id": str(uuid.uuid4()),
+                "level": 4,
+                "difficulty": difficulty,
+                "template_id": template["id"],
+                "template_type": template["type"],
+                "question": template["template"],
+                "options": {},
+                "answer": answer,
+                "acceptance_bounds": None,
+                "provenance": {
+                    "dataset": sampled_dataset,
+                    "episode": ep_path.stem,
+                    "subseries_start_index": start_idx,
+                    "subseries_length": context_len,
+                },
+                "context": context,
+            }
+
+        out_path = output_dir / f"level4_{generated:04d}.json"
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(item, f, indent=2)
+
+        logger.info(
+            f"✓ [{generated + 1}/{n}] {out_path.name} "
+            f"(template {template['id']} '{template['type']}')"
+        )
+        generated += 1
+
+    if generated < n:
+        logger.warning(f"Only generated {generated}/{n} questions after {attempts} attempts.")
+    else:
+        logger.info(f"Done: {generated} questions written to {output_dir}")
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate Level 4 (Open-Ended Reasoning) Q&A pairs."
+    )
+    repo_root = Path(__file__).resolve().parents[3]
+
+    parser.add_argument(
+        "--datasets-dir",
+        type=Path,
+        default=repo_root / "data",
+        help="Root data directory (default: <repo>/data)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=repo_root / "output" / "questions" / "level4",
+        help="Output directory (default: <repo>/output/questions/level4)",
+    )
+    parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed")
+    parser.add_argument(
+        "--datasets",
+        nargs="+",
+        default=None,
+        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true")
+
+    args = parser.parse_args()
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(levelname)s: %(message)s",
+    )
+
+    templates = load_templates(Path(__file__).with_name("question_template.json"))
+    root_causes = load_root_causes(args.datasets_dir / "labelling" / "rca" / "root_causes.json")
+    events = load_events(args.datasets_dir / "labelling" / "events.json")
+
+    generate_level4_questions(
+        datasets_dir=args.datasets_dir,
+        output_dir=args.output,
+        templates=templates,
+        root_causes=root_causes,
+        events=events,
+        n=args.n,
+        seed=args.seed,
+        datasets=args.datasets,
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -803,7 +803,7 @@ def fill_template(
         question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time, signal=signal, n=n_ms)
         vals = [float(r[signal]) for r in subseries if isinstance(r.get(signal), (int, float, np.floating))]
         std = float(np.std(vals)) if vals else 0.0
-        acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std, 6)}
+        acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std * 0.5, 6)}
 
     elif tid == 5:
         joint_signal = pick_joint_indexed_signal_base(subseries)
@@ -828,7 +828,7 @@ def fill_template(
 
         answer = "_".join(str(v) for v in tensor_values)
         question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time, joint_signal=joint_signal, n=n_ms)
-        acceptance_bounds = {"signal": joint_signal, "std": tensor_stds, "margin": tensor_stds}
+        acceptance_bounds = {"signal": joint_signal, "std": tensor_stds, "margin": [round(s * 0.5, 6) for s in tensor_stds]}
 
     else:
         logger.warning(f"Unknown template id: {tid}")

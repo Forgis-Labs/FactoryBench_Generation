@@ -1,69 +1,58 @@
 {
   "mapping": {
     "timestamp_ms": "time",
-
     "setpoint_pos_0": "target_position_1",
     "setpoint_pos_1": "target_position_2",
     "setpoint_pos_2": "target_position_3",
     "setpoint_pos_3": "target_position_4",
     "setpoint_pos_4": "target_position_5",
     "setpoint_pos_5": "target_position_6",
-
     "setpoint_speed_0": "target_velocity_1",
     "setpoint_speed_1": "target_velocity_2",
     "setpoint_speed_2": "target_velocity_3",
     "setpoint_speed_3": "target_velocity_4",
     "setpoint_speed_4": "target_velocity_5",
     "setpoint_speed_5": "target_velocity_6",
-
     "setpoint_acc_0": "target_acceleration_1",
     "setpoint_acc_1": "target_acceleration_2",
     "setpoint_acc_2": "target_acceleration_3",
     "setpoint_acc_3": "target_acceleration_4",
     "setpoint_acc_4": "target_acceleration_5",
     "setpoint_acc_5": "target_acceleration_6",
-
     "effort_target_torque_0": "target_torque_1",
     "effort_target_torque_1": "target_torque_2",
     "effort_target_torque_2": "target_torque_3",
     "effort_target_torque_3": "target_torque_4",
     "effort_target_torque_4": "target_torque_5",
     "effort_target_torque_5": "target_torque_6",
-
     "feedback_pos_0": "joint_position_1",
     "feedback_pos_1": "joint_position_2",
     "feedback_pos_2": "joint_position_3",
     "feedback_pos_3": "joint_position_4",
     "feedback_pos_4": "joint_position_5",
     "feedback_pos_5": "joint_position_6",
-
     "feedback_speed_0": "joint_velocity_1",
     "feedback_speed_1": "joint_velocity_2",
     "feedback_speed_2": "joint_velocity_3",
     "feedback_speed_3": "joint_velocity_4",
     "feedback_speed_4": "joint_velocity_5",
     "feedback_speed_5": "joint_velocity_6",
-
     "effort_current_0": "motor_iq_1",
     "effort_current_1": "motor_iq_2",
     "effort_current_2": "motor_iq_3",
     "effort_current_3": "motor_iq_4",
     "effort_current_4": "motor_iq_5",
     "effort_current_5": "motor_iq_6",
-
     "joint_voltage_0": "motor_voltage_1",
     "joint_voltage_1": "motor_voltage_2",
     "joint_voltage_2": "motor_voltage_3",
     "joint_voltage_3": "motor_voltage_4",
     "joint_voltage_4": "motor_voltage_5",
     "joint_voltage_5": "motor_voltage_6",
-
     "robot_voltage": "robot_voltage",
     "robot_current": "robot_current",
-
     "fault_label": "category"
   },
-
   "notes": {
     "axis_index_offset": "UR3e axes are 0-indexed (0-5); voraus-AD axes are 1-indexed (1-6). Axis N maps to N+1.",
     "effort_current_vs_motor_iq": "UR3e effort_current_{axis} (actual_current, phase RMS) is mapped to motor_iq_{axis} (torque-forming current Iq) as the closest available signal. These are not identical: Iq is the torque-producing component of phase current in field-oriented control.",
@@ -72,23 +61,21 @@
     "timestamp_units": "UR3e timestamp_ms is in milliseconds; voraus-AD time is in seconds. Divide by 1000 on conversion.",
     "sample_column": "voraus-AD sample is a per-recording episode ID with no direct equivalent in the UR3e row-level schema. It must be assigned externally from episode-level metadata (e.g. episode_id)."
   },
-
   "faults": {
-    "0": 21,
-    "1": 25,
-    "2": 26,
-    "3": 26,
-    "4": 26,
-    "5": 23,
-    "6": 24,
-    "7": 27,
-    "8": 28,
-    "9": 29,
-    "10": 22,
-    "11": 30,
+    "0": 6,
+    "1": 10,
+    "2": 11,
+    "3": 29,
+    "4": 30,
+    "5": 8,
+    "6": 9,
+    "7": 12,
+    "8": 13,
+    "9": 14,
+    "10": 7,
+    "11": 15,
     "12": 0
   },
-
   "absent": [
     "setpoint_tcp_0",
     "setpoint_tcp_1",
