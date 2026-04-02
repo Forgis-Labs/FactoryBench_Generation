@@ -3,10 +3,15 @@ import subprocess
 import sys
 from pathlib import Path
 from huggingface_hub import hf_hub_download
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
 
 def main():
     parser = argparse.ArgumentParser(description="End-to-End Pipeline for FactoryBench Level 1")
     parser.add_argument("-n", "--num-questions", type=int, default=100, help="Number of questions to generate")
+    parser.add_argument("-t", "--questions-per-template", type=int, default=None, help="Generate exactly X questions per template (overrides -n)")
     parser.add_argument("--dataset-repo", type=str, default="Forgis/FactoryNet_Dataset")
     parser.add_argument("--kg-repo", type=str, default="Forgis/FactoryBench-KnowledgeGraph")
     parser.add_argument("--test-mode", action="store_true", help="Run in test mode (faster generation)")
@@ -36,6 +41,8 @@ def main():
         "--dataset-repo", args.dataset_repo, 
         "--output-dir", str(q_dir)
     ]
+    if args.questions_per_template is not None:
+        cmd1.extend(["--questions-per-template", str(args.questions_per_template)])
     if args.test_mode:
         cmd1.append("--test-mode")
     subprocess.run(cmd1, check=True)
