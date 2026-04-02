@@ -15,6 +15,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 from typing import Any, Dict, Optional, Tuple
 
 try:
@@ -83,7 +84,7 @@ def create_client_and_model(
 
     key = resolve_api_key(cli_api_key)
     client = OpenAI(api_key=key)
-    model = cli_model or os.getenv("OPENAI_MODEL") or "gpt-5.1"
+    model = os.getenv("OPENAI_MODEL") or cli_model or "gpt-5.1"
     return client, model, "openai"
 
 
@@ -275,6 +276,13 @@ def llm_judge_score(
         return 0.0, f"Judge call failed: {e}"
 
 
+
+def parse_llm_answer(text):
+    # search last A,B,C,D and return it
+    # the model use to answer at the end of the answer something like "The correct answer is C."
+    matches = re.findall(r'\b([A-D])\b', text.upper())
+    return matches[-1] if matches else None
+
 def run_direct_requests(
     entries: list[Tuple[Path, str, int, str]],
     client: Any,
@@ -316,8 +324,8 @@ def run_direct_requests(
         except Exception:
             qa_payload = {}
 
-        answer_format: Dict[str, Any] = qa_payload.get("answer_format") or {}
-        q_type = str(answer_format.get("type") or qa_payload.get("template_type") or qa_payload.get("type") or "unknown")
+        answer_format = str(qa_payload.get("answer_format") or "unknown")
+        question_type = str(qa_payload.get("type") or "unknown")
         acceptance_bounds = qa_payload.get("acceptance_bounds")
 
         # Derive eval level from the Q&A JSON if not provided via CLI
@@ -350,9 +358,8 @@ def run_direct_requests(
             llm_judge_result: tuple[float, str] | None = None
             gt = ground_truth_index.get(prompt_path.stem)
             pred = answer
-            evaluation_method = str(answer_format.get("type") or "rule_based")
             try:
-                if evaluation_method == "free_form":
+                if answer_format == "free_form":
                     # LLM-as-a-judge: call the model to score the free-form answer
                     question_text = qa_payload.get("question", "")
                     ref_answer = str(gt) if gt is not None else ""
@@ -365,22 +372,21 @@ def run_direct_requests(
                     )
                     score = judge_score
                     llm_judge_result = (judge_score, judge_reason)
-                elif evaluation_method in ("numerical", "tensor"):
+                elif answer_format in ("numerical", "tensor"):
                     # Numerical: float, Tensor: underscore-separated floats
-                    if evaluation_method == "numerical":
+                    if answer_format == "numerical":
                         try:
-                            gt_val = float(gt)
-                            pred_val = float(pred)
+                            gt_val = round(float(gt), 4)
+                            pred_val = round(float(pred), 4)
                         except Exception:
                             score = 0
                         else:
                             if acceptance_bounds:
                                 margin = acceptance_bounds.get("margin", 0)
-                                mean = acceptance_bounds.get("mean", 0)
                                 score = int(abs(pred_val - gt_val) <= margin)
                             else:
                                 score = int(abs(pred_val - gt_val) < 1e-4)
-                    elif evaluation_method == "tensor":
+                    elif answer_format == "tensor":
                         try:
                             gt_vals = [float(x) for x in str(gt).split("_")]
                             pred_vals = [float(x) for x in str(pred).split("_")]
@@ -397,7 +403,7 @@ def run_direct_requests(
                                     score = 0.0
                             else:
                                 score = float(gt_vals == pred_vals)
-                elif evaluation_method == "multiple_choice_multi_select":
+                elif answer_format == "multiple_choice_multi_select":
                     # Multi-select MCQ: string of T/F, e.g., TFFT
                     gt_str = str(gt).strip().upper()
                     pred_str = str(pred).strip().upper()
@@ -412,13 +418,31 @@ def run_direct_requests(
                             score = 0.0
                     else:
                         score = 0.0
-                elif evaluation_method == "ranking":
+                elif answer_format == "multiple_choice_single_select":
+                    # Single-select MCQ: ground truth is a letter like "C",
+                    # model may answer "C", "C.", "C. some explanation", etc.
+                    gt_str = str(gt).strip().upper()
+                    pred_str = str(pred).strip()
+
+                    pred_letter = parse_llm_answer(pred_str)
+                    if pred_letter is None:
+                        score = 0.0
+                    else:
+                        score = float(gt_str == pred_letter)
+
+                elif answer_format == "ranking":
                     # Ranking: permutation of A-D, e.g., DCAB
                     gt_str = str(gt).strip().upper()
-                    pred_str = str(pred).strip().upper()
+                    pred_raw = str(pred).strip().upper()
+
+                    # Extract only alphabetic characters from the prediction
+                    match = re.search(r'\b([A-D]{4})\b', pred_raw)
+                    pred_str = match.group(1) if match else ""
+
                     score = float(gt_str == pred_str)
+
                 else:
-                    if evaluation_method == "llm_judge":
+                    if answer_format == "llm_judge":
                         # Already handled above; this branch won't be reached
                         pass
                     else:
@@ -450,9 +474,25 @@ def run_direct_requests(
                     )
                     total_tokens: int = int(usage_raw.get("total_tokens") or (prompt_tokens + completion_tokens))
                     
-                    # Estimate cost based on model name
+                    # Estimate cost based on model name - https://developers.openai.com/api/docs/pricing
                     model_name = (body.get("model") or model).lower()
-                    if "mini" in model_name:
+                    if "gpt-4o-mini" in model_name:
+                        price_in, price_out = 0.15, 0.60
+                    elif "gpt-5.1" in model_name:
+                        price_in, price_out = 1.25, 10.00
+                    elif "gpt-4o" in model_name:
+                        price_in, price_out = 2.50, 10.00
+                    elif "o1-mini" in model_name:
+                        price_in, price_out = 3.00, 12.00
+                    elif "o1-preview" in model_name or model_name == "o1":
+                        price_in, price_out = 15.00, 60.00
+                    elif "gpt-4-turbo" in model_name:
+                        price_in, price_out = 10.00, 30.00
+                    elif "gpt-4" in model_name:
+                        price_in, price_out = 30.00, 60.00
+                    elif "gpt-3.5-turbo" in model_name:
+                        price_in, price_out = 0.50, 1.50
+                    elif "mini" in model_name:
                         price_in, price_out = 0.15, 0.60
                     else:
                         # Default to GPT-4 pricing from the interactive notebook
@@ -460,16 +500,13 @@ def run_direct_requests(
                     
                     est_cost = (prompt_tokens / 1_000_000 * price_in) + (completion_tokens / 1_000_000 * price_out)
 
-                    # print qa_payload for debugging to see what tags it contains
-                    print(f"-------> QA Payload for {custom_id}: {qa_payload}")
-
-                    category_tag = evaluation_method
                     metadata_payload = qa_payload.get("metadata") or {}
                     dataset_tag = metadata_payload.get("dataset")
+                    episode_tag = metadata_payload.get("episode")
                     qa_pair_id = metadata_payload.get("qa_pair_id")
                     
                     # Filter out None/empty values so Opik receives only real tags
-                    opik_tags = [str(t) for t in [effective_eval_level, category_tag, dataset_tag] if t]
+                    opik_tags = [str(t) for t in [effective_eval_level, question_type, dataset_tag, answer_format] if t]
 
                     type_tag = metadata_payload.get("type")
                     model_tag = model_name
@@ -477,8 +514,8 @@ def run_direct_requests(
                     if type_tag and type_tag != "unknown":
                         opik_tags.append(str(type_tag))
 
-                    if evaluation_method and evaluation_method != "unknown":
-                        opik_tags.append(f"eval_{evaluation_method}")
+                    if answer_format and answer_format != "unknown":
+                        opik_tags.append(f"eval_{answer_format}")
                     
                     if model_tag and model_tag != "unknown":
                         opik_tags.append(model_tag)
@@ -486,28 +523,33 @@ def run_direct_requests(
                     if dataset_tag and dataset_tag != "unknown":
                         opik_tags.append(dataset_tag)
 
+                    if qa_pair_id and qa_pair_id != "unknown":
+                        opik_tags.append("template_" + str(qa_pair_id))
+
+
                     opik_metadata = {
                         "model": model_tag,
-                        "evaluation_method": evaluation_method,
-                        "q_type": evaluation_method,
+                        "answer_format": answer_format,
+                        "question_type": question_type,
                         "qa_pair_id": qa_pair_id,
                         "dataset": dataset_tag,
+                        "episode": episode_tag,
+                        "time_window": metadata_payload.get("time_window"),
+                        "correct_answer": gt,
                         "usage": {
                             "prompt_tokens": prompt_tokens,
                             "completion_tokens": completion_tokens,
                             "total_tokens": total_tokens,
                             "total_estimated_cost": f"${est_cost}"
                         },
+                        "full_telemetry_context": {"text": prompt_text}
                     }
-                    if isinstance(metadata_payload, dict):
-                        opik_metadata.update(metadata_payload)
-
 
 
                     trace = client_opik.trace(
-                        name="factorybench_eval",
-                        input={"custom_id": custom_id, "prompt": prompt_text, "ground_truth": gt, "q_type": q_type},
-                        output={"answer": answer, "raw_body": body},
+                        name=f"factorybench_{effective_eval_level}_{qa_pair_id}",
+                        input={"question": qa_payload.get("question"), "ground_truth": gt, "prediction": pred},
+                        output={"answer": pred, "raw_body": body},
                         tags=opik_tags,
                         usage={
                             "prompt_tokens": prompt_tokens,
@@ -526,70 +568,15 @@ def run_direct_requests(
                             f"Predicted: '{pred_str_repr}' | "
                             f"Ground truth: '{gt_str_repr}'"
                         )
+
+                        # Accuracy
                         trace.log_feedback_score(
                             name="accuracy",
                             value=float(score),
                             reason=accuracy_reason,
                         )
 
-                        # --- Exact match ---
-                        exact_match = float(pred_str_repr == gt_str_repr)
-                        trace.log_feedback_score(
-                            name="exact_match",
-                            value=exact_match,
-                            reason=accuracy_reason,
-                        )
-
-                        # --- F1 Score (type-aware) ---
-                        try:
-                            f1: float | None = None
-                            if q_type in ("numerical", "ranking"):
-                                # Binary for these types → F1 == accuracy
-                                f1 = float(score)
-                            elif q_type == "tensor":
-                                # Element-wise F1: TP / (TP + 0.5*(FP+FN)) — same as accuracy here
-                                # since each element is a numeric match, reuse score
-                                f1 = float(score)
-                            elif q_type == "multiple_choice_multi_select":
-                                # Per-position binary F1 over T/F labels
-                                gt_labels  = [1 if c == "T" else 0 for c in gt_str_repr.upper()  if c in ("T","F")]
-                                pred_labels = [1 if c == "T" else 0 for c in pred_str_repr.upper() if c in ("T","F")]
-                                if gt_labels and len(gt_labels) == len(pred_labels):
-                                    tp = sum(g == 1 and p == 1 for g, p in zip(gt_labels, pred_labels))
-                                    fp = sum(g == 0 and p == 1 for g, p in zip(gt_labels, pred_labels))
-                                    fn = sum(g == 1 and p == 0 for g, p in zip(gt_labels, pred_labels))
-                                    denom = 2 * tp + fp + fn
-                                    f1 = (2 * tp / denom) if denom > 0 else 0.0
-                                else:
-                                    f1 = 0.0
-                            else:
-                                # Token-overlap F1 (for free-text / single-choice questions)
-                                gt_tokens   = set(gt_str_repr.lower().split())
-                                pred_tokens = set(pred_str_repr.lower().split())
-                                if gt_tokens or pred_tokens:
-                                    tp = len(gt_tokens & pred_tokens)
-                                    fp = len(pred_tokens - gt_tokens)
-                                    fn = len(gt_tokens - pred_tokens)
-                                    denom = 2 * tp + fp + fn
-                                    f1 = (2 * tp / denom) if denom > 0 else 0.0
-                                else:
-                                    f1 = 1.0  # both empty → perfect match
-
-                            if f1 is not None:
-                                f1_reason = (
-                                    f"Token-overlap F1 for type '{q_type}' | "
-                                    f"Predicted: '{pred_str_repr}' | "
-                                    f"Ground truth: '{gt_str_repr}'"
-                                )
-                                trace.log_feedback_score(
-                                    name="f1_score",
-                                    value=f1,
-                                    reason=f1_reason,
-                                )
-                        except Exception as f1_err:
-                            logger.debug(f"F1 score computation failed: {f1_err}")
-
-                        # --- LLM-as-a-judge score ---
+                        # LLM-as-a-judge score
                         if llm_judge_result is not None:
                             judge_value, judge_reason = llm_judge_result
                             trace.log_feedback_score(
@@ -612,7 +599,8 @@ def run_direct_requests(
                 "score": score,
                 "llm_judge_score": llm_judge_result[0] if llm_judge_result else None,
                 "llm_judge_reason": llm_judge_result[1] if llm_judge_result else None,
-                "evaluation_method": evaluation_method,
+                "answer_format": answer_format,
+                "question_type": question_type,
                 "model": body.get("model"),
                 "usage": body.get("usage"),
                 "estimated_cost": est_cost if 'est_cost' in locals() else None,

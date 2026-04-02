@@ -251,15 +251,17 @@ def main() -> None:
         output_payload = {
             "prompt": prompt,
             "metadata": {
-                "qa_pair_id": payload.get("id"),
+                "qa_pair_id": payload.get("template_id"),
                 "dataset": payload.get("provenance", {}).get("dataset"),
+                "episode": payload.get("provenance", {}).get("episode"),
+                "time_window": payload.get("provenance", {}).get("time_window"),
                 "level": payload.get("level"),
-                "type": payload.get("type"),
+                "type": payload.get("template_type"),
             },
-            "type": payload.get("type"),
+            "type": payload.get("template_type"),
             "question": payload.get("question"),
-            "answer": payload.get("answer"),
-            "answer_format": payload.get("answer_format"),
+            "correct_answer": payload.get("answer"),
+            "answer_format": payload.get("answer_format", {}).get("type", "unknown") if isinstance(payload.get("answer_format"), dict) else str(payload.get("answer_format", "unknown")),
         }
 
         write_json(out_path, output_payload)
