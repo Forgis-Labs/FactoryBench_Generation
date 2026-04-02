@@ -8,10 +8,16 @@
 ### Use
 
 ```bash
+# Generate 100 questions total, picked randomly from any template
 python src/pipeline/run_level1_pipeline.py -n 100
 ```
 
-Run test mode:
+```bash
+# Generate exactly 10 questions for each template
+python src/pipeline/run_level1_pipeline.py -t 10
+```
+
+Run test mode (only reads 5000 rows per episode):
 ```bash
 python src/pipeline/run_level1_pipeline.py -n 5 --test-mode
 ```
