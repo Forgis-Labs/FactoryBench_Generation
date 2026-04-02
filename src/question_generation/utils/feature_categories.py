@@ -56,7 +56,7 @@ FEATURE_CATEGORY_PREFIXES: Dict[str, List[str]] = {
 TEMPLATE_CATEGORIES: Dict[str, List[str]] = {
     "state_joint_moved": ["position", "speed"],
     "state_friction_increase": ["current", "speed", "position"],
-    "state_acceleration": ["vibration", "force"],
+    "state_acceleration": ["vibration", "force", "speed"],
     "state_external_force_detected": ["force", "vibration"],
     "state_jerk": ["speed", "position"],
     "state_torque_magnitude": ["force", "current"],
@@ -64,6 +64,8 @@ TEMPLATE_CATEGORIES: Dict[str, List[str]] = {
     "state_joint_within_rated_speed": ["speed", "current"],
     "state_current_within_rated": ["current", "speed"],
     "state_signal_description": ["current", "speed", "position"],
+    "state_safety_mode": ["metadata", "speed"],
+    "state_robot_mode": ["metadata", "current"],
 }
 
 # Columns that are always preserved regardless of category filtering.

@@ -2,12 +2,15 @@
   {
     "id": 1,
     "type": "state_joint_moved",
-    "template": "Is joint {axis} at the same position at {t1}ms and {t2}ms (tolerance of {eps_1} rad)? Answer only with 'Yes' or 'No'.",
+    "template": "Compare the position of joint {axis} at {t1}ms and {t2}ms. Which of the following best describes its state change (tolerance of {eps_1} rad)? Answer only with 'A', 'B', 'C', or 'D'.",
     "answer_format": {
       "type": "multiple_choice_single_select",
-      "options": [
-        "Yes",
-        "No"
+      "options": ["A", "B", "C", "D"],
+      "options_schema": [
+        "The joint remained stationary (difference <= {eps_1}).",
+        "The joint moved to a higher positive angular position.",
+        "The joint moved to a lower negative angular position.",
+        "The telemetry data at these timestamps is missing or invalid."
       ],
       "notes": "Classification based on deterministic position evaluation."
     }
@@ -15,59 +18,55 @@
   {
     "id": 2,
     "type": "state_friction_increase",
-    "template": "Has the friction proxy for joint {axis} increased from {t1}ms to {t2}ms (tolerance of {eps_2}%)? Assessed using a symmetric half-window of {delta_1}ms. Answer only with 'Yes' or 'No'.",
+    "template": "Which of the following best describes the change in the friction proxy for joint {axis} from {t1}ms to {t2}ms (tolerance of {eps_2}%, half-window of {delta_1}ms)? Answer only with 'A', 'B', 'C', or 'D'.",
     "answer_format": {
       "type": "multiple_choice_single_select",
-      "options": [
-        "Yes",
-        "No"
+      "options": ["A", "B", "C", "D"],
+      "options_schema": [
+        "Friction proxy increased significantly (> {eps_2}%).",
+        "Friction proxy decreased significantly (< -{eps_2}%).",
+        "Friction proxy remained stable (within +/- {eps_2}%).",
+        "Friction proxy fluctuated without a clear directional trend."
       ]
     }
   },
   {
     "id": 3,
     "type": "state_acceleration",
-    "template": "What is the acceleration of the end effector at {t_ms}ms? Answer only with a tensor of length 3 (X, Y, Z in m/s^2), separated by '_'.",
+    "template": "What is the acceleration at {t_ms}ms? Answer only with a tensor of length 3 (three components), separated by '_'.",
     "answer_format": {
       "type": "tensor",
-      "shape": [
-        3
-      ],
-      "notes": "3-element vector of floats formatted as a string."
+      "shape": [3],
+      "notes": "3-element acceleration vector. Uses end-effector accelerometer (m/s^2) when available; otherwise computes angular acceleration from joint speed finite differences (rad/s^2)."
     }
   },
   {
     "id": 4,
     "type": "state_external_force_detected",
-    "template": "Is an external force detected at {t_ms}ms (threshold of {eps_3} N)? Answer only with 'Yes' or 'No'.",
+    "template": "What is the status of the force/torque acting on the robot at {t_ms}ms (threshold of {eps_3})? Answer only with 'A', 'B', 'C', or 'D'.",
     "answer_format": {
       "type": "multiple_choice_single_select",
-      "options": [
-        "Yes",
-        "No"
-      ]
+      "options": ["A", "B", "C", "D"],
+      "options_schema": [
+        "No significant force/torque detected (magnitude <= {eps_3}).",
+        "Force/torque detected above threshold in the positive direction.",
+        "Force/torque detected above threshold in the negative direction.",
+        "Sensor data is out of bounds or unavailable."
+      ],
+      "notes": "Uses external force sensor when available; otherwise uses motor current magnitude as a torque proxy."
     }
   },
-  {
+{
     "id": 5,
-    "type": "state_jerk",
-    "template": "What is the jerk of joint {axis} at {t_ms}ms? Answer only with a numerical value in rad/s^3.",
+    "type": "state_signal_statistic",
+    "template": "What is the {statistic_type} of the {signal_description} over the window [T={t1}ms, T={t2}ms]? Answer only with a numerical value in {units}.",
     "answer_format": {
       "type": "numerical",
-      "notes": "Single float value."
+      "notes": "Single float value. Evaluates basic time series telemetry literacy (e.g., understanding mean/max/min of a time series). By forcing a statistical computation over a defined time window rather than a single-point retrieval, it prevents simple text pattern-matching and establishes a mathematical baseline necessary for the later Root Cause Analysis (RCA) stage."
     }
   },
   {
     "id": 6,
-    "type": "state_torque_magnitude",
-    "template": "What is the torque magnitude about the {axis_label}-axis at {t_ms}ms? Answer only with a numerical value in Nm.",
-    "answer_format": {
-      "type": "numerical",
-      "notes": "Single float value."
-    }
-  },
-  {
-    "id": 7,
     "type": "state_joint_speed_ranking",
     "template": "Rank the joints {joints_list} by their absolute speed at time {t_ms}ms, from highest to lowest. Answer only with a 4-letter string containing the letters A, B, C, and D in your ranked order.",
     "answer_format": {
@@ -77,7 +76,7 @@
     }
   },
   {
-    "id": 8,
+    "id": 7,
     "type": "state_joint_within_rated_speed",
     "template": "Which of the following joints are operating within their rated maximum speed at T={t_ms}ms? Answer only with a 4-letter string using T and F (e.g. TFTF), nothing else.",
     "answer_format": {
@@ -97,16 +96,19 @@
     }
   },
   {
-    "id": 9,
+    "id": 8,
     "type": "state_current_within_rated",
-    "template": "Is the motor current of joint {axis} at T={t_ms}ms within the rated continuous current limit for this robot? Answer only with 'Yes' or 'No'.",
+    "template": "Evaluate the motor current of joint {axis} at T={t_ms}ms against the rated continuous current limit. Which statement is correct? Answer only with 'A', 'B', 'C', or 'D'.",
     "answer_format": {
       "type": "multiple_choice_single_select",
-      "options": [
-        "Yes",
-        "No"
+      "options": ["A", "B", "C", "D"],
+      "options_schema": [
+        "Current is safely within nominal limits (<= 80% of rated).",
+        "Current is near the limit (80% - 100% of rated).",
+        "Current exceeds the continuous rated limit (> 100%).",
+        "Current reading is unexpectedly zero or missing."
       ],
-      "notes": "Ground truth: True iff |effort_current_{axis}(t)| <= rated_current_{axis} from the machine KG. Complements Q8 by targeting a single joint and a different physical limit (current vs speed). A model relying purely on signal magnitude without the rated spec will guess randomly.",
+      "notes": "Ground truth evaluated against rated_current_{axis} from the machine KG. Replaces simple Yes/No with proportional bounds assessment.",
       "requires_kg": true,
       "kg_fields": [
         "rated_current_per_joint"
@@ -114,13 +116,36 @@
     }
   },
   {
-    "id": 10,
+    "id": 9,
     "type": "state_signal_description",
-    "template": "Describe in one sentence the behaviour of {signal} for joint {axis} over the window [T={t1}ms, T={t2}ms].",
+    "template": "Which of the following best describes the behaviour of {signal} for joint {axis} over the window [T={t1}ms, T={t2}ms]? Answer only with 'A', 'B', 'C', or 'D'.",
     "answer_format": {
-      "type": "free_form",
-      "evaluation": "llm_judge",
-      "notes": "Rule-based reference answer generated from data (e.g. 'Motor current rises sharply from ~1.2 A to ~4.8 A, consistent with a high-load transient'). Scored with LLM-as-judge. Signal ∈ {effort_current, feedback_speed, feedback_pos}."
+      "type": "multiple_choice_single_select",
+      "options": ["A", "B", "C", "D"],
+      "options_schema": [
+        "The signal is generally stable (fluctuations within a normal noise threshold).",
+        "The signal exhibits a clear and continuous increasing trend.",
+        "The signal exhibits a clear and continuous decreasing trend.",
+        "The signal is highly erratic or oscillating without a single directional trend."
+      ],
+      "notes": "Standardized to 4 options. Signal ∈ {effort_current, feedback_speed, feedback_pos}."
+    }
+  },
+  {
+    "id": 10,
+    "type": "state_safety_mode",
+    "template": "Based on the available data, what is the operational state of the robot at T={t_ms}ms? Answer only with 'A', 'B', 'C', or 'D'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["A", "B", "C", "D"],
+      "options_schema": [
+        "The robot is in {state_correct}.",
+        "The robot is in {state_distractor_1}.",
+        "The robot is in {state_distractor_2}.",
+        "The robot is in {state_distractor_3}."
+      ],
+      "notes": "Uses safety_mode column mapped via KG enum when available; otherwise derives operational state from joint speed and current patterns (Idle, Standby, Normal Operation, High Load).",
+      "requires_kg": true
     }
   }
 ]

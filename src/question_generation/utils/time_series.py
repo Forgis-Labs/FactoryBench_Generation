@@ -353,6 +353,8 @@ def downsample_peak_preserving(
     rows: List[Dict[str, Any]],
     min_keep: int = DEFAULT_MIN_KEEP,
     max_keep: int = DEFAULT_MAX_KEEP,
+    important_features: Optional[List[str]] = None,
+    anchor_timestamps: Optional[set[float]] = None,
 ) -> List[Dict[str, Any]]:
     """Downsample *rows* to a target between *min_keep* and *max_keep*,
     preserving the rows where the sharpest signal changes occur.
@@ -377,6 +379,22 @@ def downsample_peak_preserving(
 
     # Always keep first and last
     anchor_indices = {0, n_rows - 1}
+
+    if anchor_timestamps:
+        for i, r in enumerate(rows):
+            ts = r.get("timestamp_ms")
+            if ts is not None and float(ts) in anchor_timestamps:
+                anchor_indices.add(i)
+
+    if important_features:
+        for feat in important_features:
+            valid_indices = [i for i, r in enumerate(rows) if r.get(feat) is not None]
+            if valid_indices:
+                idx_min = min(valid_indices, key=lambda i: float(rows[i][feat]))
+                idx_max = max(valid_indices, key=lambda i: float(rows[i][feat]))
+                anchor_indices.add(idx_min)
+                anchor_indices.add(idx_max)
+
     budget = target - len(anchor_indices)
 
     if budget <= 0:

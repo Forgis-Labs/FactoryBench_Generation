@@ -21,25 +21,22 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-from huggingface_hub import list_repo_files
+from huggingface_hub import hf_hub_download, list_repo_files
 
 from src.question_generation.utils.io import load_json, load_templates
 from src.question_generation.utils.template import build_context
 from src.question_generation.level1.mc_truth import (
-    answer_q1_position_check,
-    answer_q2_friction_increase,
-    answer_q3_end_effector_accel,
-    answer_q4_external_force,
-    answer_q5_joint_jerk,
-    answer_q6_torque_magnitude,
-    answer_joint_speed,
-    answer_motor_current,
-    answer_tracking_error,
-    answer_joint_comparison,
+    answer_q1_state_joint_moved,
+    answer_q2_state_friction_increase,
+    answer_q3_state_acceleration,
+    answer_q4_state_external_force_detected,
+    answer_q5_state_signal_statistic,
+    answer_q6_state_joint_speed_ranking,
+    answer_q7_state_joint_within_rated_speed,
+    answer_q8_state_current_within_rated,
+    answer_q9_state_signal_description,
+    answer_q10_state_safety_mode,
     get_num_joints,
-    answer_q8_joint_speed_check,
-    answer_q9_joint_current_check,
-    answer_q10_signal_description,
     get_machine_by_id,
     load_machine_metadata
 )
@@ -138,67 +135,63 @@ def fill_template(
     options = {}
     
     if template_type == "state_joint_moved":
-        truth = answer_q1_position_check(rows, t1, t2, axis, eps_1)
-        if truth["answer"] == "Unknown": return None
+        truth = answer_q1_state_joint_moved(rows, t1, t2, axis, eps_1)
+        if truth["answer"] in ["Unknown", "N/A", "Error"] or (truth["answer"] == "D" and not truth.get("is_true", True)):
+            return None
         answer = truth["answer"]
+        options = truth.get("options", {})
         question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_1=eps_1)
-        options = {"A": "Yes", "B": "No"}
         
     elif template_type == "state_friction_increase":
-        truth = answer_q2_friction_increase(rows, t1, t2, axis, eps_2, delta_1)
-        if truth["answer"] == "Unknown": return None
+        truth = answer_q2_state_friction_increase(rows, t1, t2, axis, eps_2, delta_1)
+        if truth["answer"] in ["Unknown", "N/A", "Error"] or (truth["answer"] == "D" and not truth.get("is_true", True)):
+            return None
         answer = truth["answer"]
+        options = truth.get("options", {})
         question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_2=eps_2, delta_1=delta_1)
-        options = {"A": "Yes", "B": "No"}
 
     elif template_type == "state_acceleration":
-        truth = answer_q3_end_effector_accel(rows, t_ms)
-        if truth["answer"] == "Unknown": return None
+        truth = answer_q3_state_acceleration(rows, t_ms)
+        if truth["answer"] in ["Unknown", "N/A", "Error"]: return None
         answer = truth["answer"]
         question = tmpl_text.format(t_ms=t_ms)
 
     elif template_type == "state_external_force_detected":
-        truth = answer_q4_external_force(rows, t_ms, eps_3)
-        if truth["answer"] == "Unknown": return None
+        truth = answer_q4_state_external_force_detected(rows, t_ms, eps_3)
+        if truth["answer"] in ["Unknown", "N/A", "Error"] or (truth["answer"] == "D" and not truth.get("is_true", True)):
+            return None
         answer = truth["answer"]
+        options = truth.get("options", {})
         question = tmpl_text.format(t_ms=t_ms, eps_3=eps_3)
-        options = {"A": "Yes", "B": "No"}
 
-    elif template_type == "state_jerk":
-        truth = answer_q5_joint_jerk(rows, t_ms, axis)
-        if truth["answer"] == "Unknown": return None
-        answer = str(round(truth["raw_value"], 4))
-        question = tmpl_text.format(axis=axis, t_ms=t_ms)
-
-    elif template_type == "state_torque_magnitude":
-        truth = answer_q6_torque_magnitude(rows, t_ms, axis_label)
-        if truth["answer"] == "Unknown": return None
-        answer = str(round(truth["raw_value"], 4))
-        question = tmpl_text.format(axis_label=axis_label, t_ms=t_ms)
+    elif template_type == "state_signal_statistic":
+        signal_choice = random.choice(["effort_current", "feedback_speed", "feedback_pos"])
+        statistic_choice = random.choice(["mean", "max", "min"])
+        truth = answer_q5_state_signal_statistic(rows, t1, t2, axis, signal_choice, statistic_choice)
+        if truth["answer"] in ["Unknown", "N/A", "Error"]: return None
+        answer = truth["answer"]
+        question = tmpl_text.format(
+            axis=axis, 
+            t1=t1, 
+            t2=t2, 
+            signal_description=signal_choice.replace("_", " "), 
+            statistic_type=statistic_choice, 
+            units="A" if "current" in signal_choice else ("rad/s" if "speed" in signal_choice else "rad"),
+            t_ms=t_ms
+        )
 
     elif template_type == "state_joint_speed_ranking":
-        # Sample 4 random joints for ranking
         total_joints = get_num_joints(rows)
         joints_list = random.sample(range(total_joints), min(4, total_joints))
         while len(joints_list) < 4:
-            joints_list.append(joints_list[-1]) # Padding if less than 4 joints
-        
-        truth = answer_joint_comparison(rows, t_ms, "feedback_speed_")
-        if truth["answer"] == "Unknown": return None
-        
-        sorted_vals = truth["sorted_values"] # [(axis, abs_val), ...]
-        # Filter for our sampled joints
-        sampled_sorted = [x for x in sorted_vals if x[0] in joints_list]
-        # Map labels A, B, C, D to joints_list
-        label_map = {joint: chr(ord('A') + i) for i, joint in enumerate(joints_list)}
-        # Build ranking string
-        ranking_str = "".join([label_map[axis] for axis, val in sampled_sorted])
-        
-        answer = ranking_str
-        question = tmpl_text.format(
-            t_ms=t_ms,
-            joints_list=", ".join([str(j) for j in joints_list])
-        )
+            joints_list.append(joints_list[-1])
+            
+        truth = answer_q6_state_joint_speed_ranking(rows, t_ms, joints_list)
+        if truth["answer"] in ["Unknown", "N/A", "Error"]: return None
+        answer = truth["answer"]
+        options = truth.get("options", {})
+        joints_list_str = ", ".join(map(str, joints_list))
+        question = tmpl_text.format(t_ms=t_ms, joints_list=joints_list_str)
 
     elif template_type == "state_joint_within_rated_speed":
         total_joints = get_num_joints(rows)
@@ -206,10 +199,11 @@ def fill_template(
         while len(joints_list) < 4:
             joints_list.append(joints_list[-1])
         
-        truth = answer_q8_joint_speed_check(rows, t_ms, machine_id, joints_list)
-        if truth["answer"] == "Unknown": return None
+        truth = answer_q7_state_joint_within_rated_speed(rows, t_ms, machine_id, joints_list)
+        if truth["answer"] in ["Unknown", "N/A", "Error"]: return None
         
         answer = truth["answer"]
+        options = truth.get("options", {})
         question = tmpl_text.format(
             t_ms=t_ms,
             axis_a=joints_list[0],
@@ -219,23 +213,34 @@ def fill_template(
         )
 
     elif template_type == "state_current_within_rated":
-        truth = answer_q9_joint_current_check(rows, t_ms, axis, machine_id)
-        if truth["answer"] == "Unknown": return None
+        truth = answer_q8_state_current_within_rated(rows, t_ms, axis, machine_id)
+        if truth["answer"] in ["Unknown", "N/A", "Error"] or (truth["answer"] == "D" and not truth.get("is_true", True)):
+            return None
         answer = truth["answer"]
+        options = truth.get("options", {})
         question = tmpl_text.format(axis=axis, t_ms=t_ms)
 
     elif template_type == "state_signal_description":
         signal_choice = random.choice(["effort_current", "feedback_speed", "feedback_pos"])
-        truth = answer_q10_signal_description(rows, t1, t2, axis, signal_choice)
-        if truth["answer"] == "Unknown": return None
-        
+        truth = answer_q9_state_signal_description(rows, t1, t2, axis, signal_choice)
+        if truth["answer"] in ["Unknown", "N/A", "Error"] or (truth["answer"] == "D" and not truth.get("is_true", True)):
+            return None
+
         answer = truth["answer"]
+        options = truth.get("options", {})
         question = tmpl_text.format(
             signal=signal_choice.replace("_", " "),
             axis=axis,
             t1=t1,
             t2=t2
         )
+
+    elif template_type == "state_safety_mode":
+        truth = answer_q10_state_safety_mode(rows, t_ms, machine_id)
+        if truth["answer"] in ["Unknown", "N/A", "Error"]: return None
+        answer = truth["answer"]
+        options = truth.get("options", {})
+        question = tmpl_text.format(t_ms=t_ms)
 
     else:
         logger.warning(f"Unknown template type: {template_type}")
@@ -246,7 +251,10 @@ def fill_template(
         "answer_format": answer_format,
         "options": options,
         "answer": answer,
-        "reasoning": truth["reasoning"]
+        "reasoning": truth["reasoning"],
+        "anchor_timestamps": truth.get("anchor_timestamps"),
+        "acceptance_bounds": truth.get("acceptance_bounds"),
+        "important_features": truth.get("important_features")
     }
 
 
@@ -265,6 +273,7 @@ def generate_level1_questions(
     eps_3: float = None,
     dataset_repo: str = "Forgis/FactoryNet_Dataset",
     test_mode: bool = False,
+    questions_per_template: Optional[int] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -285,7 +294,7 @@ def generate_level1_questions(
         stem = Path(f).stem
         for ds in VALID_DATASETS:
             if stem.startswith(ds + "_") or stem == ds or stem.startswith(ds): # Intercept naming
-                episodes_by_dataset[ds].append(f"hf://datasets/{dataset_repo}/{f}")
+                episodes_by_dataset[ds].append(f)
                 break
 
     available_datasets = [ds for ds, files in episodes_by_dataset.items() if len(files) > 0]
@@ -297,16 +306,20 @@ def generate_level1_questions(
 
     def load_episode(path: str) -> List[List[Dict[str, Any]]]:
         if path not in episode_cache:
-            logger.info(f"Downloading/Reading from Hugging Face: {path}")
-            
+            # Use hf_hub_download which caches files locally after first download
+            logger.info(f"Loading episode (cached): {path}")
+            local_path = hf_hub_download(
+                repo_id=dataset_repo, repo_type="dataset", filename=path
+            )
+
             # If in test mode, only read the first 5000 rows to drastically speed up execution
             import pyarrow.parquet as pq
             if test_mode:
                 logger.info("TEST MODE EXTRACTING 5000 ROWS ONLY")
-                df = pd.read_parquet(path)
+                df = pd.read_parquet(local_path)
                 df = df.head(5000)
             else:
-                df = pd.read_parquet(path)
+                df = pd.read_parquet(local_path)
                 
             if "time_s" in df.columns and "timestamp_ms" not in df.columns:
                 df["timestamp_ms"] = df["time_s"] * 1000.0
@@ -338,10 +351,19 @@ def generate_level1_questions(
         return episode_cache[path]
 
     generated = 0
-    attempts = 0
-    max_attempts = n * 50
 
-    while generated < n and attempts < max_attempts:
+    # Track how many we've generated for each template ID
+    template_counts = {t["id"]: 0 for t in templates}
+
+    if questions_per_template is not None:
+        target_total = len(templates) * questions_per_template
+    else:
+        target_total = n
+
+    attempts = 0
+    max_attempts = target_total * 50
+
+    while generated < target_total and attempts < max_attempts:
         attempts += 1
 
         ds = random.choice(available_datasets)
@@ -361,7 +383,14 @@ def generate_level1_questions(
         except ValueError:
             continue
 
-        valid_templates = templates
+        if questions_per_template is not None:
+            # Filter templates to only those that haven't reached their per-template quota
+            valid_templates = [t for t in templates if template_counts[t["id"]] < questions_per_template]
+            if not valid_templates:
+                break
+        else:
+            valid_templates = templates
+            
         template = random.choice(valid_templates)
         
         filled = fill_template(
@@ -376,20 +405,26 @@ def generate_level1_questions(
         ctx_start = max(0, start_idx - margin)
         ctx_end = min(len(rows), end_idx + margin)
         subseries = rows[ctx_start:ctx_end]
-        context = build_context(subseries, template_type=template["type"])
+        context = build_context(
+            subseries, 
+            template_type=template["type"],
+            anchor_timestamps=filled.get("anchor_timestamps"),
+            important_features=filled.get("important_features")
+        )
 
         item = {
             "id": str(uuid.uuid4()),
             "level": 1,
             "template_id": template["id"],
             "template_type": template["type"],
+            "answer_format": filled["answer_format"],
             "question": filled["question"],
             "options": filled["options"],
             "answer": filled["answer"],
             "reasoning": filled["reasoning"],
             "provenance": {
                 "dataset": ds,
-                "episode": ep_path.split("/")[-1].replace(".parquet", ""),
+                "episode": Path(ep_path).stem,
                 "time_window": [float(rows[start_idx]["timestamp_ms"]), float(rows[end_idx]["timestamp_ms"])]
             },
             "context": context,
@@ -399,11 +434,12 @@ def generate_level1_questions(
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(item, f, indent=2)
 
-        logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template {template['id']}, {ds})")
+        logger.info(f"✓ [{generated + 1}/{target_total}] {out_path.name} (template {template['id']}, {ds})")
         generated += 1
+        template_counts[template["id"]] += 1
 
-    if generated < n:
-        logger.warning(f"Only generated {generated}/{n} questions.")
+    if generated < target_total:
+        logger.warning(f"Only generated {generated}/{target_total} questions.")
     else:
         logger.info(f"Done: {generated} questions written to {output_dir}")
 
@@ -419,6 +455,7 @@ def main() -> None:
     parser.add_argument("--templates", type=Path, default=Path("src/question_generation/level1/question_template.json"))
     parser.add_argument("--dataset-repo", type=str, default="Forgis/FactoryNet_Dataset", help="Hugging Face Dataset Repo")
     parser.add_argument("--test-mode", action="store_true", help="Only download a lightweight fraction of an episode for testing")
+    parser.add_argument("--questions-per-template", type=int, default=None, help="Generate exactly X questions per template (overrides -n)")
 
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -435,6 +472,7 @@ def main() -> None:
         eps_q=args.eps_q,
         dataset_repo=args.dataset_repo,
         test_mode=args.test_mode,
+        questions_per_template=args.questions_per_template,
     )
 
 if __name__ == "__main__":

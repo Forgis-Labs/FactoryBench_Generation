@@ -154,6 +154,8 @@ def sample_chunks(
 def build_context(
     subseries: List[Dict[str, Any]],
     template_type: Optional[str] = None,
+    important_features: Optional[List[str]] = None,
+    anchor_timestamps: Optional[set[float]] = None,
 ) -> Dict[str, Any]:
     """
     Build the context dict attached to every generated question.
@@ -169,7 +171,11 @@ def build_context(
         ts = filter_features_for_template(ts, template_type)
 
     # Layer 2: peak-preserving downsampling (cap to 32-64 rows)
-    ts = downsample_peak_preserving(ts)
+    ts = downsample_peak_preserving(
+        ts,
+        important_features=important_features,
+        anchor_timestamps=anchor_timestamps
+    )
 
     ts = sort_feature_keys(ts)
     ts = remove_feature(ts, "fault_label")
