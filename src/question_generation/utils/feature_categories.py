@@ -66,6 +66,8 @@ TEMPLATE_CATEGORIES: Dict[str, List[str]] = {
     "state_signal_description": ["current", "speed", "position"],
     "state_safety_mode": ["metadata", "speed"],
     "state_robot_mode": ["metadata", "current"],
+    "state_signal_prediction": ["current", "speed", "position"],
+    "state_signal_anomaly": ["current", "speed", "position"],
 }
 
 # Columns that are always preserved regardless of category filtering.

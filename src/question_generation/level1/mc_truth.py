@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Tuple, Optional
 import numpy as np
 from huggingface_hub import hf_hub_download
 
+from src.question_generation.utils.time_series import quantize_value_for_context
+
 
 def interpolate_value(t_target: float, t1: float, v1: float, t2: float, v2: float) -> float:
     """Linear interpolation between two values."""
@@ -112,31 +114,25 @@ def get_wrench_components_at_time(
     indices: List[int],
 ) -> Tuple[Optional[List[float]], Optional[str], Optional[str]]:
     """Get wrench components (force/torque) at time, preferring external sensor then estimate."""
-    # Try external sensor first
-    values = []
-    modes = []
-    for idx in indices:
-        val, mode = interpolate_signal_at_time(rows, f"true_force_{idx}", t_ms)
-        if val is None:
-            values = []
-            break
-        values.append(val)
-        modes.append(mode)
-    if values:
-        interp_mode = "exact" if all(m == "exact" for m in modes) else "interpolated"
-        return values, "external sensor", interp_mode
+    prefixes = ["effort_force_cartesian_", "true_force_", "est_contact_force_"]
+    
+    for prefix in prefixes:
+        values = []
+        modes = []
+        for idx in indices:
+            val, mode = interpolate_signal_at_time(rows, f"{prefix}{idx}", t_ms)
+            if val is None:
+                values = []
+                break
+            values.append(val)
+            modes.append(mode)
+        
+        if values:
+            interp_mode = "exact" if all(m == "exact" for m in modes) else "interpolated"
+            source_name = "external sensor" if "true" in prefix or "cartesian" in prefix else "controller estimate"
+            return values, source_name, interp_mode
 
-    # Fallback to controller estimate
-    values = []
-    modes = []
-    for idx in indices:
-        val, mode = interpolate_signal_at_time(rows, f"est_contact_force_{idx}", t_ms)
-        if val is None:
-            return None, None, None
-        values.append(val)
-        modes.append(mode)
-    interp_mode = "exact" if all(m == "exact" for m in modes) else "interpolated"
-    return values, "controller estimate", interp_mode
+    return None, None, None
 
 
 def get_num_joints(rows: List[Dict[str, Any]], signal_prefix: str = "feedback_pos_") -> int:
@@ -172,6 +168,10 @@ def get_signal_key(row: Dict[str, Any], prefix: str, axis: int) -> str:
             return alt_key
     elif prefix == "vibration_":
         alt_key = f"auxiliary_accel_tool_{axis}"
+        if alt_key in row:
+            return alt_key
+    elif prefix == "feedback_speed_cartesian_":
+        alt_key = f"feedback_vel_cartesian_{axis}"
         if alt_key in row:
             return alt_key
             
@@ -327,9 +327,13 @@ def answer_q3_state_acceleration(
     t_ms: float, 
     threshold: float = 1.0
 ) -> Dict[str, Any]:
-    vib0, _ = interpolate_signal_at_time(rows, "vibration_0", t_ms)
-    vib1, _ = interpolate_signal_at_time(rows, "vibration_1", t_ms)
-    vib2, _ = interpolate_signal_at_time(rows, "vibration_2", t_ms)
+    vib0_key = get_signal_key(rows[0], "vibration_", 0)
+    vib1_key = get_signal_key(rows[0], "vibration_", 1)
+    vib2_key = get_signal_key(rows[0], "vibration_", 2)
+    
+    vib0, _ = interpolate_signal_at_time(rows, vib0_key, t_ms)
+    vib1, _ = interpolate_signal_at_time(rows, vib1_key, t_ms)
+    vib2, _ = interpolate_signal_at_time(rows, vib2_key, t_ms)
 
     if vib0 is not None and vib1 is not None and vib2 is not None:
         G = 9.81
@@ -350,13 +354,12 @@ def answer_q3_state_acceleration(
             "acceptance_bounds": {"margin": [0.5, 0.5, 0.5]}
         }
 
-    # acceleration (rad/s^2)
+    # Cartesian linear acceleration fallback (m/s^2)
     dt_ms = 10.0
     accels: List[float] = []
     
-    num_j = get_num_joints(rows, "feedback_speed_")
-    for axis in range(min(3, num_j)):
-        speed_key = get_signal_key(rows[0], "feedback_speed_", axis)
+    for axis in range(3):
+        speed_key = get_signal_key(rows[0], "feedback_speed_cartesian_", axis)
         v1, _ = interpolate_signal_at_time(rows, speed_key, t_ms)
         v2, _ = interpolate_signal_at_time(rows, speed_key, t_ms + dt_ms)
         
@@ -370,7 +373,7 @@ def answer_q3_state_acceleration(
     if len(accels) < 3:
         return {
             "answer": "N/A", 
-            "reasoning": "Insufficient data to compute 3-axis acceleration.", 
+            "reasoning": "Insufficient data to compute 3-axis Cartesian acceleration.", 
             "is_true": False
         }
 
@@ -380,7 +383,7 @@ def answer_q3_state_acceleration(
 
     return {
         "answer": answer_tensor,
-        "reasoning": f"Joint angular acceleration (rad/s^2) from speed diff. Magnitude: {magnitude:.4f}.",
+        "reasoning": f"Cartesian linear acceleration (m/s^2) from speed diff. Magnitude: {magnitude:.4f}.",
         "raw_value": [a_0, a_1, a_2],
         "magnitude": magnitude,
         "is_true": magnitude > threshold,
@@ -429,7 +432,7 @@ def answer_q4_state_external_force_detected(
             }
             
         magnitude = math.sqrt(sum(c**2 for c in currents))
-        dominant_direction = sum(currents)
+        dominant_direction = currents[int(np.argmax([abs(x) for x in currents]))]
         source_label = "current proxy"
 
     if magnitude <= eps_3:
@@ -542,9 +545,21 @@ def answer_q6_state_joint_speed_ranking(
                 "is_true": False
             }
         
-        values.append((label_map[i], abs(val), axis))
+        # Round the absolute speed to 2 decimals to match downsampled context
+        # and prevent ranking based on invisible micro-noise.
+        rounded_speed = round(abs(val), 2)
+        values.append((label_map[i], rounded_speed, axis))
     
     values.sort(key=lambda x: x[1], reverse=True)
+
+    # Check for ties: if any adjacent sorted speeds are identical, the ranking is ambiguous
+    for i in range(len(values) - 1):
+        if values[i][1] == values[i+1][1]:
+            return {
+                "answer": "N/A",
+                "reasoning": f"Ambiguous ranking: tie detected at {values[i][1]} rad/s.",
+                "is_true": False
+            }
 
     ranking_str = "".join(item[0] for item in values)
 
@@ -553,7 +568,7 @@ def answer_q6_state_joint_speed_ranking(
     return {
         "answer": ranking_str,
         "options": options_dict,
-        "reasoning": f"Speeds: " + ", ".join([f"{item[0]}(J{item[2]}): {item[1]:.4f}" for item in values]),
+        "reasoning": f"Speeds: " + ", ".join([f"{item[0]}(J{item[2]}): {item[1]:.2f}" for item in values]),
         "is_true": True,
         "anchor_timestamps": [t_ms]
     }
@@ -779,4 +794,190 @@ def answer_q10_state_safety_mode(rows: List[Dict[str, Any]], t_ms: float, machin
         "options": options,
         "reasoning": f"Derived operational state: '{state}' from speed/current patterns. Correct option is {correct_letter}.",
         "is_true": True,
+    }
+
+
+_SIGNAL_PREFIX_MAP = {
+    "effort_current": "effort_current_",
+    "feedback_speed": "feedback_speed_",
+    "feedback_pos": "feedback_pos_",
+}
+
+
+def answer_q11_state_signal_prediction(
+    rows: List[Dict[str, Any]],
+    t1_ms: float,
+    t2_ms: float,
+    end_idx: int,
+    axis: int,
+    signal_name: str,
+    horizon_steps: int,
+) -> Dict[str, Any]:
+    """Predict signal value at t3 = timestamp(end_idx + horizon_steps).
+
+    The context window shown to the model is truncated at t2 (i.e. row end_idx)
+    so the answer cannot be read off directly. The ground truth is the actual
+    sample at t3, which lies inside the episode but outside the visible window.
+    """
+    key = get_signal_key(rows[0], _SIGNAL_PREFIX_MAP.get(signal_name, "feedback_pos_"), axis)
+
+    # Locate the future row corresponding to the prediction horizon.
+    t3_idx = end_idx + horizon_steps
+    if t3_idx >= len(rows):
+        return {
+            "answer": "N/A",
+            "reasoning": "Not enough future samples in the episode for the requested prediction horizon.",
+            "is_true": False,
+        }
+
+    t3_ms = rows[t3_idx].get("timestamp_ms")
+    if t3_ms is None:
+        return {
+            "answer": "N/A",
+            "reasoning": "Missing timestamp at the prediction target row.",
+            "is_true": False,
+        }
+
+    val_t3, _ = interpolate_signal_at_time(rows, key, float(t3_ms))
+    if val_t3 is None:
+        return {
+            "answer": "N/A",
+            "reasoning": f"Missing value for {key} at t3={t3_ms}ms.",
+            "is_true": False,
+        }
+
+    # Compute the signal range over the visible context window for tolerance.
+    # Quantize to the same precision the encoder uses so the range matches
+    # what the model can actually compute from the encoded context.
+    window_rows = [
+        r for r in rows
+        if r.get("timestamp_ms") is not None and t1_ms <= r["timestamp_ms"] <= t2_ms
+    ]
+    vals: List[float] = []
+    for r in window_rows:
+        try:
+            if key in r and r[key] is not None:
+                vals.append(quantize_value_for_context(r[key]))
+        except (ValueError, TypeError):
+            continue
+
+    if not vals:
+        return {
+            "answer": "N/A",
+            "reasoning": f"No valid samples for {key} in window [{t1_ms}, {t2_ms}].",
+            "is_true": False,
+        }
+
+    signal_range = max(vals) - min(vals)
+    tolerance = 0.10 * signal_range  # k = 10% of context-window range (quantized)
+    # Floor on tolerance so flat windows still admit a sensible band.
+    # Also ensure we never tolerate less than the encoder's rounding step.
+    min_tolerance = 10 ** (-2)  # one quantization step
+    if tolerance < min_tolerance:
+        tolerance = max(min_tolerance, 0.01 * (abs(val_t3) + 1e-6))
+
+    val_rounded = round(float(val_t3), 4)
+
+    return {
+        "answer": str(val_rounded),
+        "reasoning": (
+            f"Predicted {key} at t3={t3_ms}ms (horizon={horizon_steps} samples beyond t2={t2_ms}ms). "
+            f"Window range={signal_range:.4f}, tolerance=+/-{tolerance:.4f}."
+        ),
+        "raw_value": val_rounded,
+        "is_true": True,
+        "anchor_timestamps": [t1_ms, t2_ms],
+        "important_features": [key],
+        "acceptance_bounds": {"margin": round(float(tolerance), 6)},
+        "t3_ms": float(t3_ms),
+        "truncate_ctx_at_end": True,
+    }
+
+
+def answer_q12_state_signal_anomaly(
+    rows: List[Dict[str, Any]],
+    t1_ms: float,
+    t2_ms: float,
+    axis: int,
+    signal_name: str,
+    k_sigma: float = 3.0,
+) -> Dict[str, Any]:
+    """Pointwise z-score anomaly detection over the window [t1, t2]."""
+    key = get_signal_key(rows[0], _SIGNAL_PREFIX_MAP.get(signal_name, "feedback_pos_"), axis)
+
+    window_rows = [
+        r for r in rows
+        if r.get("timestamp_ms") is not None and t1_ms <= r["timestamp_ms"] <= t2_ms
+    ]
+
+    # IMPORTANT: quantize to the same precision the encoder uses before
+    # computing any statistics. The model only ever sees the rounded values
+    # in the encoded context, so labels derived from the raw floats can
+    # disagree with what the model can verify (rounding tends to crush noise
+    # and inflate apparent outliers, which can flip the answer).
+    vals: List[float] = []
+    for r in window_rows:
+        try:
+            if key in r and r[key] is not None:
+                vals.append(quantize_value_for_context(r[key]))
+        except (ValueError, TypeError):
+            continue
+
+    options_dict = {
+        "A": f"Yes - an upward anomaly is present (a sample exceeds mean + {k_sigma}*sigma).",
+        "B": f"Yes - a downward anomaly is present (a sample falls below mean - {k_sigma}*sigma).",
+        "C": f"No anomalous sample detected (all samples remain within +/- {k_sigma}*sigma).",
+        "D": "Signal data is unavailable or insufficient for this window.",
+    }
+
+    if len(vals) < 5:
+        return {
+            "answer": "D",
+            "options": options_dict,
+            "reasoning": f"Only {len(vals)} samples for {key} in window [{t1_ms}, {t2_ms}]; insufficient for anomaly statistics.",
+            "is_true": False,
+        }
+
+    arr = np.asarray(vals, dtype=float)
+    mean_val = float(arr.mean())
+    std_val = float(arr.std())
+
+    if std_val < 1e-9:
+        # Constant signal (post-quantization) -> no anomaly possible.
+        return {
+            "answer": "C",
+            "options": options_dict,
+            "reasoning": (
+                f"{key} is effectively constant over [{t1_ms}, {t2_ms}] after quantization "
+                "to context precision (sigma~0); no anomaly possible."
+            ),
+            "raw_value": {"mean": mean_val, "std": std_val},
+            "is_true": True,
+            "anchor_timestamps": [t1_ms, t2_ms],
+            "important_features": [key],
+        }
+
+    z_scores = (arr - mean_val) / std_val
+    max_pos = float(z_scores.max())
+    max_neg = float(z_scores.min())
+
+    if max_pos > k_sigma and max_pos >= abs(max_neg):
+        correct_letter = "A"
+    elif max_neg < -k_sigma and abs(max_neg) > max_pos:
+        correct_letter = "B"
+    else:
+        correct_letter = "C"
+
+    return {
+        "answer": correct_letter,
+        "options": options_dict,
+        "reasoning": (
+            f"{key} window stats (computed on context-quantized values): "
+            f"mean={mean_val:.4f}, std={std_val:.4f}, "
+            f"max_z={max_pos:.2f}, min_z={max_neg:.2f}, k={k_sigma}. Correct: {correct_letter}."
+        ),
+        "raw_value": {"max_z": max_pos, "min_z": max_neg, "mean": mean_val, "std": std_val},
+        "is_true": True,
+        "anchor_timestamps": [t1_ms, t2_ms],
+        "important_features": [key],
     }

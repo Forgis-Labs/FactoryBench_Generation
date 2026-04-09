@@ -68,6 +68,24 @@ def format_note_value(value: Any) -> Any:
     return value
 
 
+# Number of decimal places used by `_encode_timestep` when serialising the
+# context. Truth-function code that wants its labels to agree with the
+# numbers actually visible in the encoded context must round to the same
+# precision via `quantize_value_for_context` before computing statistics.
+CONTEXT_NUMERIC_DECIMALS = 2
+
+
+def quantize_value_for_context(value: float, decimals: int = CONTEXT_NUMERIC_DECIMALS) -> float:
+    """Round *value* the same way the time-series encoder does.
+
+    Always returns a float (unlike :func:`format_note_value`, which collapses
+    integer-valued numbers to ``int``). Use this in ground-truth pipelines so
+    statistics and answers are computed on the same numeric representation
+    the model sees in the encoded context.
+    """
+    return round(float(value), decimals)
+
+
 # ---------------------------------------------------------------------------
 # Constant-feature removal
 # ---------------------------------------------------------------------------

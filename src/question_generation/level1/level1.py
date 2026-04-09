@@ -36,6 +36,8 @@ from src.question_generation.level1.mc_truth import (
     answer_q8_state_current_within_rated,
     answer_q9_state_signal_description,
     answer_q10_state_safety_mode,
+    answer_q11_state_signal_prediction,
+    answer_q12_state_signal_anomaly,
     get_num_joints,
     get_machine_by_id,
     load_machine_metadata
@@ -103,6 +105,10 @@ def fill_template(
     t2 = float(rows[end_idx]["timestamp_ms"])
     t_ms = t1 
     
+    t1_fmt = f"{t1:.2f}"
+    t2_fmt = f"{t2:.2f}"
+    t_ms_fmt = f"{t_ms:.2f}"
+    
     # Dynamic joint detection
     num_joints = get_num_joints(rows)
     if num_joints == 0:
@@ -140,7 +146,7 @@ def fill_template(
             return None
         answer = truth["answer"]
         options = truth.get("options", {})
-        question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_1=eps_1)
+        question = tmpl_text.format(axis=axis, t1=t1_fmt, t2=t2_fmt, eps_1=eps_1)
         
     elif template_type == "state_friction_increase":
         truth = answer_q2_state_friction_increase(rows, t1, t2, axis, eps_2, delta_1)
@@ -148,13 +154,13 @@ def fill_template(
             return None
         answer = truth["answer"]
         options = truth.get("options", {})
-        question = tmpl_text.format(axis=axis, t1=t1, t2=t2, eps_2=eps_2, delta_1=delta_1)
+        question = tmpl_text.format(axis=axis, t1=t1_fmt, t2=t2_fmt, eps_2=eps_2, delta_1=delta_1)
 
     elif template_type == "state_acceleration":
         truth = answer_q3_state_acceleration(rows, t_ms)
         if truth["answer"] in ["Unknown", "N/A", "Error"]: return None
         answer = truth["answer"]
-        question = tmpl_text.format(t_ms=t_ms)
+        question = tmpl_text.format(t_ms=t_ms_fmt)
 
     elif template_type == "state_external_force_detected":
         truth = answer_q4_state_external_force_detected(rows, t_ms, eps_3)
@@ -162,7 +168,7 @@ def fill_template(
             return None
         answer = truth["answer"]
         options = truth.get("options", {})
-        question = tmpl_text.format(t_ms=t_ms, eps_3=eps_3)
+        question = tmpl_text.format(t_ms=t_ms_fmt, eps_3=eps_3)
 
     elif template_type == "state_signal_statistic":
         signal_choice = random.choice(["effort_current", "feedback_speed", "feedback_pos"])
@@ -172,12 +178,12 @@ def fill_template(
         answer = truth["answer"]
         question = tmpl_text.format(
             axis=axis, 
-            t1=t1, 
-            t2=t2, 
+            t1=t1_fmt, 
+            t2=t2_fmt, 
             signal_description=signal_choice.replace("_", " "), 
             statistic_type=statistic_choice, 
             units="A" if "current" in signal_choice else ("rad/s" if "speed" in signal_choice else "rad"),
-            t_ms=t_ms
+            t_ms=t_ms_fmt
         )
 
     elif template_type == "state_joint_speed_ranking":
@@ -191,7 +197,7 @@ def fill_template(
         answer = truth["answer"]
         options = truth.get("options", {})
         joints_list_str = ", ".join(map(str, joints_list))
-        question = tmpl_text.format(t_ms=t_ms, joints_list=joints_list_str)
+        question = tmpl_text.format(t_ms=t_ms_fmt, joints_list=joints_list_str)
 
     elif template_type == "state_joint_within_rated_speed":
         total_joints = get_num_joints(rows)
@@ -205,7 +211,7 @@ def fill_template(
         answer = truth["answer"]
         options = truth.get("options", {})
         question = tmpl_text.format(
-            t_ms=t_ms,
+            t_ms=t_ms_fmt,
             axis_a=joints_list[0],
             axis_b=joints_list[1],
             axis_c=joints_list[2],
@@ -218,7 +224,7 @@ def fill_template(
             return None
         answer = truth["answer"]
         options = truth.get("options", {})
-        question = tmpl_text.format(axis=axis, t_ms=t_ms)
+        question = tmpl_text.format(axis=axis, t_ms=t_ms_fmt)
 
     elif template_type == "state_signal_description":
         signal_choice = random.choice(["effort_current", "feedback_speed", "feedback_pos"])
@@ -231,8 +237,8 @@ def fill_template(
         question = tmpl_text.format(
             signal=signal_choice.replace("_", " "),
             axis=axis,
-            t1=t1,
-            t2=t2
+            t1=t1_fmt,
+            t2=t2_fmt
         )
 
     elif template_type == "state_safety_mode":
@@ -240,7 +246,45 @@ def fill_template(
         if truth["answer"] in ["Unknown", "N/A", "Error"]: return None
         answer = truth["answer"]
         options = truth.get("options", {})
-        question = tmpl_text.format(t_ms=t_ms)
+        question = tmpl_text.format(t_ms=t_ms_fmt)
+
+    elif template_type == "state_signal_prediction":
+        signal_choice = random.choice(["effort_current", "feedback_speed", "feedback_pos"])
+        horizon_steps = random.randint(1, 5)
+        truth = answer_q11_state_signal_prediction(
+            rows, t1, t2, end_idx, axis, signal_choice, horizon_steps
+        )
+        if truth["answer"] in ["Unknown", "N/A", "Error"]:
+            return None
+        answer = truth["answer"]
+        t3 = truth["t3_ms"]
+        question = tmpl_text.format(
+            axis=axis,
+            t1=t1_fmt,
+            t2=t2_fmt,
+            t3=f"{t3:.2f}",
+            signal_description=signal_choice.replace("_", " "),
+        )
+
+    elif template_type == "state_signal_anomaly":
+        signal_choice = random.choice(["effort_current", "feedback_speed", "feedback_pos"])
+        k_sigma = random.choice([2.5, 3.0, 3.5])
+        truth = answer_q12_state_signal_anomaly(
+            rows, t1, t2, axis, signal_choice, k_sigma
+        )
+        if truth["answer"] in ["Unknown", "N/A", "Error"] or (
+            truth["answer"] == "D" and not truth.get("is_true", True)
+        ):
+            return None
+        answer = truth["answer"]
+        options = truth.get("options", {})
+        question = tmpl_text.format(
+            axis=axis,
+            t1=t1_fmt,
+            t2=t2_fmt,
+            signal_description=signal_choice.replace("_", " "),
+            k_sigma=k_sigma,
+        )
 
     else:
         logger.warning(f"Unknown template type: {template_type}")
@@ -254,7 +298,8 @@ def fill_template(
         "reasoning": truth["reasoning"],
         "anchor_timestamps": truth.get("anchor_timestamps"),
         "acceptance_bounds": truth.get("acceptance_bounds"),
-        "important_features": truth.get("important_features")
+        "important_features": truth.get("important_features"),
+        "truncate_ctx_at_end": truth.get("truncate_ctx_at_end", False),
     }
 
 
@@ -403,7 +448,11 @@ def generate_level1_questions(
         # Extract context around the relevant window
         margin = max(10, (end_idx - start_idx) // 2)
         ctx_start = max(0, start_idx - margin)
-        ctx_end = min(len(rows), end_idx + margin)
+        if filled.get("truncate_ctx_at_end"):
+            # Prediction templates: do not leak data after t2.
+            ctx_end = min(len(rows), end_idx + 1)
+        else:
+            ctx_end = min(len(rows), end_idx + margin)
         subseries = rows[ctx_start:ctx_end]
         context = build_context(
             subseries, 

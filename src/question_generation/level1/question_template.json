@@ -147,5 +147,30 @@
       "notes": "Uses safety_mode column mapped via KG enum when available; otherwise derives operational state from joint speed and current patterns (Idle, Standby, Normal Operation, High Load).",
       "requires_kg": true
     }
+  },
+  {
+    "id": 11,
+    "type": "state_signal_prediction",
+    "template": "Given the {signal_description} for joint {axis} over [T={t1}ms, T={t2}ms], what will its value be at T={t3}ms? Answer only with an integer or decimal number, nothing else.",
+    "answer_format": {
+      "type": "numerical",
+      "notes": "Ground truth: interpolate/extrapolate signal_{axis}(t3) from the episode data. t3 must lie within the episode but outside the context window shown. Tolerance band: +/- k% of signal range over the context window (k=10). Signal in {effort_current, feedback_speed, feedback_pos}. Horizon n = t3 - t2 sampled from [1, 5] timesteps to keep extrapolation tractable at L1. The context shown to the model is truncated at t2 so the answer cannot be read off directly."
+    }
+  },
+  {
+    "id": 12,
+    "type": "state_signal_anomaly",
+    "template": "Over the window [T={t1}ms, T={t2}ms], does the {signal_description} for joint {axis} contain an anomalous sample (defined as exceeding {k_sigma} standard deviations from the window mean)? Answer only with 'A', 'B', 'C', or 'D'.",
+    "answer_format": {
+      "type": "multiple_choice_single_select",
+      "options": ["A", "B", "C", "D"],
+      "options_schema": [
+        "Yes - an upward anomaly is present (a sample exceeds mean + {k_sigma}*sigma).",
+        "Yes - a downward anomaly is present (a sample falls below mean - {k_sigma}*sigma).",
+        "No anomalous sample detected (all samples remain within +/- {k_sigma}*sigma).",
+        "Signal data is unavailable or insufficient for this window."
+      ],
+      "notes": "Pointwise z-score anomaly detection over the context window. Signal in {effort_current, feedback_speed, feedback_pos}. k_sigma sampled from {2.5, 3.0, 3.5}. If both upward and downward outliers exist, the larger absolute deviation determines A vs B."
+    }
   }
 ]
