@@ -283,6 +283,34 @@ def parse_llm_answer(text):
     matches = re.findall(r'\b([A-D])\b', text.upper())
     return matches[-1] if matches else None
 
+def _estimate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
+    """Return estimated USD cost for a single call given token counts."""
+    model_name = model_name.lower()
+    if "gpt-4o-mini" in model_name:
+        price_in, price_out = 0.15, 0.60
+    elif "gpt-5.1" in model_name:
+        price_in, price_out = 1.25, 10.00
+    elif "gpt-5-mini" in model_name:
+        price_in, price_out = 0.25, 2.00
+    elif "gpt-4o" in model_name:
+        price_in, price_out = 2.50, 10.00
+    elif "o1-mini" in model_name:
+        price_in, price_out = 3.00, 12.00
+    elif "o1-preview" in model_name or model_name == "o1":
+        price_in, price_out = 15.00, 60.00
+    elif "gpt-4-turbo" in model_name:
+        price_in, price_out = 10.00, 30.00
+    elif "gpt-4" in model_name:
+        price_in, price_out = 30.00, 60.00
+    elif "gpt-3.5-turbo" in model_name:
+        price_in, price_out = 0.50, 1.50
+    elif "mini" in model_name:
+        price_in, price_out = 0.15, 0.60
+    else:
+        price_in, price_out = 5.0, 15.0
+    return (prompt_tokens / 1_000_000 * price_in) + (completion_tokens / 1_000_000 * price_out)
+
+
 def run_direct_requests(
     entries: list[Tuple[Path, str, int, str]],
     client: Any,
@@ -292,12 +320,14 @@ def run_direct_requests(
     overwrite: bool,
     ground_truth_index: Dict[str, Any],
     eval_level: str,
+    cost_limit: float = 40.0,
 ) -> tuple[int, int, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     completed = 0
     failed = 0
     skipped = 0
+    total_cost = 0.0
 
     for prompt_path, prompt_text, prompt_idx, custom_id in entries:
         out_path = output_dir / f"{custom_id}_answer.json"
@@ -352,6 +382,18 @@ def run_direct_requests(
                     answer = body.get("choices", [{}])[0].get("message", {}).get("content", "")
                 else:
                     raise e
+
+            # --- Cost tracking ---
+            usage_raw = body.get("usage", {}) or {}
+            prompt_tokens: int = int(
+                usage_raw.get("prompt_tokens") or usage_raw.get("input_tokens") or 0
+            )
+            completion_tokens: int = int(
+                usage_raw.get("completion_tokens") or usage_raw.get("output_tokens") or 0
+            )
+            model_name = (body.get("model") or model).lower()
+            est_cost = _estimate_cost(model_name, prompt_tokens, completion_tokens)
+            total_cost += est_cost
 
             # --- Scoring logic ---
             score = None
@@ -460,45 +502,8 @@ def run_direct_requests(
                         workspace=os.getenv("OPIK_WORKSPACE", "forgis")
                     )
                     
-                    usage_raw = body.get("usage", {}) or {}
-                    # Normalize across Chat Completions (prompt_tokens) and Responses API (input_tokens)
-                    prompt_tokens: int = int(
-                        usage_raw.get("prompt_tokens")
-                        or usage_raw.get("input_tokens")
-                        or 0
-                    )
-                    completion_tokens: int = int(
-                        usage_raw.get("completion_tokens")
-                        or usage_raw.get("output_tokens")
-                        or 0
-                    )
+                    # prompt_tokens, completion_tokens, model_name, est_cost already computed above
                     total_tokens: int = int(usage_raw.get("total_tokens") or (prompt_tokens + completion_tokens))
-                    
-                    # Estimate cost based on model name - https://developers.openai.com/api/docs/pricing
-                    model_name = (body.get("model") or model).lower()
-                    if "gpt-4o-mini" in model_name:
-                        price_in, price_out = 0.15, 0.60
-                    elif "gpt-5.1" in model_name:
-                        price_in, price_out = 1.25, 10.00
-                    elif "gpt-4o" in model_name:
-                        price_in, price_out = 2.50, 10.00
-                    elif "o1-mini" in model_name:
-                        price_in, price_out = 3.00, 12.00
-                    elif "o1-preview" in model_name or model_name == "o1":
-                        price_in, price_out = 15.00, 60.00
-                    elif "gpt-4-turbo" in model_name:
-                        price_in, price_out = 10.00, 30.00
-                    elif "gpt-4" in model_name:
-                        price_in, price_out = 30.00, 60.00
-                    elif "gpt-3.5-turbo" in model_name:
-                        price_in, price_out = 0.50, 1.50
-                    elif "mini" in model_name:
-                        price_in, price_out = 0.15, 0.60
-                    else:
-                        # Default to GPT-4 pricing from the interactive notebook
-                        price_in, price_out = 5.0, 15.0
-                    
-                    est_cost = (prompt_tokens / 1_000_000 * price_in) + (completion_tokens / 1_000_000 * price_out)
 
                     metadata_payload = qa_payload.get("metadata") or {}
                     dataset_tag = metadata_payload.get("dataset")
@@ -607,7 +612,15 @@ def run_direct_requests(
                 "raw_api_response": body,
             })
             completed += 1
-            logger.info(f"✓ [{completed + failed + skipped}/{len(entries)}] Saved answer: {custom_id}")
+            logger.info(
+                f"✓ [{completed + failed + skipped}/{len(entries)}] Saved answer: {custom_id}"
+                f" | cost this call: ${est_cost:.4f} | run total: ${total_cost:.4f}"
+            )
+            if total_cost >= cost_limit:
+                logger.warning(
+                    f"Cost limit of ${cost_limit:.2f} reached (${total_cost:.4f} spent). Stopping."
+                )
+                return completed, failed, skipped
         except Exception as exc:
             failed += 1
             save_json(fail_path, {
@@ -675,6 +688,12 @@ def main() -> None:
         default=None,
         help="Evaluation level tag for Opik (e.g. level_1)",
     )
+    parser.add_argument(
+        "--cost-limit",
+        type=float,
+        default=20.0,
+        help="Maximum USD spend per run (default: $20.00). Stops after the limit is reached.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -718,6 +737,7 @@ def main() -> None:
         overwrite=args.overwrite,
         ground_truth_index=ground_truth_index,
         eval_level=args.eval_level,
+        cost_limit=args.cost_limit,
     )
     logger.info(
         f"Done. Completed={completed}, Failed={failed}, Skipped={skipped}, OutputDir={args.output_dir}"
