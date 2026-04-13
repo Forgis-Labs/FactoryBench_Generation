@@ -2,8 +2,8 @@
 
 **NeurIPS 2026 Datasets and Benchmarks Track**
 
-_Authors: Coral Izquierdo Muniz, Yanis Merzouki, Jonas Petersen, [Additional Authors]_
-_Affiliation: Forgis AG, ETH Zurich, [University]_
+_Authors: Yanis Merzouki, Coral Izquierdo Muniz, Matei Ignuta-Ciuncanu, Jonas Petersen_
+_Affiliation: ETH Zurich, Forgis AG, Imperial College London_
 
 ---
 
@@ -47,16 +47,20 @@ Time-series modeling has advanced through transformer-based architectures (Infor
 
 Causal frameworks provide formal tools for interventions and counterfactuals [27, 28, 29], while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series [30, 31]. Existing broad benchmarks (MMLU, BIG-bench, MMMU) [13, 14, 15] and classical time-series resources [16, 17, 18] do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support.
 
-| Benchmark               | Machine/Robot | Multivariate |    Size | Counterfactual | Ranking | Numerical | Free-Form | Novel Dense TS |
-| ----------------------- | :-----------: | :----------: | ------: | :------------: | :-----: | :-------: | :-------: | :------------: |
-| TimeSeriesExam          |       ✗       |      ✗       |    ~700 |       ✗        |    ✓    |     ✗     |     ✗     |       ✗        |
-| ChatTS                  |       ✗       |      ✓       |   ~134k |       ✗        |    ✓    |     ✓     |     ✗     |       ✗        |
-| EngineMT-QA             |       ✓       |      ✓       |   ~110k |       ✗        |    ✓    |     ✓     |     ✓     |       ✗        |
-| TSAQA                   |       ✗       |      ✗       |   ~210k |       ✗        |    ✓    |     ✗     |     ✗     |       ✗        |
-| Time-MQA                |       ✗       |      ✓       |   ~200k |       ✗        |    ✓    |     ✓     |     ✓     |       ✗        |
-| MTBench                 |       ✗       |      ✓       |       ? |       ✗        |    ✓    |     ✓     |     ✓     |       ✗        |
-| QuAnTS                  |       ✗       |      ✓       |   ~150k |       ✗        |    ✓    |     ✓     |     ✓     |       ✗        |
-| **FactoryBench (Ours)** |       ✓       |      ✓       | **TBD** |       ✓        |    ✓    |     ✓     |     ✓     |       ✓        |
+(TODO: ADD MORE DATASETS THAT TICK COUNTERFACTUAL AND ROBOTIC BOX)
+
+| Benchmark               | Machine/Robot | Multivariate TS |    Size | Counterfactual | Ranking | Numerical | Free-Form | Novel Dense TS Dataset |
+| ----------------------- | :-----------: | :-------------: | ------: | :------------: | :-----: | :-------: | :-------: | :--------------------: |
+| TimeSeriesExam          |       ✗       |        ✗        |    ~700 |       ✗        |    ✓    |     ✗     |     ✗     |           ✗            |
+| ChatTS                  |       ✗       |        ✓        |   ~134k |       ✗        |    ✓    |     ✓     |     ✗     |           ✗            |
+| EngineMT-QA             |       ✓       |        ✓        |   ~110k |       ✗        |    ✓    |     ✓     |     ✓     |           ✗            |
+| TSAQA                   |   Partially   |        ✗        |   ~210k |       ✗        |    ✓    |     ✗     |     ✗     |           ✗            |
+| Time-MQA                |       ✗       |        ✓        |   ~200k |       ✗        |    ✓    |     ✓     |     ✓     |           ✗            |
+| MTBench                 |       ✗       |        ✓        |       ? |       ✗        |    ✓    |     ✓     |     ✓     |           ✗            |
+| QuAnTS                  |       ✗       |        ✓        |   ~150k |       ✗        |    ✓    |     ✓     |     ✓     |           ✗            |
+| CLEVR                   |       ✗       |        ✗        |     ~1M |       ✗        |    ✗    |     ✓     |     ✗     |           ✗            |
+| CLEVRER                 |       ✗       |        ✗        |   ~305k |       ✓        |    ✗    |     ✓     |     ✓     |           ✗            |
+| **FactoryBench (Ours)** |       ✓       |        ✓        | **TBD** |       ✓        |    ✓    |     ✓     |     ✓     |           ✓            |
 
 ---
 
@@ -75,13 +79,13 @@ Causal frameworks provide formal tools for interventions and counterfactuals [27
 
 To systematically evaluate machine understanding, we organize question-answering tasks according to a four-tier hierarchy, each probing distinct reasoning capabilities:
 
-**Level 1: State.** This tier assesses the agent’s ability to interpret the current state of the machine, including detection of anomalies, identification of operational modes, and recognition of sensor patterns. Questions at this level require accurate extraction and interpretation of time series features.
+**Level 1: State.** This level assesses the agent’s ability to interpret the current state of the machine, including detection of anomalies, identification of operational modes, and recognition of sensor patterns. Questions at this level require accurate extraction and interpretation of time series features.
 
 **Level 2: Intervention.** At this level, the agent must reason about the consequences of interventions or events occurring at the present timestep that might perturb the distribution of machine states. Tasks include predicting the immediate impact of control actions, diagnosing faults as they arise, and understanding causal relationships in real time.
 
-**Level 3: Counterfactual.** This tier evaluates the agent’s ability to reason about hypothetical scenarios, such as the effect of an event or intervention at a previous timestep. Questions require the agent to simulate alternative histories and assess how outcomes would differ under counterfactual conditions, while still considering the history they know.
+**Level 3: Counterfactual.** This level evaluates the agent’s ability to reason about hypothetical scenarios, such as the effect of an event or intervention at a previous timestep. Questions require the agent to simulate alternative histories and assess how outcomes would differ under counterfactual conditions, while still considering the history they know.
 
-**Level 4: Decision Making.** The highest tier encompasses complex decision-making tasks, where the agent must generate a sequence of actions or recommendations based on the time series and a prompt. This includes troubleshooting, optimization, and planning, requiring integration of state interpretation, causal reasoning, and goal-directed synthesis.
+**Level 4: Decision Making.** The highest level encompasses complex decision-making tasks, where the agent must generate a sequence of actions or recommendations based on the time series and a prompt. This includes troubleshooting, optimization, and planning, requiring integration of state interpretation, causal reasoning, and goal-directed synthesis.
 
 By structuring Q&A tasks along these four levels, FactoryBench enables rigorous and granular assessment of machine understanding, from basic state recognition to advanced decision support.
 
@@ -93,11 +97,13 @@ By structuring Q&A tasks along these four levels, FactoryBench enables rigorous 
 
 FactoryBench uses three answer formats, chosen to balance evaluation rigor with scalability. Each format supports deterministic scoring (with the exception of free form), has been chosen in order to make questions very easily checkable, but also hard to answer in the absence of correct reasoning.
 
-**Multi-Select True/False.** The model is presented with four independent statements (A–D) about the outcome of an event or intervention, and must classify each as True or False. This format tests whether the model understands the causal consequences of a perturbation across multiple dimensions simultaneously — safety state, tracking error, current draw — without the answer leaking from any single correct choice. Evaluation gives a score of 1 for exact match, 0.5 for 1 mistake and 0 otherwise (random guesser is expected to get 0).
+**Multi-Select MC.** The model is presented with four independent statements (A–D) about the outcome of an event or intervention, and must select any subset of statements. Evaluation gives a score of 1 for exact match, 0.5 for 1 mistake and 0 otherwise (random guesser is expected to get 0).
 
-**Ranking.** The model is given four time-series segments or outcomes (A–D) and must order them according to a specified criterion (e.g., severity of deviation, magnitude of a signal). The answer is a permutation string (e.g., `DABC`). This format probes the model's ability to perform relative quantitative reasoning rather than threshold-based classification. Evaluation uses exact-match rate and Kendall's τ rank correlation against the ground-truth ordering.
+**Ranking.** The model is given four time-series segments or outcomes (A–D) and must order them according to a specified criterion (e.g., severity of deviation, magnitude of a signal). The answer is a permutation string (e.g., `DABC`). Evaluation uses exact-match rate and Kendall's τ rank correlation against the ground-truth ordering.
 
-**Tensor Prediction.** The model must predict at least one specific scalar value — such as the expected sensor reading following an intervention — with no multiple-choice scaffolding. The answer is a list of floating-point numbers (possibly one). This format directly tests quantitative extrapolation from time-series context. Evaluation is done on each scalar separately, and uses mean absolute percentage error (MAPE) and a threshold-based accuracy metric (prediction within ±*k*% of ground truth), with partial points given to all correct scalars given.
+**Tensor.** The model must output at least one specific scalar value — such as the expected sensor reading following an intervention — with no multiple-choice scaffolding. The answer is a list of floating-point numbers (possibly one). Evaluation is done on each scalar separately, and uses mean absolute percentage error (MAPE) and a threshold-based accuracy metric (prediction within ±*k*% of ground truth), with partial points given to all correct scalars given.
+
+**Free-Form.** The model produces an open-ended natural language response such as a diagnosis, recommended action sequence, or causal explanation. Because no single deterministic answer exists, evaluation is performed via an LLM-as-judge voting protocol: three independent frontier LLMs each compare the model's response against the ground-truth reference and cast a verdict of **Wrong** (0), **Neutral** (0.5), or **Correct** (1). The final score is the majority vote across the three judges, with ties broken by averaging.
 
 ---
 
