@@ -62,6 +62,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # data
+datasets/open_datasets/*
 data/open_datasets/*
 data/normalized_episodes/*
 
@@ -72,3 +73,20 @@ output/*
 datasets/*
 
 figures/paperbanana_runs
+# Claude Code
+.claude/
+
+# LaTeX auxiliary files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb

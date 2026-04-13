@@ -2,8 +2,8 @@
 
 **NeurIPS 2026 Datasets and Benchmarks Track**
 
-_Authors: Coral Izquierdo Muniz, Yanis Merzouki, Jonas Petersen, [Additional Authors]_
-_Affiliation: Forgis AG, ETH Zurich, [University]_
+_Authors: Yanis Merzouki, Coral Izquierdo Muniz, Matei Ignuta-Ciuncanu, Jonas Petersen_
+_Affiliation: ETH Zurich, Forgis AG, Imperial College London_
 
 ---
 
