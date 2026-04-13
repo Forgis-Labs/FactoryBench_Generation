@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-04-13T11:59:55.188549",
+  "prompt_file": "scripts\\prompts\\factorybench_method_paper_level.txt",
+  "colors_file": "scripts/color_schema.json",
+  "agent": "claude",
+  "chat_model": "gpt-5-mini",
+  "reasoning_model": "claude-opus-4-6",
+  "max_compile_retries": 3,
+  "visual_review": false,
+  "visual_iterations": 2,
+  "compiled": true,
+  "visual_reviewed": false,
+  "cost": {
+    "total_usd": 0.45228,
+    "entries": [
+      {
+        "model": "claude-opus-4-6",
+        "label": "generate",
+        "input_tokens": 1132,
+        "output_tokens": 5804,
+        "cost": 0.45228
+      }
+    ]
+  }
+}
