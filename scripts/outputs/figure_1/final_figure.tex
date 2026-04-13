@@ -147,7 +147,7 @@
 % ====== RIGHT COLUMN: GENERATION + RESULTS ======
 % --- Q&A Generation Engine ---
 \begin{scope}
-\fill[panelbg, rounded corners=6pt] (8.5, 11.0) rectangle (17.2, 15.6);
+\fill[panelbg, rounded corners=6pt] (8.5, 10.8) rectangle (17.2, 15.6);
 \node[font=\sffamily\bfseries\normalsize, text=gunmetal] at (12.85, 15.2) 
   {Scalable Q\&A Generation Engine};
 
@@ -169,7 +169,7 @@
 \draw[gunmetal, line width=1pt, ->] (10.4, 13.6) -- (10.4, 13.1) -- (12.85, 12.8);
 \draw[gunmetal, line width=1pt, ->] (14.5, 13.6) -- (14.5, 13.1) -- (12.85, 12.8);
 
-% Dynamic sampling box (Convertido a nodo inteligente)
+% Dynamic sampling box
 \node[
   draw=flicker, fill=white, line width=1pt, rounded corners=3pt, 
   align=center, inner sep=4pt, minimum width=4.7cm
@@ -187,15 +187,17 @@
   }
 }
 
-\node[outbox] (ms)     at (9.5,  11.25) {Multi-Select};
-\node[outbox] (rank)   at (11.5, 11.25) {Ranking};
-\node[outbox] (tensor) at (14.0, 11.25) {Tensor Prediction};
-\node[outbox] (open)   at (16.2, 11.25) {Open answers};
+\node[outbox] (ms)      at (9.3,   11.25) {Multi-Select};
+\node[outbox] (escalar) at (11.05, 11.25) {Scalar};
+\node[outbox] (tensor)  at (12.85, 11.25) {Tensor};  % Centro exacto
+\node[outbox] (rank)    at (14.65, 11.25) {Ranking};
+\node[outbox] (open)    at (16.4,  11.25) {Free form};
 
-\draw[steel, line width=0.8pt, ->] ([xshift=-1.8cm]sampling.south) -- (ms.north);
-\draw[steel, line width=0.8pt, ->] ([xshift=-0.6cm]sampling.south) -- (rank.north);
-\draw[steel, line width=0.8pt, ->] ([xshift=0.6cm]sampling.south)  -- (tensor.north);
-\draw[steel, line width=0.8pt, ->] ([xshift=1.8cm]sampling.south)  -- (open.north);
+\draw[steel, line width=0.8pt, ->] ([xshift=-1.7cm]sampling.south)  -- (ms.north);
+\draw[steel, line width=0.8pt, ->] ([xshift=-0.85cm]sampling.south) -- (escalar.north);
+\draw[steel, line width=0.8pt, ->] (sampling.south)                 -- (tensor.north); 
+\draw[steel, line width=0.8pt, ->] ([xshift=0.85cm]sampling.south)  -- (rank.north);
+\draw[steel, line width=0.8pt, ->] ([xshift=1.7cm]sampling.south)   -- (open.north);
 
 \end{scope}
 
