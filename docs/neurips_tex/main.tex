@@ -358,4 +358,113 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 }
 \end{verbatim}
 
+\section{Benchmark inference cost}
+\label{app:cost}
+
+A practical concern when deploying large-scale Q\&A benchmarks is the monetary cost of running inference across all questions. We derive a simple cost model and tabulate estimates for three representative frontier models under batch-API pricing.
+
+\subsection{Cost model}
+
+Let $Q$ denote the total number of question--answer pairs in the benchmark. For each question $q$, the API call consumes $t_{\text{in}}^{(q)}$ input tokens (prompt, context time series, and answer options) and $t_{\text{out}}^{(q)}$ output tokens (model response). We denote the per-token prices as $p_{\text{in}}$ and $p_{\text{out}}$ respectively (in USD per token). The total cost is:
+
+\begin{equation}
+    C = \sum_{q=1}^{Q} \bigl( p_{\text{in}} \cdot t_{\text{in}}^{(q)} + p_{\text{out}} \cdot t_{\text{out}}^{(q)} \bigr).
+    \label{eq:cost_exact}
+\end{equation}
+
+Since individual token counts vary by question, we work with corpus-level averages. Let $\bar{t}_{\text{in}}$ and $\bar{t}_{\text{out}}$ denote the mean input and output tokens per question. Then:
+
+\begin{equation}
+    C \approx Q \cdot \bigl( p_{\text{in}} \cdot \bar{t}_{\text{in}} + p_{\text{out}} \cdot \bar{t}_{\text{out}} \bigr).
+    \label{eq:cost_approx}
+\end{equation}
+
+It is convenient to express prices per million tokens. Writing $P_{\text{in}}$ and $P_{\text{out}}$ for the price in USD per million tokens:
+
+\begin{equation}
+    C = Q \cdot \left( \frac{P_{\text{in}} \cdot \bar{t}_{\text{in}} + P_{\text{out}} \cdot \bar{t}_{\text{out}}}{10^6} \right).
+    \label{eq:cost_final}
+\end{equation}
+
+\subsection{Assumptions}
+
+\paragraph{Input tokens.} Each question payload averages approximately 30\,KB, comprising the system prompt, question text, serialized time-series context window, and answer options. At an empirical ratio of 0.25 tokens per byte, this yields:
+\[
+    \bar{t}_{\text{in}} = 30{,}000 \;\text{bytes} \times 0.25 \;\text{tokens/byte} = 7{,}500 \;\text{tokens}.
+\]
+
+\paragraph{Output tokens.} The majority of FactoryBench answer formats---Multi-Select MC (\texttt{FTTF}), Ranking (\texttt{DABC}), and Tensor (a scalar)---require only $\sim$2 output tokens. Free-form answers, which constitute at most 10\% of the benchmark, produce longer responses ($\sim$300 tokens). The weighted average is therefore:
+\[
+    \bar{t}_{\text{out}} = 0.9 \times 2 + 0.1 \times 300 = 31.8 \approx 32 \;\text{tokens}.
+\]
+
+\paragraph{Batch constraints.} Most batch APIs impose a maximum request file size of 50\,MB. At 30\,KB per question, each batch accommodates $\lfloor 50{,}000 / 30 \rfloor \approx 1{,}666$ questions. A full benchmark run of $Q = 200{,}000$ therefore requires $\lceil 200{,}000 / 1{,}666 \rceil = 120$ batches. This affects throughput scheduling but not per-token pricing.
+
+All models are evaluated via their respective \textbf{batch processing APIs}, which offer reduced pricing with longer turnaround times (typically up to 24 hours). This is the natural choice for offline benchmark evaluation.
+
+\subsection{Model pricing}
+
+Table~\ref{tab:pricing} summarizes the batch-API pricing for three frontier models as of April 2026.
+
+\begin{table}[h]
+\centering
+\caption{Batch-API pricing for selected frontier models (USD per million tokens, April 2026).}
+\label{tab:pricing}
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Model & $P_{\text{in}}$ (\$/M tokens) & $P_{\text{out}}$ (\$/M tokens) \\
+\midrule
+Claude Opus 4.6 (Anthropic) & 2.50 & 12.50 \\
+GPT-4o (OpenAI) & 1.25 & 5.00 \\
+Gemini 2.5 Pro (Google) & 0.625 & 5.00 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Sample calculation for $Q = 200{,}000$}
+
+Substituting into Equation~\ref{eq:cost_final} with $Q = 200{,}000$, $\bar{t}_{\text{in}} = 7{,}500$, and $\bar{t}_{\text{out}} = 32$:
+
+\paragraph{Claude Opus 4.6.}
+\begin{align}
+    C_{\text{Opus}} &= 200{,}000 \times \frac{2.50 \times 7{,}500 + 12.50 \times 32}{10^6} \notag \\
+    &= 200{,}000 \times \frac{18{,}750 + 400}{10^6} \notag \\
+    &= 200{,}000 \times 0.01915 = \mathbf{\$3{,}830}.
+\end{align}
+
+\paragraph{GPT-4o.}
+\begin{align}
+    C_{\text{GPT-4o}} &= 200{,}000 \times \frac{1.25 \times 7{,}500 + 5.00 \times 32}{10^6} \notag \\
+    &= 200{,}000 \times \frac{9{,}375 + 160}{10^6} \notag \\
+    &= 200{,}000 \times 0.009535 = \mathbf{\$1{,}907}.
+\end{align}
+
+\paragraph{Gemini 2.5 Pro.}
+\begin{align}
+    C_{\text{Gemini}} &= 200{,}000 \times \frac{0.625 \times 7{,}500 + 5.00 \times 32}{10^6} \notag \\
+    &= 200{,}000 \times \frac{4{,}687.5 + 160}{10^6} \notag \\
+    &= 200{,}000 \times 0.0048475 = \mathbf{\$969.50}.
+\end{align}
+
+\subsection{Summary}
+
+\begin{table}[h]
+\centering
+\caption{Estimated benchmark inference cost for $Q = 200{,}000$ questions (batch API).}
+\label{tab:cost_summary}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Model & Input cost & Output cost & \textbf{Total cost} & Cost per question \\
+\midrule
+Claude Opus 4.6 & \$3,750.00 & \$80.00 & \textbf{\$3,830.00} & \$0.0192 \\
+GPT-4o & \$1,875.00 & \$32.00 & \textbf{\$1,907.00} & \$0.0095 \\
+Gemini 2.5 Pro & \$937.50 & \$32.00 & \textbf{\$969.50} & \$0.0049 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These estimates show that a full benchmark run of 200k questions on a frontier model costs between roughly \$1,000 and \$4,000 using batch APIs. Costs are heavily input-dominated: output tokens contribute less than 5\% of the total, since 90\% of FactoryBench answers are short structured strings (2 tokens). Standard (non-batch) API pricing is typically $2\times$ higher. Note that these costs are for a \emph{single} evaluation pass; repeated runs (e.g., for variance estimation or ablation studies) scale linearly. The per-question cost (\$0.005--\$0.02) confirms that FactoryBench is economically feasible to evaluate at scale, even on the most expensive frontier models.
+
 \end{document}
