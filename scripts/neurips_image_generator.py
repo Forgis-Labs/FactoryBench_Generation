@@ -1,7 +1,8 @@
-"""NeurIPS figure generator using Azure AI Foundry (MAI-Image-2).
+"""LaTeX/TikZ figure generator driven by LLMs.
 
-Generates publication-quality diagrams from text prompts stored in
-scripts/prompts/, with optional AI-driven prompt refinement and cost tracking.
+Generates publication-quality figures by asking an LLM to write a standalone
+TikZ/LaTeX document, compiles it with latexmk, and iteratively feeds any
+compilation errors back to the model until it builds
 """
 
 from __future__ import annotations
@@ -10,8 +11,10 @@ import argparse
 import base64
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -23,99 +26,101 @@ load_dotenv()
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-COLOR_SCHEMA_PATH = SCRIPT_DIR / "color_schema.json"
-DEFAULT_PROMPT_PATH = SCRIPT_DIR / "prompts" / "factorybench_neurips.txt"
 
 
 API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "")
 
-MAI_BASE = os.getenv(
-    "IMAGE_ENDPOINT",
-).rstrip("/").rstrip('"')
+CHAT_BASE = os.getenv("CHAT_ENDPOINT", "").rstrip("/").rstrip('"')
+ANTHROPIC_BASE = os.getenv("REASONING_ENDPOINT", "").rstrip("/").rstrip('"')
 
-CHAT_BASE = os.getenv(
-    "CHAT_ENDPOINT",
-).rstrip("/").rstrip('"')
-
-ANTHROPIC_BASE = os.getenv(
-    "REASONING_ENDPOINT",
-).rstrip("/").rstrip('"')
-
-IMAGE_MODEL = os.getenv("IMAGE_MODEL", "MAI-Image-2")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "gpt-5-mini")
 REASONING_MODEL = os.getenv("REASONING_MODEL", "claude-opus-4-6")
 
-# OpenAI client for the chat model
-chat_client = OpenAI(api_key=API_KEY, base_url=CHAT_BASE)
+chat_client = OpenAI(api_key=API_KEY, base_url=CHAT_BASE) if CHAT_BASE else None
 
 COST_TABLE = {
-    "MAI-Image-2":      {"per_image": 0.020},
-    "gpt-5-mini":       {"input_per_1k": 0.0004, "output_per_1k": 0.0016},
-    "claude-opus-4-6":  {"input_per_1k": 0.015,  "output_per_1k": 0.075},
+    "gpt-5-mini":      {"input_per_1k": 0.0004, "output_per_1k": 0.0016},
+    "claude-opus-4-6": {"input_per_1k": 0.015,  "output_per_1k": 0.075},
 }
 
 
+# LLM system prompts
 
-def load_color_schema() -> dict:
-    """Load the Forgis color schema from JSON."""
-    with open(COLOR_SCHEMA_PATH) as f:
-        return json.load(f)
+TIKZ_SYSTEM = r"""You are an expert at writing publication-quality figures in TikZ/LaTeX
+for academic papers (NeurIPS, ICML, CVPR style).
+
+Given a text description of a figure, produce a COMPLETE, SELF-CONTAINED
+LaTeX document that renders the figure using TikZ/pgfplots.
+
+Hard requirements:
+- Start with \documentclass[border=5pt]{standalone}
+- Only load widely-available packages: tikz, pgfplots, xcolor, amsmath,
+  amssymb, amsfonts, bm. Do NOT load fontawesome, emoji, or exotic packages.
+  If the description mentions icons, draw them with TikZ primitives.
+- Use \pgfplotsset{compat=1.18} when loading pgfplots.
+- Define named colors near the top with \definecolor using hex values.
+- Every text label must appear EXACTLY as specified in the description.
+  No paraphrasing, no abbreviations, no placeholder text.
+- Flat, clean, academic style: no gradients, no 3D effects, no drop shadows
+  unless explicitly requested.
+- Choose coordinates and sizes so the layout matches the description.
+- For plots, use pgfplots with inline coordinates — do not read external files.
+- The document MUST compile cleanly with pdflatex.
+
+Output format:
+Return ONLY the complete LaTeX source inside a single ```latex ... ``` code
+fence. No commentary before or after the fence.
+"""
+
+FIX_SYSTEM = r"""You are debugging a TikZ/LaTeX compilation failure.
+
+You will receive:
+1. The current LaTeX source.
+2. The relevant portion of the pdflatex error log.
+
+Fix ALL errors and return the complete corrected source. Preserve the original
+figure content and layout — change only what is needed to make it compile.
+Keep the \documentclass[border=5pt]{standalone} structure.
+
+Output format:
+Return ONLY the complete corrected LaTeX inside a single ```latex ... ``` code
+fence. No commentary.
+"""
+
+REVIEW_SYSTEM = r"""You are reviewing a rendered academic figure against its written specification.
+
+You will receive:
+1. The original text description.
+2. The current TikZ/LaTeX source.
+3. A PNG rendering of the compiled figure.
+
+Check whether the rendering matches the description: zones present, labels
+correct, colors right, alignment sensible, nothing overlapping, proportions
+readable. If it matches well, respond with exactly the single word: LGTM
+
+If it needs fixes, return the complete revised LaTeX source inside a
+```latex ... ``` code fence. Change only what is needed. Keep the
+\documentclass[border=5pt]{standalone} structure.
+"""
 
 
-def format_color_block(colors: dict) -> str:
-    """Format the color schema as a text block to inject into prompts."""
-    lines = [
-        "",
-        "═══════════════════════════════════════════════════════",
-        "FORGIS BRAND COLOR PALETTE (use these colors)",
-        "═══════════════════════════════════════════════════════",
-    ]
-    for section, mapping in colors.items():
-        lines.append(f"\n{section.upper()}:")
-        if isinstance(mapping, dict) and all(isinstance(v, str) for v in mapping.values()):
-            for name, hex_val in mapping.items():
-                lines.append(f"  - {name}: {hex_val}")
-        elif isinstance(mapping, dict):
-            for name, obj in mapping.items():
-                if isinstance(obj, dict):
-                    parts = ", ".join(f"{k}={v}" for k, v in obj.items())
-                    lines.append(f"  - {name}: {parts}")
-                else:
-                    lines.append(f"  - {name}: {obj}")
-    return "\n".join(lines)
+# Cost tracking
 
-
-def load_prompt(path: Path) -> str:
-    """Read a prompt text file."""
-    return path.read_text(encoding="utf-8").strip()
-
-
-def inject_colors_into_prompt(prompt: str, colors: dict) -> str:
-    """Append the Forgis color palette to the end of a prompt."""
-    color_block = format_color_block(colors)
-    return f"{prompt}\n\n{color_block}"
-
-
-# Cost tracker
 class CostTracker:
-    """Accumulates estimated API costs across all calls."""
+    """Accumulates estimated LLM costs across all calls."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.entries: list[dict] = []
 
-    def add_image(self, model: str = "MAI-Image-2"):
-        cost = COST_TABLE.get(model, {}).get("per_image", 0.0)
-        self.entries.append({"type": "image", "model": model, "cost": cost})
-
-    def add_chat(self, model: str, input_tokens: int, output_tokens: int):
+    def add_chat(self, model: str, input_tokens: int, output_tokens: int, label: str = "") -> None:
         table = COST_TABLE.get(model, {})
         cost = (
             (input_tokens / 1000) * table.get("input_per_1k", 0)
             + (output_tokens / 1000) * table.get("output_per_1k", 0)
         )
         self.entries.append({
-            "type": "chat",
             "model": model,
+            "label": label,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "cost": cost,
@@ -128,143 +133,98 @@ class CostTracker:
     def summary(self) -> str:
         lines = ["\n--- Cost Summary ---"]
         for i, e in enumerate(self.entries, 1):
-            if e["type"] == "image":
-                lines.append(f"  [{i}] {e['model']} image generation: ${e['cost']:.4f}")
-            else:
-                lines.append(
-                    f"  [{i}] {e['model']} chat "
-                    f"({e['input_tokens']} in / {e['output_tokens']} out): "
-                    f"${e['cost']:.4f}"
-                )
+            label = f" [{e['label']}]" if e["label"] else ""
+            lines.append(
+                f"  [{i}] {e['model']}{label} "
+                f"({e['input_tokens']} in / {e['output_tokens']} out): "
+                f"${e['cost']:.4f}"
+            )
         lines.append(f"  TOTAL estimated cost: ${self.total:.4f}")
         return "\n".join(lines)
 
 
-# Image generation (MAI-Image-2)
-MAX_RETRIES = 3
-RETRY_BACKOFF = [10, 30, 60]  # seconds to wait between retries
+# Prompt / color helpers
+
+def load_prompt(path: Path) -> str:
+    return path.read_text(encoding="utf-8").strip()
 
 
-def generate_image(
-    prompt: str,
-    width: int = 1366,
-    height: int = 768,
-    tracker: CostTracker | None = None,
-) -> bytes | None:
-    """Call MAI-Image-2 to generate an image with retry logic.
-
-    Retries up to MAX_RETRIES times on 499/timeout errors with exponential
-    backoff, since MAI-Image-2 can be slow for complex prompts.
-    """
-    print(f"[image] Generating via {IMAGE_MODEL} ({width}x{height}) ...")
-
-    for attempt in range(1, MAX_RETRIES + 1):
-        timeout = 180 + (attempt - 1) * 60  # 180s, 240s, 300s
-        try:
-            r = requests.post(
-                f"{MAI_BASE}/images/generations",
-                headers={"api-key": API_KEY, "Content-Type": "application/json"},
-                json={
-                    "model": IMAGE_MODEL,
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                },
-                timeout=timeout,
-            )
-        except requests.exceptions.Timeout:
-            print(f"[image] Attempt {attempt}/{MAX_RETRIES}: timed out after {timeout}s")
-            if attempt < MAX_RETRIES:
-                wait = RETRY_BACKOFF[attempt - 1]
-                print(f"[image] Retrying in {wait}s ...")
-                time.sleep(wait)
-                continue
-            print("[image] All retries exhausted (timeout).")
-            if tracker:
-                tracker.add_image(IMAGE_MODEL)
-            return None
-
-        if r.status_code == 499 or r.status_code == 429:
-            print(f"[image] Attempt {attempt}/{MAX_RETRIES}: HTTP {r.status_code}")
-            if attempt < MAX_RETRIES:
-                wait = RETRY_BACKOFF[attempt - 1]
-                print(f"[image] Retrying in {wait}s ...")
-                time.sleep(wait)
-                continue
-            print("[image] All retries exhausted.")
-            if tracker:
-                tracker.add_image(IMAGE_MODEL)
-            return None
-
-        if tracker:
-            tracker.add_image(IMAGE_MODEL)
-
-        if not r.ok:
-            print(f"[image] ERROR {r.status_code}: {r.text[:500]}")
-            return None
-
-        item = r.json()["data"][0]
-        if "b64_json" in item:
-            return base64.b64decode(item["b64_json"])
-        if "url" in item:
-            print("[image] Downloading from URL ...")
-            img_r = requests.get(item["url"], timeout=120)
-            if img_r.ok:
-                return img_r.content
-            print(f"[image] Download failed: {img_r.status_code}")
+def load_colors(path: Path | None) -> dict | None:
+    if path is None:
         return None
-
-    return None
-
-# AI agents for prompt refinement
-
-CRITIQUE_SYSTEM = """\
-You are an expert academic figure reviewer for NeurIPS 2026.
-You will receive the text prompt that was used to generate a diagram.
-Evaluate the prompt for:
-1. Clarity of layout instructions (flow direction, alignment, zones)
-2. Completeness of text labels (every label must be spelled out verbatim)
-3. Color specification (hex codes, not named colors)
-4. Academic quality (clean, flat, no gradients, no 3D, NO dark backgrounds)
-5. Domain accuracy for an industrial robotics benchmark paper
-
-Output a structured critique with:
-- STRENGTHS: what the prompt does well (2-3 bullet points)
-- WEAKNESSES: what needs improvement (2-5 bullet points)
-- REVISED_PROMPT: the full improved prompt text, ready to use for image generation
-
-Important: the REVISED_PROMPT must be a complete, self-contained prompt.
-Do NOT include any preamble or explanation inside REVISED_PROMPT — only the
-prompt text itself. Keep the Forgis brand color palette section intact.
-"""
+    with open(path) as f:
+        return json.load(f)
 
 
-def refine_with_gpt(prompt: str, tracker: CostTracker) -> tuple[str, str]:
-    """Use GPT-5-mini to critique and improve the prompt.
-    Returns (critique_text, revised_prompt).
-    """
-    print(f"[refine] Critiquing with {CHAT_MODEL} ...")
+def format_color_block(colors: dict) -> str:
+    lines = ["", "----- COLOR PALETTE (use these exact hex values) -----"]
+    for section, mapping in colors.items():
+        lines.append(f"\n{section.upper()}:")
+        if isinstance(mapping, dict):
+            for name, val in mapping.items():
+                if isinstance(val, dict):
+                    parts = ", ".join(f"{k}={v}" for k, v in val.items())
+                    lines.append(f"  - {name}: {parts}")
+                else:
+                    lines.append(f"  - {name}: {val}")
+    return "\n".join(lines)
+
+
+def inject_colors(prompt: str, colors: dict | None) -> str:
+    if colors is None:
+        return prompt
+    return f"{prompt}\n\n{format_color_block(colors)}"
+
+
+def _extract_latex(text: str) -> str:
+    """Pull a LaTeX source out of a model response (handles ```latex fences)."""
+    m = re.search(r"```(?:latex|tex)?\s*\n(.*?)```", text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    return text.strip()
+
+
+def _extract_error_excerpt(log: str, context_lines: int = 10) -> str:
+    """Keep the interesting chunks of a pdflatex log, not the whole thing."""
+    lines = log.splitlines()
+    keep: list[str] = []
+    for i, line in enumerate(lines):
+        if line.startswith("!") or " Error" in line or line.startswith("l."):
+            start = max(0, i - 2)
+            end = min(len(lines), i + context_lines + 1)
+            keep.append("\n".join(lines[start:end]))
+            keep.append("---")
+    if not keep:
+        return "\n".join(lines[-60:])
+    excerpt = "\n".join(keep)
+    if len(excerpt) > 6000:
+        excerpt = excerpt[:6000] + "\n... [truncated]"
+    return excerpt
+
+
+# LLM calls
+
+def call_gpt(system: str, user_content, tracker: CostTracker, label: str) -> str:
+    if chat_client is None:
+        raise RuntimeError("CHAT_ENDPOINT is not configured.")
     resp = chat_client.chat.completions.create(
         model=CHAT_MODEL,
         messages=[
-            {"role": "system", "content": CRITIQUE_SYSTEM},
-            {"role": "user", "content": f"Here is the current image-generation prompt:\n\n{prompt}"},
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
         ],
-        max_completion_tokens=4096,
+        max_completion_tokens=8192,
     )
     msg = resp.choices[0].message.content or ""
     usage = resp.usage
     if usage:
-        tracker.add_chat(CHAT_MODEL, usage.prompt_tokens, usage.completion_tokens)
+        tracker.add_chat(CHAT_MODEL, usage.prompt_tokens, usage.completion_tokens, label)
+    return msg
 
-    return _parse_critique(msg, prompt)
 
-
-def refine_with_claude(prompt: str, tracker: CostTracker) -> tuple[str, str]:
-    """Use Claude Opus via the Anthropic endpoint to critique and improve the prompt.
-    Returns (critique_text, revised_prompt).
-    """
-    print(f"[refine] Critiquing with {REASONING_MODEL} ...")
+def call_claude(system: str, user_content, tracker: CostTracker, label: str) -> str:
+    if not ANTHROPIC_BASE:
+        raise RuntimeError("REASONING_ENDPOINT is not configured.")
     r = requests.post(
         f"{ANTHROPIC_BASE}/messages",
         headers={
@@ -274,394 +234,355 @@ def refine_with_claude(prompt: str, tracker: CostTracker) -> tuple[str, str]:
         },
         json={
             "model": REASONING_MODEL,
-            "max_tokens": 4096,
-            "system": CRITIQUE_SYSTEM,
-            "messages": [
-                {"role": "user", "content": f"Here is the current image-generation prompt:\n\n{prompt}"},
-            ],
+            "max_tokens": 8192,
+            "system": system,
+            "messages": [{"role": "user", "content": user_content}],
         },
-        timeout=120,
+        timeout=300,
     )
     if not r.ok:
-        print(f"[refine] ERROR {r.status_code}: {r.text[:500]}")
-        return "Error: could not get critique", prompt
-
+        raise RuntimeError(f"Claude call failed: {r.status_code} {r.text[:500]}")
     body = r.json()
-    msg = body.get("content", [{}])[0].get("text", "")
+    msg = ""
+    for block in body.get("content", []):
+        if block.get("type") == "text":
+            msg += block.get("text", "")
     usage = body.get("usage", {})
     tracker.add_chat(
         REASONING_MODEL,
         usage.get("input_tokens", 0),
         usage.get("output_tokens", 0),
+        label,
     )
-    return _parse_critique(msg, prompt)
+    return msg
 
 
-TEXT_CHECK_SYSTEM = """\
-You are a meticulous proofreader specializing in AI-generated diagrams.
-You will receive an image of a diagram along with the original prompt used to
-generate it.
-
-Your job:
-1. Read EVERY piece of text visible in the image — titles, labels, captions,
-   axis names, legend entries, annotations, watermarks, everything.
-2. List each text element you found in the image (exactly as it appears).
-3. Compare each one against the intended text in the prompt.
-4. Identify ALL errors: misspellings, garbled words, missing words, extra
-   characters, wrong capitalisation, truncated labels, or nonsensical text.
-
-Output format:
-EXTRACTED_TEXT:
-- "<text as it appears in image>" -> INTENDED: "<correct text from prompt>" | STATUS: OK / ERROR
-
-ERRORS_FOUND: <number>
-
-If ERRORS_FOUND > 0, output:
-REVISED_PROMPT: <the full prompt with added emphasis on correct spelling>
-
-In the REVISED_PROMPT:
-- Keep the entire original prompt intact.
-- After EVERY text label, add the instruction: (spell exactly as written).
-- At the very top, add a bold instruction: "CRITICAL: Every text label must be
-  spelled EXACTLY as specified. Double-check every letter."
-- If specific words were garbled, add explicit notes like:
-  "The word 'FactoryBench' must appear exactly — not 'FctoryBnch' or similar."
-
-If ERRORS_FOUND == 0, do NOT output REVISED_PROMPT.
-"""
+def call_llm(agent: str, system: str, user_content, tracker: CostTracker, label: str) -> str:
+    if agent == "claude":
+        return call_claude(system, user_content, tracker, label)
+    return call_gpt(system, user_content, tracker, label)
 
 
-def check_and_fix_text(
-    image_bytes: bytes,
+# LaTeX compilation
+
+def compile_latex(tex_path: Path) -> tuple[bool, str, Path | None]:
+    """Compile a .tex file with latexmk. Returns (ok, log_text, pdf_path)."""
+    workdir = tex_path.parent
+    name = tex_path.stem
+
+    latexmk = shutil.which("latexmk")
+    if latexmk is None:
+        raise RuntimeError(
+            "latexmk not found on PATH. Install a LaTeX distribution "
+            "(MiKTeX or TeX Live) so latexmk/pdflatex are available."
+        )
+
+    try:
+        proc = subprocess.run(
+            [
+                latexmk,
+                "-pdf",
+                "-interaction=nonstopmode",
+                "-halt-on-error",
+                tex_path.name,
+            ],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=240,
+        )
+    except subprocess.TimeoutExpired as e:
+        return False, f"latexmk timed out: {e}", None
+
+    log_file = workdir / f"{name}.log"
+    if log_file.exists():
+        log_text = log_file.read_text(encoding="utf-8", errors="replace")
+    else:
+        log_text = (proc.stdout or "") + "\n" + (proc.stderr or "")
+
+    pdf_path = workdir / f"{name}.pdf"
+    ok = proc.returncode == 0 and pdf_path.exists()
+    return ok, log_text, (pdf_path if ok else None)
+
+
+# PDF -> PNG rasterization (optional, requires pymupdf)
+
+def pdf_to_png(pdf_path: Path, png_path: Path, dpi: int = 200) -> bool:
+    try:
+        import fitz  # pymupdf
+    except ImportError:
+        return False
+    try:
+        doc = fitz.open(pdf_path)
+        page = doc.load_page(0)
+        zoom = dpi / 72.0
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        pix.save(png_path)
+        doc.close()
+        return True
+    except Exception as e:
+        print(f"[render] PDF->PNG failed: {e}")
+        return False
+
+
+# Pipeline stages
+
+def generate_tikz(prompt: str, agent: str, tracker: CostTracker) -> str:
+    print(f"[tikz] Generating standalone LaTeX with {agent} ...")
+    user = f"Figure description:\n\n{prompt}"
+    resp = call_llm(agent, TIKZ_SYSTEM, user, tracker, "generate")
+    return _extract_latex(resp)
+
+
+def fix_tikz_errors(tex: str, error_log: str, agent: str, tracker: CostTracker) -> str:
+    excerpt = _extract_error_excerpt(error_log)
+    user = (
+        f"Current LaTeX source:\n\n```latex\n{tex}\n```\n\n"
+        f"Compilation error log (excerpt):\n\n```\n{excerpt}\n```"
+    )
+    resp = call_llm(agent, FIX_SYSTEM, user, tracker, "fix-compile")
+    return _extract_latex(resp)
+
+
+def visual_review(
     prompt: str,
-    width: int,
-    height: int,
+    tex: str,
+    png_path: Path,
+    agent: str,
     tracker: CostTracker,
-    agent: str = "gpt",
-) -> tuple[str, bytes | None]:
-    """Send the generated image to a vision model to check all text.
+) -> tuple[bool, str]:
+    """Ask the LLM whether the rendered figure matches the description.
 
-    Returns (report, corrected_image_bytes_or_None).
-    If all text is correct, corrected_image_bytes is None.
+    Returns (needs_fix, response_or_new_tex).
     """
-    img_b64 = base64.b64encode(image_bytes).decode()
+    img_b64 = base64.b64encode(png_path.read_bytes()).decode()
+    text_part = (
+        f"Original description:\n\n{prompt}\n\n"
+        f"Current LaTeX source:\n\n```latex\n{tex}\n```\n\n"
+        "Rendered figure attached."
+    )
 
     if agent == "claude":
-        return _check_text_claude(img_b64, prompt, width, height, tracker)
-    return _check_text_gpt(img_b64, prompt, width, height, tracker)
-
-
-def _check_text_gpt(
-    img_b64: str,
-    prompt: str,
-    width: int,
-    height: int,
-    tracker: CostTracker,
-) -> tuple[str, bytes | None]:
-    """Use GPT-5-mini vision to check text in the image."""
-    print(f"[text-fix] Checking text with {CHAT_MODEL} (vision) ...")
-    resp = chat_client.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=[
-            {"role": "system", "content": TEXT_CHECK_SYSTEM},
+        user_content = [
+            {"type": "text", "text": text_part},
             {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            f"Here is the original prompt:\n\n{prompt}\n\n"
-                            "And here is the generated image. "
-                            "Please check ALL text in the image for errors."
-                        ),
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{img_b64}",
-                        },
-                    },
-                ],
-            },
-        ],
-        max_completion_tokens=4096,
-    )
-    msg = resp.choices[0].message.content or ""
-    usage = resp.usage
-    if usage:
-        tracker.add_chat(CHAT_MODEL, usage.prompt_tokens, usage.completion_tokens)
-
-    return _process_text_check(msg, width, height, tracker)
-
-
-def _check_text_claude(
-    img_b64: str,
-    prompt: str,
-    width: int,
-    height: int,
-    tracker: CostTracker,
-) -> tuple[str, bytes | None]:
-    """Use Claude Opus vision to check text in the image."""
-    print(f"[text-fix] Checking text with {REASONING_MODEL} (vision) ...")
-    r = requests.post(
-        f"{ANTHROPIC_BASE}/messages",
-        headers={
-            "Authorization": f"Bearer {API_KEY}",
-            "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": REASONING_MODEL,
-            "max_tokens": 4096,
-            "system": TEXT_CHECK_SYSTEM,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                f"Here is the original prompt:\n\n{prompt}\n\n"
-                                "And here is the generated image. "
-                                "Please check ALL text in the image for errors."
-                            ),
-                        },
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/png",
-                                "data": img_b64,
-                            },
-                        },
-                    ],
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": img_b64,
                 },
-            ],
-        },
-        timeout=120,
-    )
-    if not r.ok:
-        print(f"[text-fix] ERROR {r.status_code}: {r.text[:500]}")
-        return "Error: could not check text", None
-
-    body = r.json()
-    msg = body.get("content", [{}])[0].get("text", "")
-    usage = body.get("usage", {})
-    tracker.add_chat(
-        REASONING_MODEL,
-        usage.get("input_tokens", 0),
-        usage.get("output_tokens", 0),
-    )
-    return _process_text_check(msg, width, height, tracker)
-
-
-def _process_text_check(
-    response: str,
-    width: int,
-    height: int,
-    tracker: CostTracker,
-) -> tuple[str, bytes | None]:
-    """Parse the text-check response and regenerate if errors found."""
-    # Check how many errors were found
-    errors_found = 0
-    for line in response.splitlines():
-        if line.strip().startswith("ERRORS_FOUND:"):
-            try:
-                errors_found = int(line.split(":")[1].strip())
-            except (ValueError, IndexError):
-                pass
-            break
-
-    if errors_found == 0:
-        print("[text-fix] All text looks correct!")
-        return response, None
-
-    print(f"[text-fix] Found {errors_found} text error(s). Regenerating ...")
-
-    # Extract the revised prompt
-    marker = "REVISED_PROMPT:"
-    idx = response.find(marker)
-    if idx == -1:
-        print("[text-fix] No REVISED_PROMPT in response, cannot fix.")
-        return response, None
-
-    revised = response[idx + len(marker):].strip()
-    if revised.startswith("```"):
-        first_nl = revised.index("\n") if "\n" in revised else 3
-        revised = revised[first_nl + 1:]
-    if revised.endswith("```"):
-        revised = revised[:-3].strip()
-
-    # Regenerate with corrected prompt
-    corrected = generate_image(revised, width, height, tracker)
-    return response, corrected
-
-
-def _parse_critique(response: str, fallback_prompt: str) -> tuple[str, str]:
-    """Extract the critique summary and revised prompt from the agent response."""
-    revised = fallback_prompt
-    marker = "REVISED_PROMPT:"
-    idx = response.find(marker)
-    if idx != -1:
-        revised = response[idx + len(marker):].strip()
-        # Strip markdown code fences if the model wrapped it
-        if revised.startswith("```"):
-            first_nl = revised.index("\n") if "\n" in revised else 3
-            revised = revised[first_nl + 1:]
-        if revised.endswith("```"):
-            revised = revised[:-3].strip()
-        critique = response[:idx].strip()
+            },
+        ]
     else:
-        critique = response
+        user_content = [
+            {"type": "text", "text": text_part},
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{img_b64}"},
+            },
+        ]
 
-    return critique, revised
+    resp = call_llm(agent, REVIEW_SYSTEM, user_content, tracker, "visual-review")
+    if resp.strip().upper().startswith("LGTM"):
+        return False, resp
+
+    revised = _extract_latex(resp)
+    if not revised or not revised.lstrip().startswith("\\documentclass"):
+        # Model didn't return a proper source — treat as a no-op.
+        return False, resp
+    return True, revised
 
 
 # Main pipeline
 
 def run(args: argparse.Namespace) -> None:
     tracker = CostTracker()
-    colors = load_color_schema()
     prompt_path = Path(args.prompt)
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # Load and prepare the initial prompt
     raw_prompt = load_prompt(prompt_path)
-    prompt = inject_colors_into_prompt(raw_prompt, colors)
-    print(f"[init] Prompt loaded from {prompt_path} ({len(prompt)} chars)")
-    print(f"[init] Output directory: {outdir}")
-    print(f"[init] Refine: {args.refine}  Agent: {args.agent}  Iterations: {args.iterations}")
+    colors = load_colors(Path(args.colors)) if args.colors else None
+    prompt = inject_colors(raw_prompt, colors)
+
+    (outdir / "prompt.txt").write_text(prompt, encoding="utf-8")
+
+    print(f"[init] Prompt: {prompt_path} ({len(prompt)} chars)")
+    print(f"[init] Outdir: {outdir}")
+    print(f"[init] Agent : {args.agent}  (compile retries: {args.max_compile_retries})")
+    if args.visual_review:
+        print(f"[init] Visual review: on  (iterations: {args.visual_iterations})")
     print("---")
 
-    iterations = args.iterations if args.refine else 1
-    refine_fn = refine_with_claude if args.agent == "claude" else refine_with_gpt
+    # Step 1: generate initial TikZ
+    tex = generate_tikz(prompt, args.agent, tracker)
 
-    for i in range(1, iterations + 1):
-        print(f"\n{'='*60}")
-        print(f" Iteration {i}/{iterations}")
-        print(f"{'='*60}")
+    tex_path = outdir / "figure.tex"
+    tex_path.write_text(tex, encoding="utf-8")
 
-        t0 = time.time()
-        image_bytes = generate_image(prompt, args.width, args.height, tracker)
-        elapsed = time.time() - t0
-        print(f"[image] Generation took {elapsed:.1f}s")
+    # Step 2: compile, feeding errors back to the LLM if needed
+    compile_ok = False
+    pdf_path: Path | None = None
+    last_log = ""
+    for attempt in range(1, args.max_compile_retries + 2):
+        print(f"\n[compile] Attempt {attempt} ...")
+        (outdir / f"figure_attempt_{attempt}.tex").write_text(tex, encoding="utf-8")
+        tex_path.write_text(tex, encoding="utf-8")
+        ok, log, pdf = compile_latex(tex_path)
+        last_log = log
+        if ok:
+            print("[compile] SUCCESS")
+            compile_ok = True
+            pdf_path = pdf
+            break
+        print(f"[compile] FAILED (attempt {attempt})")
+        if attempt > args.max_compile_retries:
+            print("[compile] No retries left.")
+            break
+        print("[compile] Asking LLM to fix compilation errors ...")
+        tex = fix_tikz_errors(tex, log, args.agent, tracker)
 
-        if image_bytes:
-            img_path = outdir / f"diagram_iter_{i}.png"
-            img_path.write_bytes(image_bytes)
-            print(f"[image] Saved -> {img_path}")
-        else:
-            print("[image] No image returned, skipping save.")
+    (outdir / "compile_log.txt").write_text(last_log, encoding="utf-8")
 
-        prompt_out = outdir / f"prompt_iter_{i}.txt"
-        prompt_out.write_text(prompt, encoding="utf-8")
+    if not compile_ok:
+        print("\n[done] Compilation never succeeded. See compile_log.txt and figure.tex.")
+        _write_metadata(outdir, args, prompt_path, tracker, compiled=False, visual_reviewed=False)
+        print(tracker.summary())
+        sys.exit(2)
 
-        # Refine prompt for next iteration (if enabled)
-        if args.refine and i < iterations:
-            critique, revised_prompt = refine_fn(prompt, tracker)
+    # Optional PNG preview (required for visual review)
+    png_path: Path | None = None
+    if args.visual_review or args.png:
+        png_path = outdir / "figure.png"
+        if not pdf_to_png(pdf_path, png_path):
+            print("[render] pymupdf not available — skipping PNG preview.")
+            print("         Install it with: pip install pymupdf")
+            png_path = None
 
-            critique_path = outdir / f"critique_iter_{i}.txt"
-            critique_path.write_text(critique, encoding="utf-8")
-            print(f"[refine] Critique saved -> {critique_path}")
+    # Step 3: optional visual review loop
+    last_good_tex = tex
+    if args.visual_review and png_path is not None:
+        for i in range(1, args.visual_iterations + 1):
+            print(f"\n[review] Visual review iteration {i}/{args.visual_iterations} ...")
+            needs_fix, out = visual_review(prompt, tex, png_path, args.agent, tracker)
+            if not needs_fix:
+                print("[review] LGTM — figure matches description.")
+                (outdir / f"review_iter_{i}.txt").write_text(out, encoding="utf-8")
+                break
+            print("[review] Revision proposed, recompiling ...")
+            (outdir / f"review_iter_{i}.tex").write_text(out, encoding="utf-8")
+            candidate = out
+            tex_path.write_text(candidate, encoding="utf-8")
+            ok, log, pdf = compile_latex(tex_path)
+            if not ok:
+                print("[review] Revised version failed to compile — keeping previous tex.")
+                (outdir / f"review_iter_{i}_compile_log.txt").write_text(log, encoding="utf-8")
+                tex_path.write_text(last_good_tex, encoding="utf-8")
+                compile_latex(tex_path)  # regenerate the previous PDF
+                break
+            tex = candidate
+            last_good_tex = candidate
+            pdf_path = pdf
+            pdf_to_png(pdf_path, png_path)
+    elif args.visual_review:
+        print("[review] Skipped (PNG preview not available).")
 
-            # Show a preview of the critique
-            preview = critique[:300].replace("\n", " ")
-            print(f"[refine] Preview: {preview}...")
+    print(f"\n[done] Figure tex: {tex_path}")
+    if pdf_path is not None:
+        print(f"[done] Figure pdf: {pdf_path}")
+    if png_path and png_path.exists():
+        print(f"[done] Figure png: {png_path}")
 
-            prompt = revised_prompt
-            print(f"[refine] Prompt updated ({len(prompt)} chars)")
+    _write_metadata(
+        outdir, args, prompt_path, tracker,
+        compiled=True,
+        visual_reviewed=args.visual_review and png_path is not None,
+    )
+    print(tracker.summary())
 
-    # Text correction step (post-generation)
-    if args.fix_text and image_bytes:
-        print(f"\n{'='*60}")
-        print(" Text Correction Step")
-        print(f"{'='*60}")
 
-        report, corrected_bytes = check_and_fix_text(
-            image_bytes, prompt, args.width, args.height, tracker, args.agent,
-        )
-
-        report_path = outdir / "text_check_report.txt"
-        report_path.write_text(report, encoding="utf-8")
-        print(f"[text-fix] Report saved -> {report_path}")
-
-        if corrected_bytes:
-            corrected_path = outdir / "diagram_text_fixed.png"
-            corrected_bytes_obj = corrected_bytes
-            corrected_path.write_bytes(corrected_bytes_obj)
-            print(f"[text-fix] Corrected image saved -> {corrected_path}")
-            image_bytes = corrected_bytes
-        else:
-            print("[text-fix] No correction needed or regeneration failed.")
-
+def _write_metadata(
+    outdir: Path,
+    args: argparse.Namespace,
+    prompt_path: Path,
+    tracker: CostTracker,
+    compiled: bool,
+    visual_reviewed: bool,
+) -> None:
     metadata = {
         "timestamp": datetime.now().isoformat(),
         "prompt_file": str(prompt_path),
-        "agent": args.agent if args.refine else None,
-        "refine": args.refine,
-        "iterations": iterations,
-        "image_model": IMAGE_MODEL,
-        "chat_model": CHAT_MODEL if args.agent == "gpt" else REASONING_MODEL,
-        "width": args.width,
-        "height": args.height,
-        "color_schema": str(COLOR_SCHEMA_PATH),
+        "colors_file": args.colors,
+        "agent": args.agent,
+        "chat_model": CHAT_MODEL,
+        "reasoning_model": REASONING_MODEL,
+        "max_compile_retries": args.max_compile_retries,
+        "visual_review": args.visual_review,
+        "visual_iterations": args.visual_iterations,
+        "compiled": compiled,
+        "visual_reviewed": visual_reviewed,
         "cost": {
             "total_usd": round(tracker.total, 6),
             "entries": tracker.entries,
         },
     }
-    meta_path = outdir / "metadata.json"
-    meta_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-    print(f"\n[done] Metadata saved -> {meta_path}")
-    print(tracker.summary())
-
+    (outdir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Generate NeurIPS-quality figures via MAI-Image-2 with optional AI refinement.",
+        description="Generate publication-quality figures by having an LLM write TikZ/LaTeX.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument(
-        "--prompt", default=str(DEFAULT_PROMPT_PATH),
-        help="Path to the prompt .txt file (default: prompts/factorybench_neurips.txt)",
+        "--prompt", required=True,
+        help="Path to the figure description .txt file",
     )
     p.add_argument(
-        "--outdir", default=str(SCRIPT_DIR / "outputs" / datetime.now().strftime("run_%Y%m%d_%H%M%S")),
-        help="Output directory for images and metadata",
+        "--outdir",
+        default=str(SCRIPT_DIR / "outputs" / datetime.now().strftime("run_%Y%m%d_%H%M%S")),
+        help="Output directory for .tex, .pdf, logs, metadata",
     )
     p.add_argument(
-        "--width", type=int, default=1366,
-        help="Image width in pixels (default: 1366)",
+        "--colors", default=None,
+        help="Optional path to a color schema JSON to inject into the prompt",
     )
     p.add_argument(
-        "--height", type=int, default=768,
-        help="Image height in pixels (default: 768)",
+        "--agent", choices=["gpt", "claude"], default="claude",
+        help="Which LLM to use (default: claude — better at TikZ)",
     )
     p.add_argument(
-        "--refine", action="store_true",
-        help="Enable AI-driven iterative prompt refinement",
+        "--max-compile-retries", type=int, default=3,
+        help="Max LLM-driven compile-fix attempts after the first try (default: 3)",
     )
     p.add_argument(
-        "--agent", choices=["gpt", "claude"], default="gpt",
-        help="Which model to use for critique/refinement (default: gpt)",
+        "--visual-review", action="store_true",
+        help="After a successful compile, render the PDF to PNG and ask the LLM "
+             "to critique the rendering. Requires pymupdf (pip install pymupdf).",
     )
     p.add_argument(
-        "--iterations", type=int, default=3,
-        help="Number of generate-refine cycles when --refine is set (default: 3)",
+        "--visual-iterations", type=int, default=2,
+        help="Max visual-review iterations when --visual-review is set (default: 2)",
     )
     p.add_argument(
-        "--fix-text", action="store_true",
-        help="After final generation, use AI vision to check all text in the image and regenerate if errors are found",
+        "--png", action="store_true",
+        help="Always produce a PNG preview of the final figure (requires pymupdf)",
     )
     return p.parse_args(argv)
 
 
-def main():
+def main() -> None:
     args = parse_args()
     if not API_KEY:
         print("ERROR: AZURE_OPENAI_API_KEY not set. Check your .env file.")
+        sys.exit(1)
+    if args.agent == "claude" and not ANTHROPIC_BASE:
+        print("ERROR: REASONING_ENDPOINT not set but --agent claude selected.")
+        sys.exit(1)
+    if args.agent == "gpt" and not CHAT_BASE:
+        print("ERROR: CHAT_ENDPOINT not set but --agent gpt selected.")
         sys.exit(1)
     run(args)
 
