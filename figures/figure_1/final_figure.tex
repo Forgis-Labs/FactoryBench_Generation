@@ -96,7 +96,7 @@
 
 % --- Difficulty arrow on the side ---
 \draw[steel, line width=1.5pt, -{Stealth[length=5pt]}] (-0.25, 14.3) -- (-0.25, 7.9);
-\node[font=\sffamily\tiny, text=steel, rotate=90] at (-0.55, 11.1) {Increasing Causal Depth};
+\node[font=\sffamily\small, text=steel, rotate=90] at (-0.55, 11.1) {Increasing Causal Depth};
 
 \fill[warm_amber, rounded corners=4pt] (0.0, 4.5) rectangle (7.3, 7.5);
 \draw[flicker, line width=1.2pt, rounded corners=4pt] (0.0, 4.5) rectangle (7.3, 7.5);
@@ -117,19 +117,19 @@
 \node[causalNode, draw=forgis_orange, line width=1pt] (nodeS) at (1.25, 6.0) {
   \textbf{\textcolor{forgis_orange}{$S$}}\\[-0.5ex]
   \scriptsize\textcolor{gunmetal}{Setpoint}\\[-0.5ex]
-  \fontsize{5}{6}\selectfont\textcolor{steel}{(target commands)}
+  \scriptsize\textcolor{steel}{(target commands)}
 };
 
 \node[causalNode, draw=blue, line width=1pt] (nodeC) at (3.65, 6.0) {
   \textbf{\textcolor{blue}{$C$}}\\[-0.5ex]
   \scriptsize\textcolor{gunmetal}{Context}\\[-0.5ex]
-  \fontsize{5}{6}\selectfont\textcolor{steel}{(environment)}
+  \scriptsize\textcolor{steel}{(environment)}
 };
 
 \node[causalNode, draw=green, line width=1pt] (nodeE) at (6.05, 6.0) {
   \textbf{\textcolor{green}{$E$}}\\[-0.5ex]
   \scriptsize\textcolor{gunmetal}{Effort+Feedback}\\[-0.5ex]
-  \fontsize{5}{6}\selectfont\textcolor{steel}{(response)}
+  \scriptsize\textcolor{steel}{(response)}
 };
 
 \draw[forgis_orange, line width=1.2pt, ->] 
@@ -140,34 +140,34 @@
 \node[font=\sffamily\scriptsize, text=gunmetal] at (3.65, 4.9) 
   {Healthy: $E = f(S, C)$ \quad \textbar \quad Fault: $E \neq f(S, C)$};
 
-\node[font=\sffamily\tiny, text=steel] at (3.65, 4.5) 
+\node[font=\sffamily\scriptsize, text=steel] at (3.65, 4.5)
   {Fault $\Leftrightarrow$ empirical deviation in \textit{Effort} given \textit{Setpoint} and \textit{Context}};
 \end{scope}
 
 % ====== RIGHT COLUMN: GENERATION + RESULTS ======
 % --- Q&A Generation Engine ---
-\begin{scope}
+\begin{scope}[xshift=-0.4cm]
 \fill[panelbg, rounded corners=6pt] (8.5, 10.8) rectangle (17.2, 15.6);
 \node[font=\sffamily\bfseries\normalsize, text=gunmetal] at (12.85, 15.2) 
   {Scalable Q\&A Generation Engine};
 
 % Template box
-\fill[white, rounded corners=3pt] (9.0, 13.6) rectangle (11.8, 14.7);
-\draw[forgis_orange, line width=1pt, rounded corners=3pt] (9.0, 13.6) rectangle (11.8, 14.7);
-\node[font=\sffamily\bfseries\scriptsize, text=forgis_orange] at (10.4, 14.35) {+80 Expert Templates};
-\node[font=\sffamily\tiny, text=gunmetal, text width=2.4cm, align=center] at (10.4, 13.95) 
+\fill[white, rounded corners=3pt] (8.7, 13.5) rectangle (11.3, 14.7);
+\draw[forgis_orange, line width=1pt, rounded corners=3pt] (8.7, 13.5) rectangle (11.3, 14.7);
+\node[font=\sffamily\bfseries\scriptsize, text=forgis_orange] at (10.0, 14.35) {+80 Expert Templates};
+\node[font=\sffamily\scriptsize, text=gunmetal, text width=2.4cm, align=center] at (10.0, 13.9) 
   {Expert-authored across all 4 levels};
 
 % Datasets box
-\fill[white, rounded corners=3pt] (12.3, 13.6) rectangle (16.7, 14.7);
-\draw[blue, line width=1pt, rounded corners=3pt] (12.3, 13.6) rectangle (16.7, 14.7);
-\node[font=\sffamily\bfseries\scriptsize, text=blue] at (14.5, 14.35) {Industrial Datasets};
-\node[font=\sffamily\tiny, text=gunmetal] at (14.5, 14.0) {FactoryWave $\cdot$ AURSAD $\cdot$ Simulated Robotic};
-\node[font=\sffamily\tiny, text=steel] at (14.5, 13.75) {Real + simulated sensor streams};
+\fill[white, rounded corners=3pt] (11.6, 13.5) rectangle (17.0, 14.7);
+\draw[blue, line width=1pt, rounded corners=3pt] (11.6, 13.5) rectangle (17.0, 14.7);
+\node[font=\sffamily\bfseries\scriptsize, text=blue] at (14.3, 14.35) {Industrial Datasets};
+\node[font=\sffamily\scriptsize, text=gunmetal] at (14.3, 13.95) {FactoryWave $\cdot$ AURSAD $\cdot$ Simulated Robotic};
+\node[font=\sffamily\scriptsize, text=steel] at (14.3, 13.65) {Real + simulated sensor streams};
 
 % Arrow down
-\draw[gunmetal, line width=1pt, ->] (10.4, 13.6) -- (10.4, 13.1) -- (12.85, 12.8);
-\draw[gunmetal, line width=1pt, ->] (14.5, 13.6) -- (14.5, 13.1) -- (12.85, 12.8);
+\draw[gunmetal, line width=1pt, ->] (10.0, 13.5) -- (10.0, 13.1) -- (12.85, 12.8);
+\draw[gunmetal, line width=1pt, ->] (14.3, 13.5) -- (14.3, 13.1) -- (12.85, 12.8);
 
 % Dynamic sampling box
 \node[
@@ -175,22 +175,22 @@
   align=center, inner sep=4pt, minimum width=4.7cm
 ] (sampling) at (12.85, 12.3) {
   \textbf{\textcolor{flicker}{Dynamic Variable Sampling}}\\[0.5ex]
-  \tiny\textcolor{gunmetal}{Deterministic ground truth $\cdot$ Vendi Score validates diversity}
+  \scriptsize\textcolor{gunmetal}{Deterministic ground truth $\cdot$ Vendi Score validates diversity}
 };
 
 % Output formats
 \tikzset{
   outbox/.style={
     draw=steel, line width=0.8pt, fill=white, rounded corners=2pt,
-    font=\sffamily\tiny\bfseries, text=gunmetal, 
+    font=\sffamily\scriptsize\bfseries, text=gunmetal, 
     minimum height=0.5cm, inner sep=3pt, align=center
   }
 }
 
-\node[outbox] (ms)      at (9.3,   11.25) {Multi-Select};
-\node[outbox] (escalar) at (11.05, 11.25) {Scalar};
-\node[outbox] (tensor)  at (12.85, 11.25) {Tensor};  % Centro exacto
-\node[outbox] (rank)    at (14.65, 11.25) {Ranking};
+\node[outbox] (ms)      at (9.5,   11.25) {Multi-Select};
+\node[outbox] (escalar) at (11.2, 11.25) {Scalar};
+\node[outbox] (tensor)  at (12.9, 11.25) {Tensor};
+\node[outbox] (rank)    at (14.7, 11.25) {Ranking};
 \node[outbox] (open)    at (16.4,  11.25) {Free form};
 
 \draw[steel, line width=0.8pt, ->] ([xshift=-1.7cm]sampling.south)  -- (ms.north);
@@ -202,7 +202,7 @@
 \end{scope}
 
 % ====== WHY FACTORYBENCH (COMPARISON MATRIX) ======
-\begin{scope}
+\begin{scope}[xshift=-0.4cm]
 \fill[panelbg, rounded corners=6pt] (8.5, 4.0) rectangle (17.2, 10.6);
 \node[font=\sffamily\bfseries\normalsize, text=gunmetal] at (12.85, 10.15) 
   {Comparison with Existing Benchmarks};
