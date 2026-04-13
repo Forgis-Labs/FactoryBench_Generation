@@ -61,17 +61,27 @@ yarn-debug.log*
 yarn-error.log*
 
 # data
+datasets/open_datasets/*
 data/open_datasets/*
 data/normalized_episodes/*
-data/simulations/*
-
 
 #output
 output/*
 
-#claude
-.claude/*
+# Claude Code
+.claude/
 
-sims/*.csv
+# LaTeX auxiliary files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
 *.out
-*.log
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb

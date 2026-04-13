@@ -317,6 +317,108 @@ def create_model_metrics_heatmap(runs: List[Dict[str, Any]], output_path: Path) 
     return fig
 
 
+def create_reasoning_level_comparison_chart(data: Dict[str, Dict[str, float]], output_path: Path) -> Figure:
+    """
+    Figure 3: Grouped bar chart comparing models across reasoning levels.
+    
+    Args:
+        data: Dict mapping model name to dict of level -> accuracy (0-1)
+        output_path: Path to save result
+    """
+    apply_style()
+    
+    levels = ["Level 1", "Level 2", "Level 3", "Level 4", "Level 5"]
+    models = list(data.keys())
+    
+    x = np.arange(len(levels))
+    width = 0.12  # Bar width
+    
+    fig, ax = plt.subplots(figsize=(12, 7), dpi=300)
+    
+    # 6 LLMs: use a cycle of Forgis and complementary colors
+    model_colors = [
+        COLORS["fire"], 
+        COLORS["tiger"], 
+        COLORS["flicker"], 
+        "#00A3FF",  # Blue
+        "#9B51E0",  # Purple
+        COLORS.get("platinum", "#CCD3D6")
+    ]
+    
+    for i, model in enumerate(models):
+        accuracies = [data[model].get(lvl, 0) * 100 for lvl in levels]
+        ax.bar(x + (i - len(models)/2) * width + width/2, accuracies, 
+               width, label=model, color=model_colors[i % len(model_colors)])
+    
+    # Baseline
+    ax.axhline(y=50, color=COLORS["fire"], linestyle="--", alpha=0.6, label="Random Baseline (50%)")
+    
+    ax.set_ylabel("Accuracy (%)", fontweight="bold", fontsize=14)
+    ax.set_xlabel("Reasoning Level", fontweight="bold", fontsize=14)
+    ax.set_title("Model Comparison across FactoryBench Reasoning Levels", fontsize=16, fontweight="bold", pad=20)
+    ax.set_xticks(x)
+    ax.set_xticklabels(levels)
+    ax.set_ylim(0, 105)
+    
+    # Legend at top
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.1), ncol=3, frameon=False)
+    
+    plt.tight_layout()
+    fig.savefig(output_path, dpi=300, facecolor=COLORS["gunmetal"], edgecolor="none")
+    return fig
+
+
+def create_causal_gap_chart(rungs_data: Dict[str, Tuple[float, float]], output_path: Path) -> Figure:
+    """
+    Figure 4: The Causal Gap bar chart.
+    
+    Args:
+        rungs_data: Dict mapping rung name to (Oracle, Best Method) accuracies
+        output_path: Path to save result
+    """
+    apply_style()
+    
+    rungs = ["Rung 1", "Rung 2", "Rung 3", "Rung 4"]
+    labels = ["Association", "Intervention", "Counterfactual", "Remediation"]
+    
+    oracle_vals = [rungs_data.get(r, (0, 0))[0] * 100 for r in rungs]
+    best_vals = [rungs_data.get(r, (0, 0))[1] * 100 for r in rungs]
+    
+    x = np.arange(len(rungs))
+    width = 0.35
+    
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+    
+    rects1 = ax.bar(x - width/2, oracle_vals, width, label="Oracle (Upper Bound)", color="#27AE60")
+    rects2 = ax.bar(x + width/2, best_vals, width, label="Best Method (CIGNN+SCM)", color=COLORS["fire"])
+    
+    ax.set_ylabel("Accuracy (%)", fontweight="bold", fontsize=14)
+    ax.set_title("The Causal Gap in FactoryBench", fontsize=16, fontweight="bold", pad=15)
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{r}\n{l}" for r, l in zip(rungs, labels)])
+    ax.set_ylim(0, 105)
+    ax.legend()
+    
+    # Add gap annotation at Rung 3
+    rung3_idx = 2
+    # Verify range before access
+    if len(oracle_vals) > rung3_idx and len(best_vals) > rung3_idx:
+        gap = oracle_vals[rung3_idx] - best_vals[rung3_idx]
+        
+        # Draw double-headed arrow
+        y_mid = (oracle_vals[rung3_idx] + best_vals[rung3_idx]) / 2
+        ax.annotate("", xy=(rung3_idx + width/2, oracle_vals[rung3_idx]), 
+                    xytext=(rung3_idx + width/2, best_vals[rung3_idx]),
+                    arrowprops=dict(arrowstyle="<->", color=COLORS["white"], lw=1.5))
+        
+        ax.text(rung3_idx + width/2 + 0.1, y_mid, f"Causal Gap\n-{gap:.0f}%", 
+                va="center", color=COLORS["white"], fontweight="bold", fontsize=10)
+    
+    plt.tight_layout()
+    fig.savefig(output_path, dpi=300, facecolor=COLORS["gunmetal"], edgecolor="none")
+    return fig
+
+
 def _create_empty_chart(message: str) -> Figure:
     """Create a placeholder chart for missing data."""
     apply_style()
