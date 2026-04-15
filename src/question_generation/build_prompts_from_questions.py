@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def load_json(path: Path) -> Any:
@@ -184,7 +187,7 @@ def detect_repo_root(start: Path) -> Path:
     if current.is_file():
         current = current.parent
     for candidate in [current, *current.parents]:
-        if (candidate / "data" / "machines" / "machines.json").exists() and (candidate / "src").exists():
+        if (candidate / "data" / "labelling" / "machines.json").exists() and (candidate / "src").exists():
             return candidate
     for candidate in [current, *current.parents]:
         if (candidate / ".git").exists():
@@ -201,7 +204,7 @@ def main() -> None:
     parser.add_argument(
         "--machines",
         type=Path,
-        default=repo_root / "data" / "machines" / "machines.json",
+        default=repo_root / "data" / "labelling" / "machines.json",
         help="Path to machines.json",
     )
 
@@ -233,12 +236,35 @@ def main() -> None:
             continue
 
         prompt = build_prompt(payload, machines)
+
+        # Token budget guard
+        estimated_tokens = len(prompt) // 4
+        if estimated_tokens > 900_000:
+            logger.warning(
+                f"Skipping {in_path.name}: estimated {estimated_tokens} tokens exceeds budget"
+            )
+            continue
+
         rel = in_path.relative_to(input_dir)
         out_path = output_dir / rel
-        write_json(out_path, {
+
+        output_payload = {
             "prompt": prompt,
-            "metadata": {"qa_pair_id": payload.get("id")},
-        })
+            "metadata": {
+                "qa_pair_id": payload.get("template_id"),
+                "dataset": payload.get("provenance", {}).get("dataset"),
+                "episode": payload.get("provenance", {}).get("episode"),
+                "time_window": payload.get("provenance", {}).get("time_window"),
+                "level": payload.get("level"),
+                "type": payload.get("template_type"),
+            },
+            "type": payload.get("template_type"),
+            "question": payload.get("question"),
+            "correct_answer": payload.get("answer"),
+            "answer_format": payload.get("answer_format", {}).get("type", "unknown") if isinstance(payload.get("answer_format"), dict) else str(payload.get("answer_format", "unknown")),
+        }
+
+        write_json(out_path, output_payload)
         converted += 1
 
     print(f"Scanned {scanned} JSON files; converted {converted} question files to prompts in {output_dir}")

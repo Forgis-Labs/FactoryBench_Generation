@@ -15,6 +15,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 from typing import Any, Dict, Optional, Tuple
 
 try:
@@ -83,7 +84,7 @@ def create_client_and_model(
 
     key = resolve_api_key(cli_api_key)
     client = OpenAI(api_key=key)
-    model = cli_model or os.getenv("OPENAI_MODEL") or "gpt-5.1"
+    model = os.getenv("OPENAI_MODEL") or cli_model or "gpt-5.1"
     return client, model, "openai"
 
 
@@ -205,6 +206,111 @@ def _extract_output_text_from_responses_body(body: Dict[str, Any]) -> str:
     return "".join(chunks)
 
 
+JUDGE_SYSTEM_PROMPT = """You are an expert evaluator for a robotics sensor-data Q&A benchmark.
+Your task is to score a model's free-form answer against a reference answer.
+
+Scoring criteria (0-10):
+  10 – Answer is semantically equivalent to the reference: correct direction of change, correct signal, correct magnitude range, correct time window.
+   7 – Answer captures the main trend and signal correctly but is imprecise on magnitude or timing.
+   4 – Answer mentions the right signal but the described behaviour is partially incorrect or vague.
+   1 – Answer is on-topic but mostly incorrect or misleading.
+   0 – Answer is completely wrong, irrelevant, or refuses to answer.
+
+Respond ONLY with a JSON object in this exact format (no extra text):
+{"score": <integer 0-10>, "reason": "<one sentence justification>"}"""
+
+
+def llm_judge_score(
+    client: Any,
+    model: str,
+    question: str,
+    prediction: str,
+    reference: str,
+    max_tokens: int = 256,
+) -> tuple[float, str]:
+    """
+    Ask the LLM to score `prediction` against `reference` for the given `question`.
+    Returns (normalised_score 0.0–1.0, justification_string).
+    Falls back to (0.0, error_message) on any failure.
+    """
+    user_msg = (
+        f"Question: {question}\n\n"
+        f"Reference answer: {reference}\n\n"
+        f"Model answer: {prediction}\n\n"
+        "Please score the model answer (0-10) and provide a one-sentence justification."
+    )
+    try:
+        try:
+            response = client.responses.create(
+                model=model,
+                input=[{"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+                       {"role": "user",   "content": user_msg}],
+                max_output_tokens=max_tokens,
+            )
+            raw = _extract_output_text_from_responses_body(_to_dict(response))
+        except Exception:
+            # Fallback to Chat Completions
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+                    {"role": "user",   "content": user_msg},
+                ],
+                max_tokens=max_tokens,
+            )
+            raw = _to_dict(response).get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        # Parse the JSON response from the judge
+        raw = raw.strip()
+        # Sometimes the model wraps in markdown code fences
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        parsed = json.loads(raw)
+        raw_score = float(parsed["score"])
+        reason = str(parsed.get("reason", ""))
+        normalised = max(0.0, min(1.0, raw_score / 10.0))
+        return normalised, reason
+    except Exception as e:
+        return 0.0, f"Judge call failed: {e}"
+
+
+
+def parse_llm_answer(text):
+    # search last A,B,C,D and return it
+    # the model use to answer at the end of the answer something like "The correct answer is C."
+    matches = re.findall(r'\b([A-D])\b', text.upper())
+    return matches[-1] if matches else None
+
+def _estimate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
+    """Return estimated USD cost for a single call given token counts."""
+    model_name = model_name.lower()
+    if "gpt-4o-mini" in model_name:
+        price_in, price_out = 0.15, 0.60
+    elif "gpt-5.1" in model_name:
+        price_in, price_out = 1.25, 10.00
+    elif "gpt-5-mini" in model_name:
+        price_in, price_out = 0.25, 2.00
+    elif "gpt-4o" in model_name:
+        price_in, price_out = 2.50, 10.00
+    elif "o1-mini" in model_name:
+        price_in, price_out = 3.00, 12.00
+    elif "o1-preview" in model_name or model_name == "o1":
+        price_in, price_out = 15.00, 60.00
+    elif "gpt-4-turbo" in model_name:
+        price_in, price_out = 10.00, 30.00
+    elif "gpt-4" in model_name:
+        price_in, price_out = 30.00, 60.00
+    elif "gpt-3.5-turbo" in model_name:
+        price_in, price_out = 0.50, 1.50
+    elif "mini" in model_name:
+        price_in, price_out = 0.15, 0.60
+    else:
+        price_in, price_out = 5.0, 15.0
+    return (prompt_tokens / 1_000_000 * price_in) + (completion_tokens / 1_000_000 * price_out)
+
+
 def run_direct_requests(
     entries: list[Tuple[Path, str, int, str]],
     client: Any,
@@ -213,12 +319,15 @@ def run_direct_requests(
     max_output_tokens: int,
     overwrite: bool,
     ground_truth_index: Dict[str, Any],
+    eval_level: str,
+    cost_limit: float = 40.0,
 ) -> tuple[int, int, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     completed = 0
     failed = 0
     skipped = 0
+    total_cost = 0.0
 
     for prompt_path, prompt_text, prompt_idx, custom_id in entries:
         out_path = output_dir / f"{custom_id}_answer.json"
@@ -230,46 +339,96 @@ def run_direct_requests(
             continue
 
 
+        # Token budget guard – skip prompts that are too large for the model
+        estimated_tokens = len(prompt_text) // 4
+        if estimated_tokens > 900_000:
+            logger.warning(
+                f"- Skipping {custom_id}: estimated {estimated_tokens} tokens exceeds budget"
+            )
+            skipped += 1
+            continue
+
         # Load full Q&A object for scoring (not just answer)
         try:
             qa_payload = load_json(prompt_path)
         except Exception:
             qa_payload = {}
 
-        answer_format = qa_payload.get("answer_format", {})
-        q_type = answer_format.get("type") or qa_payload.get("template_type")
+        answer_format = str(qa_payload.get("answer_format") or "unknown")
+        question_type = str(qa_payload.get("type") or "unknown")
         acceptance_bounds = qa_payload.get("acceptance_bounds")
 
+        # Derive eval level from the Q&A JSON if not provided via CLI
+        level_val = qa_payload.get("level")
+        effective_eval_level = eval_level or (f"level_{level_val}" if level_val is not None else None)
+
         try:
-            response = client.responses.create(
-                model=model,
-                input=prompt_text,
-                max_output_tokens=max_output_tokens,
+            try:
+                response = client.responses.create(
+                    model=model,
+                    input=prompt_text,
+                    max_output_tokens=max_output_tokens,
+                )
+                body = _to_dict(response)
+                answer = _extract_output_text_from_responses_body(body)
+            except Exception as e:
+                if "404" in str(e) or "not found" in str(e).lower() or not hasattr(client, "responses"):
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=[{"role": "user", "content": prompt_text}],
+                        max_tokens=max_output_tokens,
+                    )
+                    body = _to_dict(response)
+                    answer = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+                else:
+                    raise e
+
+            # --- Cost tracking ---
+            usage_raw = body.get("usage", {}) or {}
+            prompt_tokens: int = int(
+                usage_raw.get("prompt_tokens") or usage_raw.get("input_tokens") or 0
             )
-            body = _to_dict(response)
-            answer = _extract_output_text_from_responses_body(body)
+            completion_tokens: int = int(
+                usage_raw.get("completion_tokens") or usage_raw.get("output_tokens") or 0
+            )
+            model_name = (body.get("model") or model).lower()
+            est_cost = _estimate_cost(model_name, prompt_tokens, completion_tokens)
+            total_cost += est_cost
 
             # --- Scoring logic ---
             score = None
-            gt = ground_truth
+            llm_judge_result: tuple[float, str] | None = None
+            gt = ground_truth_index.get(prompt_path.stem)
             pred = answer
             try:
-                if q_type in ("numerical", "tensor"):
+                if answer_format == "free_form":
+                    # LLM-as-a-judge: call the model to score the free-form answer
+                    question_text = qa_payload.get("question", "")
+                    ref_answer = str(gt) if gt is not None else ""
+                    judge_score, judge_reason = llm_judge_score(
+                        client=client,
+                        model=model,
+                        question=question_text,
+                        prediction=str(pred) if pred is not None else "",
+                        reference=ref_answer,
+                    )
+                    score = judge_score
+                    llm_judge_result = (judge_score, judge_reason)
+                elif answer_format in ("numerical", "tensor"):
                     # Numerical: float, Tensor: underscore-separated floats
-                    if q_type == "numerical":
+                    if answer_format == "numerical":
                         try:
-                            gt_val = float(gt)
-                            pred_val = float(pred)
+                            gt_val = round(float(gt), 4)
+                            pred_val = round(float(pred), 4)
                         except Exception:
                             score = 0
                         else:
                             if acceptance_bounds:
                                 margin = acceptance_bounds.get("margin", 0)
-                                mean = acceptance_bounds.get("mean", 0)
                                 score = int(abs(pred_val - gt_val) <= margin)
                             else:
                                 score = int(abs(pred_val - gt_val) < 1e-4)
-                    elif q_type == "tensor":
+                    elif answer_format == "tensor":
                         try:
                             gt_vals = [float(x) for x in str(gt).split("_")]
                             pred_vals = [float(x) for x in str(pred).split("_")]
@@ -286,7 +445,7 @@ def run_direct_requests(
                                     score = 0.0
                             else:
                                 score = float(gt_vals == pred_vals)
-                elif q_type == "multiple_choice_multi_select":
+                elif answer_format == "multiple_choice_multi_select":
                     # Multi-select MCQ: string of T/F, e.g., TFFT
                     gt_str = str(gt).strip().upper()
                     pred_str = str(pred).strip().upper()
@@ -301,16 +460,139 @@ def run_direct_requests(
                             score = 0.0
                     else:
                         score = 0.0
-                elif q_type == "ranking":
+                elif answer_format == "multiple_choice_single_select":
+                    # Single-select MCQ: ground truth is a letter like "C",
+                    # model may answer "C", "C.", "C. some explanation", etc.
+                    gt_str = str(gt).strip().upper()
+                    pred_str = str(pred).strip()
+
+                    pred_letter = parse_llm_answer(pred_str)
+                    if pred_letter is None:
+                        score = 0.0
+                    else:
+                        score = float(gt_str == pred_letter)
+
+                elif answer_format == "ranking":
                     # Ranking: permutation of A-D, e.g., DCAB
                     gt_str = str(gt).strip().upper()
-                    pred_str = str(pred).strip().upper()
+                    pred_raw = str(pred).strip().upper()
+
+                    # Extract only alphabetic characters from the prediction
+                    match = re.search(r'\b([A-D]{4})\b', pred_raw)
+                    pred_str = match.group(1) if match else ""
+
                     score = float(gt_str == pred_str)
+
                 else:
-                    # Fallback: exact match
-                    score = float(str(gt) == str(pred))
+                    if answer_format == "llm_judge":
+                        # Already handled above; this branch won't be reached
+                        pass
+                    else:
+                        # Fallback: exact match
+                        score = float(str(gt) == str(pred))
             except Exception:
                 score = None
+
+            # --- Opik Tracing ---
+            try:
+                if os.getenv("OPIK_API_KEY"):
+                    import opik
+                    client_opik = opik.Opik(
+                        project_name=os.getenv("OPIK_PROJECT_NAME", "FactoryBench"),
+                        workspace=os.getenv("OPIK_WORKSPACE", "forgis")
+                    )
+                    
+                    # prompt_tokens, completion_tokens, model_name, est_cost already computed above
+                    total_tokens: int = int(usage_raw.get("total_tokens") or (prompt_tokens + completion_tokens))
+
+                    metadata_payload = qa_payload.get("metadata") or {}
+                    dataset_tag = metadata_payload.get("dataset")
+                    episode_tag = metadata_payload.get("episode")
+                    qa_pair_id = metadata_payload.get("qa_pair_id")
+                    
+                    # Filter out None/empty values so Opik receives only real tags
+                    opik_tags = [str(t) for t in [effective_eval_level, question_type, dataset_tag, answer_format] if t]
+
+                    type_tag = metadata_payload.get("type")
+                    model_tag = model_name
+
+                    if type_tag and type_tag != "unknown":
+                        opik_tags.append(str(type_tag))
+
+                    if answer_format and answer_format != "unknown":
+                        opik_tags.append(f"eval_{answer_format}")
+                    
+                    if model_tag and model_tag != "unknown":
+                        opik_tags.append(model_tag)
+
+                    if dataset_tag and dataset_tag != "unknown":
+                        opik_tags.append(dataset_tag)
+
+                    if qa_pair_id and qa_pair_id != "unknown":
+                        opik_tags.append("template_" + str(qa_pair_id))
+
+
+                    opik_metadata = {
+                        "model": model_tag,
+                        "answer_format": answer_format,
+                        "question_type": question_type,
+                        "qa_pair_id": qa_pair_id,
+                        "dataset": dataset_tag,
+                        "episode": episode_tag,
+                        "time_window": metadata_payload.get("time_window"),
+                        "correct_answer": gt,
+                        "usage": {
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": total_tokens,
+                            "total_estimated_cost": f"${est_cost}"
+                        },
+                        "full_telemetry_context": {"text": prompt_text}
+                    }
+
+
+                    trace = client_opik.trace(
+                        name=f"factorybench_{effective_eval_level}_{qa_pair_id}",
+                        input={"question": qa_payload.get("question"), "ground_truth": gt, "prediction": pred},
+                        output={"answer": pred, "raw_body": body},
+                        tags=opik_tags,
+                        usage={
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": total_tokens,
+                        },
+                        metadata=opik_metadata,
+                        total_estimated_cost=est_cost,
+                        model=body.get("model") or model_name
+                    )
+                    if score is not None:
+                        pred_str_repr = str(pred).strip() if pred is not None else "N/A"
+                        gt_str_repr   = str(gt).strip()   if gt   is not None else "N/A"
+                        # For llm_judge questions, use the judge's reason as the primary accuracy reason
+                        accuracy_reason = judge_reason if (llm_judge_result and judge_reason) else (
+                            f"Predicted: '{pred_str_repr}' | "
+                            f"Ground truth: '{gt_str_repr}'"
+                        )
+
+                        # Accuracy
+                        trace.log_feedback_score(
+                            name="accuracy",
+                            value=float(score),
+                            reason=accuracy_reason,
+                        )
+
+                        # LLM-as-a-judge score
+                        if llm_judge_result is not None:
+                            judge_value, judge_reason = llm_judge_result
+                            trace.log_feedback_score(
+                                name="llm_judge",
+                                value=judge_value,
+                                reason=judge_reason or accuracy_reason,
+                            )
+
+            except Exception as e:
+                logger.warning(f"Opik logging failed: {e}")
+
 
             save_json(out_path, {
                 "custom_id": custom_id,
@@ -320,11 +602,25 @@ def run_direct_requests(
                 "answer": answer,
                 "ground_truth": gt,
                 "score": score,
+                "llm_judge_score": llm_judge_result[0] if llm_judge_result else None,
+                "llm_judge_reason": llm_judge_result[1] if llm_judge_result else None,
+                "answer_format": answer_format,
+                "question_type": question_type,
                 "model": body.get("model"),
                 "usage": body.get("usage"),
+                "estimated_cost": est_cost if 'est_cost' in locals() else None,
+                "raw_api_response": body,
             })
             completed += 1
-            logger.info(f"✓ [{completed + failed + skipped}/{len(entries)}] Saved answer: {custom_id}")
+            logger.info(
+                f"✓ [{completed + failed + skipped}/{len(entries)}] Saved answer: {custom_id}"
+                f" | cost this call: ${est_cost:.4f} | run total: ${total_cost:.4f}"
+            )
+            if total_cost >= cost_limit:
+                logger.warning(
+                    f"Cost limit of ${cost_limit:.2f} reached (${total_cost:.4f} spent). Stopping."
+                )
+                return completed, failed, skipped
         except Exception as exc:
             failed += 1
             save_json(fail_path, {
@@ -386,6 +682,18 @@ def main() -> None:
         default=None,
         help="Directory containing Q&A pair JSON files (for ground truth lookup)",
     )
+    parser.add_argument(
+        "--eval-level",
+        type=str,
+        default=None,
+        help="Evaluation level tag for Opik (e.g. level_1)",
+    )
+    parser.add_argument(
+        "--cost-limit",
+        type=float,
+        default=20.0,
+        help="Maximum USD spend per run (default: $20.00). Stops after the limit is reached.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -428,6 +736,8 @@ def main() -> None:
         max_output_tokens=args.max_output_tokens,
         overwrite=args.overwrite,
         ground_truth_index=ground_truth_index,
+        eval_level=args.eval_level,
+        cost_limit=args.cost_limit,
     )
     logger.info(
         f"Done. Completed={completed}, Failed={failed}, Skipped={skipped}, OutputDir={args.output_dir}"

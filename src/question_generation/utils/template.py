@@ -12,7 +12,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from src.question_generation.utils.feature_categories import filter_features_for_template
 from src.question_generation.utils.time_series import (
+    downsample_peak_preserving,
     encode_time_series,
     format_note_value,
     remove_constant_features,
@@ -149,12 +151,32 @@ def sample_chunks(
 # ---------------------------------------------------------------------------
 
 
-def build_context(subseries: List[Dict[str, Any]]) -> Dict[str, Any]:
+def build_context(
+    subseries: List[Dict[str, Any]],
+    template_type: Optional[str] = None,
+    important_features: Optional[List[str]] = None,
+    anchor_timestamps: Optional[set[float]] = None,
+) -> Dict[str, Any]:
     """
     Build the context dict attached to every generated question.
     Contains the encoded time series and any constant-feature notes.
+
+    When *template_type* is provided, per-template feature filtering and
+    peak-preserving downsampling are applied to reduce token count.
     """
     ts = strip_null_features(subseries)
+
+    # Layer 1: per-template feature filtering
+    if template_type is not None:
+        ts = filter_features_for_template(ts, template_type)
+
+    # Layer 2: peak-preserving downsampling (cap to 32-64 rows)
+    ts = downsample_peak_preserving(
+        ts,
+        important_features=important_features,
+        anchor_timestamps=anchor_timestamps
+    )
+
     ts = sort_feature_keys(ts)
     ts = remove_feature(ts, "fault_label")
     ts, constant_features = remove_constant_features(ts)

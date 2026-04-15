@@ -1,8 +1,0 @@
-[
-  "Is joint {axis} at the same position in {t1}ms and {t2}ms (threshold of {eps_1} rad)?",
-  "Has joint {axis} friction increased between {t1}ms and {t2}ms (threshold of {eps_2} rad)? Approximate over a symmetric half window of {Delta_1}.",
-  "What is the acceleration of the end effector at time {t1}ms?",
-  "Is external force detected at time {t}ms (threshold of {eps_3})?",
-  "What is the jerk of joint {axis} at time {t}ms?",
-  "What is the torque magnitude about axis {axis_label} at time {t}ms?"
-]
