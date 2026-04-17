@@ -9,9 +9,9 @@ _Affiliation: ETH Zurich, Forgis AG, Imperial College London_
 
 ## Abstract
 
-Time-series models are widely used in industrial monitoring tasks such as forecasting, anomaly detection, and signal analysis. While highly effective for these objectives, they are often opaque and limited in their ability to provide structured reasoning for engineering decision-making. Large language models (LLMs), in contrast, can generate coherent, context-aware explanations and support multi-step reasoning. However, general-purpose LLMs still struggle when applied directly to dense multivariate sensor streams and machine-specific diagnostics without adaptation or external tools. A promising direction is therefore to use LLM agents augmented with specialized numerical and signal-processing tools. This raises a central question: how can we verify that these systems truly understand machine behavior rather than only generating plausible text?
+Time-series models are widely used in industrial monitoring tasks such as forecasting, anomaly detection, and signal analysis. While highly effective for these objectives, they are often opaque and limited in their ability to provide structured reasoning for engineering decision-making. Large language models (LLMs), in contrast, can generate coherent, context-aware explanations and support multi-step reasoning. However, general-purpose LLMs still struggle when applied directly to dense multivariate sensor streams and machine-specific diagnostics without adaptation or external tools, and even then they often tend to learn wrong signals even when answering correctly to a question. This raises a central question: how can we verify that these systems truly understand machine behavior rather than only generating plausible output?
 
-We introduce **FactoryBench**, a benchmark for evaluating LLM agents on machine understanding over industrial time-series data. Our contributions are threefold. First, we propose a scalable framework for generating machine-understanding question-answering tasks, built around 80 structured question templates spanning diverse reasoning scenarios. Second, we present **FactoryWave**, a dense multivariate dataset generated from one-armed robotic systems, including both collaborative and industrial manufacturing robots. Third, we construct FactoryBench as a large-scale Q\&A dataset for time-series understanding in LLM agents, grounded in FactoryWave as well as open-source robotics datasets and simulations. Together, these components provide a rigorous testbed for evaluating reasoning, causal understanding, and decision support over real and simulated industrial signals.
+We introduce **FactoryBench**, a benchmark for evaluating time series models and LLMs on machine understanding over industrial time-series data. We propose a scalable Q&A generation framework built around structured question templates, present **FactoryWave** (a dense, multitask and multivariate sensor dataset from real robotic systems) and construct FactoryBench as a large-scale benchmark grounded in FactoryWave alongside open-source datasets and simulations. Together, these provide a rigorous testbed for evaluating reasoning, causal understanding, and decision support over industrial signals. _(Note: consider moving the full contributions paragraph to the end of the Introduction.)_
 
 ---
 
@@ -25,9 +25,9 @@ Large language models, on the other hand, exhibit strong general reasoning abili
 
 A promising paradigm is to build LLM agents equipped with specialized tools, including time-series models and signal-processing modules [10, 11, 12]. These agents can combine language reasoning with domain-specific computation. Nevertheless, evaluating whether such systems truly understand machine behavior remains challenging. Existing benchmarks mostly target textual reasoning, code generation, or generic multimodal understanding [13, 14, 15], leaving a gap in rigorous evaluation for machine-centered, time-series reasoning.
 
-To address this gap, we propose FactoryBench, a benchmark designed to evaluate machine understanding in LLM agents. FactoryBench is grounded in FactoryWave, a dense multivariate time-series dataset collected from one-armed robotic systems, including collaborative and industrial manufacturing robots. The dataset captures rich dynamic behavior under diverse operational conditions.
+To address this gap, we propose FactoryBench, a benchmark designed to evaluate machine understanding in time series models and LLMs. FactoryBench is grounded in FactoryWave, a dense multivariate time-series dataset collected from one-armed robotic systems, including collaborative and industrial manufacturing robots. The dataset captures rich dynamic behavior under diverse operational conditions.
 
-We also introduce a scalable question-generation framework composed of 80 structured templates spanning a wide range of reasoning types and applicable to general machine data flows. These templates enable systematic construction of question-answering tasks that probe state understanding, intervention reasoning, counterfactual analysis, and decision-making in machine contexts. Using this framework and the FactoryWave dataset, we build FactoryBench, a large-scale Q\&A dataset specifically designed to evaluate time-series understanding and engineering reasoning in LLM agents.
+We also introduce a scalable question-generation framework composed of 20 structured templates spanning a wide range of reasoning types and applicable to general machine data flows. These templates enable systematic construction of question-answering tasks that probe state understanding, intervention reasoning, counterfactual analysis, and decision-making in machine contexts. Using this framework and the FactoryWave dataset, we build FactoryBench, a large-scale Q\&A dataset specifically designed to evaluate time-series understanding and engineering reasoning in LLM agents.
 
 By bridging the gap between general language reasoning and specialized time-series modeling, FactoryBench provides a principled foundation for studying machine-centered intelligence in industrial environments.
 
@@ -70,12 +70,12 @@ Causal frameworks provide formal tools for interventions and counterfactuals [27
 
 (TODO: REPLACE EXAMPLES WITH MORE UP TO DATE ONES)
 
-| Level | Task           | Example Question                                                     | Ground Truth Source        | Commercial Value               |
-| ----- | -------------- | -------------------------------------------------------------------- | -------------------------- | ------------------------------ |
-| **1** | State          | "What's the current of joint 3 now?"                                 | Sensor data                | Fleet monitoring               |
-| **2** | Intervention   | "If force in joint 3 increases _now_ to X, what happens?"            | Simulation (present state) | Diagnostic intervention        |
-| **3** | Counterfactual | "If force had increased to X _at t=20ms_, what would have happened?" | Simulation (past state)    | Root cause / Capacity planning |
-| **4** | Decision       | "Robot stopped with error C203A. What to do?"                        | Manual + sensor fusion     | Expert-free recovery           |
+| Level | Task           | What It Tests                                                                   | Example Question                                                                                                                                               | Answer Format         |
+| ----- | -------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| **1** | State          | Can the model understand what the machine is doing and how it is behaving?      | "We want to isolate the lifting phase in the robot's time series. Assuming a fixed window length of 15 timesteps, at which timestamp should the window begin?" | Tensor                |
+| **2** | Intervention   | Can the model reason about how the machine will behave in the face of an event? | "A collision with a foam cube occurs at T=850ms. Rank the following signal segments (A–D) in the order you would expect them to appear after the event."       | Ranking (permutation) |
+| **3** | Counterfactual | Can the model reason accurately about theoretical scenarios?                    | "Had a payload misconfiguration occurred at T=200ms, what would be the expected value of the target torque on joint 2 at T+50ms in this counterfactual case?"  | Scalar (float)        |
+| **4** | Decision       | Can the model make informed decisions about the machine?                        | "Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and the steps to fix it."       | Free-form text        |
 
 To systematically evaluate machine understanding, we organize question-answering tasks according to a four-tier hierarchy, each probing distinct reasoning capabilities:
 
@@ -101,31 +101,29 @@ FactoryBench uses three answer formats, chosen to balance evaluation rigor with 
 
 **Ranking.** The model is given four time-series segments or outcomes (A–D) and must order them according to a specified criterion (e.g., severity of deviation, magnitude of a signal). The answer is a permutation string (e.g., `DABC`). Evaluation uses exact-match rate and Kendall's τ rank correlation against the ground-truth ordering.
 
-**Tensor.** The model must output at least one specific scalar value — such as the expected sensor reading following an intervention — with no multiple-choice scaffolding. The answer is a list of floating-point numbers (possibly one). Evaluation is done on each scalar separately, and uses mean absolute percentage error (MAPE) and a threshold-based accuracy metric (prediction within ±*k*% of ground truth), with partial points given to all correct scalars given.
+**Tensor.** The model must output at least one specific scalar value (such as the expected sensor reading following an intervention) with no multiple-choice scaffolding. The answer is a list of floating-point numbers (possibly one). Evaluation is done on each scalar separately, and uses mean absolute percentage error (MAPE) and a threshold-based accuracy metric (prediction within ±*k*% of ground truth), with partial points given to all correct scalars given.
 
 **Free-Form.** The model produces an open-ended natural language response such as a diagnosis, recommended action sequence, or causal explanation. Because no single deterministic answer exists, evaluation is performed via an LLM-as-judge voting protocol: three independent frontier LLMs each compare the model's response against the ground-truth reference and cast a verdict of **Wrong** (0), **Neutral** (0.5), or **Correct** (1). The final score is the majority vote across the three judges, with ties broken by averaging.
 
 ---
 
-### 3.3 Time Series Data and Causal Schema (SCE)
+### 3.3 Time Series Data and Causal Schema (SCF)
 
-To ensure that the dataset structure itself encodes causality, FactoryBench organizes all time-series signals into three causal groups, answering the core question: _"What was the machine told to do, and what did it actually do?"_
+FactoryBench is built on the assumption that three causal signal categories (setpoint, context, and execution) are sufficient to accurately approximate the full state of a machine at any point in time. Under this assumption, FactoryBench organizes all time-series signals accordingly, answering the core question: _"What was the machine told to do, and what did it actually do?"_
 
-- **Setpoint:** The controller’s command — target position, velocity, and acceleration per axis.
-- **Context:** Physical conditions affecting behavior — payload, temperature, material properties. Split into _static_ (episode metadata) and _dynamic_ (time-series columns).
-- **Effort + Feedback:** The machine’s response — motor current (effort), actual position (feedback), vibration, and acoustic emission.
+- **Setpoint:** The controller’s command: target position, velocity, and acceleration per axis.
+- **Context:** Physical conditions affecting behavior as well as semantic prior of machine: payload, temperature, material properties. Split into _static_ (metadata of machine and environment) and _dynamic_ (time-series columns).
+- **Feedback:** The machine’s response: motor current (effort), actual position (feedback), vibration, and acoustic emission.
 
-This structure enables a universal fault definition: under healthy operation, Effort is a lawful function of Setpoint. Faults manifest as deviations in the `f(Setpoint) vs Effort` relationship. The dataset provides the paired signals that make this comparison possible.
-
-This data is sourced from:
+We then only consider datasets which encode, at least partly, all 3 sensor categories. This data is sourced from:
 
 - **FactoryWave:** A custom dataset generated from one-arm robotic platforms executing canonical industrial tasks (e.g., pick-and-place) under varied conditions and systematically injected anomalies.
 - **Open Source Datasets:** Adapted datasets such as Aursad and Vorausad, offering diverse industrial scenarios and preprocessed to conform to the unified episode structure.
 
-  | Dataset   | Robot | Size | Frequency | Task           | # of Anomaly Types | SCE Compliance |
-  | --------- | ----- | ---- | --------- | -------------- | ------------------ | -------------- |
-  | AURSAD    | UR3e  | ?    | 100       | Screwing       | 4                  | ✓              |
-  | voraus-AD | UR5   | ?    | 100/500   | Pick and Place | 12                 | ✓              |
+  | Dataset   | Robot    | Size | Frequency | Task           | # of Anomaly Types | SCE Compliance |
+  | --------- | -------- | ---- | --------- | -------------- | ------------------ | -------------- |
+  | AURSAD    | UR3e     | ?    | 100       | Screwing       | 4                  | ✓              |
+  | voraus-AD | Yu-Cobot | ?    | 100/500   | Pick and Place | 12                 | ✓              |
 
 - **Simulations:** Synthetic time-series data generated from simulated robotic systems to enable controlled experimentation, ablation studies, and validation across both physical and virtual domains.
 
@@ -137,33 +135,37 @@ This data is sourced from:
 
 ### 4.1 At scale generation via extensive labelling
 
-Scalable ground-truth generation is the central challenge of any Q&A benchmark grounded in raw sensor data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by PhD-level experts in robotics. Rather than annotating individual questions by hand, each template is parameterized: concrete values are filled at generation time from the episode data and its associated labels. The context time serie(s) used to fill the variables of the question is sampled uniformly by datasource (sim vs open source vs FactoryWave), dataset (if looking at open source), experiment, difficulty, length and then placement in that order. This yields a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
+Scalable ground-truth generation is the central challenge of any Q&A benchmark grounded in raw sensor data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by PhD-level experts in robotics. Rather than annotating individual questions by hand, each template is parameterized: concrete values are filled at generation time from the episode data and its associated labels. The context time serie(s) used to fill the variables of the question is sampled uniformly by datasource (sim vs open source vs FactoryWave), dataset (if looking at open source), task, and then sample in that order. This yields a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
 
 ![Question generation pipeline](../figures/question_generation.png)
 
-**Variable sampling.** Each question template contains multiple variable slots that are filled at generation time via variable-specific sampling distributions. Continuous variables — such as signal names, timestamps, prediction horizons, and numerical thresholds — are sampled directly from the episode data or drawn from predefined distributions. Discrete variables — such as tasks, anomaly types, and root causes — are sampled from curated vocabularies. These vocabularies were initially aggregated from the open-source datasets used in FactoryBench, then substantially expanded by PhD-level robotics experts to cover a broader range of operationally realistic scenarios, while remaining fully reproducible for FactoryWave episodes. This separation between template structure and sampled content is what allows a small number of hand-authored templates to generate a large and semantically diverse question pool.
+**Variable sampling.** Each question template contains multiple variable slots that are filled at generation time via variable-specific sampling distributions. Continuous variables (such as signal names, timestamps, prediction horizons, and numerical thresholds) are sampled directly from the episode data or drawn from predefined distributions. Discrete variables (such as tasks, anomaly types, and root causes) are sampled from curated vocabularies. These vocabularies were initially aggregated from the open-source datasets used in FactoryBench, then substantially expanded by PhD-level robotics experts to cover a broader range of operationally realistic scenarios, while remaining fully reproducible for FactoryWave episodes. This separation between template structure and sampled content is what allows a small number of hand-authored templates to generate a large and semantically diverse question pool.
 
-**Template design.** Each of the 40 question templates was manually authored to probe one specific reasoning capability at the appropriate level of the hierarchy, while remaining general enough to admit a wide range of concrete instantiations. Templates are parameterized over episode segments, signal names, event descriptions, timestamps, and predicted values. Answer options for multi-select questions are drawn from a shared pool of verifiable statements, each paired with a rule that can be evaluated deterministically against the time series, given the densely labelled data. This design ensures that ground truth is never imputed or inferred — it is computed directly from labeled episode data — making the benchmark both reliable and fully reproducible.
+**Template design.** Each of the 20 question templates was manually authored to probe one specific reasoning capability at the appropriate level of the hierarchy, while remaining general enough to admit a wide range of concrete instantiations. Answer options for multi-select questions are drawn from a shared pool of verifiable statements, each paired with a rule that can be evaluated deterministically against the time series, given the densely labelled data. This design ensures that ground truth is never imputed or inferred (it is computed directly from labeled episode data) making the benchmark both reliable and fully reproducible.
 
 ### 4.2 Density of FactoryWave
 
-(TODO: TALK ABOUT DATA GENERATION FOR ALL LEVELS (ESPECIALLY LEVEL 3), MENTION HOW LABELLING IS COLLECTED AUTOMATICALLY)
+FactoryWave is collected from two physical robots (UR3e and the Kuka KR10) executing up to three canonical industrial tasks each: pick-and-place, screwing (UR3e only), and peg-in-hole. Each complete task cycle constitutes one episode, recorded at 500 Hz across [TODO: find number] sensor channels covering joint setpoints, feedback, torques, speeds, estimated contact forces, TCP pose, gripper state, and task phase labels.
+
+Episodes are organized into four experiment types. **Normal** episodes capture nominal operation across three payload levels (light, medium, heavy for pick-and-place). **Trajectory optimization** episodes run the same task with randomly varied waypoint sequences, recording episode-level duration and energy metadata to support Level 4 ranking questions. **Fault** episodes inject one of 37 fault types (spanning gripper failures, payload misconfigurations, software faults, collisions, and peg-in-hole-specific anomalies), each recorded with fault-specific metadata and, where applicable, a precise injection timestep. **Counterfactual** episodes pair a clean baseline run with a fault run whose pre-injection segment most closely matches the baseline (selected by minimum KL divergence), providing ground truth for Level 3 causal reasoning.
+
+[TODO: table to summarize all number of episodes and categories]
 
 ### 4.3 Adapting labelling to open datasets and simulations
 
 (TODO: TALK ABOUT HOW LABELLING WAS DONE ON OPEN DATASETS AND SIMULATIONS)
 
-### 4.4 Dataset Diversity & Quality Assurance
+### 4.4 Knowledge Graph and Protocol Extraction
 
-(TODO: GENERATE GRAPHS AND ADD PARAGRAPHS ABOUT Q&A DISTRIBUTIONS (LEVEL, DIFFICULTY, ETC))
+Reliable ground truth for Level 4 troubleshooting questions requires more than episode labels: it demands machine-specific recovery protocols grounded in manufacturer documentation. To produce this at scale, we implement a structured parsing pipeline over robot technical manuals.
 
-A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine understanding, we utilize the **Vendi Score** on the embeddings of our Q&A pairs to measure and maximize effective population diversity.
+**Error-to-protocol extraction.** For each robot in FactoryBench, we parse the manufacturer's runtime error documentation to extract a structured mapping from error codes to error names, descriptions, and recommended recovery steps. Each entry captures what the controller reports when a fault occurs and what an operator should do to resolve it.
 
-We iteratively evaluate dataset diversity across three primary axes during generation:
+**Anomaly-to-error mapping.** We then map every anomaly type studied in FactoryBench to the most likely corresponding manufacturer error code. This mapping is established by PhD-level robotics experts who reason about the physical cause of each anomaly and identify which runtime error it would most plausibly trigger on the target robot. The result is a fault-indexed lookup table linking each root cause to a specific error code and its associated protocol.
 
-- **Low Diversity (Parameter Variation):** Varying only parameters like time windows and joint indices yields a low Vendi Score, confirming that simple parameter randomization is insufficient.
-- **Moderate Diversity (Format Variation):** Semantically identical questions expressed across different formats (Open-ended, Multiple Choice, True/False) measurably increase the effective diversity.
-- **High Diversity (Template & Type Variation):** Introducing mixed reasoning templates across levels (e.g., kinematic comparison, derivative estimation like friction/acceleration, anomaly detection) drives the highest Vendi Score. By enforcing high Vendi Scores across our generated subsets, we ensure the benchmark tests versatile analytical capabilities.
+**Expert-authored gap-filling.** Not all anomalies correspond to a documented runtime error. Physical fault injections (such as gripper misactivation, peg misalignment, or external collisions) may not produce a well-defined controller error at all. For these cases, robotics experts author recovery protocols directly, following the same structure as the manufacturer documentation to maintain consistency.
+
+**Knowledge graph integration.** The complete mapping (error-derived and expert-authored protocols alike) is ingested into a knowledge graph alongside robot specifications, task definitions, and signal schema. At question generation time, the pipeline queries this graph to automatically assemble the relevant protocol context and inject it as ground truth into Level 4 troubleshooting Q&A pairs, without requiring per-question human review.
 
 ### 4.5 Pipeline Overview
 
@@ -181,7 +183,7 @@ We iteratively evaluate dataset diversity across three primary axes during gener
 - Gemini-2.5-Pro, Gemini-2.5-Flash
 - Claude-3.5-Sonnet, Claude-3-Opus
 
-**Specialized Methods:**
+**Specialized Methods (on a subset of data):**
 
 - Time-series encoders + LLM (Chronos, Moirai)
 - Multimodal industrial models (FD-LLM)
@@ -243,7 +245,7 @@ This benchmark evaluates on a **subset** of FactoryNet. The full dataset (50k+ e
 
 ## 7. Conclusion
 
-FactoryBench introduces a systematic approach to evaluating machine understanding via Q&A. By focusing deeply on one machine family and providing reliable answer generation at scale, we enable rigorous comparison of methods across four levels of reasoning—from basic state identification to procedure generation grounded in technical manuals.
+FactoryBench introduces a systematic approach to evaluating machine understanding via Q&A. By focusing deeply on one machine family and providing reliable answer generation at scale, we enable rigorous comparison of methods across four levels of reasoning, from basic state identification to procedure generation grounded in technical manuals.
 
 Our physical validation protocol closes the loop from benchmark to reality, addressing the fundamental question: can AI systems that excel at industrial Q&A actually help in the real world?
 
@@ -344,6 +346,78 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
   "context": {...}
 }
 ```
+
+---
+
+---
+
+## Appendix A: FactoryWave Recording Protocol
+
+### A.1 Robots and Tasks
+
+FactoryWave is collected across two physical robots: **UR3e** (Universal Robots E-series) and the **Agile Robots Yu 5 Industrial**. Each robot executes up to three tasks:
+
+- **Pick-and-Place** (both robots): 10-phase cycle: approach above object, descend, settle, grip, lift, lateral transfer, lower, release, retract, return to home.
+- **Screwing** (UR3e only): 9-phase cycle: approach, descend, screw, disengage, retract, descend, loosen, engage, retract.
+- **Peg-in-Hole** (both robots): 9-phase cycle: align above hole, insert, disengage, rise above hole, retract, align above object, engage, rise above object, retract.
+
+Every timestep carries a `task_phase` label, enabling phase-conditioned analysis and question generation. Policies are simple scripted programs designed for >95% nominal success rate; policy quality is not the subject of study.
+
+### A.2 Signal Schema (137 Columns, 50 Hz)
+
+All available sensor channels are recorded without filtering. Signals are organized into three causal categories per the SCF schema:
+
+- **Setpoint:** Controller commands: target joint positions, velocities, accelerations, and TCP pose (6 axes each).
+- **Context:** Episode-level metadata (robot model, task, payload, gripper, TCP and CoG configuration) plus dynamic context signals (task phase, gripper command).
+- **Feedback:** Robot response: measured joint positions, velocities, torques, motor currents, estimated contact forces, and safety/mode flags.
+
+### A.3 Episode Types
+
+| Type                    | Description                                                                    | Episodes per Robot                                                   |
+| ----------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Normal                  | Nominal operation; pick-and-place varied across 3 payload levels               | 1,000                                                                |
+| Trajectory Optimization | Randomized waypoint sequences; records duration and energy metadata            | 450                                                                  |
+| Parameter Optimization  | Software configuration variants (TCP, payload, CoG) for intervention reasoning | 500                                                                  |
+| Fault                   | 37 fault types injected; programmatic fault ID and injection timestep recorded | 1,820                                                                |
+| Counterfactual          | Paired baseline + fault run selected by minimum KL divergence pre-injection    | 360                                                                  |
+| **Total per robot**     |                                                                                | **~4,130** (UR3e with screwing) / **~3,260** (Yu 5 without screwing) |
+
+### A.4 Fault Catalogue
+
+37 fault types are organized across five families:
+
+- **Gripper** (3): activation failure, mid-transport release, invalid gripping position
+- **Mechanical / Hardware** (5): additional axis payload, cable routed on robot, unstable mounting platform, motor miscommutation, motor phase fault
+- **Payload / Configuration** (5): unexpected payload weight, TCP misconfiguration, zero payload misconfiguration, CoG misconfiguration, additional axis friction
+- **Collision / Disturbance** (8): foam, cardboard, rigid object, hanging cable, external arm disturbance, self-collision/link interference, and joint/safety limit violations
+- **Peg-in-Hole specific** (5): insertion misalignment, hole obstruction, incorrect depth, surface contamination, fixture displacement
+- **Screwing specific** (5): damaged screw thread, damaged plate thread, missing screw, extra assembly component, loosening phase
+- **General software** (6): joint position limit violation, singularity passage, safety plane violation, TCP misconfiguration, zero payload, CoG offset
+
+Each fault entry records: root cause key, injection method, automation level, fault-specific metadata fields, and event timing window (start and end of the anomalous event).
+
+### A.5 Dataset Diversity & Quality Assurance
+
+(TODO: GENERATE GRAPHS AND ADD PARAGRAPHS ABOUT Q&A DISTRIBUTIONS (LEVEL, DIFFICULTY, ETC))
+
+A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine understanding, we utilize the **Vendi Score** on the embeddings of our Q&A pairs to measure and maximize effective population diversity.
+
+We iteratively evaluate dataset diversity across three primary axes during generation:
+
+- **Low Diversity (Parameter Variation):** Varying only parameters like time windows and joint indices yields a low Vendi Score, confirming that simple parameter randomization is insufficient.
+- **Moderate Diversity (Format Variation):** Semantically identical questions expressed across different formats (Open-ended, Multiple Choice, True/False) measurably increase the effective diversity.
+- **High Diversity (Template & Type Variation):** Introducing mixed reasoning templates across levels (e.g., kinematic comparison, derivative estimation like friction/acceleration, anomaly detection) drives the highest Vendi Score. By enforcing high Vendi Scores across our generated subsets, we ensure the benchmark tests versatile analytical capabilities.
+
+### A.6 Counterfactual Collection Protocol
+
+For each of 5–6 selected injectable faults per task:
+
+1. Record one clean baseline run under fixed initial conditions.
+2. Record 3–5 fault runs with the fault injected at the same timestep $t_\text{inj}$, varying only the random seed.
+3. Compute KL divergence between the pre-injection segment of each fault run and the corresponding baseline segment.
+4. Retain the fault run minimising KL divergence as the counterfactual ground truth; discard the rest.
+
+The retained pair (baseline, best fault run) provides a matched counterfactual sample with programmatically logged injection time, event type, and parameters, requiring no human annotation.
 
 ---
 
