@@ -529,15 +529,15 @@ We iteratively evaluate dataset diversity across three primary axes during gener
 \subsection{Models to evaluate}
 
 \textbf{Frontier LLMs:}
+We evaluate a cross-vendor panel including the strongest closed-weight frontier systems and the leading open-weight releases available at submission time (April 2026). This follows the now-standard practice in recent reasoning and tool-use benchmarks of pairing multiple closed frontier APIs with a comparable set of open-weight models to separate capability from deployment cost \cite{srivastava2023bigbench,liang2022helm,chollet2019arc}. A detailed justification is given in Appendix~\ref{app:model_selection}.
 \begin{itemize}
-    \item GPT-4o, GPT-4-Turbo
-    \item Gemini-2.5-Pro, Gemini-2.5-Flash
-    \item Claude-3.5-Sonnet, Claude-3-Opus
+    \item \textit{Closed-weight, flagship reasoning:} GPT-5-mini \cite{openai2025gpt5mini}, Claude Haiku 4.5 \cite{anthropic2025claudehaiku45}.
+    \item \textit{Open-weight, flagship reasoning:} Qwen-3.5 \cite{qwen2026qwen35}, DeepSeek V3.1 \cite{deepseek2025v31}, Mistral-Large-3 \cite{mistral2025large3}.
 \end{itemize}
 
 \textbf{Specialized Methods:}
 \begin{itemize}
-    \item Time-series encoders + LLM (Chronos, Moirai)
+    \item Time-series foundation models (Chronos-2 \cite{ansari2024chronos}, Moirai \cite{woo2024unified}), evaluated only on the forecasting-style subset of FactoryBench (i.e., questions whose ground truth is a future scalar or segment of the time series, such as Tensor-type prediction questions). These models do not ingest natural-language prompts and are therefore not applicable to the MC, Multi-Select, Ranking, or Free-Form subsets.
     \item Multimodal industrial models (FD-LLM)
     \item RAG with manual retrieval
 \end{itemize}
@@ -755,5 +755,25 @@ Gemini 2.5 Pro & \$937.50 & \$32.00 & \textbf{\$969.50} & \$0.0049 \\
 \end{table}
 
 These estimates show that a full benchmark run of 200k questions on a frontier model costs between roughly \$1,000 and \$4,000 using batch APIs. Costs are heavily input-dominated: output tokens contribute less than 5\% of the total, since 90\% of FactoryBench answers are short structured strings (2 tokens). Standard (non-batch) API pricing is typically $2\times$ higher. Note that these costs are for a \emph{single} evaluation pass; repeated runs (e.g., for variance estimation or ablation studies) scale linearly. The per-question cost (\$0.005--\$0.02) confirms that FactoryBench is economically feasible to evaluate at scale, even on the most expensive frontier models.
+
+\section{Model selection and justification}
+\label{app:model_selection}
+
+\paragraph{Selection criteria.} Following standard latest practice in recent LLM reasoning benchmarks \cite{srivastava2023bigbench,liang2022helm,chollet2019arc,hendrycks2021mmlu,rein2023gpqa}, our selection is constructed to satisfy the following criteria: (i) coverage of more than one closed-API vendor to avoid single-vendor bias; (ii) inclusion of strong open-weight models so that benchmark results remain reproducible without paid API access and can be run on-premise --- a requirement for many industrial deployments; and (iii) inclusion of at least one cost-efficient tier, since the per-question cost analysis in Appendix~\ref{app:cost} shows that flagship-tier inference across 200k questions is substantially more expensive than cost-efficient tiers.
+
+\paragraph{Closed-weight frontier models:}
+\begin{itemize}
+    \item \textbf{GPT-5-mini} \cite{openai2025gpt5mini}
+    \item \textbf{Claude Haiku 4.5} \cite{anthropic2025claudehaiku45}
+\end{itemize}
+
+\paragraph{Open-weight frontier models:}
+\begin{itemize}
+    \item \textbf{Qwen-3.5} \cite{qwen2026qwen35}
+    \item \textbf{DeepSeek V3.1} \cite{deepseek2025v31}
+    \item \textbf{Mistral-Large-3} \cite{mistral2025large3}
+\end{itemize}
+
+\paragraph{Scope of time-series foundation models.} Task-specialized time-series foundation models (Chronos-2 \cite{ansari2024chronos}, Moirai \cite{woo2024unified}) are not part of the frontier-LLM panel. They are evaluated separately under ``Specialized Methods'' and only on the forecasting-style subset of FactoryBench --- i.e., questions that admit a numerical future-value ground truth (Tensor-type and other prediction questions). These models do not accept natural-language prompts and are not applicable to the multiple-choice, ranking, or free-form subsets, so reporting them on those subsets would be ill-defined rather than merely unfavorable. This preserves a clean separation between language-reasoning capability (measured on the full benchmark) and numerical forecasting capability (measured on the prediction subset).
 
 \end{document}
