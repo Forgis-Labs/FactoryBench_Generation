@@ -18,6 +18,7 @@
 \usepackage{xcolor}         % colors
 \usepackage{graphicx}
 \usepackage{multirow}
+\usepackage{enumerate}
 \usepackage{todonotes}
 
 \title{FactoryBench: Benchmarking Machine Understanding via Question-Answering}
@@ -44,33 +45,36 @@
 
 \maketitle
 
-% \todo[inline]{I think the first paragraph of the abstract should be deleted. The abstract is not a place to discuss the state-of-the-art. The second paragraph is enough.}
-
 \begin{abstract}
-% Time-series models are widely used in industrial monitoring tasks such as forecasting, anomaly detection, and signal analysis. While highly effective for these objectives, they are often opaque and limited in their ability to provide structured reasoning for engineering decision-making. Large language models (LLMs), in contrast, can generate coherent, context-aware explanations and support multi-step reasoning. However, general-purpose LLMs still struggle when applied directly to dense multivariate sensor streams and machine-specific diagnostics without adaptation or external tools. A promising direction is therefore to use LLM agents augmented with specialized numerical and signal-processing tools. This raises a central question: how can we verify that these systems truly understand machine behavior rather than only generating plausible text?
-
-We introduce \textbf{FactoryBench}, a benchmark for evaluating LLM agents on machine understanding over industrial time-series data. Our contributions are threefold. First, we propose a scalable framework for generating machine-understanding question-answering tasks, built around 80 structured question templates spanning diverse reasoning scenarios. Second, we present \textbf{FactoryWave}, a dense multivariate dataset generated from one-armed robotic systems, including both collaborative and industrial manufacturing robots. Third, we construct FactoryBench as a large-scale Q\&A dataset for time-series understanding in LLM agents, grounded in FactoryWave as well as open-source robotics datasets and simulations. Together, these components provide a rigorous testbed for evaluating reasoning, causal understanding, and decision support over real and simulated industrial signals.
+We introduce \textbf{FactoryBench}, a benchmark for evaluating LLM agents on their understanding of machine behavior over industrial time-series data. Our contributions are threefold. First, we propose a scalable framework for generating machine-understanding question-answering tasks, built around 80 \todo{[TODO: check the exact number when level 4 implemented]} structured question templates spanning diverse reasoning scenarios. Second, we present \textbf{FactoryWave}, a dense multivariate dataset generated from one-armed robotic systems, including both collaborative and industrial manufacturing robots. Third, we construct FactoryBench as a large-scale Q\&A dataset for time-series understanding in LLM agents, grounded in FactoryWave as well as open-source robotics datasets and simulations. Together, these components provide a rigorous testbed for evaluating reasoning, causal understanding, and decision support over real and simulated industrial signals.
 \end{abstract}
 
 \section{Introduction}
 
-Modern industrial systems generate large volumes of multivariate time-series data from sensors, actuators, and controllers. In robotic manufacturing settings, these signals encode joint states, torques, forces, velocities, contact events, task phases, and fault indicators. Extracting actionable knowledge from such data is central to monitoring, diagnostics, anomaly detection, and decision support.
-\todo[inline]{This first paragraph would be much better if it would refer to a real-world example. At least one or two modern industrail systems that fall into the category described here should be referenced.}
+Modern industrial systems generate large volumes of multivariate time-series data from sensors, actuators, and controllers. In robotic manufacturing settings---such as Universal Robots UR-series collaborative arms deployed on automotive assembly lines or KUKA industrial manipulators in electronics packaging---these signals encode joint states, torques, forces, velocities, contact events, task phases, and fault indicators. Extracting actionable knowledge from such data is central to monitoring, diagnostics, anomaly detection, and decision support.
 
-Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection\todo{citation needed}. However, these models are often specialized and difficult to interpret. They typically output labels or numeric predictions without explicit reasoning or higher-level explanations and cannot do much more outside of the specific task they are trained on\todo{citation needed}, which limits their direct utility for automated engineering decision-making.
+Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection \cite{zhou2021informer,su2019omni,audibert2020usad}. However, these models are often specialized and difficult to interpret. They typically output labels or numeric predictions without explicit reasoning or higher-level explanations, and generalize poorly outside of the specific task they are trained on \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}, which limits their direct utility for automated engineering decision-making.
 
-Large language models, in contrast, exhibit strong general reasoning abilities and can produce structured explanations in technical contexts \cite{wei2022chain,yao2023tree}. They can integrate textual information, follow logical chains, and generate interpretable outputs. Yet, when applied directly to dense numerical time series, general LLMs still underperform without adaptation\todo{citation needed}. At the same time, transformer-based architectures have become increasingly effective for time-series forecasting and representation learning \cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst,woo2024chronos,das2024survey}.
-\todo[inline]{The last sentence seems to contradict the sentence before. Is this attempting to say that specialized transformer architectures are effective in contrast to general LLMs? Then I would add a quantifier like "specialized" here. }
+Large language models, in contrast, exhibit strong general reasoning abilities and can produce structured explanations in technical contexts \cite{wei2022chain,yao2023tree}. They can integrate textual information, follow logical chains, and generate interpretable outputs. Yet, when applied directly to dense numerical time series, general LLMs still underperform without adaptation \cite{gruver2023llmtime,jin2024timellm}. In contrast, specialized transformer-based architectures have become increasingly effective for time-series forecasting and representation learning \cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst,woo2024chronos,das2024survey}.
 
-A promising paradigm is to build LLM agents equipped with specialized tools, including time-series models and signal-processing modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These agents can combine language reasoning with domain-specific computation. 
-Nevertheless, evaluating whether such systems truly understand machine behavior remains challenging. Existing benchmarks mostly target textual reasoning, code generation, or generic multimodal understanding \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu}, leaving a gap in rigorous evaluation for machine-centered, time-series reasoning.
-\todo[inline]{In the previous paragraph there is the phrase " whether such systems truly understand machine behavior". This phrase is a) basically the most important concept for this paper because it is essentially the gap that we are attempting to fill and b) not really that clear. I think it would make sense to really spell out here how current models fall short in understanding and what understanding means for us exactly.}
+A promising paradigm is to build LLM agents equipped with specialized tools, including time-series models and signal-processing modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These agents can combine language reasoning with domain-specific computation. Nevertheless, evaluating whether such systems truly reason about machine behavior---rather than pattern-matching on surface textual cues---remains challenging. By machine behavior understanding we mean the ability to:
 
-To address this gap, we propose FactoryBench, a benchmark designed to evaluate machine understanding\todo{the phrase "machine understanding" is a bit ambiguous in our context. Does it mean understanding of machines like robots or machines/agents that understand something about the world. I would try to find a different phrase here.} in LLM agents. FactoryBench is grounded in FactoryWave, a dense multivariate time-series dataset collected from one-armed robotic systems, including collaborative and industrial manufacturing robots. The dataset captures rich dynamic behavior under diverse operational conditions.
+\begin{enumerate}[I.]
+    \item interpret the current operational state from raw multivariate signals
+    \item predict the effect of an intervention on the system
+    \item reason counterfactually about what would have happened under alternative histories
+    \item recommend remedial actions grounded in physical and engineering constraints
+\end{enumerate}
 
-We also introduce a scalable question-generation framework composed of 80 structured templates spanning a wide range of reasoning types and applicable to general machine data flows. These templates enable systematic construction of question-answering tasks that probe state understanding, intervention reasoning, counterfactual analysis, and decision-making in machine contexts. Using this framework and the FactoryWave dataset\todo{Currently I think FactoryWave is not really that well described. But this will probably still come.}, we build FactoryBench, a large-scale Q\&A dataset specifically designed to evaluate time-series understanding and engineering reasoning in LLM agents.
+Current LLMs typically fail on II, III and IV because they lack access to calibrated dynamics and cannot reliably ingest long, dense numerical streams. Existing benchmarks mostly target textual reasoning, code generation, or generic multimodal understanding \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu}, leaving a gap in rigorous evaluation of machine-behavior reasoning over industrial telemetry.
 
-By bridging the gap between general language reasoning and specialized time-series modeling, FactoryBench provides a principled foundation for studying machine-centered intelligence in industrial environments.
+To address this gap, we propose FactoryBench, a benchmark designed to evaluate machine-behavior reasoning in time series models and LLMs. FactoryBench is grounded in FactoryWave, a dense multivariate time-series dataset collected from one-armed robotic systems, including collaborative and industrial manufacturing robots. FactoryWave captures synchronized setpoint, context, feedback, and effort signals at [TODO: add frequency maybe?].
+
+\todo{Add details about FactoryWave, like frequency, number of episodes, tasks, anomaly types, etc.}
+
+We also introduce a scalable question-generation framework composed of 80 \todo{[TODO: check the exact number when level 4 implemented]} structured templates spanning a wide range of reasoning types and applicable to general machine data flows. These templates enable systematic construction of question-answering tasks that probe state understanding, intervention reasoning, counterfactual analysis, and decision-making in machine contexts. Using this framework and the FactoryWave dataset, we build FactoryBench, a large-scale Q\&A dataset specifically designed to evaluate time-series understanding and engineering reasoning in LLM agents.
+
+By bridging the gap between general language reasoning and specialized time-series modeling, FactoryBench provides a principled foundation for studying machine-behavior reasoning in industrial environments.
 
 \section{Related work}
 
@@ -84,15 +88,11 @@ Time-series modeling has advanced through transformer-based architectures (Infor
 
 \subsection{Causality and benchmark gaps}
 
-Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969causal,runge2019causal}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support.
-
-% TODO: ADD MORE DATASETS THAT TICK COUNTERFACTUAL AND ROBOTIC BOX
-
-\todo[inline]{Both tables \ref{tab:benchmark_comparison} and \ref{tab:levels} are not referenced in the text. First of all, all tables should be referenced, but second, I think the table \ref{tab:benchmark_comparison} cannot be understood on its own. The words "Counterfactual", "Free-Form", "Novel Dense TS" are explained at some point in the manuscript, but when I see the table I haven't read aby if these yet.}
+Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969causal,runge2019causal}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support. Table~\ref{tab:benchmark_comparison} positions FactoryBench against closely related Q\&A and time-series benchmarks along eight axes. The column labels refer to concepts introduced later in the paper: Counterfactual denotes questions that reason about alternative histories (Level~3, Section~\ref{sec:levels}); Free-Form denotes open-ended natural-language answers evaluated via an LLM-as-judge protocol (Section~\ref{sec:answer-formats}); and Novel Dense TS indicates whether the benchmark contributes a new, high-frequency multivariate dataset rather than relying exclusively on public sources.
 
 \begin{table}[t]
 \centering
-\caption{Comparison of FactoryBench with existing benchmarks.}
+\caption{Comparison of FactoryBench with existing benchmarks. ``Counterfactual'' = questions reasoning over alternative histories; ``Free-Form'' = open-ended answers judged by LLMs; ``Novel Dense TS'' = contributes a new multivariate high-frequency dataset.}
 \label{tab:benchmark_comparison}
 \small
 \begin{tabular}{@{}lcccccccc@{}}
@@ -117,12 +117,11 @@ CLEVRER & \texttimes & \texttimes & $\sim$305k & \checkmark & \texttimes & \chec
 \section{FactoryBench framework}
 
 \subsection{Four levels of machine understanding}
-
-% TODO: REPLACE EXAMPLES WITH MORE UP TO DATE ONES
+\label{sec:levels}
 
 \begin{table}[t]
 \centering
-\caption{Four levels of machine understanding in FactoryBench.}
+\caption{Four levels of machine-behavior reasoning in FactoryBench.}
 \label{tab:levels}
 \small
 \begin{tabular}{@{}clp{4.5cm}p{2.5cm}p{2.8cm}@{}}
@@ -137,34 +136,43 @@ Level & Task & Example Question & Ground Truth Source & Commercial Value \\
 \end{tabular}
 \end{table}
 
-\todo[inline]{Is this some sort of standard design of levels to test understanding or did you come up with this yourself. If you created this, then it should probably be argued a bit more why this was chosen. Maybe this happens later. It would, however, be great, if this was to some extend grounded in previous work or general principles in robotics and not be adhoc. }
+Our four-tier hierarchy is explicitly modeled on Pearl's \emph{ladder of causation}---association, intervention, and counterfactual reasoning---which has become the standard organizing principle for causal inference and is increasingly adopted as an evaluation axis for machine-learning systems \cite{pearl2009causality,peters2017elements}. We extend the three causal rungs with a fourth decision-making rung that reflects how industrial robotic platforms are actually operated: after interpreting state and causal relationships, operators must select and execute corrective procedures, typically prescribed by vendor manuals (e.g., Universal Robots error-code handbooks). This final rung aligns with the diagnostic-then-act loop that is standard in fault-tolerant control. Grounding the hierarchy in these established principles ensures that each level probes a qualitatively distinct reasoning skill and that failure modes are interpretable in terms of the underlying causal or decision-theoretic primitive.
 
-To systematically evaluate machine understanding, we organize question-answering tasks according to a four-tier hierarchy, each probing distinct reasoning capabilities:
+To systematically evaluate machine-behavior reasoning, we organize question-answering tasks according to this four-tier hierarchy, each probing distinct reasoning capabilities:
 
-\textbf{Level 1: State.} This level assesses the agent's ability to interpret the current state of the machine, including detection of anomalies, identification of operational modes, and recognition of sensor patterns. Questions at this level require accurate extraction and interpretation of time series features.
+\begin{itemize}
 
-\textbf{Level 2: Intervention.} At this level, the agent must reason about the consequences of interventions or events occurring at the present timestep that might perturb the distribution of machine states. Tasks include predicting the immediate impact of control actions, diagnosing faults as they arise, and understanding causal relationships in real time.
+\item \textbf{Level 1: State.} This level assesses the agent's ability to interpret the current state of the machine, including detection of anomalies, identification of operational modes, and recognition of sensor patterns. Questions at this level require accurate extraction and interpretation of time series features.
 
-\textbf{Level 3: Counterfactual.} This level evaluates the agent's ability to reason about hypothetical scenarios, such as the effect of an event or intervention at a previous timestep. Questions require the agent to simulate alternative histories and assess how outcomes would differ under counterfactual conditions, while still considering the history they know.
+\item \textbf{Level 2: Intervention.} At this level, the agent must reason about the consequences of interventions or events occurring at the present timestep that might perturb the distribution of machine states. Tasks include predicting the immediate impact of control actions, diagnosing faults as they arise, and understanding causal relationships in real time.
 
-\textbf{Level 4: Decision Making.} The highest level encompasses complex decision-making tasks, where the agent must generate a sequence of actions or recommendations based on the time series and a prompt. This includes troubleshooting, optimization, and planning, requiring integration of state interpretation, causal reasoning, and goal-directed synthesis.
+\item \textbf{Level 3: Counterfactual.} This level evaluates the agent's ability to reason about hypothetical scenarios, such as the effect of an event or intervention at a previous timestep. Questions require the agent to simulate alternative histories and assess how outcomes would differ under counterfactual conditions, while still considering the history they know.
 
-By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous and granular assessment of machine understanding, from basic state recognition to advanced decision support.
+\item \textbf{Level 4: Decision Making.} The highest level encompasses complex decision-making tasks, where the agent must generate a sequence of actions or recommendations based on the time series and a prompt. This includes troubleshooting, optimization, and planning, requiring integration of state interpretation, causal reasoning, and goal-directed synthesis.
 
-\textbf{Design principle:} Each level builds on previous. Failure at Level $N$ implies failure at Level $N+1$. \todo{Why is this so?}
+\end{itemize}
+
+By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous and granular assessment of machine-behavior reasoning, from basic state recognition to advanced decision support.
+
+\textbf{Design principle: compositional dependency.} Each level presupposes the competencies of the previous one. Intervention reasoning (Level~2) requires correctly identifying the current state (Level~1): one cannot predict the effect of perturbing a joint torque without first reading the joint's current operating regime. Counterfactual reasoning (Level~3) additionally requires being able to simulate interventions (Level~2) in a modified history. Decision-making (Level~4) requires combining all three to map observed symptoms to remedial procedures. This compositional structure mirrors Pearl's ladder of causation \cite{pearl2009causality}, in which each higher rung strictly subsumes the inferential machinery of the lower ones.
 
 \subsection{Answer formats}
+\label{sec:answer-formats}
 
-FactoryBench uses three answer formats, chosen to balance evaluation rigor with scalability. Each format supports deterministic scoring (with the exception of free form), and has been chosen in order to make questions very easily checkable, but also hard to answer in the absence of correct reasoning.
+FactoryBench uses four answer formats, chosen to balance evaluation rigor with scalability. Each format supports deterministic scoring (with the exception of free form), and has been chosen in order to make questions very easily checkable, but also hard to answer in the absence of correct reasoning.
 
-\textbf{Multi-Select MC.} The model is presented with four independent statements (A--D) about the outcome of an event or intervention, and must select any subset of statements. Evaluation gives a score of 1 for exact match, 0.5 for 1 mistake and 0 otherwise (random guesser is expected to get 0).\todo{This just seems wrong. The expected points of a random guesser are clearly positive as all awarded points are nonnegative and there is a nonzero probability to achieve more than 0 points.}
+\begin{itemize}
 
-\textbf{Ranking.} The model is given four time-series segments or outcomes (A--D) and must order them according to a specified criterion (e.g., severity of deviation, magnitude of a signal). The answer is a permutation string (e.g., \texttt{DABC}). Evaluation uses exact-match rate and Kendall's $\tau$ rank correlation against the ground-truth ordering.
+\item \textbf{Multi-Select MC.} The model is presented with four independent statements (A--D) about the outcome of an event or intervention, and must select any subset of statements. Evaluation gives a score of 1 for exact match, 0.5 for 1 mistake, and 0 otherwise.
 
-\textbf{Tensor.} The model must output at least one specific scalar value---such as the expected sensor reading following an intervention---with no multiple-choice scaffolding. The answer is a list of floating-point numbers (possibly one). Evaluation is done on each scalar separately, and uses mean absolute percentage error (MAPE) and a threshold-based accuracy metric (prediction within $\pm k\%$ of ground truth), with partial points given to all correct scalars given.
+A uniformly random guesser selects each statement independently with probability $1/2$; the probability of an exact match on four statements is $1/16$, the probability of exactly one mistake is $4/16$, yielding an expected score of $1 \cdot \tfrac{1}{16} + 0.5 \cdot \tfrac{4}{16} = 3/16 \approx 0.188$. We report this baseline alongside model performance so that reasoning gains are measured against the chance ceiling.
 
-\textbf{Free-Form.} The model produces an open-ended natural language response such as a diagnosis, recommended action sequence, or causal explanation. Because no single deterministic answer exists, evaluation is performed via an LLM-as-judge voting protocol: three independent frontier LLMs each compare the model's response against the ground-truth reference and cast a verdict of \textbf{Wrong} (0), \textbf{Neutral} (0.5), or \textbf{Correct} (1). The final score is the majority vote across the three judges, with ties broken by averaging.
-\todo[inline]{This invites the obvious criticism that your evaluation and hence the final score depends on the LLM judges and could therefore change with time. I don't think it is a big issue, but one could address it here. (E.g. one could say that the LLM judges actually have a very simple task and hence not much fluctuation is expected. You could support this by studying how often the current judges are vote unanimously, which I would think is essentially always.)}
+\item \textbf{Ranking.} The model is given four time-series segments or outcomes (A--D) and must order them according to a specified criterion (e.g., severity of deviation, magnitude of a signal). The answer is a permutation string (e.g., \texttt{DABC}). Evaluation uses exact-match rate and Kendall's $\tau$ rank correlation against the ground-truth ordering.
+
+\item \textbf{Tensor.} The model must output at least one specific scalar value---such as the expected sensor reading following an intervention---with no multiple-choice scaffolding. The answer is a list of floating-point numbers (possibly one). Evaluation is done on each scalar separately, and uses mean absolute percentage error (MAPE) and a threshold-based accuracy metric (prediction within $\pm k\%$ of ground truth), with partial points given to all correct scalars given.
+
+\item \textbf{Free-Form.} The model produces an open-ended natural language response such as a diagnosis, recommended action sequence, or causal explanation. Because no single deterministic answer exists, evaluation is performed via an LLM-as-judge voting protocol: three independent frontier LLMs each compare the model's response against the ground-truth reference and cast a verdict of \textbf{Wrong} (0), \textbf{Neutral} (0.5), or \textbf{Correct} (1). The final score is the majority vote across the three judges, with ties broken by averaging.
+\end{itemize}
 
 \subsection{Time series data and causal schema (SCE)}
 
@@ -176,7 +184,11 @@ To ensure that the dataset structure itself encodes causality, FactoryBench orga
     \item \textbf{Effort + Feedback:} The machine's response---motor current (effort), actual position (feedback), vibration, and acoustic emission.
 \end{itemize}
 
-This structure enables a universal fault definition: under healthy operation, Effort is a lawful function\todo{unclear what a lawful function is} of Setpoint. Faults manifest as deviations in the $f(\text{Setpoint})$\todo{here a function $f$ is used that was never defined} vs Effort relationship. The dataset provides the paired signals that make this comparison possible.
+This structure enables a universal fault definition. Under healthy operation, the measured Effort+Feedback response $\mathbf{y}_t$ is defined as a direct function of the Setpoint command $\mathbf{S}$ and the Context $\mathbf{C}_t$:
+
+$$\mathbf{y}_t = f(\mathbf{S}, \mathbf{C}_t)$$
+
+where $f$ represents the nominal plant dynamics (inverse-dynamics-plus-controller transfer) calibrated per robot. Faults manifest as structured deviations from this expected baseline---specifically, residuals $\mathbf{y}_t - f(\mathbf{S}, \mathbf{C}_t)$ that form a clear, fault-specific spatiotemporal pattern. Because FactoryBench supplies the paired $(\mathbf{S}, \mathbf{C}_t, \mathbf{y}_t)$ streams, this residual can be computed directly, establishing a single operational definition of a fault that applies across machines and tasks.
 
 This data is sourced from:
 
@@ -186,7 +198,7 @@ This data is sourced from:
 	\item \textbf{Simulations:} Synthetic time-series data generated from simulated robotic systems to enable controlled experimentation, ablation studies, and validation across both physical and virtual domains.
 \end{itemize}
 
-\todo[inline]{table \ref{tab:datasets} is never mentioned in the text.}
+The two open-source datasets currently integrated into FactoryBench are summarized in Table~\ref{tab:datasets}; both provide the full setpoint--context--effort triplet at 100\,Hz or higher and have been relabelled to conform to our unified episode schema.
 
 \begin{table}[t]
 \centering
@@ -210,7 +222,8 @@ voraus-AD & UR5 & ? & 100/500 Hz & Pick and Place & 12 \\
 \subsection{At scale generation via extensive labelling}
 
 Scalable ground-truth generation is the central challenge of any Q\&A benchmark grounded in raw sensor data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by PhD-level experts in robotics. Rather than annotating individual questions by hand, each template is parameterized: concrete values are filled at generation time from the episode data and its associated labels. The context time series used to fill the variables of the question is sampled uniformly by datasource (sim vs open source vs FactoryWave), dataset (if looking at open source), experiment, difficulty, length and then placement in that order. This yields a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
-\todo[inline]{Every referee will ask if the reliance on templates can lead to models finding shortcuts. If the template structure can be learned then the task can be learned simply by emulating those and no understanding is achieved. One needs to address this issue here.}
+
+\paragraph{Guarding against template shortcuts.} A natural concern is that template-generated benchmarks can be solved by learning the surface structure of templates rather than the underlying reasoning. Our primary defense is structural: each template admits a combinatorially large instantiation space over signal names, timestamps, prediction horizons, payload conditions, and injected-fault types, so two questions sharing the same template rarely share more than a fraction of their variable slots. Crucially, the correct answer is never recoverable from the question text alone---it is determined by the paired time series, which varies across instantiations. We further characterize the semantic coverage of the generated pool in Section~\ref{sec:diversity}.
 
 % \begin{figure}[t]
 % \centering
@@ -219,9 +232,10 @@ Scalable ground-truth generation is the central challenge of any Q\&A benchmark 
 % \label{fig:question_generation}
 % \end{figure}
 
-\textbf{Variable sampling.} Each question template contains multiple variable slots that are filled at generation time via variable-specific sampling distributions. Continuous variables---such as signal names, timestamps, prediction horizons, and numerical thresholds---are sampled directly from the episode data or drawn from predefined distributions. Discrete variables---such as tasks, anomaly types, and root causes---are sampled from curated vocabularies. These vocabularies were initially aggregated from the open-source datasets used in FactoryBench, then substantially expanded by PhD-level robotics experts to cover a broader range of operationally realistic scenarios\todo{Reference to experts is a bit dangerous, if it is not clearly described how they operated. Was some protocol followed to identify the variables?}, while remaining fully reproducible for FactoryWave episodes. This separation between template structure and sampled content is what allows a small number of hand-authored templates to generate a large and semantically diverse question pool.
+\textbf{Variable sampling.} Each question template contains multiple variable slots that are filled at generation time via variable-specific sampling distributions. Continuous variables---such as signal names, timestamps, prediction horizons, and numerical thresholds---are sampled directly from the episode data or drawn from predefined distributions. Discrete variables---such as tasks, anomaly types, and root causes---are sampled from curated vocabularies. These vocabularies were seeded from the label sets of the open-source datasets incorporated in FactoryBench (AURSAD, voraus-AD) and extended to cover additional operationally realistic cases that arise in FactoryWave. While the extension relied on expert judgment, the resulting vocabularies are released in full as part of the benchmark, so that every question instantiation is inspectable and reproducible. This separation between template structure and sampled content is what allows a small number of hand-authored templates to generate a large and semantically diverse question pool.
 
-\textbf{Template design.} Each of the 40 question templates was manually authored to probe one specific reasoning capability at the appropriate level of the hierarchy, while remaining general enough to admit a wide range of concrete instantiations. Templates are parameterized over episode segments, signal names, event descriptions, timestamps, and predicted values. Answer options for multi-select questions are drawn from a shared pool of verifiable statements, each paired with a rule that can be evaluated deterministically against the time series, given the densely labelled data. This design ensures that ground truth is never imputed or inferred---it is computed directly from labeled episode data---making the benchmark both reliable and fully reproducible.
+\textbf{Template design.} Each of the 80 \todo{[TODO: check the exact number when level 4 implemented]} question templates was manually authored to probe one specific reasoning capability at the appropriate level of the hierarchy, while remaining general enough to admit a wide range of concrete instantiations. Templates are parameterized over episode segments, signal names, event descriptions, timestamps, and predicted values. Answer options for multi-select questions are drawn from a shared pool of verifiable statements, each paired with a rule that can be evaluated deterministically against the time series, given the densely labelled data. This design ensures that ground truth is never imputed or inferred---it is computed directly from labeled episode data---making the benchmark both reliable and fully reproducible.
+
 
 \subsection{Density of FactoryWave}
 
@@ -232,10 +246,11 @@ Scalable ground-truth generation is the central challenge of any Q\&A benchmark 
 % TODO: TALK ABOUT HOW LABELLING WAS DONE ON OPEN DATASETS AND SIMULATIONS
 
 \subsection{Dataset diversity \& quality assurance}
+\label{sec:diversity}
 
 % TODO: GENERATE GRAPHS AND ADD PARAGRAPHS ABOUT Q&A DISTRIBUTIONS (LEVEL, DIFFICULTY, ETC)
 
-A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine understanding, we utilize the \textbf{Vendi Score}\todo{citation needed} on the embeddings of our Q\&A pairs to measure and maximize effective population diversity.
+A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine-behavior reasoning, we utilize the \textbf{Vendi Score} \cite{friedman2023vendi} on the embeddings of our Q\&A pairs to measure and maximize effective population diversity.
 
 We iteratively evaluate dataset diversity across three primary axes during generation:
 
@@ -249,7 +264,7 @@ We iteratively evaluate dataset diversity across three primary axes during gener
 
 \todo[inline]{Some practical questions: How can people employ the benchmark? Where can it be found. Will it be maintained and expanded? Will incorrect labels be corrected? Is there a private dataset too? Are parts of the dataset designated for training and parts for testing?}
 
-% TODO: ADD GRAPH OR SCHEMA SUMMARIZING IT
+\paragraph{Access and maintenance.} FactoryBench and FactoryWave are released under a \todo{check license} license and distributed via a public Hugging Face repository. The release includes the episode data, the generator source code, the full set of 80 question templates with their paraphrase banks, and all LLM-as-judge prompts. We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file.
 
 \section{Experiments}
 
