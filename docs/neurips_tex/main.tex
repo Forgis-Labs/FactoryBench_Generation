@@ -662,7 +662,7 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 \section{Benchmark inference cost}
 \label{app:cost}
 
-A practical concern when deploying large-scale Q\&A benchmarks is the monetary cost of running inference across all questions. We derive a simple cost model and tabulate estimates for three representative frontier models under batch-API pricing.
+A practical concern when deploying large-scale Q\&A benchmarks is the monetary cost of running inference across all questions. We derive a simple cost model and tabulate estimates for five frontier models evaluated in FactoryBench (see Appendix~\ref{app:model_selection}) under batch-API pricing.
 
 \subsection{Cost model}
 
@@ -705,7 +705,7 @@ All models are evaluated via their respective \textbf{batch processing APIs}, wh
 
 \subsection{Model pricing}
 
-Table~\ref{tab:pricing} summarizes the batch-API pricing for three frontier models as of April 2026.
+Table~\ref{tab:pricing} summarizes the batch-API pricing for the five frontier models included in our evaluation as of April 2026. Prices are derived from each vendor's published standard-API rate card by applying the standard 50\% batch-API discount: GPT-5-mini (\$0.25/\$2.00), Claude Haiku 4.5 (\$1.00/\$5.00), Mistral-Large-3 (\$0.50/\$1.50), Qwen-3.5 Plus via Alibaba Cloud (\$0.40/\$2.40), and DeepSeek V3.1 (\$0.28/\$0.42) per million input/output tokens. Open-weight models can alternatively be self-hosted, in which case the effective cost depends on hardware utilization.
 
 \begin{table}[h]
 \centering
@@ -716,9 +716,11 @@ Table~\ref{tab:pricing} summarizes the batch-API pricing for three frontier mode
 \toprule
 Model & $P_{\text{in}}$ (\$/M tokens) & $P_{\text{out}}$ (\$/M tokens) \\
 \midrule
-Claude Opus 4.6 (Anthropic) & 2.50 & 12.50 \\
-GPT-4o (OpenAI) & 1.25 & 5.00 \\
-Gemini 2.5 Pro (Google) & 0.625 & 5.00 \\
+GPT-5-mini (OpenAI) & 0.125 & 1.00 \\
+Claude Haiku 4.5 (Anthropic) & 0.50 & 2.50 \\
+Qwen-3.5 (Alibaba) & 0.20 & 1.20 \\
+DeepSeek V3.1 (DeepSeek) & 0.14 & 0.21 \\
+Mistral-Large-3 (Mistral AI) & 0.25 & 0.75 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -727,25 +729,39 @@ Gemini 2.5 Pro (Google) & 0.625 & 5.00 \\
 
 Substituting into Equation~\ref{eq:cost_final} with $Q = 200{,}000$, $\bar{t}_{\text{in}} = 7{,}500$, and $\bar{t}_{\text{out}} = 32$:
 
-\paragraph{Claude Opus 4.6.}
+\paragraph{GPT-5-mini.}
 \begin{align}
-    C_{\text{Opus}} &= 200{,}000 \times \frac{2.50 \times 7{,}500 + 12.50 \times 32}{10^6} \notag \\
-    &= 200{,}000 \times \frac{18{,}750 + 400}{10^6} \notag \\
-    &= 200{,}000 \times 0.01915 = \mathbf{\$3{,}830}.
+    C_{\text{GPT-5-mini}} &= 200{,}000 \times \frac{0.125 \times 7{,}500 + 1.00 \times 32}{10^6} \notag \\
+    &= 200{,}000 \times \frac{937.5 + 32}{10^6} \notag \\
+    &= 200{,}000 \times 0.0009695 = \mathbf{\$193.90}.
 \end{align}
 
-\paragraph{GPT-4o.}
+\paragraph{Claude Haiku 4.5.}
 \begin{align}
-    C_{\text{GPT-4o}} &= 200{,}000 \times \frac{1.25 \times 7{,}500 + 5.00 \times 32}{10^6} \notag \\
-    &= 200{,}000 \times \frac{9{,}375 + 160}{10^6} \notag \\
-    &= 200{,}000 \times 0.009535 = \mathbf{\$1{,}907}.
+    C_{\text{Haiku}} &= 200{,}000 \times \frac{0.50 \times 7{,}500 + 2.50 \times 32}{10^6} \notag \\
+    &= 200{,}000 \times \frac{3{,}750 + 80}{10^6} \notag \\
+    &= 200{,}000 \times 0.003830 = \mathbf{\$766.00}.
 \end{align}
 
-\paragraph{Gemini 2.5 Pro.}
+\paragraph{Qwen-3.5.}
 \begin{align}
-    C_{\text{Gemini}} &= 200{,}000 \times \frac{0.625 \times 7{,}500 + 5.00 \times 32}{10^6} \notag \\
-    &= 200{,}000 \times \frac{4{,}687.5 + 160}{10^6} \notag \\
-    &= 200{,}000 \times 0.0048475 = \mathbf{\$969.50}.
+    C_{\text{Qwen}} &= 200{,}000 \times \frac{0.20 \times 7{,}500 + 1.20 \times 32}{10^6} \notag \\
+    &= 200{,}000 \times \frac{1{,}500 + 38.4}{10^6} \notag \\
+    &= 200{,}000 \times 0.0015384 = \mathbf{\$307.68}.
+\end{align}
+
+\paragraph{DeepSeek V3.1.}
+\begin{align}
+    C_{\text{DeepSeek}} &= 200{,}000 \times \frac{0.14 \times 7{,}500 + 0.21 \times 32}{10^6} \notag \\
+    &= 200{,}000 \times \frac{1{,}050 + 6.72}{10^6} \notag \\
+    &= 200{,}000 \times 0.0010567 = \mathbf{\$211.34}.
+\end{align}
+
+\paragraph{Mistral-Large-3.}
+\begin{align}
+    C_{\text{Mistral}} &= 200{,}000 \times \frac{0.25 \times 7{,}500 + 0.75 \times 32}{10^6} \notag \\
+    &= 200{,}000 \times \frac{1{,}875 + 24}{10^6} \notag \\
+    &= 200{,}000 \times 0.001899 = \mathbf{\$379.80}.
 \end{align}
 
 \subsection{Summary}
@@ -759,14 +775,18 @@ Substituting into Equation~\ref{eq:cost_final} with $Q = 200{,}000$, $\bar{t}_{\
 \toprule
 Model & Input cost & Output cost & \textbf{Total cost} & Cost per question \\
 \midrule
-Claude Opus 4.6 & \$3,750.00 & \$80.00 & \textbf{\$3,830.00} & \$0.0192 \\
-GPT-4o & \$1,875.00 & \$32.00 & \textbf{\$1,907.00} & \$0.0095 \\
-Gemini 2.5 Pro & \$937.50 & \$32.00 & \textbf{\$969.50} & \$0.0049 \\
+GPT-5-mini & \$187.50 & \$6.40 & \textbf{\$193.90} & \$0.0010 \\
+DeepSeek V3.1 & \$210.00 & \$1.34 & \textbf{\$211.34} & \$0.0011 \\
+Qwen-3.5 & \$300.00 & \$7.68 & \textbf{\$307.68} & \$0.0015 \\
+Mistral-Large-3 & \$375.00 & \$4.80 & \textbf{\$379.80} & \$0.0019 \\
+Claude Haiku 4.5 & \$750.00 & \$16.00 & \textbf{\$766.00} & \$0.0038 \\
+\midrule
+\textbf{Total} & \$1,822.50 & \$36.22 & \textbf{\$1,858.72} & -- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-These estimates show that a full benchmark run of 200k questions on a frontier model costs between roughly \$1,000 and \$4,000 using batch APIs. Costs are heavily input-dominated: output tokens contribute less than 5\% of the total, since 90\% of FactoryBench answers are short structured strings (2 tokens). Standard (non-batch) API pricing is typically $2\times$ higher. Note that these costs are for a \emph{single} evaluation pass; repeated runs (e.g., for variance estimation or ablation studies) scale linearly. The per-question cost (\$0.005--\$0.02) confirms that FactoryBench is economically feasible to evaluate at scale, even on the most expensive frontier models.
+These estimates show that a full benchmark run of 200k questions on any single frontier model in our panel costs between roughly \$190 and \$770 using batch APIs, and evaluating all five models in a single pass totals approximately \$1,860. Costs are heavily input-dominated: output tokens contribute less than 2\% of the total, since 90\% of FactoryBench answers are short structured strings (2 tokens). Standard (non-batch) API pricing is typically $2\times$ higher. Note that these costs are for a \emph{single} evaluation pass; repeated runs (e.g., for variance estimation or ablation studies) scale linearly. The per-question cost (\$0.001--\$0.004) confirms that FactoryBench is economically feasible to evaluate at scale across the full panel.
 
 \section{Model selection and justification}
 \label{app:model_selection}
