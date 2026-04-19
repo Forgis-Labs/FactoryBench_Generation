@@ -518,11 +518,23 @@ We iteratively evaluate dataset diversity across three primary axes during gener
     \item \textbf{High Diversity (Template \& Type Variation):} Introducing mixed reasoning templates across levels (e.g., kinematic comparison, derivative estimation like friction/acceleration, anomaly detection) drives the highest Vendi Score. By enforcing high Vendi Scores across our generated subsets, we ensure the benchmark tests versatile analytical capabilities.
 \end{itemize}
 
+\subsection{FactoryBench-Lite: a representative 10\% subset}
+\label{sec:lite}
+
+\todo[inline]{FactoryBench-Lite not yet implemented.
+
+IDEA: 
+\\1. run full dataset
+\\2. implement stratified selection preserving per-stratum mean/std of reference-model scores (GHOSTS-style, \cite{frieder2023ghosts})
+\\3. validate via Spearman/Kendall rank correlation and per-level MAE \cite{polo2024tinybenchmarks,bean2025scales}}
+
 \subsection{Pipeline overview}
 
 \todo[inline]{Some practical questions: How can people employ the benchmark? Where can it be found. Will it be maintained and expanded? Will incorrect labels be corrected? Is there a private dataset too? Are parts of the dataset designated for training and parts for testing?}
 
-\paragraph{Access and maintenance.} FactoryBench and FactoryWave are released under a \todo{check license} license and distributed via a public Hugging Face repository. The release includes the episode data, the generator source code, the full set of 80 question templates with their paraphrase banks, and all LLM-as-judge prompts. We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file.
+\paragraph{Access and maintenance.} FactoryBench and FactoryWave are released under a \todo{check license} license and distributed via a public Hugging Face repository. The release includes the episode data, the generator source code, the full set of 80 question templates \todo{Check the number of question templates when level 4 finished}
+with their paraphrase banks, all LLM-as-judge prompts, and both the full benchmark and the FactoryBench-Lite subset (Section~\ref{sec:lite}). We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file.
+
 
 \section{Experiments}
 
@@ -775,5 +787,18 @@ These estimates show that a full benchmark run of 200k questions on a frontier m
 \end{itemize}
 
 \paragraph{Scope of time-series foundation models.} Task-specialized time-series foundation models (Chronos-2 \cite{ansari2024chronos}, Moirai \cite{woo2024unified}) are not part of the frontier-LLM panel. They are evaluated separately under ``Specialized Methods'' and only on the forecasting-style subset of FactoryBench --- i.e., questions that admit a numerical future-value ground truth (Tensor-type and other prediction questions). These models do not accept natural-language prompts and are not applicable to the multiple-choice, ranking, or free-form subsets, so reporting them on those subsets would be ill-defined rather than merely unfavorable. This preserves a clean separation between language-reasoning capability (measured on the full benchmark) and numerical forecasting capability (measured on the prediction subset).
+
+\section{FactoryBench-Lite: distillation methodology and validation}
+\label{app:lite}
+
+\todo[inline]{FactoryBench-Lite appendix: not yet implemented. Add details like:}
+\begin{itemize}
+  \item \textbf{Motivation and prior art:} anchor on miniGHOSTS \cite{frieder2023ghosts} (stratified selection preserving per-file mean/std); contrast with rank-preservation \cite{polo2024tinybenchmarks} and cognitive-scales \cite{bean2025scales}.
+  \item \textbf{Selection procedure:} stratify by $(\ell, f, d, \delta)$ = level $\times$ format $\times$ source $\times$ difficulty; within each stratum select $\lceil 0.1\,|\mathcal{Q}_{\ell,f,d,\delta}|\rceil$ items minimising $\sum_{m \in \mathcal{M}_{\text{ref}}} (|\mu_m(\mathcal{S})-\mu_m(\mathcal{Q})| + |\sigma_m(\mathcal{S})-\sigma_m(\mathcal{Q})|)$; greedy swap from stratified uniform init.
+  \item \textbf{Up-front cost:} $|\mathcal{M}_{\text{ref}}| \times C_{\text{full}}$, paid once.
+  \item \textbf{Validation:} Spearman $\rho$ / Kendall $\tau$ between per-model aggregates on $\mathcal{S}$ vs.\ $\mathcal{Q}$, plus per-level MAE; acceptance $\rho \geq 0.9$ and MAE $\leq 3$ pp.
+  \item \textbf{Scope:} extrapolation caveat \cite{zhang2025benchmark_prediction}; Lite for development/ablations/budget-constrained runs, full benchmark remains authoritative for leaderboard claims.
+  \item \textbf{Cost table on Lite:} re-apply Appendix~\ref{app:cost} cost model with $Q = 20{,}000$ once Lite size is fixed.
+\end{itemize}
 
 \end{document}
