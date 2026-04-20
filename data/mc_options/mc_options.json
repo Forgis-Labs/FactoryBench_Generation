@@ -1,19 +1,5 @@
 [
   {
-    "id": "mc_001",
-    "statement": "Following the event, the system escalates to a non-normal safety state.",
-    "usable_levels": [2, 3],
-    "required_features": ["safety_mode"],
-    "verifiable_rule": "exists timestep in post_event_window where safety_mode != 1"
-  },
-  {
-    "id": "mc_002",
-    "statement": "Following the event, the system remains in normal safety mode throughout the horizon.",
-    "usable_levels": [2, 3],
-    "required_features": ["safety_mode"],
-    "verifiable_rule": "for all timesteps in post_event_window: safety_mode == 1"
-  },
-  {
     "id": "mc_003",
     "statement": "Following the event, at least one joint speed drops sharply (>=30% below pre-event baseline).",
     "usable_levels": [2, 3],
@@ -60,14 +46,6 @@
     ],
     "verifiable_rule": "mean(post_event_tracking_error) >= 1.25 * mean(pre_event_tracking_error)"
   },
-
-  {
-    "id": "mc_010",
-    "statement": "Following the event, vibration exhibits a transient burst (>=50% above pre-event baseline on at least one vibration axis).",
-    "usable_levels": [2, 3],
-    "required_features": ["vibration_0", "vibration_1", "vibration_2"],
-    "verifiable_rule": "exists timestep and axis k: abs(post_event_vibration_k) >= 1.50 * max(eps, abs(pre_event_vibration_k))"
-  },
   {
     "id": "mc_013",
     "statement": "Following the event, robot current remains approximately constant (peak-to-peak range <=10% of pre-event baseline).",
@@ -113,7 +91,6 @@
     "required_features": ["joint_temp_{axis}"],
     "verifiable_rule": "count_axes i where slope(post_event_joint_temp_i) > 0.005 * max(eps, pre_event_joint_temp_i) >= 2"
   },
-
   {
     "id": "mc_019",
     "statement": "No significant effect: safety stays normal and aggregate error (mean of tracking, TCP-tracking, force, and robot-current deviation terms) increases by <=10%.",
@@ -125,17 +102,16 @@
     ],
     "verifiable_rule": "for all post_event timesteps: safety_mode == 1 and aggregate_error(post_event) <= 1.10 * aggregate_error(pre_event)"
   },
-
+  {
+    "id": "mc_020",
+    "statement": "The task is completed successfully.",
+    "usable_levels": [2, 3],
+    "required_features": [],
+    "verifiable_rule": "check task_success field in episode metadata (baseline or counterfactual section)"
+  },
   {
     "id": "mc_020",
     "statement": "Those come from different robots.",
-    "usable_levels": [1],
-    "template_id": 3,
-    "verifiable_rule": "Trivial from metadata."
-  },
-  {
-    "id": "mc_021",
-    "statement": "One of the robots is mounted on the ground, the other is mounted upside down.",
     "usable_levels": [1],
     "template_id": 3,
     "verifiable_rule": "Trivial from metadata."
@@ -155,24 +131,17 @@
     "verifiable_rule": "Trivial from metadata."
   },
   {
-    "id": "mc_024",
-    "statement": "Robot A is mounted on the ground.",
+    "id": "mc_026",
+    "statement": "The two robots are performing the same task, but at different phases.",
     "usable_levels": [1],
     "template_id": 3,
-    "verifiable_rule": "Trivial from metadata."
+    "verifiable_rule": "Same task_id in metadata but different task_phase at the sampled window."
   },
   {
-    "id": "mc_025",
-    "statement": "Robot B is mounted on the ground.",
+    "id": "mc_027",
+    "statement": "Both robots are performing pick-and-place, but with different payload weights.",
     "usable_levels": [1],
     "template_id": 3,
-    "verifiable_rule": "Trivial from metadata."
-  },
-  {
-    "id": "mc_020",
-    "statement": "The task is completed successfully.",
-    "usable_levels": [2, 3],
-    "required_features": [],
-    "verifiable_rule": "check task_success field in episode metadata (baseline or counterfactual section)"
+    "verifiable_rule": "Both episodes have task == pick_and_place and different payload_kg in metadata."
   }
 ]
