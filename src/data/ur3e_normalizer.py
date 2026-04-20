@@ -22,6 +22,8 @@ try:
 except ImportError:
     raise ImportError("pandas is required. Install with: pip install pandas")
 
+from src.data._decimation import decimate_dataframe
+
 
 logger = logging.getLogger(__name__)
 
@@ -221,8 +223,13 @@ def normalize_dataset(
     logger.info(f"Loading dataset from {input_file.name}...")
     df = pd.read_excel(input_file)
     
-    # Halve the sampling frequency by keeping every 2nd row
-    df = df.iloc[::2].reset_index(drop=True)
+    # Anti-aliased downsampling (default: halve the sampling frequency)
+    _CONTINUOUS_EXCEL_COLS = {
+        "Speed_J0", "Speed_J1", "Speed_J2", "Speed_J3", "Speed_J4", "Speed_J5",
+        "Current_J0", "Current_J1", "Current_J2", "Current_J3", "Current_J4", "Current_J5",
+        "Temperature_T0", "Temperature_J1", "Temperature_J2", "Temperature_J3", "Temperature_J4", "Temperature_J5",
+    }
+    df = decimate_dataframe(df, q=2, continuous_cols=_CONTINUOUS_EXCEL_COLS)
 
     logger.info(f"Normalizing {len(df)} rows...")
 

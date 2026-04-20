@@ -39,6 +39,8 @@ try:
 except ImportError:
     raise ImportError("pandas is required. Install with: pip install pandas")
 
+from src.data._decimation import decimate_dataframe
+
 logger = logging.getLogger(__name__)
 
 
@@ -204,9 +206,11 @@ def normalize_csv(csv_path: Path, src_hz: int = 60, target_hz: int = 5) -> List[
     if df.empty:
         return []
 
-    # Downsample from src_hz to target_hz by keeping every nth row
+    # Anti-aliased downsample from src_hz to target_hz
     step = src_hz // target_hz
-    df = df.iloc[::step].reset_index(drop=True)
+    _NON_CONTINUOUS = {"event_id", "event_params", "task_phase", "gripper_attached"}
+    _continuous = set(df.columns) - _NON_CONTINUOUS
+    df = decimate_dataframe(df, q=step, continuous_cols=_continuous)
 
     first_timestamp_ms = float(df.iloc[0]["sim_time_s"]) * 1000
 
