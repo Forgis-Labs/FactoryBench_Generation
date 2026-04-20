@@ -25,7 +25,20 @@ def main():
     print("1. Downloading Knowledge Graph from Hugging Face...")
     print("="*60)
     kg_path = hf_hub_download(repo_id=args.kg_repo, repo_type="dataset", filename="machines.json")
-    print(f"Knowledge Graph downloaded to: {kg_path}\n")
+    print(f"Knowledge Graph downloaded to: {kg_path}")
+    try:
+        grippers_path = hf_hub_download(repo_id=args.kg_repo, repo_type="dataset", filename="grippers.json")
+        print(f"Grippers downloaded to: {grippers_path}")
+    except Exception as exc:
+        grippers_path = None
+        print(f"Grippers file not available on HF ({exc}); skipping gripper info in prompts.")
+    try:
+        dataset_index_path = hf_hub_download(repo_id=args.kg_repo, repo_type="dataset", filename="dataset.json")
+        print(f"Dataset index downloaded to: {dataset_index_path}")
+    except Exception as exc:
+        dataset_index_path = None
+        print(f"Dataset index not available on HF ({exc}); skipping dataset->gripper mapping.")
+    print("")
     
     print("="*60)
     print("2. Generating Questions...")
@@ -48,8 +61,12 @@ def main():
         sys.executable, "-m", "src.question_generation.build_prompts_from_questions",
         "--input", str(q_dir),
         "--output", str(p_dir),
-        "--machines", kg_path
+        "--machines", kg_path,
     ]
+    if grippers_path:
+        cmd2.extend(["--grippers", grippers_path])
+    if dataset_index_path:
+        cmd2.extend(["--dataset-index", dataset_index_path])
     subprocess.run(cmd2, check=True)
     print("\n")
     
