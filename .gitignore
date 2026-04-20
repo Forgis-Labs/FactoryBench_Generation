@@ -64,6 +64,8 @@ yarn-error.log*
 datasets/open_datasets/*
 data/open_datasets/*
 data/normalized_episodes/*
+data/simulations/*
+data/factorywave/*
 
 #output
 output/*
