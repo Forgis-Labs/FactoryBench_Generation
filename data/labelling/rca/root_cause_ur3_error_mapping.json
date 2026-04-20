@@ -1,0 +1,282 @@
+[
+  {
+    "fault_id": 1,
+    "root_cause": "damaged_screw_thread",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The screw thread is physically damaged, preventing proper engagement during tightening and producing an abnormal torque signature.",
+    "ur3_protocol": "Retract the screwdriver immediately to avoid cross-threading the plate hole. Discard the damaged screw and replace it with a new one from the feeder. Inspect the plate hole for any thread damage caused by the failed engagement attempt. Verify the torque signature returns to nominal on a slow test cycle before resuming production."
+  },
+  {
+    "fault_id": 2,
+    "root_cause": "extra_assembly_component",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "An unexpected object such as a washer is present in the assembly location, altering contact geometry and tightening dynamics.",
+    "ur3_protocol": "Retract before applying further tightening force. Remove the unexpected component from the assembly location and verify the mating surface is clean and unobstructed. Check upstream assembly steps to identify how the extra component was introduced. Resume the tightening cycle and confirm the torque profile matches nominal."
+  },
+  {
+    "fault_id": 3,
+    "root_cause": "missing_screw",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The robot attempts tightening but no screw is present, typically due to a pick failure or skipped step in the sequence.",
+    "ur3_protocol": "Halt the tightening motion and return to the pick position. Inspect the feeder to confirm screw availability and that the pick was successful before the next attempt. Check the gripper activation log to determine whether the pick step was skipped or failed silently. Retry the full pick-and-tighten sequence from the start."
+  },
+  {
+    "fault_id": 4,
+    "root_cause": "damaged_plate_thread",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The threaded hole in the plate is damaged, preventing proper screw engagement and risking cross-threading or stripping.",
+    "ur3_protocol": "Retract the screw immediately without applying further torque. Inspect the plate hole visually and with a thread gauge to assess the extent of damage. If the thread is salvageable, re-tap the hole with the correct tap size before retrying. If the damage is beyond repair, replace the plate. Do not attempt re-insertion until the hole thread is confirmed good."
+  },
+  {
+    "fault_id": 5,
+    "root_cause": "loosening_phase",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The robot is performing a screw-loosening operation rather than tightening, producing a distinct counterclockwise torque signature that may appear anomalous if only tightening is expected.",
+    "ur3_protocol": "Verify the current task phase in the program and confirm whether a loosening step is expected at this point in the sequence. If the loosening is unintended, halt the cycle, check the program logic for incorrect phase ordering, and restart from the correct step. If loosening is expected, no corrective action is required beyond confirming the screw disengages cleanly."
+  },
+  {
+    "fault_id": 7,
+    "root_cause": "motor_miscommutation",
+    "ur3_error_code": "C 39 A 1",
+    "ur3_error_name": "Max current deviation failure",
+    "ur3_description": null,
+    "ur3_protocol": "a) Stop the robot program and power-cycle the controller to reset the motor commutation state. b) Re-run a slow-speed diagnostic cycle on the affected joint to verify correct torque-forming efficiency. c) If the fault recurs after power-cycling, inspect the motor winding connections and commutation configuration in the servo drive. d) If the fault persists across multiple power cycles, replace the affected joint."
+  },
+  {
+    "fault_id": 8,
+    "root_cause": "gripper_activation_failure",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The vacuum gripper failed to activate at the pick phase, leaving the robot carrying no payload through the full transport trajectory.",
+    "ur3_protocol": "a) Check vacuum supply pressure at the source and verify the solenoid valve receives its activation signal via the I/O monitor. b) Inspect the vacuum line and fittings for leaks, kinks, or disconnections. c) Test the solenoid valve in isolation (manual I/O trigger) to confirm it opens and closes correctly. d) If the valve is functional, inspect the gripper cup for cracks or deformation that prevent suction from forming. e) Clear the fault, re-home the robot, and verify gripper activation on a slow test pick before resuming normal cycles."
+  },
+  {
+    "fault_id": 9,
+    "root_cause": "gripper_release_during_motion",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The vacuum gripper released the object mid-trajectory, causing an abrupt loss of payload and leaving the dropped object in an unknown location within the workspace.",
+    "ur3_protocol": "a) Stop the robot and locate the dropped object before resuming: it may have landed in the trajectory of the return motion. b) Check the I/O log to determine whether the solenoid OFF signal was commanded or spurious. c) Inspect the vacuum line for intermittent connections or pressure drops under dynamic loading. d) If the release was spurious, check for electrical noise on the gripper control line and verify connector seating. e) If not, check policy used. d) Re-home the robot, confirm gripper hold force on a static test before resuming transport cycles."
+  },
+  {
+    "fault_id": 10,
+    "root_cause": "additional_axis_payload",
+    "ur3_error_code": "C 153 A 0",
+    "ur3_error_name": "Protective Stop: Too high dynamics",
+    "ur3_description": "Check payload, center of gravity and acceleration settings. Log screen may contain additional information.",
+    "ur3_protocol": "a) Stop the robot and update the payload configuration to include the additional axis weight. b) Set the correct center of gravity offset for the modified arm configuration in the installation settings. c) Review and reduce motion accelerations and speeds to account for the increased effective inertia. d) Run a slow-speed test cycle to verify the dynamic loads stay within the robot's rated limits before resuming normal operation."
+  },
+  {
+    "fault_id": 11,
+    "root_cause": "collision_foam_object",
+    "ur3_error_code": "C 157 A",
+    "ur3_error_name": "Protective Stop: Collision detected by joint",
+    "ur3_description": "A soft object in the trajectory produced a transient TCP force spike. Foam typically does not trigger a protective stop but may at higher speeds or densities.",
+    "ur3_protocol": "a) Inspect the workspace and remove any soft obstructions from the programmed trajectory. b) If a protective stop occurred, acknowledge it in the robot controller interface and verify the arm posture is nominal before resuming. c) Reduce speed if repeated false-positive collision detections occur."
+  },
+  {
+    "fault_id": 12,
+    "root_cause": "unexpected_payload_weight",
+    "ur3_error_code": "C 283 A 26",
+    "ur3_error_name": "Force limitation: exceeded torque window",
+    "ur3_description": null,
+    "ur3_protocol": "a) Verify the mounted payload mass and CoG configuration match the actual object being transported. b) Update the payload configuration if the weight differs from the configured value. c) Reduce motion speeds and accelerations until the payload configuration is corrected. d) If force limit violations persist with a correct payload configuration, contact the robot manufacturer's support."
+  },
+  {
+    "fault_id": 13,
+    "root_cause": "cable_routed_on_robot",
+    "ur3_error_code": "C 173 A 1",
+    "ur3_error_name": "Robot motion causes too high joint torques on Shoulder",
+    "ur3_description": null,
+    "ur3_protocol": "a) Stop the robot and inspect all cable routing along the arm links. b) Re-route the cable to eliminate pose-dependent friction and excess loading on the affected joints, ensuring sufficient slack at all extreme configurations. c) Secure the cable with appropriate management clips so it does not drag or tension during motion. d) Reduce motion accelerations if re-routing is not immediately possible. e) Run a slow-speed test cycle monitoring joint torques to confirm loading returns to nominal before resuming normal operation."
+  },
+  {
+    "fault_id": 14,
+    "root_cause": "invalid_gripping_position",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The gripper closed at an off-center or tilted position due to a timing error in the pick sequence, resulting in asymmetric payload distribution throughout the transport phase.",
+    "ur3_protocol": "a) If the object is visibly misaligned or at risk of dropping, stop the robot and re-place the object at the nominal pick position before continuing. b) Review the pick sequence timing: identify and correct any sleep() delays or I/O latency that caused the gripper to close late. c) Verify gripper activation is synchronised with the arm being fully settled at the pick waypoint (zero velocity). d) Perform a slow-speed test pick and visually confirm symmetric grip before resuming normal cycles."
+  },
+  {
+    "fault_id": 15,
+    "root_cause": "unstable_mounting_platform",
+    "ur3_error_code": "C 173 A 0",
+    "ur3_error_name": "Robot motion causes too high joint torques on Base",
+    "ur3_description": null,
+    "ur3_protocol": "a) Stop the robot immediately and stabilise the mounting platform by locking all wheel brakes or re-securing the base fixture. b) Verify base rigidity across all planned robot configurations before resuming. c) Reduce motion speeds and accelerations until the mounting is confirmed stable. d) Inspect the robot base and mounting interface for mechanical damage caused by the vibration. e) Run a slow-speed test cycle to confirm joint torques return to nominal values."
+  },
+  {
+    "fault_id": 16,
+    "root_cause": "gearbox_overload",
+    "ur3_error_code": "C 70 A",
+    "ur3_error_name": "Close to gearbox shear limit",
+    "ur3_description": "Acceleration/deceleration too high. Mechanical problem in gear related to encoder mounting.",
+    "ur3_protocol": "a) Reduce acceleration and deceleration values in the motion program to lower peak gearbox loads. b) Power-cycle the controller to clear the fault state. c) Run a slow-speed test cycle to verify the joint operates without torque overload. d) If the fault recurs across multiple cycles, inspect the gearbox for mechanical damage and replace the joint if necessary."
+  },
+  {
+    "fault_id": 17,
+    "root_cause": "motor_encoder_stall",
+    "ur3_error_code": "C 85 A",
+    "ur3_error_name": "Motor encoder error",
+    "ur3_description": "The motor is receiving current commands but the encoder reports no position change, indicating the joint shaft is mechanically stalled or seized.",
+    "ur3_protocol": "a) Do NOT attempt to power through the stall: cut motor current immediately to avoid gearbox or winding damage. b) Identify and remove any mechanical obstruction before re-energising the joint. c) Power down and manually check the affected joint for free rotation across its full range. d) Inspect the encoder connector and cable for damage or loose seating that may have caused a false stall reading. e) Power-cycle the controller to clear the fault state. f) If the stall recurs with no external obstruction, the joint motor or gearbox is likely damaged: replace the joint."
+  },
+  {
+    "fault_id": 19,
+    "root_cause": "joint_position_limit_violation",
+    "ur3_error_code": "C 39 A 3",
+    "ur3_error_name": "Max motor-encoder speed exceeded",
+    "ur3_description": null,
+    "ur3_protocol": "a) Power-cycle the controller to clear the fault state. b) Review the motion program and verify all waypoints and blends stay within the configured joint position and speed limits. c) Reduce trajectory speeds or adjust the problematic waypoint. d) Run a slow-speed test cycle to confirm the joint operates within limits. e) If the violation recurs after program correction, inspect the joint encoder and replace the joint if necessary."
+  },
+  {
+    "fault_id": 20,
+    "root_cause": "idle_power_overconsumption",
+    "ur3_error_code": "C 61 A",
+    "ur3_error_name": "Idle power consumption too high",
+    "ur3_description": "The system is drawing more power than expected while idle.",
+    "ur3_protocol": "a) Check the braking resistor / energy dissipation unit cables and connections for loose or damaged contacts. b) Inspect the braking resistor for signs of overheating or physical damage. c) Check whether joint brakes are engaging correctly and not dragging while the robot is idle. d) Replace the braking resistor if damage is confirmed."
+  },
+  {
+    "fault_id": 21,
+    "root_cause": "singularity_passage",
+    "ur3_error_code": "C 154 A",
+    "ur3_error_name": "Protective Stop: Position in singularity",
+    "ur3_description": "Robot cannot move linear near a singularity.",
+    "ur3_protocol": "a) Avoid commanding linear (Cartesian) motion through or near the singularity configuration. b) Replace the problematic linear move with a joint-space motion command to bypass the singularity. c) Alternatively, re-plan the approach and departure waypoints so the straight-line path does not pass near the singularity."
+  },
+  {
+    "fault_id": 22,
+    "root_cause": "tcp_frame_misconfiguration",
+    "ur3_error_code": "C 156 A",
+    "ur3_error_name": "Protective Stop: Wrong payload or mounting detected, or something is pushing the robot when entering Free drive mode",
+    "ur3_description": "The robot may move unexpectedly due to wrong settings.",
+    "ur3_protocol": "Verify that the TCP configuration and mounting in the used installation is correct."
+  },
+  {
+    "fault_id": 23,
+    "root_cause": "zero_payload_misconfiguration",
+    "ur3_error_code": "C 158 A",
+    "ur3_error_name": "Protective Stop: Collision detected by joint",
+    "ur3_description": "The joint torque model detected an unexpected resistive force consistent with a physical collision while the payload is specified as 0 kg, making the collision threshold very sensitive.",
+    "ur3_protocol": "a) Set the correct payload mass and center of gravity in the installation settings. b) Clear any obstruction from the workspace. c) Verify acceleration and speed settings are appropriate for the mounted tool."
+  },
+  {
+    "fault_id": 24,
+    "root_cause": "safety_plane_violation",
+    "ur3_error_code": "C 152 A",
+    "ur3_error_name": "Protective Stop: Position close to safety plane limits",
+    "ur3_description": "The robot TCP or a body link has approached or crossed a configured safety plane boundary defined in the safety configuration.",
+    "ur3_protocol": "a) Review safety plane positions in the safety configuration. b) Modify the robot program to keep all motion within the defined safety zones. c) Check that the correct safety configuration is active."
+  },
+  {
+    "fault_id": 25,
+    "root_cause": "external_arm_disturbance",
+    "ur3_error_code": "C 111 A",
+    "ur3_error_name": "Something is pulling the robot",
+    "ur3_description": null,
+    "ur3_protocol": "Check TCP configuration, payload and mounting settings."
+  },
+  {
+    "fault_id": 26,
+    "root_cause": "magnetic_encoder_misalignment",
+    "ur3_error_code": "C 74 A 1",
+    "ur3_error_name": "Invalid decode: Read head misalignment, ring damaged or external magnetic field present",
+    "ur3_description": "Magnetic encoder error (absolute encoder). Argument = sum of C 74 errors.",
+    "ur3_protocol": "Check grounding and shielding for EMC problems."
+  },
+  {
+    "fault_id": 27,
+    "root_cause": "motor_phase_fault",
+    "ur3_error_code": "C 71 A 12",
+    "ur3_error_name": "Phase 3 or multiple phases is unconnected or not working",
+    "ur3_description": "The wire is (1) damaged, (2) has been disconnected from the PCB, or (3) defect PCB.",
+    "ur3_protocol": "a) Check joint for damaged or loose connections. b) Replace the joint."
+  },
+  {
+    "fault_id": 28,
+    "root_cause": "payload_cog_misconfiguration",
+    "ur3_error_code": "C 162 A",
+    "ur3_error_name": "Protective stop likely caused by incorrectly specified payload mass and/or center of gravity",
+    "ur3_description": "Specifying an incorrect payload mass and/or center of gravity may cause poor robot performance and/or protective stops.",
+    "ur3_protocol": "Make sure the specified payload mass and center of gravity are correct."
+  },
+  {
+    "fault_id": 29,
+    "root_cause": "collision_hanging_cable",
+    "ur3_error_code": "C 157 A",
+    "ur3_error_name": "Protective Stop: Collision detected by joint",
+    "ur3_description": "A cable or wire dragging along the arm during motion produced a sustained asymmetric force on the joints, triggering the collision detection model.",
+    "ur3_protocol": "a) Power down and inspect the arm and tool flange for entangled cables or wires before resuming. b) Clear the workspace above and around the robot trajectory of any hanging cables. c) If a protective stop occurred, acknowledge it in the robot controller interface and perform a slow-speed test run to confirm the obstruction is fully removed."
+  },
+  {
+    "fault_id": 30,
+    "root_cause": "collision_cardboard_object",
+    "ur3_error_code": "C 157 A",
+    "ur3_error_name": "Protective Stop: Collision detected by joint",
+    "ur3_description": "The robot struck a cardboard object in its path. A free-standing box may be displaced without triggering a stop; a braced box generates enough resistive torque to trigger a protective stop.",
+    "ur3_protocol": "a) Remove the cardboard obstruction from the trajectory. b) Inspect the TCP and wrist links for any displacement or damage from the impact. c) If a protective stop occurred, acknowledge it in the robot controller interface, verify the arm posture, and perform a slow-speed test run before resuming normal operation."
+  },
+  {
+    "fault_id": 31,
+    "root_cause": "collision_rigid_object",
+    "ur3_error_code": "C 157 A",
+    "ur3_error_name": "Protective Stop: Collision detected by joint",
+    "ur3_description": "The robot collided with a hard, immovable object. The high contact stiffness produces an immediate large torque deviation that invariably triggers a protective stop.",
+    "ur3_protocol": "a) Do NOT resume motion before removing the rigid obstacle from the workspace. b) Physically inspect the TCP, tool flange, and all arm links for structural damage or loose fasteners. c) If no damage is found, acknowledge the protective stop, perform a slow-speed dry run across the full trajectory, and confirm clearance before restoring normal speed."
+  },
+  {
+    "fault_id": 32,
+    "root_cause": "peg_insertion_misalignment",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The peg approached the hole at an angular or lateral offset, causing the tip to jam against the hole rim rather than enter cleanly, producing elevated contact forces and position tracking errors.",
+    "ur3_protocol": "a) Retract the peg fully before attempting re-insertion. b) Inspect the peg tip for deformation from rim contact. c) Verify the approach waypoint alignment: correct any angular offset (target < 1°) and lateral offset (target < 1 mm) relative to the hole axis. d) Perform a slow-speed test insertion to confirm clean entry before restoring normal speed."
+  },
+  {
+    "fault_id": 33,
+    "root_cause": "hole_obstruction",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "A foreign object or debris lodged inside the insertion hole prevented full peg insertion, generating abnormal force buildup as the peg contacted the obstruction mid-stroke.",
+    "ur3_protocol": "a) Retract the peg immediately to avoid bending or overloading the wrist. b) Visually inspect the hole and remove any debris or foreign object with appropriate tooling (compressed air, tweezers). c) Verify the hole is fully clear before re-attempting insertion. d) If force anomalies persist after clearing, inspect the hole walls for damage caused by the obstructed insertion."
+  },
+  {
+    "fault_id": 34,
+    "root_cause": "incorrect_insertion_depth",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The insertion motion terminated at an incorrect Z depth due to a misconfigured endpoint, leaving the peg partially inserted (too shallow) or over-pushing against the hole bottom (too deep).",
+    "ur3_protocol": "a) If over-insertion occurred, retract carefully to avoid bending the peg against the hole bottom. b) Verify the insertion endpoint Z value against the nominal depth specification and correct the offset. c) Check the peg and hole bottom for damage if over-push force was significant. d) Perform a slow-speed test insertion to confirm correct final depth before resuming normal operation."
+  },
+  {
+    "fault_id": 35,
+    "root_cause": "peg_surface_contamination",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "Contamination or increased surface roughness on the peg raised insertion friction, producing stick-slip force patterns and higher-than-nominal contact force throughout the insertion stroke.",
+    "ur3_protocol": "a) Retract the peg and clean the peg surface thoroughly (isopropyl alcohol or appropriate solvent depending on contaminant type). b) Inspect the hole interior for transferred contamination that could affect subsequent insertions. c) Verify insertion force returns to nominal on a slow-speed test run before resuming. d) Identify the contamination source and implement a prevention measure if recurrent."
+  },
+  {
+    "fault_id": 36,
+    "root_cause": "fixture_displacement",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The insertion fixture shifted laterally from its nominal position, creating a mismatch between the programmed approach and the actual hole location.",
+    "ur3_protocol": "a) Retract the peg before adjusting the fixture to avoid lateral forces on the wrist during repositioning. b) Re-align the fixture to its nominal position using reference marks or a calibration tool and re-clamp securely. c) If the fixture cannot be repositioned exactly, update the approach waypoint or path to match the new fixture position. d) Perform a slow-speed approach to verify alignment before resuming normal insertion cycles."
+  },
+  {
+    "fault_id": 37,
+    "root_cause": "self_collision_link_interference",
+    "ur3_error_code": "C 157 A",
+    "ur3_error_name": "Protective Stop: Collision detected by joint",
+    "ur3_description": "The programmed trajectory drove the arm into a self-colliding configuration where a link contacted the robot's own body or mounting fixture, triggering an immediate protective stop.",
+    "ur3_protocol": "a) Do NOT jog the robot blindly: identify the self-colliding configuration from the joint state at stop time before moving any joint. b) Manually back out the arm to a safe posture using reduced-speed gravity-compensation (backdrive) mode or slow jog. c) Inspect all links and the mounting fixture for damage. d) Review and correct the motion that caused the self-colliding configuration (whether by adjusting waypoints, modifying trajectory generator parameters, or replanning the path) to ensure the arm stays clear of itself and the mounting fixture across the full motion range."
+  }
+]

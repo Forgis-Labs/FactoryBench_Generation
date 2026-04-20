@@ -107,67 +107,6 @@
     "simulation_procedure": "Program the robot to execute a loosening (counterclockwise) rotation instead of tightening. No hardware modification required."
   },
   {
-    "fault_id": 6,
-    "task": [
-      "pick_and_place"
-    ],
-    "root_cause": "additional_axis_friction",
-    "description": "Increased mechanical friction at one robot axis joint or gearbox, requiring higher motor torque to maintain the commanded trajectory. Simulates dirt or age-related gear wear.",
-    "severity_levels": [
-      "low",
-      "high"
-    ],
-    "injectable": true,
-    "event_id": 11,
-    "possible_anomalies": [
-      "torque_sensor_elevation",
-      "motor_iq_elevation",
-      "persistent_tracking_error",
-      "motor_electrical_power_elevation",
-      "torque_deviation_from_nominal"
-    ],
-    "related_error_codes": [
-      "C331A",
-      "C70A",
-      "C71A",
-      "C173A0",
-      "C173A1",
-      "C173A2",
-      "C173A3",
-      "C173A4",
-      "C173A5"
-    ],
-    "primary_error_code": "C331A",
-    "simulation_procedure": "Apply a controlled amount of grease-resistant friction compound (e.g. dry chalk or fine abrasive paste) inside a target joint housing, or mechanically restrict the joint with a calibrated friction brake fixture."
-  },
-  {
-    "fault_id": 7,
-    "task": [
-      "pick_and_place"
-    ],
-    "root_cause": "motor_miscommutation",
-    "description": "The motor commutation phase is deliberately offset in firmware, reducing torque-forming efficiency without affecting the commanded path or velocity. Simulates electrical or magnetic component wear.",
-    "severity_levels": [
-      "medium"
-    ],
-    "injectable": true,
-    "event_id": 12,
-    "possible_anomalies": [
-      "motor_id_elevation",
-      "iq_id_ratio_anomaly",
-      "motor_electrical_power_elevation",
-      "joint_current_imbalance"
-    ],
-    "related_error_codes": [
-      "C39A1",
-      "C39A2",
-      "C25A",
-      "C26A"
-    ],
-    "primary_error_code": "C39A1",
-    "simulation_procedure": "Use the robot's service interface or a custom firmware patch to introduce a fixed phase offset (e.g. 10-30 degrees) in the motor commutation table of one joint."
-  },
-  {
     "fault_id": 8,
     "task": [
       "pick_and_place"
@@ -297,37 +236,6 @@
     "simulation_procedure": "Replace the nominal payload with cans of known different weights (e.g. empty or filled) without updating the payload configuration."
   },
   {
-    "fault_id": 13,
-    "task": [
-      "pick_and_place"
-    ],
-    "root_cause": "cable_routed_on_robot",
-    "description": "A cable is attached along the robot arm with cable ties, introducing pose-dependent friction and gravity loading on affected axes as the cable bends and twists during motion.",
-    "severity_levels": [
-      "medium"
-    ],
-    "injectable": false,
-    "possible_anomalies": [
-      "pose_dependent_torque_anomaly",
-      "joint_current_imbalance",
-      "persistent_tracking_error",
-      "torque_sensor_elevation"
-    ],
-    "related_error_codes": [
-      "C331A",
-      "C70A",
-      "C71A",
-      "C173A0",
-      "C173A1",
-      "C173A2",
-      "C173A3",
-      "C173A4",
-      "C173A5"
-    ],
-    "primary_error_code": "C173A1",
-    "simulation_procedure": "Route a cable along the robot arm using cable ties at multiple link points, then run the full motion program across varying poses."
-  },
-  {
     "fault_id": 14,
     "root_cause": "invalid_gripping_position",
     "description": "The can is gripped at an unusual or offset position due to a timing error in the pick sequence, causing an asymmetric payload distribution and altered gripper-to-can contact geometry.",
@@ -375,50 +283,6 @@
     "simulation_procedure": "Release the wheel brakes of the robot trolley, or place calibrated foam pads of varying thickness under the base mounting plate."
   },
   {
-    "fault_id": 16,
-    "root_cause": "gearbox_overload",
-    "description": "Joint gearbox is operating close to its shear torque limit due to excessive acceleration, deceleration, or mechanical obstruction.",
-    "severity_levels": [
-      "medium",
-      "high"
-    ],
-    "injectable": false,
-    "possible_anomalies": [
-      "high_current_low_motion",
-      "persistent_tracking_error",
-      "protective_stop_event"
-    ],
-    "related_error_codes": [
-      "C70A",
-      "C71A",
-      "C72A",
-      "C73A",
-      "C74A",
-      "C75A"
-    ],
-    "primary_error_code": "C70A",
-    "simulation_procedure": "Set joint acceleration and deceleration parameters to the maximum allowed values while using a near-maximum payload, then run repeated cycles."
-  },
-  {
-    "fault_id": 17,
-    "root_cause": "motor_encoder_stall",
-    "description": "Motor is receiving current commands but the encoder reports no position change, indicating a stalled or seized motor shaft.",
-    "severity_levels": [
-      "high"
-    ],
-    "injectable": false,
-    "possible_anomalies": [
-      "high_current_low_motion",
-      "protective_stop_event"
-    ],
-    "related_error_codes": [
-      "C85A",
-      "C85A200"
-    ],
-    "primary_error_code": "C85A",
-    "simulation_procedure": "Mechanically obstruct a joint (e.g. place a wedge or clamp against a link) and command a motion through that joint while monitoring current and position."
-  },
-  {
     "fault_id": 19,
     "root_cause": "joint_position_limit_violation",
     "description": "Robot joint moved outside its configured soft or hard position limits, triggering a safety stop.",
@@ -436,43 +300,6 @@
     ],
     "primary_error_code": "C39A3",
     "simulation_procedure": "Program a waypoint slightly beyond the configured soft joint limit and execute the move, or manually shift a joint limit in the safety configuration to encroach on the normal trajectory."
-  },
-  {
-    "fault_id": 20,
-    "root_cause": "idle_power_overconsumption",
-    "description": "Robot is drawing significantly more power than expected during idle state, indicating an internal electrical fault, short circuit, or brake malfunction.",
-    "severity_levels": [
-      "low",
-      "medium"
-    ],
-    "injectable": false,
-    "possible_anomalies": [
-      "gradual_current_force_temperature_rise"
-    ],
-    "related_error_codes": [
-      "C61A",
-      "C62A"
-    ],
-    "primary_error_code": "C61A",
-    "simulation_procedure": "Apply a partial short circuit across a non-critical internal power rail via a calibrated load resistor, or deliberately engage joint brakes while the robot is powered but idle."
-  },
-  {
-    "fault_id": 21,
-    "root_cause": "singularity_passage",
-    "description": "The programmed trajectory passes through or very close to a kinematic singularity (wrist or shoulder), causing the controller to halt linear motion and issue a protective stop.",
-    "severity_levels": [
-      "medium"
-    ],
-    "injectable": true,
-    "possible_anomalies": [
-      "protective_stop_event",
-      "persistent_tracking_error"
-    ],
-    "related_error_codes": [
-      "C154A"
-    ],
-    "primary_error_code": "C154A",
-    "simulation_procedure": "Program a MoveL (linear) move whose straight-line path passes through the wrist singularity (wrist joints aligned) or shoulder singularity, then execute at moderate speed."
   },
   {
     "fault_id": 22,
@@ -515,24 +342,6 @@
     "simulation_procedure": "Ensure the installation payload is set to 0 kg while a tool (e.g. gripper, 300 g) is physically mounted, then run a standard pick-and-place cycle."
   },
   {
-    "fault_id": 24,
-    "root_cause": "safety_plane_violation",
-    "description": "The robot trajectory crosses a configured safety plane or zone boundary, triggering an immediate protective stop from the safety system.",
-    "severity_levels": [
-      "medium",
-      "high"
-    ],
-    "injectable": true,
-    "possible_anomalies": [
-      "protective_stop_event"
-    ],
-    "related_error_codes": [
-      "C152A"
-    ],
-    "primary_error_code": "C152A",
-    "simulation_procedure": "Configure a safety plane in PolyScope that bisects the normal robot workspace, then run the existing program without modifying its waypoints."
-  },
-  {
     "fault_id": 25,
     "root_cause": "external_arm_disturbance",
     "description": "An external force continuously pulls or pushes the robot arm during motion, such as a tethered cable, hanging weight, or operator interference, causing persistent torque anomalies.",
@@ -552,48 +361,6 @@
     ],
     "primary_error_code": "C111A",
     "simulation_procedure": "Anchor a spring or elastic band between a fixed point in the workspace (e.g. the bench frame) and the robot tool flange, with no contact along the arm links. Run the standard trajectory so the arm experiences a continuously varying external pull force at the TCP only. Alternatively, have an operator apply a steady manual push/pull force on the tool flange during motion."
-  },
-  {
-    "fault_id": 26,
-    "root_cause": "magnetic_encoder_misalignment",
-    "description": "The absolute magnetic encoder read head is physically displaced relative to the magnetic ring \u2014 due to mechanical shock, loose mounting, or external magnetic interference \u2014 causing invalid position decoding.",
-    "severity_levels": [
-      "medium",
-      "high"
-    ],
-    "injectable": true,
-    "possible_anomalies": [
-      "persistent_tracking_error",
-      "protective_stop_event"
-    ],
-    "related_error_codes": [
-      "C74A1",
-      "C74A32",
-      "C75A1"
-    ],
-    "primary_error_code": "C74A1",
-    "simulation_procedure": "Loosen the encoder read head mounting screws on a target joint by a controlled amount (0.5-1 mm gap increase) using feeler gauges, then power on and run."
-  },
-  {
-    "fault_id": 27,
-    "root_cause": "motor_phase_fault",
-    "description": "One or more motor phase wires are partially or fully disconnected at the joint connector, reducing available torque and causing asymmetric current draw across phases.",
-    "severity_levels": [
-      "high"
-    ],
-    "injectable": true,
-    "possible_anomalies": [
-      "high_current_low_motion",
-      "persistent_tracking_error",
-      "protective_stop_event"
-    ],
-    "related_error_codes": [
-      "C71A10",
-      "C71A11",
-      "C71A12"
-    ],
-    "primary_error_code": "C71A12",
-    "simulation_procedure": "Partially unplug one motor phase connector at a target joint (leave it seated but not latched) to introduce intermittent phase contact, then run the program."
   },
   {
     "fault_id": 28,
@@ -779,5 +546,66 @@
       "protective_stop_event"
     ],
     "simulation_procedure": "Deliberately shift the hole fixture by a controlled lateral offset (e.g. 5-15 mm) from its nominal position without updating the robot program waypoints."
+  },
+  {
+    "fault_id": 37,
+    "root_cause": "self_collision_link_interference",
+    "description": "The robot trajectory passes through a configuration where an arm link collides with the robot's own body or mounting fixture, triggering an immediate protective stop.",
+    "severity_levels": [
+      "medium",
+      "high"
+    ],
+    "injectable": true,
+    "possible_anomalies": [
+      "tcp_force_spike",
+      "protective_stop_event",
+      "persistent_tracking_error"
+    ],
+    "related_error_codes": [
+      "C157A",
+      "C158A"
+    ],
+    "primary_error_code": "C157A",
+    "simulation_procedure": "Program a waypoint that requires the arm to fold into a self-colliding configuration, or deliberately offset the mounting fixture so the standard trajectory causes a link to contact it."
+  },
+  {
+    "fault_id": 38,
+    "task": [
+      "pick_and_place"
+    ],
+    "root_cause": "missing_box",
+    "description": "The robot executes the full pick-and-place cycle but no box is present at the pick position. The gripper closes on empty air and the arm transports no payload, producing a torque and current profile consistent with an unloaded trajectory.",
+    "severity_levels": [
+      "low",
+      "medium"
+    ],
+    "injectable": true,
+    "possible_anomalies": [
+      "payload_torque_absence",
+      "sustained_low_torque",
+      "gripper_close_no_force",
+      "torque_deviation_from_nominal"
+    ],
+    "simulation_procedure": "Remove the box from the pick position before the episode starts. The robot runs the standard pick-and-place program unmodified."
+  },
+  {
+    "fault_id": 39,
+    "task": [
+      "peg_in_hole"
+    ],
+    "root_cause": "missing_peg",
+    "description": "The robot executes the full peg-in-hole cycle but no peg is gripped. The arm descends into the hole empty-handed and the insertion phase produces no contact force, resulting in an anomalously low force and torque profile during what should be a high-contact phase.",
+    "severity_levels": [
+      "low",
+      "medium"
+    ],
+    "injectable": true,
+    "possible_anomalies": [
+      "reduced_contact_force",
+      "gripper_close_no_force",
+      "sustained_low_torque",
+      "torque_deviation_from_nominal"
+    ],
+    "simulation_procedure": "Remove the peg from the gripper or skip the peg pick-up step before the episode starts. The robot runs the standard insertion program unmodified."
   }
 ]

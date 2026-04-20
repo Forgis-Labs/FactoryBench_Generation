@@ -1,92 +1,5 @@
 [
   {
-    "id": 1,
-    "name": "Accidental Package Drop",
-    "description": "accidental drop of the payload from gripper {gripper} at {drop_time} ms into the trajectory",
-    "tasks": ["pick_and_place"],
-    "injectable": false,
-    "variables": {
-      "gripper": "string",
-      "drop_time": "numeric"
-    }
-  },
-  {
-    "id": 2,
-    "name": "Transient Spike",
-    "description": "a sudden spike in {feature_i} of magnitude {delta}",
-    "tasks": ["pick_and_place", "screwing"],
-    "variables": {
-      "feature_i": "string",
-      "delta": "numeric",
-      "duration": "integer"
-    },
-    "variable_constraints": {
-      "feature_i": [
-        "effort_current_0",
-        "effort_current_1",
-        "effort_current_2",
-        "effort_current_3",
-        "effort_current_4",
-        "effort_current_5",
-        "est_contact_force_0",
-        "est_contact_force_1",
-        "est_contact_force_2",
-        "est_contact_force_3",
-        "est_contact_force_4",
-        "est_contact_force_5",
-        "effort_target_torque_0",
-        "effort_target_torque_1",
-        "effort_target_torque_2",
-        "effort_target_torque_3",
-        "effort_target_torque_4",
-        "effort_target_torque_5",
-        "vibration_0",
-        "vibration_1",
-        "vibration_2",
-        "vibration_3",
-        "vibration_4",
-        "acoustic_0",
-        "robot_current"
-      ]
-    }
-  },
-  {
-    "id": 3,
-    "name": "Transient Dip",
-    "description": "a sudden dip in {feature_i} of magnitude {delta}",
-    "tasks": ["pick_and_place", "screwing"],
-    "variables": {
-      "feature_i": "string",
-      "delta": "numeric",
-      "duration": "integer"
-    },
-    "variable_constraints": {
-      "feature_i": [
-        "effort_current_0",
-        "effort_current_1",
-        "effort_current_2",
-        "effort_current_3",
-        "effort_current_4",
-        "effort_current_5",
-        "feedback_speed_0",
-        "feedback_speed_1",
-        "feedback_speed_2",
-        "feedback_speed_3",
-        "feedback_speed_4",
-        "feedback_speed_5",
-        "est_contact_force_0",
-        "est_contact_force_1",
-        "est_contact_force_2",
-        "est_contact_force_3",
-        "est_contact_force_4",
-        "est_contact_force_5",
-        "tool_momentum",
-        "robot_voltage",
-        "main_voltage"
-      ]
-    }
-  },
-  {
     "id": 6,
     "name": "Payload Addition",
     "description": "an increase of {x} kg to the payload",
@@ -142,6 +55,44 @@
       "object": "string",
       "impact_impulse": "numeric",
       "trajectory_fraction": "numeric"
+    }
+  },
+  {
+    "id": 17,
+    "name": "Foam Collision",
+    "description": "a collision with a foam cube at {trajectory_fraction} of the trajectory",
+    "tasks": ["pick_and_place"],
+    "variables": {
+      "trajectory_fraction": "numeric"
+    }
+  },
+  {
+    "id": 18,
+    "name": "Cardboard Collision",
+    "description": "a collision with a cardboard box at {trajectory_fraction} of the trajectory",
+    "tasks": ["pick_and_place"],
+    "variables": {
+      "trajectory_fraction": "numeric",
+      "braced": "boolean"
+    }
+  },
+  {
+    "id": 19,
+    "name": "Cable Collision",
+    "description": "a collision with a hanging cable at {trajectory_fraction} of the trajectory",
+    "tasks": ["pick_and_place"],
+    "variables": {
+      "trajectory_fraction": "numeric"
+    }
+  },
+  {
+    "id": 20,
+    "name": "Peg Misalignment",
+    "description": "a {offset_type} offset of {offset_value} in the peg insertion approach",
+    "tasks": ["peg_in_hole"],
+    "variables": {
+      "offset_type": "string",
+      "offset_value": "numeric"
     }
   }
 ]
