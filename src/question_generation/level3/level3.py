@@ -31,6 +31,7 @@ from src.question_generation.utils.template import (
     fill,
     fill_event_description,
     get_last_timestamp,
+    pick_constrained_signal,
     pick_scalar_signal,
 )
 from src.question_generation.utils.time_series import (
@@ -42,12 +43,9 @@ from src.question_generation.level3.mc_truth import DEFAULT_THRESHOLDS, evaluate
 logger = logging.getLogger(__name__)
 
 VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
-DIFFICULTY_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "easy":   {"steps_ahead_range": (1, 2),  "context_min": 65, "context_max": 90},
-    "medium": {"steps_ahead_range": (3, 5),  "context_min": 32, "context_max": 64},
-    "hard":   {"steps_ahead_range": (6, 10), "context_min": 16, "context_max": 31},
-}
-DIFFICULTIES = list(DIFFICULTY_CONFIGS.keys())
+STEPS_AHEAD_RANGE = (1, 10)
+CONTEXT_MIN = 16
+CONTEXT_MAX = 90
 
 
 
@@ -62,10 +60,7 @@ NON_SIMULATION_EXCLUDED_MC_IDS = {
 }
 
 SIMULATION_EXCLUDED_MC_IDS = {
-    "mc_001",  # safety_mode
-    "mc_002",  # safety_mode
     "mc_005",  # effort_current
-    "mc_010",  # vibration
     "mc_013",  # robot_current
     "mc_014",  # robot_current
     "mc_017",  # joint_temp
@@ -75,18 +70,21 @@ SIMULATION_EXCLUDED_MC_IDS = {
 # MC option IDs that use mode signals (safety_mode, joint_mode, robot_mode),
 # excluded from predictive templates where mode state is not being predicted.
 PREDICTIVE_EXCLUDED_MC_IDS = {
-    "mc_001",  # safety_mode
-    "mc_002",  # safety_mode
     "mc_019",  # safety_mode
 }
 
+# Collision event IDs — excluded from predictive templates because collision
+# effects are sharp discontinuities not predictable from the pre-event trajectory.
+COLLISION_EVENT_IDS = {16, 17, 18, 19}
 
-def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]]) -> Optional[str]:
+
+def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]], allowed_bases: Optional[set] = None) -> Optional[str]:
     """
     Pick a base signal name that has indexed variants for all joints 0..5.
 
     Example valid base: "setpoint_pos" (requires setpoint_pos_0 ... setpoint_pos_5).
     Excludes: joint_voltage, joint_temp, joint_mode.
+    If allowed_bases is provided, only bases in that set are considered.
     """
     base_to_indices: Dict[str, set[int]] = {}
 
@@ -111,6 +109,7 @@ def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]]) -> Optional[
         base
         for base, indices in base_to_indices.items()
         if indices == JOINT_INDEX_RANGE and base not in EXCLUDED_JOINT_SIGNALS
+        and (allowed_bases is None or base in allowed_bases)
     ]
 
     if not candidates:
@@ -715,9 +714,9 @@ def fill_template(
     mc_option_lookup: Dict[str, str],
     t2_ms: Optional[int] = None,
     answer_subseries: Optional[List[Dict[str, Any]]] = None,
-    difficulty: str = "medium",
     steps_ahead: Optional[int] = None,
     episode_metadata: Optional[Dict[str, Any]] = None,
+    dataset_name: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 3 question template.
@@ -728,11 +727,10 @@ def fill_template(
     Returns dict with question/options/answer_format/event_id/answer, or None on failure.
 
     Template IDs:
-      1 - signal_segment_ranking   : options = {A/B/C/D: encoded chunk}
-    2 - intervention_outcome     : MC T/F with 4 shuffled statements
-    3 - trajectory_outcome_multiselect: MC T/F with 4 shuffled statements
-      4 - signal_value_prediction (numerical)
-      5 - signal_value_prediction (tensor)
+      1 - signal_segment_ranking        : options = {A/B/C/D: encoded chunk}
+      4 - signal_value_prediction       : numerical
+      5 - signal_value_prediction       : tensor
+      6 - counterfactual_spatial        : what if the target were at an offset? (MC A-D)
     """
     tid = template["id"]
     tmpl_text: str = template["template"]
@@ -767,28 +765,65 @@ def fill_template(
 
         question = fill(tmpl_text, t=t, time_event=event_time, event=event_desc)
 
-    elif tid == 2:
-        options, answer = build_multiselect_options_and_answer(
-            answer_format=answer_format,
-            baseline_subseries=baseline_rows,
-            post_event_rows=post_event_rows,
-            mc_option_lookup=mc_option_lookup,
-            episode_metadata=episode_metadata,
-        )
-        question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
+    # elif tid == 2:  # intervention_outcome (template removed from question_template.json)
+    #     options, answer = build_multiselect_options_and_answer(
+    #         answer_format=answer_format,
+    #         baseline_subseries=baseline_rows,
+    #         post_event_rows=post_event_rows,
+    #         mc_option_lookup=mc_option_lookup,
+    #         episode_metadata=episode_metadata,
+    #     )
+    #     question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
 
-    elif tid == 3:
-        options, answer = build_multiselect_options_and_answer(
-            answer_format=answer_format,
-            baseline_subseries=baseline_rows,
-            post_event_rows=post_event_rows,
-            mc_option_lookup=mc_option_lookup,
-            episode_metadata=episode_metadata,
-        )
-        question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
+    # elif tid == 3:  # trajectory_outcome_multiselect (template removed from question_template.json)
+    #     options, answer = build_multiselect_options_and_answer(
+    #         answer_format=answer_format,
+    #         baseline_subseries=baseline_rows,
+    #         post_event_rows=post_event_rows,
+    #         mc_option_lookup=mc_option_lookup,
+    #         episode_metadata=episode_metadata,
+    #     )
+    #     question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
+
+    elif tid == 6:
+        task_target_names: Dict[str, str] = template.get("task_target_names", {})
+
+        task_type: Optional[str] = None
+        if episode_metadata:
+            task_type = episode_metadata.get("task_type")
+        if task_type is None and dataset_name:
+            if "aursad" in dataset_name.lower():
+                task_type = "screwing"
+            elif "vorausad" in dataset_name.lower():
+                task_type = "pick_and_place"
+        target = task_target_names.get(task_type or "pick_and_place", "target location")
+
+        offset_magnitudes = [10, 20, 30, 50, 75, 100, 150]
+        dx = random.choice([-1, 0, 1]) * random.choice(offset_magnitudes)
+        dy = random.choice([-1, 0, 1]) * random.choice(offset_magnitudes)
+        dz = random.choice([-1, 0, 1]) * random.choice(offset_magnitudes)
+        if dx == 0 and dy == 0 and dz == 0:
+            dx = random.choice([20, 30, 50])
+        offset_str = f"[Δx: {dx:+d} mm, Δy: {dy:+d} mm, Δz: {dz:+d} mm]"
+
+        outcome = episode_metadata.get("spatial_outcome") if episode_metadata else None
+        if outcome is None:
+            return None
+        outcome_map = {
+            "joint_limit": "A",
+            "singularity": "B",
+            "success": "C",
+            "self_collision": "D",
+        }
+        answer = outcome_map.get(str(outcome).lower())
+        if answer is None:
+            return None
+
+        question = fill(tmpl_text, target=target, offset=offset_str)
 
     elif tid == 4:
-        signal = pick_scalar_signal(subseries)
+        important_features = template.get("important_features")
+        signal = pick_constrained_signal(subseries, important_features) if important_features else pick_scalar_signal(subseries)
         if signal is None:
             return None
         if steps_ahead is None or steps_ahead >= len(post_event_rows):
@@ -806,7 +841,18 @@ def fill_template(
         acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std * 0.5, 6)}
 
     elif tid == 5:
-        joint_signal = pick_joint_indexed_signal_base(subseries)
+        important_features = template.get("important_features")
+        allowed_bases: Optional[set] = None
+        if important_features:
+            imp_set = set(important_features)
+            allowed_bases = set()
+            for feat in imp_set:
+                m = re.match(r"^(.*)_(\d+)$", feat)
+                if m and int(m.group(2)) in JOINT_INDEX_RANGE:
+                    base = m.group(1)
+                    if all(f"{base}_{i}" in imp_set for i in range(6)):
+                        allowed_bases.add(base)
+        joint_signal = pick_joint_indexed_signal_base(subseries, allowed_bases=allowed_bases or None)
         if joint_signal is None:
             return None
         if steps_ahead is None or steps_ahead >= len(post_event_rows):
@@ -841,7 +887,6 @@ def fill_template(
         "event_id": event_obj["id"],
         "answer": answer,
         "acceptance_bounds": acceptance_bounds,
-        "difficulty": difficulty,
     }
 
 
@@ -928,17 +973,13 @@ def generate_level3_questions(
         if event_onset_idx is None:
             continue
 
-        difficulty = random.choice(DIFFICULTIES)
-        diff_cfg = DIFFICULTY_CONFIGS[difficulty]
-        context_min = diff_cfg["context_min"]
-        context_max = diff_cfg["context_max"]
-        steps_ahead = random.randint(*diff_cfg["steps_ahead_range"])
+        steps_ahead = random.randint(*STEPS_AHEAD_RANGE)
 
         sampled_window = sample_window_around_index(
             normal_rows,
             center_index=event_onset_idx,
-            min_len=context_min,
-            max_len=context_max,
+            min_len=CONTEXT_MIN,
+            max_len=CONTEXT_MAX,
             margin=5,
         )
         if sampled_window is None:
@@ -970,7 +1011,14 @@ def generate_level3_questions(
 
         event_time_ms = get_last_timestamp(post_event_rows[:1])
 
+        # Determine the event ID for this episode
+        episode_event_id = parse_event_id(post_event_rows[0].get("event", 0))
+
         template = random.choice(templates)
+
+        # Skip predictive templates for collision events
+        if template.get("type") == "predictive" and episode_event_id in COLLISION_EVENT_IDS:
+            continue
 
         if sampled_dataset == "simulations":
             effective_mc_lookup = {k: v for k, v in mc_option_lookup.items() if k not in SIMULATION_EXCLUDED_MC_IDS}
@@ -999,9 +1047,9 @@ def generate_level3_questions(
             effective_mc_lookup,
             t2_ms=event_time_ms,
             answer_subseries=alt_answer_subseries,
-            difficulty=difficulty,
             steps_ahead=steps_ahead,
             episode_metadata=ep_metadata,
+            dataset_name=sampled_dataset,
         )
         if filled is None:
             continue
@@ -1016,7 +1064,6 @@ def generate_level3_questions(
         item = {
             "id": str(uuid.uuid4()),
             "level": 3,
-            "difficulty": filled["difficulty"],
             "template_id": template["id"],
             "template_type": template["type"],
             "question": filled["question"],

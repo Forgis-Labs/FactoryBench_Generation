@@ -11,7 +11,7 @@
   {
     "id": 2,
     "type": "optimization",
-    "template": "An engineer wants to increase the throughput of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this?",
+    "template": "An engineer wants to increase the effectiveness and accuracy of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this? Do not justify your answer, simply indicate steps to take (or specify if nothing can be done).",
     "answer_format": {
       "type": "free_form",
       "notes": "Expected answer identifies sub-optimal operating conditions visible in the sensor stream and proposes actionable adjustments (e.g., speed, payload, trajectory tuning). Scalable by recording episodes with deliberately sub-optimal parameters alongside their optimized counterparts, using the delta as a reference. Evaluated with LLM-as-Judge against a reference derived from the known parameter gap."
@@ -27,10 +27,27 @@
       "notes": "Model must output a permutation of the episode labels (A, B, ..., N). Ground truth ranking is derived from the episode-level duration metadata field recorded during trajectory optimization blocks. Evaluate by comparing the predicted permutation to the ground truth; accept exact match or compute Kendall's tau for partial credit."
     },
     "important_features": [
-      "feedback_speed_0", "feedback_speed_1", "feedback_speed_2", "feedback_speed_3", "feedback_speed_4", "feedback_speed_5",
-      "feedback_pos_0", "feedback_pos_1", "feedback_pos_2", "feedback_pos_3", "feedback_pos_4", "feedback_pos_5",
-      "setpoint_pos_0", "setpoint_pos_1", "setpoint_pos_2", "setpoint_pos_3", "setpoint_pos_4", "setpoint_pos_5",
-      "setpoint_tcp_x", "setpoint_tcp_y", "setpoint_tcp_z",
+      "feedback_speed_0",
+      "feedback_speed_1",
+      "feedback_speed_2",
+      "feedback_speed_3",
+      "feedback_speed_4",
+      "feedback_speed_5",
+      "feedback_pos_0",
+      "feedback_pos_1",
+      "feedback_pos_2",
+      "feedback_pos_3",
+      "feedback_pos_4",
+      "feedback_pos_5",
+      "setpoint_pos_0",
+      "setpoint_pos_1",
+      "setpoint_pos_2",
+      "setpoint_pos_3",
+      "setpoint_pos_4",
+      "setpoint_pos_5",
+      "setpoint_tcp_x",
+      "setpoint_tcp_y",
+      "setpoint_tcp_z",
       "task_phase"
     ]
   },
@@ -44,9 +61,24 @@
       "notes": "Model must output a permutation of the episode labels (A, B, ..., N). Ground truth ranking is derived from the episode-level energy metadata field (total joint energy in joules) recorded during trajectory optimization blocks. Evaluate by comparing the predicted permutation to the ground truth; accept exact match or compute Kendall's tau for partial credit."
     },
     "important_features": [
-      "effort_current_0", "effort_current_1", "effort_current_2", "effort_current_3", "effort_current_4", "effort_current_5",
-      "effort_torque_0", "effort_torque_1", "effort_torque_2", "effort_torque_3", "effort_torque_4", "effort_torque_5",
-      "feedback_speed_0", "feedback_speed_1", "feedback_speed_2", "feedback_speed_3", "feedback_speed_4", "feedback_speed_5",
+      "effort_current_0",
+      "effort_current_1",
+      "effort_current_2",
+      "effort_current_3",
+      "effort_current_4",
+      "effort_current_5",
+      "effort_torque_0",
+      "effort_torque_1",
+      "effort_torque_2",
+      "effort_torque_3",
+      "effort_torque_4",
+      "effort_torque_5",
+      "feedback_speed_0",
+      "feedback_speed_1",
+      "feedback_speed_2",
+      "feedback_speed_3",
+      "feedback_speed_4",
+      "feedback_speed_5",
       "ctx_robot_current",
       "task_phase"
     ]

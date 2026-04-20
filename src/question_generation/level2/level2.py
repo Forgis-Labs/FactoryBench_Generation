@@ -31,6 +31,7 @@ from src.question_generation.utils.template import (
     fill,
     fill_event_description,
     get_last_timestamp,
+    pick_constrained_signal,
     pick_scalar_signal,
 )
 from src.question_generation.utils.time_series import (
@@ -44,12 +45,9 @@ logger = logging.getLogger(__name__)
 
 VALID_DATASETS = ["inter_aursad", "inter_vorausad", "simulations"]
 
-DIFFICULTY_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "easy":   {"steps_ahead_range": (1, 2),  "context_min": 65, "context_max": 90},
-    "medium": {"steps_ahead_range": (3, 5),  "context_min": 32, "context_max": 64},
-    "hard":   {"steps_ahead_range": (6, 10), "context_min": 16, "context_max": 31},
-}
-DIFFICULTIES = list(DIFFICULTY_CONFIGS.keys())
+STEPS_AHEAD_RANGE = (1, 10)
+CONTEXT_MIN = 16
+CONTEXT_MAX = 90
 
 
 
@@ -63,10 +61,7 @@ NON_SIMULATION_EXCLUDED_MC_IDS = {
 }
 
 SIMULATION_EXCLUDED_MC_IDS = {
-    "mc_001",  # safety_mode
-    "mc_002",  # safety_mode
     "mc_005",  # effort_current
-    "mc_010",  # vibration
     "mc_013",  # robot_current
     "mc_014",  # robot_current
     "mc_017",  # joint_temp
@@ -76,18 +71,17 @@ SIMULATION_EXCLUDED_MC_IDS = {
 # MC option IDs that use mode signals (safety_mode, joint_mode, robot_mode),
 # excluded from predictive templates where mode state is not being predicted.
 PREDICTIVE_EXCLUDED_MC_IDS = {
-    "mc_001",  # safety_mode
-    "mc_002",  # safety_mode
     "mc_019",  # safety_mode
 }
 
 
-def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]]) -> Optional[str]:
+def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]], allowed_bases: Optional[set] = None) -> Optional[str]:
     """
     Pick a base signal name that has indexed variants for all joints 0..5.
 
     Example valid base: "setpoint_pos" (requires setpoint_pos_0 ... setpoint_pos_5).
     Excludes: joint_voltage, joint_temp, joint_mode.
+    If allowed_bases is provided, only bases in that set are considered.
     """
     base_to_indices: Dict[str, set[int]] = {}
 
@@ -112,6 +106,7 @@ def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]]) -> Optional[
         base
         for base, indices in base_to_indices.items()
         if indices == JOINT_INDEX_RANGE and base not in EXCLUDED_JOINT_SIGNALS
+        and (allowed_bases is None or base in allowed_bases)
     ]
 
     if not candidates:
@@ -583,7 +578,6 @@ def fill_template(
     post_event_rows: List[Dict[str, Any]],
     events: List[Dict[str, Any]],
     mc_option_lookup: Dict[str, str],
-    difficulty: str = "medium",
     steps_ahead: Optional[int] = None,
     episode_metadata: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
@@ -655,7 +649,8 @@ def fill_template(
         question = fill(tmpl_text, event=event_desc, t_event=t_event)
 
     elif tid == 4:
-        signal = pick_scalar_signal(subseries)
+        important_features = template.get("important_features")
+        signal = pick_constrained_signal(subseries, important_features) if important_features else pick_scalar_signal(subseries)
         if signal is None:
             return None
         if steps_ahead is None or steps_ahead >= len(post_event_rows):
@@ -672,7 +667,18 @@ def fill_template(
         acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std * 0.5, 6)}
 
     elif tid == 5:
-        joint_signal = pick_joint_indexed_signal_base(subseries)
+        important_features = template.get("important_features")
+        allowed_bases: Optional[set] = None
+        if important_features:
+            imp_set = set(important_features)
+            allowed_bases = set()
+            for feat in imp_set:
+                m = re.match(r"^(.*)_(\d+)$", feat)
+                if m and int(m.group(2)) in JOINT_INDEX_RANGE:
+                    base = m.group(1)
+                    if all(f"{base}_{i}" in imp_set for i in range(6)):
+                        allowed_bases.add(base)
+        joint_signal = pick_joint_indexed_signal_base(subseries, allowed_bases=allowed_bases or None)
         if joint_signal is None:
             return None
         if steps_ahead is None or steps_ahead >= len(post_event_rows):
@@ -706,7 +712,6 @@ def fill_template(
         "event_id": event_obj["id"],
         "answer": answer,
         "acceptance_bounds": acceptance_bounds,
-        "difficulty": difficulty,
     }
 
 
@@ -768,22 +773,18 @@ def generate_level2_questions(
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
-        difficulty = random.choice(DIFFICULTIES)
-        diff_cfg = DIFFICULTY_CONFIGS[difficulty]
-        context_min = diff_cfg["context_min"]
-        context_max = diff_cfg["context_max"]
-        steps_ahead = random.randint(*diff_cfg["steps_ahead_range"])
+        steps_ahead = random.randint(*STEPS_AHEAD_RANGE)
 
         ds = random.choice(available_datasets)
         ep_path = random.choice(episodes_by_dataset[ds])
         rows = load_episode(ep_path)
-        if not isinstance(rows, list) or len(rows) < context_min:
+        if not isinstance(rows, list) or len(rows) < CONTEXT_MIN:
             continue
 
         sampled = sample_subseries_before_event(
             rows,
-            context_min,
-            context_max,
+            CONTEXT_MIN,
+            CONTEXT_MAX,
             min_post_event_after=MIN_POST_EVENT_TIMESTAMPS_AFTER,
             return_metadata=True,
         )
@@ -825,7 +826,7 @@ def generate_level2_questions(
 
         filled = fill_template(
             template, subseries, post_event_rows, events, effective_mc_lookup,
-            difficulty=difficulty, steps_ahead=steps_ahead, episode_metadata=ep_metadata,
+            steps_ahead=steps_ahead, episode_metadata=ep_metadata,
         )
         if filled is None:
             continue
@@ -840,7 +841,6 @@ def generate_level2_questions(
         item = {
             "id": str(uuid.uuid4()),
             "level": 2,
-            "difficulty": difficulty,
             "template_id": template["id"],
             "template_type": template["type"],
             "question": filled["question"],

@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
+from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates, load_ur3_mapping
 from src.question_generation.utils.template import (
     build_context,
     discover_episodes_by_dataset,
@@ -43,12 +43,8 @@ RANKING_LABELS = ["A", "B", "C", "D"]
 RANKING_TEMPLATE_IDS = {3, 4}
 RANKING_METRIC = {3: "duration", 4: "energy"}
 
-DIFFICULTY_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "easy":   {"context_min": 65, "context_max": 90},
-    "medium": {"context_min": 32, "context_max": 64},
-    "hard":   {"context_min": 16, "context_max": 31},
-}
-DIFFICULTIES = list(DIFFICULTY_CONFIGS.keys())
+CONTEXT_MIN = 16
+CONTEXT_MAX = 90
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +60,7 @@ def get_root_cause_for_subseries(
     start_idx: int = 0,
 ) -> Dict[str, Any]:
     """
-    Determine the anomaly status, root cause, and triggering event for a subseries.
+    Determine the anomaly status and root cause for a subseries.
 
     Event resolution (in priority order):
       1. Any row inside the subseries with a non-zero, non-1 event token.
@@ -129,10 +125,12 @@ def get_root_cause_for_subseries(
         }
 
     rc = root_causes.get(dominant_label, {})
+    root_cause_key = rc.get("root_cause", f"fault_{dominant_label}") if dominant_label != 0 else "unknown"
+
     return {
         "anomaly_present": True,
         "fault_label": dominant_label,
-        "root_cause": rc.get("root_cause", f"fault_{dominant_label}") if dominant_label != 0 else "unknown",
+        "root_cause": root_cause_key,
         "description": rc.get("description", ""),
         "event_id": dominant_event_id,
         "event_name": event_obj["name"] if event_obj else None,
@@ -178,7 +176,6 @@ def _try_generate_ranking_question(
     episodes_by_dataset: Dict[str, List[Path]],
     available_datasets: List[str],
     raw_cache: Dict[str, Any],
-    difficulty: str,
 ) -> Optional[Dict[str, Any]]:
     """
     Attempt to build a ranking question (templates 3 and 4).
@@ -235,7 +232,6 @@ def _try_generate_ranking_question(
     return {
         "id": str(uuid.uuid4()),
         "level": 4,
-        "difficulty": difficulty,
         "template_id": template["id"],
         "template_type": template["type"],
         "question": template["template"],
@@ -256,6 +252,7 @@ def generate_level4_questions(
     n: int = 100,
     seed: Optional[int] = None,
     datasets: Optional[List[str]] = None,
+    ur3_mapping: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -297,13 +294,12 @@ def generate_level4_questions(
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
-        difficulty = random.choice(DIFFICULTIES)
         template = random.choice(templates)
 
         # --- Templates 3 & 4: multi-episode ranking ---
         if template["id"] in RANKING_TEMPLATE_IDS:
             item = _try_generate_ranking_question(
-                template, episodes_by_dataset, available_datasets, raw_cache, difficulty
+                template, episodes_by_dataset, available_datasets, raw_cache
             )
             if item is None:
                 continue
@@ -317,8 +313,7 @@ def generate_level4_questions(
             if not rows:
                 continue
 
-            diff_cfg = DIFFICULTY_CONFIGS[difficulty]
-            context_len = random.randint(diff_cfg["context_min"], diff_cfg["context_max"])
+            context_len = random.randint(CONTEXT_MIN, CONTEXT_MAX)
 
             if len(rows) < context_len:
                 continue
@@ -329,11 +324,15 @@ def generate_level4_questions(
                 continue
 
             answer = None
+            root_cause = None
             if template["id"] == 1:
-                answer = get_root_cause_for_subseries(
+                rc_info = get_root_cause_for_subseries(
                     subseries, root_causes, events,
                     all_rows=rows, start_idx=start_idx,
                 )
+                root_cause = rc_info.get("root_cause")
+                ur3_entry = (ur3_mapping or {}).get(root_cause, {})
+                answer = ur3_entry.get("ur3_protocol")
 
             important_features = template.get("important_features")
             context_subseries = subseries
@@ -347,12 +346,12 @@ def generate_level4_questions(
             item = {
                 "id": str(uuid.uuid4()),
                 "level": 4,
-                "difficulty": difficulty,
                 "template_id": template["id"],
                 "template_type": template["type"],
                 "question": template["template"],
                 "options": {},
                 "answer": answer,
+                "root_cause": root_cause,
                 "acceptance_bounds": None,
                 "provenance": {
                     "dataset": sampled_dataset,
@@ -421,6 +420,8 @@ def main() -> None:
     templates = load_templates(Path(__file__).with_name("question_template.json"))
     root_causes = load_root_causes(args.datasets_dir / "labelling" / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "labelling" / "events.json")
+    ur3_mapping_path = args.datasets_dir / "labelling" / "rca" / "root_cause_ur3_error_mapping.json"
+    ur3_mapping = load_ur3_mapping(ur3_mapping_path) if ur3_mapping_path.exists() else None
 
     generate_level4_questions(
         datasets_dir=args.datasets_dir,
@@ -431,6 +432,7 @@ def main() -> None:
         n=args.n,
         seed=args.seed,
         datasets=args.datasets,
+        ur3_mapping=ur3_mapping,
     )
 
 
