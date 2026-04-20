@@ -331,8 +331,14 @@ def generate_level4_questions(
                     all_rows=rows, start_idx=start_idx,
                 )
                 root_cause = rc_info.get("root_cause")
-                ur3_entry = (ur3_mapping or {}).get(root_cause, {})
-                answer = ur3_entry.get("ur3_protocol")
+                if rc_info.get("anomaly_present"):
+                    ur3_entry = (ur3_mapping or {}).get(root_cause, {})
+                    answer = ur3_entry.get("ur3_protocol")
+                else:
+                    answer = (
+                        "No anomalous behavior detected in the sensor stream. "
+                        "The machine is operating normally; no remediation is required."
+                    )
 
             important_features = template.get("important_features")
             context_subseries = subseries
