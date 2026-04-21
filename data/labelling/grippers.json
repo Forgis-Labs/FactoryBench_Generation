@@ -73,5 +73,15 @@
       "multi-variant assembly lines"
     ],
     "used_in_paper_for": "Automated screwdriving task on UR3"
+  },
+  {
+    "gripper_id": 2,
+    "gripper_model": null,
+    "manufacturer": "Schmalz",
+    "gripper_type": "vacuum gripper",
+    "actuation": "vacuum",
+    "equipment_note": "Schmalz vacuum generator",
+    "notes": "Exact gripper model not reported in the voraus-AD dataset documentation; only the Schmalz vacuum generator is specified.",
+    "used_in_paper_for": "Pick-and-place task on Yu 5 Industrial (voraus-AD)"
   }
 ]

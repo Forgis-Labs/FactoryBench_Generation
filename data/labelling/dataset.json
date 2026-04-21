@@ -14,7 +14,7 @@
     "name": "voraus-AD (interpolated)",
     "description": "Voraus Anomaly Detection dataset, interpolated to uniform timestep. Collected on a UR5 cobot performing pick-and-place tasks with injected faults.",
     "machine_id": 2,
-    "gripper_id": null,
+    "gripper_id": 2,
     "task_id": "pick_and_place",
     "source": "https://github.com/vorausrobotik/voraus-ad-dataset",
     "license": "Apache-2.0"
