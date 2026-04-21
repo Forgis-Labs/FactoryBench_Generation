@@ -95,27 +95,6 @@
 
 \begin{document}
 
-\todo[inline]{Do all the references actually exist? If they do not, this is typically seen as a proof that we had this paper AI generated. It will then likely be desk-rejected. 
-
-I could not find: 
-
-- Abhimanyu Das et al. Time series foundation models and forecasting
-
-This one seems to have a slightly different name:
-
-Ya Su et al. Robust anomaly detection for multivariate time series through stochastic recurrent neural
-network (omnianomaly).
-
-This seems to have the wrong author:
-
-Gerald Woo et al. Chronos: Learning the language of time series. arXiv preprint, 2024a.
-
-Two more points:
-
-A) When citing arxiv papers it is usually so that one puts the identifier in the citation, such as  arXiv:2201.12740.
-B) Sometimes capitalization is important. The references currently write everything in lowercase, but some abbreviations are chosen by their authors to capitalize some words. It is usually nice to follow their choices. 
-}
-
 \maketitle
 
 \begin{abstract}
@@ -126,11 +105,11 @@ We introduce \textbf{FactoryBench}, a benchmark for evaluating LLM agents on the
 
 Modern industrial systems generate large volumes of multivariate time-series data from sensors, actuators, and controllers. In robotic manufacturing settings---such as Universal Robots UR-series collaborative arms deployed on automotive assembly lines or KUKA industrial manipulators in electronics packaging---these signals encode joint states, torques, forces, velocities, contact events, task phases, and fault indicators. Extracting actionable knowledge from such data is central to monitoring, diagnostics, anomaly detection, and decision support.
 
-Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection \cite{zhou2021informer,su2019omni,audibert2020usad}. However, these models are often specialized and difficult to interpret. They typically output labels or numeric predictions without explicit reasoning or higher-level explanations, and generalize poorly outside of the specific task they are trained on \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}, which limits their direct utility for automated engineering decision-making.
+Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection \cite{zhou2021informer,su2019robust,audibert2020usad}. However, these models are often specialized and difficult to interpret. They typically output labels or numeric predictions without explicit reasoning or higher-level explanations, and generalize poorly outside of the specific task they are trained on \cite{chalapathy2019deep,lavin2015evaluating,zeng2023transformers}, which limits their direct utility for automated engineering decision-making.
 
-Large language models, in contrast, exhibit strong general reasoning abilities and can produce structured explanations in technical contexts \cite{wei2022chain,yao2023tree}. They can integrate textual information, follow logical chains, and generate interpretable outputs. Yet, when applied directly to dense numerical time series, general LLMs still underperform without adaptation \cite{gruver2023llmtime,jin2024timellm}. In contrast, specialized transformer-based architectures have become increasingly effective for time-series forecasting and representation learning \cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst,woo2024chronos,das2024survey}.
+Large language models, in contrast, exhibit strong general reasoning abilities and can produce structured explanations in technical contexts \cite{wei2022chain,yao2023tree}. They can integrate textual information, follow logical chains, and generate interpretable outputs. Yet, when applied directly to dense numerical time series, general LLMs still underperform without adaptation \cite{gruver2023llmtime,jin2023time}. In contrast, specialized transformer-based architectures have become increasingly effective for time-series forecasting and representation learning \cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2022time,ansari2024chronos,das2023decoder}.
 
-A promising paradigm is to build LLM agents equipped with specialized tools, including time-series models and signal-processing modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These agents can combine language reasoning with domain-specific computation. Nevertheless, evaluating whether such systems truly reason about machine behavior---rather than pattern-matching on surface textual cues---remains challenging. By machine behavior understanding we mean the ability to:
+A promising paradigm is to build LLM agents equipped with specialized tools, including time-series models and signal-processing modules \cite{schick2023toolformer,yao2022react,qin2024tool}. These agents can combine language reasoning with domain-specific computation. Nevertheless, evaluating whether such systems truly reason about machine behavior---rather than pattern-matching on surface textual cues---remains challenging. By machine behavior understanding we mean the ability to:
 
 \begin{enumerate}[I.]
     \item interpret the current operational state from raw multivariate signals
@@ -139,7 +118,7 @@ A promising paradigm is to build LLM agents equipped with specialized tools, inc
     \item recommend remedial actions grounded in physical and engineering constraints
 \end{enumerate}
 
-Current LLMs typically fail on II, III and IV because they lack access to calibrated dynamics and cannot reliably ingest long, dense numerical streams. Existing benchmarks mostly target textual reasoning, code generation, or generic multimodal understanding \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu}, leaving a gap in rigorous evaluation of machine-behavior reasoning over industrial telemetry.
+Current LLMs typically fail on II, III and IV because they lack access to calibrated dynamics and cannot reliably ingest long, dense numerical streams. Existing benchmarks mostly target textual reasoning, code generation, or generic multimodal understanding \cite{hendrycks2020measuring,srivastava2023beyond,yue2024mmmu}, leaving a gap in rigorous evaluation of machine-behavior reasoning over industrial telemetry.
 
 To address this gap, we propose FactoryBench, a benchmark designed to evaluate machine-behavior reasoning in time series models and LLMs. FactoryBench is grounded in FactoryWave, a dense multivariate time-series dataset collected from one-armed robotic systems, including collaborative and industrial manufacturing robots. FactoryWave captures synchronized setpoint, context, feedback, and effort signals at [TODO: add frequency maybe?].
 
@@ -153,15 +132,15 @@ By bridging the gap between general language reasoning and specialized time-seri
 
 \subsection{LLM agents and tool use}
 
-Recent advances in LLM reasoning include prompting and deliberative strategies (e.g., Chain-of-Thought and Tree-of-Thought) that improve multi-step performance \cite{wei2022chain,yao2023tree}, alongside tool-augmented paradigms such as Toolformer and ReAct that enable grounded computation through external modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These ideas motivate industrial agent design where symbolic reasoning must be combined with numerical workflows.
+Recent advances in LLM reasoning include prompting and deliberative strategies (e.g., Chain-of-Thought and Tree-of-Thought) that improve multi-step performance \cite{wei2022chain,yao2023tree}, alongside tool-augmented paradigms such as Toolformer and ReAct that enable grounded computation through external modules \cite{schick2023toolformer,yao2022react,qin2024tool}. These ideas motivate industrial agent design where symbolic reasoning must be combined with numerical workflows.
 
 \subsection{Time-series learning for industrial signals}
 
-Time-series modeling has advanced through transformer-based architectures (Informer, Autoformer, FEDformer, PatchTST) \cite{zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst}, strong alternative baselines such as TFT and N-BEATS \cite{lim2021tft,oreshkin2020nbeats}, and critical comparisons against simpler linear models \cite{zeng2023transformers}. Foundation-model directions (e.g., Chronos) further explore transfer and zero/few-shot adaptation \cite{woo2024chronos,das2024survey}. In parallel, anomaly and reliability monitoring literature includes OmniAnomaly, USAD, and Deep SVDD \cite{su2019omni,audibert2020usad,ruff2018deep}, with surveys and benchmarks highlighting persistent gaps in interpretability and root-cause actionability \cite{chalapathy2019survey,lavin2015numenta}.
+Time-series modeling has advanced through transformer-based architectures (Informer, Autoformer, FEDformer, PatchTST) \cite{zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2022time}, strong alternative baselines such as TFT and N-BEATS \cite{lim2021temporal,oreshkin2019n}, and critical comparisons against simpler linear models \cite{zeng2023transformers}. Foundation-model directions (e.g., Chronos) further explore transfer and zero/few-shot adaptation \cite{ansari2024chronos,das2023decoder}. In parallel, anomaly and reliability monitoring literature includes OmniAnomaly, USAD, and Deep SVDD \cite{su2019robust,audibert2020usad,ruff2018deep}, with surveys and benchmarks highlighting persistent gaps in interpretability and root-cause actionability \cite{chalapathy2019deep,lavin2015evaluating}.
 
 \subsection{Causality and benchmark gaps}
 
-Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969causal,runge2019causal}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support. Table~\ref{tab:benchmark_comparison} positions FactoryBench against closely related Q\&A and time-series benchmarks along eight axes. The column labels refer to concepts introduced later in the paper: Counterfactual denotes questions that reason about alternative histories (Level~3, Section~\ref{sec:levels}); Free-Form denotes open-ended natural-language answers evaluated via an LLM-as-judge protocol (Section~\ref{sec:answer-formats}); and Novel Dense TS indicates whether the benchmark contributes a new, high-frequency multivariate dataset rather than relying exclusively on public sources.
+Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974estimating}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969investigating,runge2019detecting}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2020measuring,srivastava2023beyond,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support. Table~\ref{tab:benchmark_comparison} positions FactoryBench against closely related Q\&A and time-series benchmarks along eight axes. The column labels refer to concepts introduced later in the paper: Counterfactual denotes questions that reason about alternative histories (Level~3, Section~\ref{sec:levels}); Free-Form denotes open-ended natural-language answers evaluated via an LLM-as-judge protocol (Section~\ref{sec:answer-formats}); and Novel Dense TS indicates whether the benchmark contributes a new, high-frequency multivariate dataset rather than relying exclusively on public sources.
 
 \begin{table}[t]
 \centering
@@ -812,7 +791,7 @@ Scalable ground-truth generation is the central challenge of any Q\&A benchmark 
 
 % TODO: GENERATE GRAPHS AND ADD PARAGRAPHS ABOUT Q&A DISTRIBUTIONS (LEVEL, DIFFICULTY, ETC)
 
-A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine-behavior reasoning, we utilize the \textbf{Vendi Score} \cite{friedman2023vendi} on the embeddings of our Q\&A pairs to measure and maximize effective population diversity.
+A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine-behavior reasoning, we utilize the \textbf{Vendi Score} \cite{friedman2022vendi} on the embeddings of our Q\&A pairs to measure and maximize effective population diversity.
 
 We iteratively evaluate dataset diversity across three primary axes during generation:
 
@@ -830,7 +809,7 @@ We iteratively evaluate dataset diversity across three primary axes during gener
 IDEA: 
 \\1. run full dataset
 \\2. implement stratified selection preserving per-stratum mean/std of reference-model scores (GHOSTS-style, \cite{frieder2023ghosts})
-\\3. validate via Spearman/Kendall rank correlation and per-level MAE \cite{polo2024tinybenchmarks,bean2025scales}}
+\\3. validate via Spearman/Kendall rank correlation and per-level MAE \cite{polo2024tinybenchmarks,bean2025scales++}}
 
 \subsection{Pipeline overview}
 
@@ -845,10 +824,10 @@ with their paraphrase banks, all LLM-as-judge prompts, and both the full benchma
 \subsection{Models to evaluate}
 
 \textbf{Frontier LLMs:}
-We evaluate a cross-vendor panel including the strongest closed-weight frontier systems and the leading open-weight releases available at submission time (April 2026). This follows the now-standard practice in recent reasoning and tool-use benchmarks of pairing multiple closed frontier APIs with a comparable set of open-weight models to separate capability from deployment cost \cite{srivastava2023bigbench,liang2022helm,chollet2019arc}. A detailed justification is given in Appendix~\ref{app:model_selection}.
+We evaluate a cross-vendor panel including the strongest closed-weight frontier systems and the leading open-weight releases available at submission time (April 2026). This follows the now-standard practice in recent reasoning and tool-use benchmarks of pairing multiple closed frontier APIs with a comparable set of open-weight models to separate capability from deployment cost \cite{srivastava2023beyond,liang2022holistic,chollet2019measure}. A detailed justification is given in Appendix~\ref{app:model_selection}.
 \begin{itemize}
-    \item \textit{Closed-weight, flagship reasoning:} GPT-5-mini \cite{openai2025gpt5mini}, Claude Haiku 4.5 \cite{anthropic2025claudehaiku45}.
-    \item \textit{Open-weight, flagship reasoning:} Qwen-3.5 \cite{qwen2026qwen35}, DeepSeek V3.1 \cite{deepseek2025v31}, Mistral-Large-3 \cite{mistral2025large3}.
+    \item \textit{Closed-weight, flagship reasoning:} GPT-5-mini \cite{openai2026gpt5mini}, Claude Haiku 4.5 \cite{anthropic2026claudehaiku45}.
+    \item \textit{Open-weight, flagship reasoning:} Qwen-3.5 \cite{qwen2026qwen35}, DeepSeek V3.1 \cite{deepseek2026v31}, Mistral-Large-3 \cite{mistral2026large3}.
 \end{itemize}
 
 \textbf{Specialized Methods:}
@@ -1095,19 +1074,19 @@ These estimates show that a full benchmark run of 200k questions on any single f
 \section{Model selection and justification}
 \label{app:model_selection}
 
-\paragraph{Selection criteria.} Following standard latest practice in recent LLM reasoning benchmarks \cite{srivastava2023bigbench,liang2022helm,chollet2019arc,hendrycks2021mmlu,rein2023gpqa}, our selection is constructed to satisfy the following criteria: (i) coverage of more than one closed-API vendor to avoid single-vendor bias; (ii) inclusion of strong open-weight models so that benchmark results remain reproducible without paid API access and can be run on-premise --- a requirement for many industrial deployments; and (iii) inclusion of at least one cost-efficient tier, since the per-question cost analysis in Appendix~\ref{app:cost} shows that flagship-tier inference across 200k questions is substantially more expensive than cost-efficient tiers.
+\paragraph{Selection criteria.} Following standard latest practice in recent LLM reasoning benchmarks \cite{srivastava2023beyond,liang2022holistic,chollet2019measure,hendrycks2020measuring,rein2024gpqa}, our selection is constructed to satisfy the following criteria: (i) coverage of more than one closed-API vendor to avoid single-vendor bias; (ii) inclusion of strong open-weight models so that benchmark results remain reproducible without paid API access and can be run on-premise --- a requirement for many industrial deployments; and (iii) inclusion of at least one cost-efficient tier, since the per-question cost analysis in Appendix~\ref{app:cost} shows that flagship-tier inference across 200k questions is substantially more expensive than cost-efficient tiers.
 
 \paragraph{Closed-weight frontier models:}
 \begin{itemize}
-    \item \textbf{GPT-5-mini} \cite{openai2025gpt5mini}
-    \item \textbf{Claude Haiku 4.5} \cite{anthropic2025claudehaiku45}
+    \item \textbf{GPT-5-mini} \cite{openai2026gpt5mini}
+    \item \textbf{Claude Haiku 4.5} \cite{anthropic2026claudehaiku45}
 \end{itemize}
 
 \paragraph{Open-weight frontier models:}
 \begin{itemize}
     \item \textbf{Qwen-3.5} \cite{qwen2026qwen35}
-    \item \textbf{DeepSeek V3.1} \cite{deepseek2025v31}
-    \item \textbf{Mistral-Large-3} \cite{mistral2025large3}
+    \item \textbf{DeepSeek V3.1} \cite{deepseek2026v31}
+    \item \textbf{Mistral-Large-3} \cite{mistral2026large3}
 \end{itemize}
 
 \paragraph{Scope of time-series foundation models.} Task-specialized time-series foundation models (Chronos-2 \cite{ansari2024chronos}, Moirai \cite{woo2024unified}) are not part of the frontier-LLM panel. They are evaluated separately under ``Specialized Methods'' and only on the forecasting-style subset of FactoryBench --- i.e., questions that admit a numerical future-value ground truth (Tensor-type and other prediction questions). These models do not accept natural-language prompts and are not applicable to the multiple-choice, ranking, or free-form subsets, so reporting them on those subsets would be ill-defined rather than merely unfavorable. This preserves a clean separation between language-reasoning capability (measured on the full benchmark) and numerical forecasting capability (measured on the prediction subset).
@@ -1117,11 +1096,11 @@ These estimates show that a full benchmark run of 200k questions on any single f
 
 \todo[inline]{FactoryBench-Lite appendix: not yet implemented. Add details like:}
 \begin{itemize}
-  \item \textbf{Motivation and prior art:} anchor on miniGHOSTS \cite{frieder2023ghosts} (stratified selection preserving per-file mean/std); contrast with rank-preservation \cite{polo2024tinybenchmarks} and cognitive-scales \cite{bean2025scales}.
+  \item \textbf{Motivation and prior art:} anchor on miniGHOSTS \cite{frieder2023ghosts} (stratified selection preserving per-file mean/std); contrast with rank-preservation \cite{polo2024tinybenchmarks} and cognitive-scales \cite{bean2025scales++}.
   \item \textbf{Selection procedure:} stratify by $(\ell, f, d, \delta)$ = level $\times$ format $\times$ source $\times$ difficulty; within each stratum select $\lceil 0.1\,|\mathcal{Q}_{\ell,f,d,\delta}|\rceil$ items minimising $\sum_{m \in \mathcal{M}_{\text{ref}}} (|\mu_m(\mathcal{S})-\mu_m(\mathcal{Q})| + |\sigma_m(\mathcal{S})-\sigma_m(\mathcal{Q})|)$; greedy swap from stratified uniform init.
   \item \textbf{Up-front cost:} $|\mathcal{M}_{\text{ref}}| \times C_{\text{full}}$, paid once.
   \item \textbf{Validation:} Spearman $\rho$ / Kendall $\tau$ between per-model aggregates on $\mathcal{S}$ vs.\ $\mathcal{Q}$, plus per-level MAE; acceptance $\rho \geq 0.9$ and MAE $\leq 3$ pp.
-  \item \textbf{Scope:} extrapolation caveat \cite{zhang2025benchmark_prediction}; Lite for development/ablations/budget-constrained runs, full benchmark remains authoritative for leaderboard claims.
+  \item \textbf{Scope:} extrapolation caveat \cite{zhang2025benchmark}; Lite for development/ablations/budget-constrained runs, full benchmark remains authoritative for leaderboard claims.
   \item \textbf{Cost table on Lite:} re-apply Appendix~\ref{app:cost} cost model with $Q = 20{,}000$ once Lite size is fixed.
 \end{itemize}
 
