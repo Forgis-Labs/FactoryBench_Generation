@@ -114,20 +114,23 @@ def gripper_details_block(gripper: Optional[Dict[str, Any]]) -> str:
     manufacturer = str(gripper.get("manufacturer") or "").strip()
     model = str(gripper.get("gripper_model") or "").strip()
     gripper_type = str(gripper.get("gripper_type") or "end-of-arm tool").strip()
+    actuation = str(gripper.get("actuation") or "").strip()
 
-    if manufacturer and model:
-        intro = f"{manufacturer} {model}"
-    elif model:
-        intro = model
-    elif manufacturer:
-        intro = manufacturer
+    equipment_note = str(gripper.get("equipment_note") or "").strip()
+
+    if model:
+        intro = f"{manufacturer} {model}".strip()
+        details: List[str] = []
+        type_lower = gripper_type.lower()
+        if type_lower and type_lower not in intro.lower():
+            details.append(type_lower)
     else:
-        intro = gripper_type
-
-    type_lower = gripper_type.lower()
-    details: List[str] = []
-    if type_lower and type_lower not in intro.lower():
-        details.append(type_lower)
+        intro = gripper_type or manufacturer or "gripper"
+        details = []
+        if equipment_note:
+            details.append(equipment_note)
+        elif manufacturer and manufacturer.lower() not in intro.lower():
+            details.append(manufacturer)
 
     torque = gripper.get("torque_range_Nm")
     if isinstance(torque, list) and len(torque) == 2:
@@ -144,6 +147,11 @@ def gripper_details_block(gripper: Optional[Dict[str, Any]]) -> str:
     if details:
         return f"{intro} ({', '.join(details)})"
     return intro
+
+
+def _indefinite_article(word: str) -> str:
+    first = word.strip()[:1].lower()
+    return "an" if first in {"a", "e", "i", "o", "u"} else "a"
 
 
 def machine_details_block(machine: Optional[Dict[str, Any]]) -> str:
@@ -242,7 +250,8 @@ def build_prompt(
     gripper_info = gripper_details_block(gripper_obj)
     machine_sentence = f"The following sensor data comes from {machine_info}."
     if gripper_info:
-        machine_sentence += f" It is equipped with an {gripper_info}."
+        article = _indefinite_article(gripper_info)
+        machine_sentence += f" It is equipped with {article} {gripper_info}."
 
     context = question_item.get("context") if isinstance(question_item.get("context"), dict) else {}
     ts_text = format_context_time_series(context)
