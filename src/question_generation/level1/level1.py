@@ -39,7 +39,7 @@ from src.question_generation.utils.time_series import (
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
+VALID_DATASETS = ["inter_aursad", "inter_vorausad", "factorywave"]
 SEVERITY_ORDER: Dict[str, int] = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
 # Precise per-fault ranking loaded from anomaly_ranking.json (fault_id → rank 1..N, higher = more severe)
@@ -49,12 +49,104 @@ _ANOMALY_RANKING: Dict[int, int] = {}
 DATASET_MACHINE_ID: Dict[str, int] = {
     "inter_aursad": 0,    # UR3e
     "inter_vorausad": 2,  # Yu cobot
+    "factorywave": 0,     # UR3e (FactoryWave real-robot recordings)
 }
 
 _NO_ANOMALY_DESC = "No anomaly is present; the machine is operating nominally."
 
 CONTEXT_MIN = 16
 CONTEXT_MAX = 90
+
+# Phase index → human-readable name per task
+PHASE_NAMES: Dict[str, Dict[str, str]] = {
+    "pick_and_place": {
+        "0": "approach above the pick position",
+        "1": "descent toward the object",
+        "2": "settling pause before grasping",
+        "3": "gripper closing phase",
+        "4": "lifting phase",
+        "5": "lateral transfer toward the bin",
+        "6": "lowering into the bin",
+        "7": "gripper opening phase",
+        "8": "retraction away from the bin",
+        "9": "return to home position",
+    },
+    "screwing": {
+        "0": "approach above the fastener",
+        "1": "descent to engage the fastener",
+        "2": "screwing phase",
+        "3": "disengagement from the fastener",
+        "4": "retraction to safe height",
+        "5": "descent to re-engage the fastener",
+        "6": "loosening phase",
+        "7": "gripper engagement phase",
+        "8": "retraction to home position",
+    },
+    "peg_in_hole": {
+        "0": "alignment above the hole",
+        "1": "insertion into the hole",
+        "2": "disengagement from the peg",
+        "3": "rise back above the hole",
+        "4": "retraction to home position",
+        "5": "alignment above the object",
+        "6": "gripper engagement phase",
+        "7": "rise back above the object",
+        "8": "retraction to home position",
+    },
+}
+
+# Variable name → human-readable signal name
+SIGNAL_DISPLAY_NAMES: Dict[str, str] = {}
+# Build automatically for indexed signals
+for _i in range(6):
+    SIGNAL_DISPLAY_NAMES[f"feedback_pos_{_i}"] = f"the position of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"feedback_speed_{_i}"] = f"the velocity of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"setpoint_pos_{_i}"] = f"the commanded position of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"setpoint_speed_{_i}"] = f"the commanded velocity of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"setpoint_acc_{_i}"] = f"the commanded acceleration of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"effort_current_{_i}"] = f"the motor current of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"effort_target_current_{_i}"] = f"the target current of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"effort_target_torque_{_i}"] = f"the motor torque of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"control_output_{_i}"] = f"the control output of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"joint_temp_{_i}"] = f"the temperature of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"joint_mode_{_i}"] = f"the mode of joint {_i}"
+    SIGNAL_DISPLAY_NAMES[f"joint_voltage_{_i}"] = f"the voltage of joint {_i}"
+for _i, _axis in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
+    SIGNAL_DISPLAY_NAMES[f"setpoint_tcp_{_i}"] = f"the commanded TCP {_axis}"
+    SIGNAL_DISPLAY_NAMES[f"setpoint_tcp_speed_{_i}"] = f"the commanded TCP speed {_axis}"
+    SIGNAL_DISPLAY_NAMES[f"feedback_tcp_{_i}"] = f"the TCP {_axis}"
+    SIGNAL_DISPLAY_NAMES[f"feedback_tcp_speed_{_i}"] = f"the TCP speed {_axis}"
+for _i, _axis in enumerate(["x", "y", "z"]):
+    SIGNAL_DISPLAY_NAMES[f"true_force_{_i}"] = f"the TCP force {_axis}"
+    SIGNAL_DISPLAY_NAMES[f"true_force_{_i + 3}"] = f"the TCP torque {_axis}"
+    SIGNAL_DISPLAY_NAMES[f"est_contact_force_{_i}"] = f"the estimated contact force {_axis}"
+    SIGNAL_DISPLAY_NAMES[f"vibration_{_i}"] = f"the vibration {_axis}"
+SIGNAL_DISPLAY_NAMES["gripper_command"] = "the gripper force"
+SIGNAL_DISPLAY_NAMES["robot_mode"] = "the robot mode"
+SIGNAL_DISPLAY_NAMES["safety_mode"] = "the safety mode"
+SIGNAL_DISPLAY_NAMES["runtime_state"] = "the runtime state"
+SIGNAL_DISPLAY_NAMES["speed_scaling"] = "the speed scaling"
+SIGNAL_DISPLAY_NAMES["robot_current"] = "the robot current"
+SIGNAL_DISPLAY_NAMES["main_voltage"] = "the main voltage"
+SIGNAL_DISPLAY_NAMES["robot_voltage"] = "the robot voltage"
+SIGNAL_DISPLAY_NAMES["tool_momentum"] = "the tool momentum"
+
+
+def _phase_display_name(phase_raw: str, task: str = "pick_and_place") -> str:
+    """Convert a phase index/name to a human-readable name."""
+    task_phases = PHASE_NAMES.get(task, PHASE_NAMES.get("pick_and_place", {}))
+    name = task_phases.get(str(phase_raw))
+    if name:
+        return name
+    # Already a name string (not an index)
+    return str(phase_raw).replace("_", " ")
+
+
+def _signal_display_name(signal: str) -> str:
+    """Convert a signal variable name to a human-readable name."""
+    if signal in SIGNAL_DISPLAY_NAMES:
+        return SIGNAL_DISPLAY_NAMES[signal]
+    return signal.replace("_", " ")
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +481,7 @@ def fill_template(
       2 - anomaly detection (single-select)
       3 - comparative change detection (single-select)
       5 - severity ranking
-      6 - effort prediction from setpoints (tensor)
+      6 - robot identification (single-select)
     """
     tid = template["id"]
     tmpl_text: str = template["template"]
@@ -429,7 +521,9 @@ def fill_template(
         phase_name, phase_start_idx, phase_length = random.choice(inner_phases)
         window_length = phase_length + 5
         answer = phase_start_idx
-        question = fill(tmpl_text, phase=phase_name, window_length=window_length)
+        _TASK_DISPLAY = {"pick_and_place": "pick-and-place", "screwing": "screwing", "peg_in_hole": "peg-in-hole"}
+        task_display = _TASK_DISPLAY.get(task_id, task_id.replace("_", " ") if task_id else "manipulation")
+        question = fill(tmpl_text, task=task_display, phase=_phase_display_name(phase_name, task_id), window_length=window_length)
         acceptance_bounds = {"tolerance": 3}
 
     elif tid == 2:
@@ -463,21 +557,46 @@ def fill_template(
         question = tmpl_text
 
     elif tid == 6:
-        joint = random.randint(0, 5)
-        joint_key = f"effort_current_{joint}"
-        n = len(rows)
-        if n == 0:
+        # Robot identification: answer is determined by machine_id
+        robot_names = {
+            0: "Universal Robots UR3e",
+            2: "Agile Robots Yu 5 Industrial",
+            3: "KUKA KR 10 R1100-2",
+        }
+        if machine_id not in robot_names:
             return None
-        values: List[float] = []
-        for row in rows:
-            v = row.get(joint_key)
-            if not isinstance(v, (int, float, np.floating)):
-                return None
-            values.append(round(float(v), 6))
-        answer = "_".join(str(v) for v in values)
-        question = fill(tmpl_text, joint=f"joint_{joint}", n=n)
-        std = float(np.std(values)) if values else 0.0
-        acceptance_bounds = {"signal": joint_key, "std": round(std, 6), "margin": round(std * 0.5, 6)}
+        correct_name = robot_names[machine_id]
+        fixed = answer_format.get("fixed_options", list(robot_names.values()))
+        labels = ["A", "B", "C"][:len(fixed)]
+        entries = list(fixed)
+        random.shuffle(entries)
+        options = {}
+        answer = "A"
+        for i, name in enumerate(entries):
+            options[labels[i]] = name
+            if name == correct_name:
+                answer = labels[i]
+        question = tmpl_text
+
+    elif tid == 7:
+        # Prediction: given the subseries, predict a signal value n steps ahead
+        important_features = template.get("important_features", [])
+        # Pick a signal that exists and has numeric values
+        candidate_signals = [
+            s for s in important_features
+            if any(isinstance(row.get(s), (int, float)) for row in rows[-5:])
+        ]
+        if not candidate_signals:
+            return None
+        signal = random.choice(candidate_signals)
+        # steps_ahead: how many steps beyond the given context
+        steps_ahead = random.randint(1, 10)
+        # The rows passed in are the context; we need the actual future value
+        # which is stored in kwargs via the generation loop
+        # For now, store steps_ahead and signal; the generation loop provides the answer
+        question = fill(tmpl_text, signal=_signal_display_name(signal), n=steps_ahead)
+        answer = None  # set by generation loop
+        acceptance_bounds = {"signal": signal, "steps_ahead": steps_ahead}
 
     else:
         logger.warning(f"Unknown template id: {tid}")
@@ -530,6 +649,7 @@ def generate_level1_questions(
     ]
 
     episode_cache: Dict[str, List[Dict[str, Any]]] = {}
+    _normal_cache: Dict[str, bool] = {}
 
     def load_episode(path: Path) -> List[Dict[str, Any]]:
         key = str(path)
@@ -540,7 +660,22 @@ def generate_level1_questions(
             episode_cache[key] = raw
         return episode_cache[key]
 
-    usable_templates = templates
+    def is_normal_episode(rows: List[Dict[str, Any]], path: Path) -> bool:
+        """Return True if the episode has no anomalies (fault_label is 0 or absent throughout)."""
+        key = str(path)
+        if key in _normal_cache:
+            return _normal_cache[key]
+        result = all(
+            int(row.get("fault_label", 0) or 0) == 0
+            for row in rows
+            if row.get("fault_label") is not None
+        )
+        _normal_cache[key] = result
+        return result
+
+    # Exclude anomaly-related templates for now (IDs 2 and 5)
+    _DISABLED_TEMPLATE_IDS = {2, 5}
+    usable_templates = [t for t in templates if t["id"] not in _DISABLED_TEMPLATE_IDS]
     if not usable_templates:
         raise ValueError("No usable templates for Level 1 generation.")
 
@@ -577,9 +712,20 @@ def generate_level1_questions(
                 df = decimate_dataframe(df, q=downsample_factor, continuous_cols=continuous)
                 full_rows = df.where(df.notna(), None).to_dict(orient="records")
 
+            # Try to determine task from metadata file
+            meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
+            ep_task = ""
+            if meta_path.exists():
+                try:
+                    meta = load_json(meta_path)
+                    ep_task = meta.get("task", "")
+                except Exception:
+                    pass
+
             filled = fill_template(
                 template, full_rows, root_causes, anomaly_lookup, mc_option_lookup,
                 machine_id=DATASET_MACHINE_ID.get(ds, -1),
+                task_id=ep_task,
             )
             if filled is None:
                 continue
@@ -596,6 +742,7 @@ def generate_level1_questions(
                 "level": 1,
                 "template_id": tid,
                 "template_type": template["type"],
+                "hides": template.get("hides", []),
                 "question": filled["question"],
                 "options": filled["options"],
                 "answer": filled["answer"],
@@ -644,6 +791,7 @@ def generate_level1_questions(
                 "level": 1,
                 "template_id": tid,
                 "template_type": template["type"],
+                "hides": template.get("hides", []),
                 "question": filled["question"],
                 "options": filled["options"],
                 "answer": filled["answer"],
@@ -653,6 +801,72 @@ def generate_level1_questions(
                     "episode": ep_path.stem,
                     "subseries_start_index": start_idx,
                     "subseries_length": len(subseries),
+                },
+                "context": context,
+            }
+
+        # ------------------------------------------------------------------
+        # Template 7: prediction — sample subseries + future steps for answer
+        # ------------------------------------------------------------------
+        elif tid == 7:
+            ds = random.choice(available_datasets)
+            ep_path = random.choice(episodes_by_dataset[ds])
+            rows = load_episode(ep_path)
+            if not isinstance(rows, list) or len(rows) < CONTEXT_MIN + 10:
+                continue
+
+            # Sample a subseries leaving room for future steps
+            max_start = len(rows) - CONTEXT_MIN - 10
+            if max_start < 0:
+                continue
+            context_len = random.randint(CONTEXT_MIN, min(CONTEXT_MAX, len(rows) - 10))
+            start_idx = random.randint(0, len(rows) - context_len - 10)
+            subseries = rows[start_idx:start_idx + context_len]
+            subseries = normalize_timestamps(subseries, _first_timestamp_ms(subseries))
+
+            filled = fill_template(
+                template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
+                machine_id=DATASET_MACHINE_ID.get(ds, -1),
+            )
+            if filled is None:
+                continue
+
+            # Get the actual future value for the answer
+            bounds = filled.get("acceptance_bounds", {})
+            signal = bounds.get("signal")
+            steps_ahead = bounds.get("steps_ahead", 1)
+            future_idx = start_idx + context_len + steps_ahead - 1
+            if future_idx >= len(rows) or signal is None:
+                continue
+            future_val = rows[future_idx].get(signal)
+            if future_val is None or not isinstance(future_val, (int, float)):
+                continue
+            filled["answer"] = round(float(future_val), 4)
+            filled["acceptance_bounds"]["actual_value"] = filled["answer"]
+
+            if important_features:
+                keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+                context_rows = [{k: v for k, v in row.items() if k in keep} for row in subseries]
+            else:
+                context_rows = subseries
+            context = build_context(context_rows)
+
+            item = {
+                "id": str(uuid.uuid4()),
+                "level": 1,
+                "template_id": tid,
+                "template_type": template["type"],
+                "hides": template.get("hides", []),
+                "question": filled["question"],
+                "options": filled["options"],
+                "answer": filled["answer"],
+                "acceptance_bounds": filled.get("acceptance_bounds"),
+                "provenance": {
+                    "dataset": ds,
+                    "episode": ep_path.stem,
+                    "subseries_start_index": start_idx,
+                    "subseries_length": context_len,
+                    "prediction_index": future_idx,
                 },
                 "context": context,
             }
@@ -714,6 +928,7 @@ def generate_level1_questions(
                 "level": 1,
                 "template_id": tid,
                 "template_type": template["type"],
+                "hides": template.get("hides", []),
                 "question": filled["question"],
                 "options": filled["options"],
                 "answer": filled["answer"],
@@ -763,6 +978,7 @@ def generate_level1_questions(
                 "level": 1,
                 "template_id": tid,
                 "template_type": template["type"],
+                "hides": template.get("hides", []),
                 "question": filled["question"],
                 "options": filled["options"],
                 "answer": filled["answer"],

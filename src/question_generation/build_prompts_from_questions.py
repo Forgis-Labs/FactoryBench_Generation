@@ -243,15 +243,22 @@ def build_prompt(
 ) -> str:
     provenance = question_item.get("provenance") if isinstance(question_item.get("provenance"), dict) else {}
     dataset = str(provenance.get("dataset", ""))
-    machine_obj = resolve_machine_object_for_dataset(dataset, machines)
-    machine_info = machine_details_block(machine_obj)
+    hides = set(question_item.get("hides", []))
 
-    gripper_obj = resolve_gripper_for_dataset(dataset, grippers or [], dataset_index or {})
-    gripper_info = gripper_details_block(gripper_obj)
-    machine_sentence = f"The following sensor data comes from {machine_info}."
-    if gripper_info:
-        article = _indefinite_article(gripper_info)
-        machine_sentence += f" It is equipped with {article} {gripper_info}."
+    machine_sentence = ""
+    if "robot" not in hides:
+        machine_obj = resolve_machine_object_for_dataset(dataset, machines)
+        machine_info = machine_details_block(machine_obj)
+        machine_sentence = f"The following sensor data comes from {machine_info}."
+    if "gripper" not in hides:
+        gripper_obj = resolve_gripper_for_dataset(dataset, grippers or [], dataset_index or {})
+        gripper_info = gripper_details_block(gripper_obj)
+        if gripper_info:
+            article = _indefinite_article(gripper_info)
+            if machine_sentence:
+                machine_sentence += f" It is equipped with {article} {gripper_info}."
+            else:
+                machine_sentence = f"The robot is equipped with {article} {gripper_info}."
 
     context = question_item.get("context") if isinstance(question_item.get("context"), dict) else {}
     ts_text = format_context_time_series(context)
@@ -259,9 +266,9 @@ def build_prompt(
     question_text = str(question_item.get("question", "")).strip()
     options_text = format_options(question_item.get("options"))
 
-    prompt = f"{machine_sentence}\n{ts_text}\nQuestion: {question_text}"
-    if mapping_text:
-        prompt = f"{machine_sentence}\n{mapping_text}\n{ts_text}\nQuestion: {question_text}"
+    header_parts = [p for p in [machine_sentence, mapping_text] if p]
+    header = "\n".join(header_parts)
+    prompt = f"{header}\n{ts_text}\nQuestion: {question_text}" if header else f"{ts_text}\nQuestion: {question_text}"
     if options_text:
         prompt += f"\nHere are the options:\n{options_text}"
     return prompt

@@ -25,7 +25,7 @@ import logging
 import random
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -38,7 +38,7 @@ from src.question_generation.utils.time_series import parse_event_id
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad", "simulations"]
+VALID_DATASETS = ["inter_aursad", "inter_vorausad", "simulations", "factorywave"]
 RANKING_LABELS = ["A", "B", "C", "D"]
 RANKING_TEMPLATE_IDS = {3, 4}
 RANKING_METRIC = {3: "duration", 4: "energy"}
@@ -124,8 +124,21 @@ def get_root_cause_for_subseries(
             "event_context": None,
         }
 
+    # If the subseries has no non-zero fault_label, the window shows normal
+    # operation regardless of event tokens nearby.
+    if dominant_label == 0:
+        return {
+            "anomaly_present": False,
+            "fault_label": 0,
+            "root_cause": "normal",
+            "description": "Normal operation — no anomaly present.",
+            "event_id": None,
+            "event_name": None,
+            "event_context": None,
+        }
+
     rc = root_causes.get(dominant_label, {})
-    root_cause_key = rc.get("root_cause", f"fault_{dominant_label}") if dominant_label != 0 else "unknown"
+    root_cause_key = rc.get("root_cause", f"fault_{dominant_label}")
 
     return {
         "anomaly_present": True,
@@ -234,6 +247,7 @@ def _try_generate_ranking_question(
         "level": 4,
         "template_id": template["id"],
         "template_type": template["type"],
+                "hides": template.get("hides", []),
         "question": template["template"],
         "options": {},
         "answer": answer,
@@ -275,6 +289,9 @@ def generate_level4_questions(
 
     episode_cache: Dict[str, List[Dict[str, Any]]] = {}
     raw_cache: Dict[str, Any] = {}
+    meta_cache: Dict[str, Tuple[Optional[int], Dict[str, Any]]] = {}
+
+    _OPTIMIZATION_FAULTS = {22, 23, 28}
 
     def load_episode(path: Path) -> List[Dict[str, Any]]:
         key = str(path)
@@ -287,6 +304,34 @@ def generate_level4_questions(
             episode_cache[key] = rows if isinstance(rows, list) else []
         return episode_cache[key]
 
+    def load_meta(ep_path: Path) -> Tuple[Optional[int], Dict[str, Any]]:
+        key = str(ep_path)
+        if key not in meta_cache:
+            meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
+            fid = None
+            meta: Dict[str, Any] = {}
+            if meta_path.exists():
+                try:
+                    meta = load_json(meta_path)
+                    fid = meta.get("fault_id")
+                    if fid is not None:
+                        fid = int(float(fid))
+                except Exception:
+                    pass
+            meta_cache[key] = (fid, meta)
+        return meta_cache[key]
+
+    # Build per-template episode pools based on fault_id
+    all_episodes: List[Tuple[str, Path]] = [
+        (ds, p) for ds, paths in episodes_by_dataset.items() for p in paths
+    ]
+    optimization_episodes = [
+        (ds, p) for ds, p in all_episodes if load_meta(p)[0] in _OPTIMIZATION_FAULTS
+    ]
+    troubleshooting_episodes = [
+        (ds, p) for ds, p in all_episodes if load_meta(p)[0] not in _OPTIMIZATION_FAULTS
+    ]
+
     generated = 0
     attempts = 0
     max_total_attempts = n * 20
@@ -294,7 +339,16 @@ def generate_level4_questions(
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
-        template = random.choice(templates)
+        # Exclude trajectory optimization templates for now (IDs 3, 4)
+        _DISABLED_TEMPLATE_IDS = {3, 4}
+        usable = [t for t in templates if t["id"] not in _DISABLED_TEMPLATE_IDS]
+        if not optimization_episodes:
+            usable = [t for t in usable if t["id"] != 2]
+        if not troubleshooting_episodes:
+            usable = [t for t in usable if t["id"] != 1]
+        if not usable:
+            break
+        template = random.choice(usable)
 
         # --- Templates 3 & 4: multi-episode ranking ---
         if template["id"] in RANKING_TEMPLATE_IDS:
@@ -306,8 +360,10 @@ def generate_level4_questions(
 
         # --- Templates 1 & 2: single-episode subseries ---
         else:
-            sampled_dataset = random.choice(available_datasets)
-            ep_path = random.choice(episodes_by_dataset[sampled_dataset])
+            if template["id"] == 2:
+                sampled_dataset, ep_path = random.choice(optimization_episodes)
+            else:
+                sampled_dataset, ep_path = random.choice(troubleshooting_episodes)
             rows = load_episode(ep_path)
 
             if not rows:
@@ -323,8 +379,11 @@ def generate_level4_questions(
             if not subseries:
                 continue
 
+            ep_fault_id, ep_meta = load_meta(ep_path)
+
             answer = None
             root_cause = None
+
             if template["id"] == 1:
                 rc_info = get_root_cause_for_subseries(
                     subseries, root_causes, events,
@@ -338,6 +397,42 @@ def generate_level4_questions(
                     answer = (
                         "No anomalous behavior detected in the sensor stream. "
                         "The machine is operating normally; no remediation is required."
+                    )
+
+            elif template["id"] == 2:
+                assert ep_fault_id is not None
+                rc_entry = root_causes.get(ep_fault_id, {})
+                root_cause = rc_entry.get("root_cause", "")
+
+                if ep_fault_id == 22:
+                    configured = ep_meta.get("tcp_offset_configured")
+                    correct = ep_meta.get("correct_tcp_offset")
+                    if configured is None or correct is None:
+                        continue
+                    answer = (
+                        f"The TCP offset is misconfigured at {configured} "
+                        f"instead of the correct {correct}. "
+                        f"Update the TCP position offset in the installation settings to {correct}."
+                    )
+                elif ep_fault_id == 23:
+                    configured = ep_meta.get("payload_mass_configured")
+                    correct = ep_meta.get("correct_payload_mass")
+                    if configured is None or correct is None:
+                        continue
+                    answer = (
+                        f"The payload mass is set to {configured} kg "
+                        f"but the actual payload weighs {correct} kg. "
+                        f"Update the payload mass in the installation settings to {correct} kg."
+                    )
+                elif ep_fault_id == 28:
+                    configured = ep_meta.get("payload_cog_configured")
+                    correct = ep_meta.get("correct_payload_cog")
+                    if configured is None or correct is None:
+                        continue
+                    answer = (
+                        f"The payload center of gravity is set to {configured} "
+                        f"but the correct value is {correct}. "
+                        f"Update the CoG offset in the installation settings to {correct}."
                     )
 
             important_features = template.get("important_features")
@@ -354,6 +449,7 @@ def generate_level4_questions(
                 "level": 4,
                 "template_id": template["id"],
                 "template_type": template["type"],
+                "hides": template.get("hides", []),
                 "question": template["template"],
                 "options": {},
                 "answer": answer,
@@ -426,7 +522,7 @@ def main() -> None:
     templates = load_templates(Path(__file__).with_name("question_template.json"))
     root_causes = load_root_causes(args.datasets_dir / "labelling" / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "labelling" / "events.json")
-    ur3_mapping_path = args.datasets_dir / "labelling" / "rca" / "root_cause_ur3_error_mapping.json"
+    ur3_mapping_path = args.datasets_dir / "labelling" / "rca" / "root_cause_error_mapping.json"
     ur3_mapping = load_ur3_mapping(ur3_mapping_path) if ur3_mapping_path.exists() else None
 
     generate_level4_questions(

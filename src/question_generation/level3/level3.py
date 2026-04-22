@@ -40,9 +40,10 @@ from src.question_generation.utils.time_series import (
 )
 from src.question_generation.level3.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
 
+
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad"]
+VALID_DATASETS = ["inter_aursad", "inter_vorausad", "factorywave"]
 STEPS_AHEAD_RANGE = (1, 10)
 CONTEXT_MIN = 16
 CONTEXT_MAX = 90
@@ -52,7 +53,7 @@ CONTEXT_MAX = 90
 EXCLUDED_JOINT_SIGNALS = {"joint_voltage", "joint_temp", "joint_mode"}
 JOINT_INDEX_RANGE = set(range(6))
 MIN_POST_EVENT_TIMESTAMPS_AFTER = 5
-CF_DATASET_FOLDERS = ["cf_aursad", "cf_vorausad", "simulations"]  # full list; filtered at runtime via --datasets
+CF_DATASET_FOLDERS = ["cf_aursad", "cf_vorausad", "simulations", "factorywave"]  # full list; filtered at runtime via --datasets
 
 # MC option IDs that require signals absent from simulation data
 NON_SIMULATION_EXCLUDED_MC_IDS = {
@@ -717,6 +718,7 @@ def fill_template(
     steps_ahead: Optional[int] = None,
     episode_metadata: Optional[Dict[str, Any]] = None,
     dataset_name: Optional[str] = None,
+    event_description: str = "",
 ) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 3 question template.
@@ -763,27 +765,27 @@ def fill_template(
         chunk_to_label = {id(chunks[i]): labels[i] for i in range(len(chunks))}
         answer = "".join(chunk_to_label[id(chunk)] for chunk in ordered_chunks)
 
-        question = fill(tmpl_text, t=t, time_event=event_time, event=event_desc)
+        question = fill(tmpl_text, event=event_description)
 
-    # elif tid == 2:  # intervention_outcome (template removed from question_template.json)
-    #     options, answer = build_multiselect_options_and_answer(
-    #         answer_format=answer_format,
-    #         baseline_subseries=baseline_rows,
-    #         post_event_rows=post_event_rows,
-    #         mc_option_lookup=mc_option_lookup,
-    #         episode_metadata=episode_metadata,
-    #     )
-    #     question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
+    elif tid == 2:
+        options, answer = build_multiselect_options_and_answer(
+            answer_format=answer_format,
+            baseline_subseries=baseline_rows,
+            post_event_rows=post_event_rows,
+            mc_option_lookup=mc_option_lookup,
+            episode_metadata=episode_metadata,
+        )
+        question = fill(tmpl_text, event=event_description)
 
-    # elif tid == 3:  # trajectory_outcome_multiselect (template removed from question_template.json)
-    #     options, answer = build_multiselect_options_and_answer(
-    #         answer_format=answer_format,
-    #         baseline_subseries=baseline_rows,
-    #         post_event_rows=post_event_rows,
-    #         mc_option_lookup=mc_option_lookup,
-    #         episode_metadata=episode_metadata,
-    #     )
-    #     question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time)
+    elif tid == 3:
+        options, answer = build_multiselect_options_and_answer(
+            answer_format=answer_format,
+            baseline_subseries=baseline_rows,
+            post_event_rows=post_event_rows,
+            mc_option_lookup=mc_option_lookup,
+            episode_metadata=episode_metadata,
+        )
+        question = fill(tmpl_text, event=event_description)
 
     elif tid == 6:
         task_target_names: Dict[str, str] = template.get("task_target_names", {})
@@ -835,7 +837,8 @@ def fill_template(
         if not isinstance(signal_value, (int, float, np.floating)):
             return None
         answer = round(float(signal_value), 6)
-        question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time, signal=signal, n=n_ms)
+        from src.question_generation.level1.level1 import _signal_display_name
+        question = fill(tmpl_text, event=event_description, signal=_signal_display_name(signal), n=n_ms)
         vals = [float(r[signal]) for r in subseries if isinstance(r.get(signal), (int, float, np.floating))]
         std = float(np.std(vals)) if vals else 0.0
         acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std * 0.5, 6)}
@@ -873,7 +876,19 @@ def fill_template(
             tensor_stds.append(round(float(np.std(vals)) if vals else 0.0, 6))
 
         answer = "_".join(str(v) for v in tensor_values)
-        question = fill(tmpl_text, event=event_desc, t=t, time_event=event_time, joint_signal=joint_signal, n=n_ms)
+        _JOINT_SIGNAL_DISPLAY = {
+            "setpoint_pos": "commanded joint positions",
+            "setpoint_speed": "commanded joint velocities",
+            "setpoint_acc": "commanded joint accelerations",
+            "feedback_pos": "joint positions",
+            "feedback_speed": "joint velocities",
+            "effort_current": "joint motor currents",
+            "effort_target_current": "target joint currents",
+            "effort_target_torque": "joint motor torques",
+            "control_output": "joint control outputs",
+        }
+        joint_signal_display = _JOINT_SIGNAL_DISPLAY.get(joint_signal, joint_signal.replace("_", " "))
+        question = fill(tmpl_text, event=event_description, joint_signal=joint_signal_display, n=n_ms)
         acceptance_bounds = {"signal": joint_signal, "std": tensor_stds, "margin": [round(s * 0.5, 6) for s in tensor_stds]}
 
     else:
@@ -955,6 +970,8 @@ def generate_level3_questions(
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
+        template = random.choice(templates)
+
         sampled_dataset = random.choice(available_cf_datasets)
         pair = random.choice(pairs_by_dataset[sampled_dataset])
         non_alt_path = cast(Path, pair["non_alt_path"])
@@ -1014,8 +1031,6 @@ def generate_level3_questions(
         # Determine the event ID for this episode
         episode_event_id = parse_event_id(post_event_rows[0].get("event", 0))
 
-        template = random.choice(templates)
-
         # Skip predictive templates for collision events
         if template.get("type") == "predictive" and episode_event_id in COLLISION_EVENT_IDS:
             continue
@@ -1029,15 +1044,42 @@ def generate_level3_questions(
             effective_mc_lookup = {k: v for k, v in effective_mc_lookup.items() if k not in PREDICTIVE_EXCLUDED_MC_IDS}
 
         ep_metadata: Optional[Dict[str, Any]] = None
-        if sampled_dataset == "simulations":
-            meta_path = alt_path.parent / f"{alt_path.stem}_metadata.json"
-            if meta_path.exists():
-                try:
-                    with meta_path.open(encoding="utf-8") as _f:
-                        raw_meta = json.load(_f)
+        ep_fault_id = None
+        meta_path = alt_path.parent / f"{alt_path.stem}_metadata.json"
+        if meta_path.exists():
+            try:
+                with meta_path.open(encoding="utf-8") as _f:
+                    raw_meta = json.load(_f)
+                if sampled_dataset == "simulations":
                     ep_metadata = raw_meta.get("counterfactual", {})
-                except Exception:
-                    pass
+                else:
+                    ep_metadata = raw_meta
+                ep_fault_id = raw_meta.get("cf_fault_id") or raw_meta.get("fault_id")
+                if ep_fault_id is not None:
+                    ep_fault_id = int(float(ep_fault_id))
+            except Exception:
+                pass
+
+        # Build event description from the event ID in the time series
+        # Use the event_id to look up root cause; fall back to fault_id from metadata
+        _effective_fault_id = episode_event_id if episode_event_id else ep_fault_id
+        _rc = root_causes.get(_effective_fault_id, {}) if _effective_fault_id else {}
+        _rc_name = _rc.get("root_cause", "")
+        if _rc_name:
+            _rc_display = _rc_name.replace("_", " ")
+            _article = "an" if _rc_display[0] in "aeiou" else "a"
+            _event_label = f"{_article} {_rc_display}"
+        else:
+            _event_label = "an unspecified fault"
+
+        # Include injection timestep unless the event spans the whole episode
+        # (event onset at index 0 = episode-wide fault)
+        _event_onset_idx = find_event_onset_index(alt_rows)
+        if _event_onset_idx is not None and _event_onset_idx > 0:
+            _onset_ts = alt_rows[_event_onset_idx].get("timestamp_ms", _event_onset_idx)
+            _event_desc = f"{_event_label} occurs at timestep {_onset_ts} ms"
+        else:
+            _event_desc = f"{_event_label} occurs"
 
         filled = fill_template(
             template,
@@ -1050,6 +1092,7 @@ def generate_level3_questions(
             steps_ahead=steps_ahead,
             episode_metadata=ep_metadata,
             dataset_name=sampled_dataset,
+            event_description=_event_desc,
         )
         if filled is None:
             continue
@@ -1066,6 +1109,7 @@ def generate_level3_questions(
             "level": 3,
             "template_id": template["id"],
             "template_type": template["type"],
+            "hides": template.get("hides", []),
             "question": filled["question"],
             "options": filled["options"],
             "answer": filled["answer"],

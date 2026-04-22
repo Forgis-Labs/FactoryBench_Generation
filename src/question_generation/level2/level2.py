@@ -40,10 +40,70 @@ from src.question_generation.utils.time_series import (
     sample_subseries_before_event,
 )
 from src.question_generation.level2.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
+from src.question_generation.level1.level1 import (
+    build_anomaly_single_select as l1_build_anomaly_single_select,
+    build_comparative_single_select as l1_build_comparative_single_select,
+    build_severity_ranking as l1_build_severity_ranking,
+    get_severity_rank as l1_get_severity_rank,
+    load_anomaly_lookup as l1_load_anomaly_lookup,
+    load_anomaly_ranking as l1_load_anomaly_ranking,
+    _phase_display_name,
+    _signal_display_name,
+    PHASE_NAMES,
+    DATASET_MACHINE_ID,
+)
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad", "simulations"]
+# Template IDs that use L1-style logic on anomalous data (not the event-based pipeline)
+_L1_STYLE_TEMPLATE_IDS = {6, 7, 8, 9, 10}
+
+# Human-readable anomaly phrases that fit mid-sentence after "suffers from"
+_ANOMALY_INLINE_NAMES: Dict[int, str] = {
+    1: "a damaged screw thread",
+    2: "an extra assembly component in the workspace",
+    3: "a missing screw",
+    4: "a damaged plate thread",
+    5: "a loosening phase instead of tightening",
+    8: "a gripper activation failure",
+    9: "a gripper release during motion",
+    10: "additional payload on one of its axes",
+    11: "a collision with a soft foam object",
+    12: "an unexpected payload weight",
+    14: "an invalid gripping position",
+    15: "an unstable mounting platform",
+    19: "a joint position limit violation",
+    22: "a TCP frame misconfiguration",
+    23: "a payload weight misconfiguration",
+    25: "an external arm disturbance",
+    28: "a payload center-of-gravity misconfiguration",
+    29: "a collision with a hanging cable",
+    30: "a collision with a cardboard object",
+    31: "a collision with a rigid object",
+    32: "a peg insertion misalignment",
+    33: "a hole obstruction",
+    34: "an incorrect insertion depth",
+    35: "peg surface contamination",
+    36: "a fixture displacement",
+    37: "a self-collision between arm links",
+    38: "a missing box at the pick position",
+    39: "a missing peg",
+}
+
+
+def _anomaly_inline_name(fault_id: int, root_cause: Dict[str, Any], capitalize: bool = False) -> str:
+    """Return a human-readable anomaly phrase that fits mid-sentence."""
+    name = _ANOMALY_INLINE_NAMES.get(fault_id)
+    if not name:
+        name = root_cause.get("root_cause", f"fault {fault_id}").replace("_", " ")
+        # Add article if missing
+        if not name.startswith(("a ", "an ")):
+            name = f"a {name}"
+    if capitalize:
+        return name[0].upper() + name[1:]
+    return name
+
+VALID_DATASETS = ["inter_aursad", "inter_vorausad", "simulations", "factorywave"]
 
 STEPS_AHEAD_RANGE = (1, 10)
 CONTEXT_MIN = 16
@@ -580,6 +640,7 @@ def fill_template(
     mc_option_lookup: Dict[str, str],
     steps_ahead: Optional[int] = None,
     episode_metadata: Optional[Dict[str, Any]] = None,
+    anomaly_description: str = "",
 ) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 2 question template.
@@ -599,12 +660,8 @@ def fill_template(
     tid = template["id"]
     tmpl_text: str = template["template"]
     answer_format: Dict[str, Any] = template["answer_format"]
-    t = get_last_timestamp(subseries)
-    t_event = _first_timestamp_ms(post_event_rows)
-
     onset_id = parse_event_id(post_event_rows[0].get("event", 0)) if post_event_rows else 0
-    event_obj = next((e for e in events if e["id"] == onset_id), random.choice(events))
-    event_desc = fill_event_description(event_obj, subseries, t, post_event_rows)
+    t_event = _first_timestamp_ms(post_event_rows)
 
     options: Dict[str, Any] = {}
     answer = None
@@ -626,7 +683,7 @@ def fill_template(
         chunk_to_label = {id(chunks[i]): labels[i] for i in range(len(chunks))}
         answer = "".join(chunk_to_label[id(chunk)] for chunk in ordered_chunks)
 
-        question = fill(tmpl_text, t_event=t_event, event=event_desc)
+        question = fill(tmpl_text, anomaly=anomaly_description)
 
     elif tid == 2:
         options, answer = build_multiselect_options_and_answer(
@@ -636,7 +693,7 @@ def fill_template(
             mc_option_lookup=mc_option_lookup,
             episode_metadata=episode_metadata,
         )
-        question = fill(tmpl_text, event=event_desc, t_event=t_event)
+        question = fill(tmpl_text, anomaly=anomaly_description)
 
     elif tid == 3:
         options, answer = build_multiselect_options_and_answer(
@@ -646,7 +703,7 @@ def fill_template(
             mc_option_lookup=mc_option_lookup,
             episode_metadata=episode_metadata,
         )
-        question = fill(tmpl_text, event=event_desc, t_event=t_event)
+        question = fill(tmpl_text, anomaly=anomaly_description)
 
     elif tid == 4:
         important_features = template.get("important_features")
@@ -661,7 +718,7 @@ def fill_template(
         if not isinstance(signal_value, (int, float, np.floating)):
             return None
         answer = round(float(signal_value), 6)
-        question = fill(tmpl_text, event=event_desc, t_event=t_event, signal=signal, n=n_ms)
+        question = fill(tmpl_text, anomaly=anomaly_description, signal=_signal_display_name(signal), n=n_ms)
         vals = [float(r[signal]) for r in subseries if isinstance(r.get(signal), (int, float, np.floating))]
         std = float(np.std(vals)) if vals else 0.0
         acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std * 0.5, 6)}
@@ -698,7 +755,19 @@ def fill_template(
             tensor_stds.append(round(float(np.std(vals)) if vals else 0.0, 6))
 
         answer = "_".join(str(v) for v in tensor_values)
-        question = fill(tmpl_text, event=event_desc, t_event=t_event, joint_signal=joint_signal, n=n_ms)
+        _JOINT_SIGNAL_DISPLAY = {
+            "setpoint_pos": "commanded joint positions",
+            "setpoint_speed": "commanded joint velocities",
+            "setpoint_acc": "commanded joint accelerations",
+            "feedback_pos": "joint positions",
+            "feedback_speed": "joint velocities",
+            "effort_current": "joint motor currents",
+            "effort_target_current": "target joint currents",
+            "effort_target_torque": "joint motor torques",
+            "control_output": "joint control outputs",
+        }
+        joint_signal_display = _JOINT_SIGNAL_DISPLAY.get(joint_signal, joint_signal.replace("_", " "))
+        question = fill(tmpl_text, anomaly=anomaly_description, joint_signal=joint_signal_display, n=n_ms)
         acceptance_bounds = {"signal": joint_signal, "std": tensor_stds, "margin": [round(s * 0.5, 6) for s in tensor_stds]}
 
     else:
@@ -709,7 +778,7 @@ def fill_template(
         "question": question,
         "answer_format": answer_format,
         "options": options,
-        "event_id": event_obj["id"],
+        "event_id": onset_id,
         "answer": answer,
         "acceptance_bounds": acceptance_bounds,
     }
@@ -738,6 +807,11 @@ def generate_level2_questions(
     if mc_option_lookup is None:
         mc_option_lookup = {}
 
+    # Load anomaly lookup for L1-style templates (7 = anomaly detection)
+    anomaly_lookup = l1_load_anomaly_lookup(
+        datasets_dir / "labelling" / "rca" / "anomalies.json"
+    )
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
     allowed = datasets if datasets else VALID_DATASETS
@@ -755,6 +829,7 @@ def generate_level2_questions(
             f"No usable datasets with episodes found under {datasets_dir / 'normalized_episodes'}"
         )
     episode_cache: Dict[str, List[Dict[str, Any]]] = {}
+    meta_cache: Dict[str, Dict[str, Any]] = {}
 
     def load_episode(path: Path) -> List[Dict[str, Any]]:
         key = str(path)
@@ -766,6 +841,32 @@ def generate_level2_questions(
             episode_cache[key] = raw
         return episode_cache[key]
 
+    def load_meta(ep_path: Path) -> Dict[str, Any]:
+        key = str(ep_path)
+        if key not in meta_cache:
+            meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
+            meta: Dict[str, Any] = {}
+            if meta_path.exists():
+                try:
+                    meta = load_json(meta_path)
+                except Exception:
+                    pass
+            meta_cache[key] = meta
+        return meta_cache[key]
+
+    # Pre-filter: only episodes that have a fault_id (all L2 templates need anomalous data)
+    anomalous_episodes: List[Tuple[str, Path]] = []
+    for ds, paths in episodes_by_dataset.items():
+        for p in paths:
+            if load_meta(p).get("fault_id"):
+                anomalous_episodes.append((ds, p))
+
+    if not anomalous_episodes:
+        logger.warning("No episodes with fault_id found; cannot generate L2 questions.")
+        return
+
+    logger.info(f"L2 eligible episodes: {len(anomalous_episodes)}")
+
     generated = 0
     attempts = 0
     max_total_attempts = n * 20
@@ -773,37 +874,165 @@ def generate_level2_questions(
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
+        template = random.choice(templates)
         steps_ahead = random.randint(*STEPS_AHEAD_RANGE)
 
-        ds = random.choice(available_datasets)
-        ep_path = random.choice(episodes_by_dataset[ds])
+        ds, ep_path = random.choice(anomalous_episodes)
         rows = load_episode(ep_path)
         if not isinstance(rows, list) or len(rows) < CONTEXT_MIN:
             continue
 
-        sampled = sample_subseries_before_event(
-            rows,
-            CONTEXT_MIN,
-            CONTEXT_MAX,
-            min_post_event_after=MIN_POST_EVENT_TIMESTAMPS_AFTER,
-            return_metadata=True,
-        )
-        subseries, post_event_rows, subseries_start_index, subseries_length = cast(
-            Tuple[List[Dict[str, Any]], List[Dict[str, Any]], int, int],
-            sampled,
-        )
-        if not subseries:
+        _ep_meta = load_meta(ep_path)
+        ep_fault_id = _ep_meta.get("fault_id")
+        ep_task = _ep_meta.get("task", "")
+
+        # Event-based templates need subseries positioned before an event;
+        # L1-style templates just need any anomalous subseries.
+        _EVENT_TEMPLATE_IDS = {1, 2, 3, 4, 5}
+        subseries: List[Dict[str, Any]] = []
+        post_event_rows: List[Dict[str, Any]] = []
+        event_segment_rows: List[Dict[str, Any]] = []
+        subseries_start_index = 0
+        subseries_length = 0
+
+        if template["id"] in _EVENT_TEMPLATE_IDS:
+            sampled = sample_subseries_before_event(
+                rows,
+                CONTEXT_MIN,
+                CONTEXT_MAX,
+                min_post_event_after=MIN_POST_EVENT_TIMESTAMPS_AFTER,
+                return_metadata=True,
+            )
+            subseries, post_event_rows, subseries_start_index, subseries_length = cast(
+                Tuple[List[Dict[str, Any]], List[Dict[str, Any]], int, int],
+                sampled,
+            )
+            if not subseries:
+                continue
+
+            base_timestamp_ms = _first_timestamp_ms(subseries)
+            subseries = normalize_timestamps(subseries, base_timestamp_ms)
+            post_event_rows = normalize_timestamps(post_event_rows, base_timestamp_ms)
+
+            event_segment_rows, _post_after_event_rows = split_event_segment(post_event_rows)
+            if not event_segment_rows:
+                continue
+
+        # L1-style templates: handle inline on anomalous episodes
+        if template["id"] in _L1_STYLE_TEMPLATE_IDS:
+            # Pick a random anomalous episode (not necessarily the CF one)
+            _all_eps = [(d, p) for d, ps in episodes_by_dataset.items() for p in ps]
+            _ds, _ep_path = random.choice(_all_eps)
+            _raw = load_json(_ep_path)
+            if isinstance(_raw, dict):
+                _raw = _raw.get("baseline", _raw.get("flat", []))
+            if not isinstance(_raw, list) or len(_raw) < CONTEXT_MIN:
+                continue
+            _fl = pick_fault_label(_raw)
+            if _fl == 0:
+                continue
+            _rc = root_causes.get(_fl, {})
+            _anomaly = _anomaly_inline_name(_fl, _rc)
+            _machine_id = DATASET_MACHINE_ID.get(_ds, -1)
+
+            _meta_path = _ep_path.with_name(_ep_path.stem + "_metadata.json")
+            _ep_task = ""
+            if _meta_path.exists():
+                try:
+                    _meta = load_json(_meta_path)
+                    _ep_task = _meta.get("task", "")
+                except Exception:
+                    pass
+
+            from src.question_generation.level1.level1 import sample_subseries as l1_sample
+            _sampled = l1_sample(_raw)
+            if _sampled is None:
+                continue
+            _sub, _start = _sampled
+            _sub = normalize_timestamps(_sub, _first_timestamp_ms(_sub))
+
+            _tmpl = template["template"]
+            _af = template["answer_format"]
+            _tid = template["id"]
+            _opts: Dict[str, Any] = {}
+            _ans: Any = None
+            _bounds = None
+
+            if _tid == 6:
+                _phases: List[Tuple[str, int, int]] = []
+                _cur = None
+                _ps = 0
+                for _i, _r in enumerate(_raw):
+                    _p = _r.get("task_phase")
+                    if _p != _cur:
+                        if _cur is not None and str(_cur) not in ("None", "none", ""):
+                            _phases.append((str(_cur), _ps, _i - _ps))
+                        _cur = _p
+                        _ps = _i
+                if _cur is not None and str(_cur) not in ("None", "none", ""):
+                    _phases.append((str(_cur), _ps, len(_raw) - _ps))
+                if len(_phases) < 3:
+                    continue
+                _inner = [(n_, s_, l_) for n_, s_, l_ in _phases[1:-1] if l_ >= 3]
+                if not _inner:
+                    continue
+                _pn, _pi, _pl = random.choice(_inner)
+                _ans = _pi
+                _tmpl_filled = fill(_tmpl, anomaly=_anomaly, phase=_phase_display_name(_pn, _ep_task), window_length=_pl + 5)
+                _bounds = {"tolerance": 3}
+
+            elif _tid == 7:
+                _opts, _ans = l1_build_anomaly_single_select(_fl, root_causes, anomaly_lookup)
+                _tmpl_filled = _tmpl  # no {anomaly} placeholder — the model must identify it
+
+            elif _tid == 10:
+                _rn = {0: "Universal Robots UR3e", 2: "Agile Robots Yu 5 Industrial", 3: "KUKA KR 10 R1100-2"}
+                if _machine_id not in _rn:
+                    continue
+                _correct = _rn[_machine_id]
+                _fixed = _af.get("fixed_options", list(_rn.values()))
+                _labels = ["A", "B", "C"][:len(_fixed)]
+                _entries = list(_fixed)
+                random.shuffle(_entries)
+                _opts = {}
+                _ans = "A"
+                for _i, _name in enumerate(_entries):
+                    _opts[_labels[_i]] = _name
+                    if _name == _correct:
+                        _ans = _labels[_i]
+                _tmpl_filled = fill(_tmpl, anomaly=_anomaly)
+
+            else:
+                # Templates 8 (comparative) and 9 (ranking) — skip for now
+                continue
+
+            _imp = template.get("important_features")
+            if _imp:
+                _keep = set(_imp) | {"timestamp_ms", "fault_label", "task_phase"}
+                _ctx_rows = [{k: v for k, v in r.items() if k in _keep} for r in _sub]
+            else:
+                _ctx_rows = _sub
+
+            item = {
+                "id": str(uuid.uuid4()),
+                "level": 2,
+                "template_id": _tid,
+                "template_type": template["type"],
+            "hides": template.get("hides", []),
+                "question": _tmpl_filled,
+                "options": _opts,
+                "answer": _ans,
+                "acceptance_bounds": _bounds,
+                "provenance": {"dataset": _ds, "episode": _ep_path.stem, "fault_label": _fl, "subseries_start_index": _start, "subseries_length": len(_sub)},
+                "context": build_context(_ctx_rows),
+            }
+
+            out_path = output_dir / f"level2_{generated:04d}.json"
+            with out_path.open("w", encoding="utf-8") as f:
+                json.dump(item, f, indent=2)
+            logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template {_tid}, {_ds})")
+            generated += 1
             continue
-
-        base_timestamp_ms = _first_timestamp_ms(subseries)
-        subseries = normalize_timestamps(subseries, base_timestamp_ms)
-        post_event_rows = normalize_timestamps(post_event_rows, base_timestamp_ms)
-
-        event_segment_rows, _post_after_event_rows = split_event_segment(post_event_rows)
-        if not event_segment_rows:
-            continue
-
-        template = random.choice(templates)
 
         if ds == "simulations":
             effective_mc_lookup = {k: v for k, v in mc_option_lookup.items() if k not in SIMULATION_EXCLUDED_MC_IDS}
@@ -824,9 +1053,14 @@ def generate_level2_questions(
                 except Exception:
                     pass
 
+        # Get anomaly description from metadata fault_id
+        _rc = root_causes.get(ep_fault_id, {}) if ep_fault_id else {}
+        _anomaly_desc = _anomaly_inline_name(ep_fault_id, _rc) if ep_fault_id else ""
+
         filled = fill_template(
             template, subseries, post_event_rows, events, effective_mc_lookup,
             steps_ahead=steps_ahead, episode_metadata=ep_metadata,
+            anomaly_description=_anomaly_desc,
         )
         if filled is None:
             continue
@@ -843,6 +1077,7 @@ def generate_level2_questions(
             "level": 2,
             "template_id": template["id"],
             "template_type": template["type"],
+            "hides": template.get("hides", []),
             "question": filled["question"],
             "options": filled["options"],
             "answer": filled["answer"],
