@@ -80,8 +80,12 @@ def decimate_dataframe(
                     .values
                     .astype(np.float64)
                 )
-                decimated = _sp_decimate(filled, q)
-                out[col] = decimated[:n_out]
+                try:
+                    decimated = _sp_decimate(filled, q)
+                    out[col] = decimated[:n_out]
+                except ValueError:
+                    # Signal too short for the anti-alias filter — fall back to subsample
+                    out[col] = filled[::q][:n_out]
         else:
             # Categorical / integer / string — just pick every q-th value.
             out[col] = values[::q][:n_out]
