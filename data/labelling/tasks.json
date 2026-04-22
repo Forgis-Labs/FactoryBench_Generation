@@ -2,142 +2,189 @@
   {
     "id": "pick_and_place",
     "name": "Pick and Place",
-    "description": "Robot picks an object from a source location and places it at a target location.",
+    "description": "Robot picks an object from a source location and places it at a target location (bin).",
     "phases": [
       {
-        "id": "approach",
+        "id": "above_pick",
         "label": 0,
-        "name": "Approach",
-        "description": "Robot moves end-effector above the target object.",
-        "transitions_to": "pre_grasp",
-        "transition_condition": "ee within horizontal threshold of object, above grasp height"
+        "name": "Above Pick",
+        "description": "EEF moves to a waypoint directly above the object."
       },
       {
-        "id": "pre_grasp",
+        "id": "descend",
         "label": 1,
-        "name": "Pre-Grasp",
-        "description": "Robot descends to grasp pose with gripper open.",
-        "transitions_to": "grasp",
-        "transition_condition": "ee at grasp height, gripper fully open"
+        "name": "Descend",
+        "description": "EEF lowers toward the object."
       },
       {
-        "id": "grasp",
+        "id": "settle",
         "label": 2,
-        "name": "Grasp",
-        "description": "Gripper closes around the object.",
-        "transitions_to": "lift",
-        "transition_condition": "gripper aperture below threshold, contact force detected"
+        "name": "Settle",
+        "description": "Brief hold to let physics settle before grasping."
+      },
+      {
+        "id": "close",
+        "label": 3,
+        "name": "Close",
+        "description": "Gripper closes around the object."
       },
       {
         "id": "lift",
-        "label": 3,
+        "label": 4,
         "name": "Lift",
-        "description": "Robot raises the object to a safe transport height.",
-        "transitions_to": "transport",
-        "transition_condition": "ee height above lift threshold, object height tracking ee"
+        "description": "EEF lifts the grasped object off the surface."
       },
       {
-        "id": "transport",
-        "label": 4,
-        "name": "Transport",
-        "description": "Robot moves the object horizontally to above the target location.",
-        "transitions_to": "lower",
-        "transition_condition": "ee within horizontal threshold of target location"
+        "id": "move_xy",
+        "label": 5,
+        "name": "Move XY",
+        "description": "Lateral transfer toward the bin."
       },
       {
         "id": "lower",
-        "label": 5,
-        "name": "Lower",
-        "description": "Robot descends to place the object at the target location.",
-        "transitions_to": "release",
-        "transition_condition": "object contact with surface detected or ee at place height"
-      },
-      {
-        "id": "release",
         "label": 6,
-        "name": "Release",
-        "description": "Gripper opens and releases the object.",
-        "transitions_to": "retreat",
-        "transition_condition": "gripper fully open"
+        "name": "Lower",
+        "description": "EEF lowers into the bin."
       },
       {
-        "id": "retreat",
+        "id": "open",
         "label": 7,
-        "name": "Retreat",
-        "description": "Robot moves end-effector away from the placed object.",
-        "transitions_to": null,
-        "transition_condition": "ee distance from object above threshold"
+        "name": "Open",
+        "description": "Gripper opens, object released."
+      },
+      {
+        "id": "retract",
+        "label": 8,
+        "name": "Retract",
+        "description": "EEF moves away from the bin."
+      },
+      {
+        "id": "return",
+        "label": 9,
+        "name": "Return",
+        "description": "EEF returns to home configuration."
       }
     ]
   },
   {
     "id": "screwing",
     "name": "Screwing",
-    "description": "Robot picks up a screw driver or bit, aligns it with a screw hole, and drives the screw to a target torque.",
+    "description": "Robot tightens a pre-gripped screw into a threaded hole, then loosens and retrieves it.",
     "phases": [
       {
-        "id": "approach_screw",
-        "label": 8,
-        "name": "Approach Screw",
-        "description": "Robot moves end-effector above the screw or driver tool.",
-        "transitions_to": "tool_grasp",
-        "transition_condition": "ee within horizontal threshold of tool, above grasp height"
+        "id": "approach",
+        "label": 0,
+        "name": "Approach",
+        "description": "EEF moves to a pre-contact waypoint above the fastener."
       },
       {
-        "id": "tool_grasp",
-        "label": 9,
-        "name": "Tool Grasp",
-        "description": "Gripper closes around the screwdriver or bit.",
-        "transitions_to": "approach_hole",
-        "transition_condition": "gripper aperture below threshold, contact force detected"
+        "id": "descend_to_screw",
+        "label": 1,
+        "name": "Descend",
+        "description": "EEF lowers to engage the fastener."
       },
       {
-        "id": "approach_hole",
-        "label": 10,
-        "name": "Approach Hole",
-        "description": "Robot moves end-effector to above the target screw hole.",
-        "transitions_to": "alignment",
-        "transition_condition": "ee within horizontal threshold of hole position"
+        "id": "screw",
+        "label": 2,
+        "name": "Screw",
+        "description": "Continuous downward force + wrist rotation to thread."
       },
       {
-        "id": "alignment",
-        "label": 11,
-        "name": "Alignment",
-        "description": "Robot descends and aligns tool tip axially with the screw hole.",
-        "transitions_to": "insertion",
-        "transition_condition": "tool tip within positional and angular tolerance of hole axis"
+        "id": "disengage",
+        "label": 3,
+        "name": "Disengage",
+        "description": "Gripper opens / tool lifts off."
       },
       {
-        "id": "insertion",
-        "label": 12,
-        "name": "Insertion",
-        "description": "Robot applies downward force to seat the tool tip into the screw head.",
-        "transitions_to": "driving",
-        "transition_condition": "contact force above threshold, tool tip engaged with screw head"
-      },
-      {
-        "id": "driving",
-        "label": 13,
-        "name": "Driving",
-        "description": "Robot rotates the tool while applying axial force to drive the screw.",
-        "transitions_to": "seating",
-        "transition_condition": "screw depth nearing target or torque rising"
-      },
-      {
-        "id": "seating",
-        "label": 14,
-        "name": "Seating",
-        "description": "Robot reduces rotation speed and monitors torque as screw seats.",
-        "transitions_to": "retract",
-        "transition_condition": "measured torque reaches target torque threshold"
-      },
-      {
-        "id": "retract",
-        "label": 15,
+        "id": "retract_after_screw",
+        "label": 4,
         "name": "Retract",
-        "description": "Robot lifts tool away from the driven screw.",
-        "transitions_to": null,
-        "transition_condition": "ee height above retract threshold, no contact force"
+        "description": "EEF returns to a safe height."
+      },
+      {
+        "id": "descend_to_loosen",
+        "label": 5,
+        "name": "Descend",
+        "description": "EEF lowers to engage the fastener."
+      },
+      {
+        "id": "loosen",
+        "label": 6,
+        "name": "Loosen",
+        "description": "Loosen screw."
+      },
+      {
+        "id": "engage",
+        "label": 7,
+        "name": "Engage",
+        "description": "Gripper closes."
+      },
+      {
+        "id": "retract_home",
+        "label": 8,
+        "name": "Retract",
+        "description": "EEF returns to a home position."
+      }
+    ]
+  },
+  {
+    "id": "peg_in_hole",
+    "name": "Peg in Hole",
+    "description": "Robot inserts a pre-gripped peg into a fixture/slot, releases it, then retrieves it and returns home.",
+    "phases": [
+      {
+        "id": "above_hole_approach",
+        "label": 0,
+        "name": "Above Hole",
+        "description": "EEF moves above the hole and aligns."
+      },
+      {
+        "id": "insert",
+        "label": 1,
+        "name": "Insert",
+        "description": "EEF pushes peg downward into the hole."
+      },
+      {
+        "id": "disengage",
+        "label": 2,
+        "name": "Disengage",
+        "description": "Gripper opens."
+      },
+      {
+        "id": "above_hole_rise",
+        "label": 3,
+        "name": "Above Hole",
+        "description": "EEF rises back to the waypoint above the hole."
+      },
+      {
+        "id": "retract_after_insert",
+        "label": 4,
+        "name": "Retract",
+        "description": "EEF returns to home position."
+      },
+      {
+        "id": "above_object_descend",
+        "label": 5,
+        "name": "Above Object",
+        "description": "EEF moves above the object and aligns with object."
+      },
+      {
+        "id": "engage",
+        "label": 6,
+        "name": "Engage",
+        "description": "Gripper closes."
+      },
+      {
+        "id": "above_object_rise",
+        "label": 7,
+        "name": "Above Object",
+        "description": "EEF rises back to the waypoint above the object."
+      },
+      {
+        "id": "retract_home",
+        "label": 8,
+        "name": "Retract",
+        "description": "EEF returns to home position."
       }
     ]
   }

@@ -18,5 +18,15 @@
     "task_id": "pick_and_place",
     "source": "https://github.com/vorausrobotik/voraus-ad-dataset",
     "license": "Apache-2.0"
+  },
+  {
+    "dataset_id": "factorywave",
+    "name": "FactoryWave",
+    "description": "Real-robot recordings from a UR3 cobot covering pick-and-place, peg-in-hole, and screwing tasks, with normal, fault, counterfactual, and trajectory-optimization conditions.",
+    "machine_id": 0,
+    "gripper_id": null,
+    "task_id": "mixed",
+    "source": "https://huggingface.co/datasets/Forgis/FactoryWave",
+    "license": "Apache-2.0"
   }
 ]

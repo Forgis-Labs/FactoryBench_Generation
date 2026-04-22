@@ -80,14 +80,6 @@
     "ur3_protocol": "a) Inspect the workspace and remove any soft obstructions from the programmed trajectory. b) If a protective stop occurred, acknowledge it in the robot controller interface and verify the arm posture is nominal before resuming. c) Reduce speed if repeated false-positive collision detections occur."
   },
   {
-    "fault_id": 12,
-    "root_cause": "unexpected_payload_weight",
-    "ur3_error_code": "C 283 A 26",
-    "ur3_error_name": "Force limitation: exceeded torque window",
-    "ur3_description": null,
-    "ur3_protocol": "a) Verify the mounted payload mass and CoG configuration match the actual object being transported. b) Update the payload configuration if the weight differs from the configured value. c) Reduce motion speeds and accelerations until the payload configuration is corrected. d) If force limit violations persist with a correct payload configuration, contact the robot manufacturer's support."
-  },
-  {
     "fault_id": 13,
     "root_cause": "cable_routed_on_robot",
     "ur3_error_code": "C 173 A 1",
@@ -161,7 +153,7 @@
   },
   {
     "fault_id": 23,
-    "root_cause": "zero_payload_misconfiguration",
+    "root_cause": "payload_misconfiguration",
     "ur3_error_code": "C 158 A",
     "ur3_error_name": "Protective Stop: Collision detected by joint",
     "ur3_description": "The joint torque model detected an unexpected resistive force consistent with a physical collision while the payload is specified as 0 kg, making the collision threshold very sensitive.",
@@ -278,5 +270,21 @@
     "ur3_error_name": "Protective Stop: Collision detected by joint",
     "ur3_description": "The programmed trajectory drove the arm into a self-colliding configuration where a link contacted the robot's own body or mounting fixture, triggering an immediate protective stop.",
     "ur3_protocol": "a) Do NOT jog the robot blindly: identify the self-colliding configuration from the joint state at stop time before moving any joint. b) Manually back out the arm to a safe posture using reduced-speed gravity-compensation (backdrive) mode or slow jog. c) Inspect all links and the mounting fixture for damage. d) Review and correct the motion that caused the self-colliding configuration (whether by adjusting waypoints, modifying trajectory generator parameters, or replanning the path) to ensure the arm stays clear of itself and the mounting fixture across the full motion range."
+  },
+  {
+    "fault_id": 38,
+    "root_cause": "missing_box",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The robot executed the full pick-and-place cycle but no box was present at the pick position. The gripper closed on empty air and the arm transported no payload.",
+    "ur3_protocol": "a) Halt the cycle and verify the pick position is loaded with the correct object before retrying. b) Check the upstream supply or operator workflow to determine why the object was absent. c) If automatic object detection is available, enable a pick-confirmation check (e.g. vacuum level or force threshold) so the robot aborts early when no object is gripped rather than completing an empty transport cycle."
+  },
+  {
+    "fault_id": 39,
+    "root_cause": "missing_peg",
+    "ur3_error_code": null,
+    "ur3_error_name": null,
+    "ur3_description": "The robot executed the full peg-in-hole cycle but no peg was gripped. The arm descended into the hole empty-handed and the insertion phase produced no contact force.",
+    "ur3_protocol": "a) Halt the cycle and verify the peg is available and correctly positioned for gripping before retrying. b) Check the gripper closure force or sensor feedback to confirm whether the peg was lost during pick or was never present. c) Inspect the peg supply fixture for misalignment or depletion. d) If automatic grip detection is available, enable a grip-confirmation check so the robot aborts before attempting insertion with an empty gripper."
   }
 ]

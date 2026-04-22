@@ -36,15 +36,6 @@
     "error_suggestion": ""
   },
   {
-    "fault_id": 12,
-    "root_cause": "unexpected_payload_weight",
-    "root_cause_description": "The can being transported has an unexpected weight that deviates from the nominal 241 g. This may simulate a damaged can or upstream filling errors. Tested weights range from 41 g (empty) to 448 g.",
-    "primary_error_code": "C283A26",
-    "error_description": "Force limitation: exceeded torque window",
-    "error_explanation": "",
-    "error_suggestion": "a) Ensure the mounted payload, TCP and Co G matches your configuration. b) Slowdown movements c) Contact your local Universal Robots service provider for assistance."
-  },
-  {
     "fault_id": 13,
     "root_cause": "cable_routed_on_robot",
     "root_cause_description": "A cable is attached along the robot arm with cable ties, introducing pose-dependent friction and gravity loading on affected axes as the cable bends and twists during motion.",
@@ -127,7 +118,7 @@
   },
   {
     "fault_id": 23,
-    "root_cause": "zero_payload_misconfiguration",
+    "root_cause": "payload_misconfiguration",
     "root_cause_description": "The payload mass is left at 0 kg in the robot configuration while a tool or workpiece is physically attached, causing the collision detection model to trigger on normal inertial forces.",
     "primary_error_code": "C158A",
     "error_description": "Protective Stop: Collision detected by joint",

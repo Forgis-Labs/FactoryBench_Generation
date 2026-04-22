@@ -204,38 +204,6 @@
     "simulation_procedure": "Place a foam cube or foam block directly in the programmed trajectory of the TCP. The robot will push through or deflect it with only a brief force spike recorded."
   },
   {
-    "fault_id": 12,
-    "task": [
-      "pick_and_place"
-    ],
-    "root_cause": "unexpected_payload_weight",
-    "description": "The can being transported has an unexpected weight that deviates from the nominal 241 g. This may simulate a damaged can or upstream filling errors. Tested weights range from 41 g (empty) to 448 g.",
-    "severity_levels": [
-      "low",
-      "medium",
-      "high"
-    ],
-    "injectable": true,
-    "event_id": 6,
-    "possible_anomalies": [
-      "torque_deviation_from_nominal",
-      "motor_iq_elevation",
-      "increased_computed_inertia",
-      "persistent_tracking_error"
-    ],
-    "related_error_codes": [
-      "C153A0",
-      "C153A1",
-      "C153A2",
-      "C153A3",
-      "C153A4",
-      "C153A5",
-      "C283A26"
-    ],
-    "primary_error_code": "C283A26",
-    "simulation_procedure": "Replace the nominal payload with cans of known different weights (e.g. empty or filled) without updating the payload configuration."
-  },
-  {
     "fault_id": 14,
     "root_cause": "invalid_gripping_position",
     "description": "The can is gripped at an unusual or offset position due to a timing error in the pick sequence, causing an asymmetric payload distribution and altered gripper-to-can contact geometry.",
@@ -323,7 +291,7 @@
   },
   {
     "fault_id": 23,
-    "root_cause": "zero_payload_misconfiguration",
+    "root_cause": "payload_misconfiguration",
     "description": "The payload mass is left at 0 kg in the robot configuration while a tool or workpiece is physically attached, causing the collision detection model to trigger on normal inertial forces.",
     "severity_levels": [
       "low",

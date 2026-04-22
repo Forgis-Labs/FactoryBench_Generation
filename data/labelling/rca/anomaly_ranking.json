@@ -52,7 +52,7 @@
     {
       "rank": 8,
       "fault_id": 23,
-      "root_cause": "zero_payload_misconfiguration",
+      "root_cause": "payload_misconfiguration",
       "severity": "low-medium",
       "justification": "Same category as TCP misconfiguration: the safety system catches it. Nuisance stops, throughput loss, but the robot stops before hurting itself or anything else. Trivial fix once diagnosed."
     },
@@ -107,13 +107,6 @@
     },
     {
       "rank": 16,
-      "fault_id": 12,
-      "root_cause": "unexpected_payload_weight",
-      "severity": "medium-high",
-      "justification": "Two problems at once: a can with wrong fill is a quality defect being transported through the line, and the robot's motion profile is wrong for the actual load, stressing joints or risking slip. The upstream process failure is the bigger concern than the robot symptom."
-    },
-    {
-      "rank": 17,
       "fault_id": 10,
       "root_cause": "additional_axis_payload",
       "severity": "medium-high",
