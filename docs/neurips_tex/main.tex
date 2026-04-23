@@ -20,6 +20,7 @@
 \usepackage{xcolor} % colors
 \usepackage{graphicx}
 \graphicspath{{../../}{./}}
+\usepackage{float} % provides [H] for strict in-place float positioning
 \usepackage{multirow}
 \usepackage{enumerate}
 \usepackage[textcolor=black, backgroundcolor=orange!20]{todonotes}
@@ -144,19 +145,13 @@ By bridging the gap between general language reasoning and specialized time-seri
 
 \section{Related work}
 
-\subsection{LLM agents and tool use}
-
 Recent advances in LLM reasoning include prompting and deliberative strategies (e.g., Chain-of-Thought and Tree-of-Thought) that improve multi-step performance \cite{wei2022chain,yao2023tree}, alongside tool-augmented paradigms such as Toolformer and ReAct that enable grounded computation through external modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These ideas motivate industrial agent design where symbolic reasoning must be combined with numerical workflows.
-
-\subsection{Time-series learning for industrial signals}
 
 Time-series modeling has advanced through transformer-based architectures (Informer, Autoformer, FEDformer, PatchTST) \cite{zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst}, strong alternative baselines such as TFT and N-BEATS \cite{lim2021tft,oreshkin2020nbeats}, and critical comparisons against simpler linear models \cite{zeng2023transformers}. Foundation-model directions (e.g., Chronos) further explore transfer and zero/few-shot adaptation \cite{ansari2024chronos,das2024decoder}. In parallel, anomaly and reliability monitoring literature includes OmniAnomaly, USAD, and Deep SVDD \cite{su2019omni,audibert2020usad,ruff2018deep}, with surveys and benchmarks highlighting persistent gaps in interpretability and root-cause actionability \cite{chalapathy2019survey,lavin2015numenta}.
 
-\subsection{Causality and benchmark gaps}
-
 Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969causal,runge2019causal}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support. Table~\ref{tab:benchmark_comparison} positions FactoryBench against closely related Q\&A and time-series benchmarks along eight axes. The column labels refer to concepts introduced later in the paper: Counterfactual denotes questions that reason about alternative histories (Level~3, Section~\ref{sec:levels}); Free-Form denotes open-ended natural-language answers evaluated via an LLM-as-judge protocol (Section~\ref{sec:answer-formats}); and Novel Dense TS indicates whether the benchmark contributes a new, high-frequency multivariate dataset rather than relying exclusively on public sources.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Comparison of FactoryBench with existing benchmarks. ``Counterfactual'' = questions reasoning over alternative histories; ``Free-Form'' = open-ended answers judged by LLMs; ``Novel Dense TS'' = contributes a new multivariate high-frequency dataset.}
 \label{tab:benchmark_comparison}
@@ -185,7 +180,7 @@ CLEVRER & \texttimes & \texttimes & $\sim$305k & \checkmark & \texttimes & \chec
 Figure~\ref{fig:factorybench_overview} provides a high-level overview of the FactoryBench framework. The left panel illustrates our four-level causal evaluation hierarchy from state interpretation to decision-making together with the setpoint--context--effort (SCE) schema that underlies the universal fault definition introduced in Section~\ref{sec:sce}. The right panel summarizes the scalable question-generation pipeline, which expands a small set of hand-authored templates into a large, semantically diverse Q\&A pool, and contrasts the resulting benchmark against existing time-series and robotics Q\&A datasets along the axes introduced in Table~\ref{tab:benchmark_comparison}.
 
 % Figure overview of factorybench
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
   \makebox[\textwidth][c]{
     \resizebox{\textwidth}{!}{
@@ -402,7 +397,7 @@ Figure~\ref{fig:factorybench_overview} provides a high-level overview of the Fac
 \label{sec:levels}
 
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{FactoryBench levels, what they test, example questions, and expected answer formats.}
 \label{tab:levels_examples}
@@ -437,7 +432,7 @@ To systematically evaluate machine-behavior reasoning, we organize question-answ
 
 By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous and granular assessment of machine-behavior reasoning, from basic state recognition to advanced decision support. Figure~\ref{fig:pearl_ladder} instantiates Pearl's three causal rungs (L1--L3) on a concrete robotic arm; FactoryBench's L4 then layers decision-making on top of these rungs.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
@@ -751,7 +746,7 @@ This data is sourced from:
 
 The two open-source datasets integrated into FactoryBench are summarized in Table~\ref{tab:datasets}; both provide the full setpoint--context--effort triplet at 100\,Hz or higher and have been relabelled to conform to our unified episode schema.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Open-source datasets incorporated into FactoryBench.}
 \label{tab:datasets}
@@ -768,7 +763,7 @@ voraus-AD & UR5 & ? & 100/500 Hz & Pick and Place & 12 \\
 
 % TODO: INSERT TABLE TO SUMMARIZE PROPORTIONS OF DATA COMING FROM EACH SOURCE
 
-\section{Reliable Q\&A generation (key contribution)}
+\section{Reliable Q\&A generation}
 
 \subsection{At scale generation via extensive labelling}
 
@@ -777,7 +772,7 @@ Scalable ground-truth generation is the central challenge of any Q\&A benchmark 
 \paragraph{Guarding against template shortcuts.} A natural concern is that template-generated benchmarks can be solved by learning the surface structure of templates rather than the underlying reasoning. Our primary defense is structural: each template admits a combinatorially large instantiation space over signal names, timestamps, prediction horizons, payload conditions, and injected-fault types, so two questions sharing the same template rarely share more than a fraction of their variable slots. Crucially, the correct answer is never recoverable from the question text alone it is determined by the paired time series, which varies across instantiations.
 
 %
-\begin{figure}[t]
+\begin{figure}[H]
 %
 \centering
 %
@@ -862,7 +857,7 @@ Counterfactual questions (Level~3) require comparing what \emph{did} happen in a
 
 \subsection{Results}
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Expected performance across levels (accuracy \%).}
 \label{tab:results}
@@ -878,6 +873,13 @@ Level & Random & Current LLMs & Target (w/ prior) & Human Expert \\
 \end{tabular}
 \end{table}
 \todo{Update values when final results are computed.}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/heatmap_models_x_levels.pdf}
+\caption{Measured accuracy of four frontier models evaluated via Microsoft Foundry across FactoryBench's four reasoning levels. Each cell reports the mean accuracy over $n$ evaluated Q\&A pairs. Levels 1--3 and Level 4 ranking templates use deterministic scoring; Level 4 free-form templates (troubleshooting and optimization) are scored against the reference root cause and remediation protocol under a $\{0, 0.5, 1\}$ rubric.}
+\label{fig:results_heatmap}
+\end{figure}
 
 \section{Discussion}
 
@@ -918,7 +920,7 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 
 Table~\ref{tab:template_inventory} lists the number of question templates currently implemented per level, broken down by answer format. Totals reflect the templates shipped in the FactoryBench release at the time of writing and are expected to grow as new templates are added.\todo{Update counts when new templates are merged.}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Number of question templates per level, by answer format.}
 \label{tab:template_inventory}
@@ -960,7 +962,7 @@ FactoryWave was collected on two one-armed platforms: the \textbf{Universal Robo
 
 Three canonical tasks are represented in the dataset: Pick-and-Place, Screwing, and Peg-in-Hole. All three are executed on both robots, using matched scripted controllers and task layouts so that cross-embodiment comparisons hold the task fixed. We structure each task as a deterministic sequence of phases (Tables~\ref{tab:phases_pp}, \ref{tab:phases_screw}, \ref{tab:phases_peg}); the phase index is written as a discrete label at every timestep, providing an interpretable segmentation that downstream models can condition on or that can be used to localize questions to a specific stage of the cycle. Within this fixed phase skeleton, we randomize as much of the episode as the task permits so that a question template that targets a given phase does not accidentally learn a fixed pose, timing, or trajectory. Pick and place locations are sampled uniformly from predefined workspace regions; phase-specific joint velocities, accelerations, and end-effector rotations are drawn from bounded per-phase ranges; and approach angles to contact events are perturbed within the tolerances of the controller. This forces the Q\&A pairs generated from FactoryWave to reflect phase-level reasoning rather than memorisation of a single scripted trajectory, which in turn makes them generalizable to a wide variety of trajectories and variation found in real recordings.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Task phases for Pick-and-Place.}
 \label{tab:phases_pp}
@@ -983,7 +985,7 @@ Phase index & Phase name & Description \\
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Task phases for Screwing.}
 \label{tab:phases_screw}
@@ -1005,7 +1007,7 @@ Phase index & Phase name & Description \\
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Task phases for Peg-in-Hole.}
 \label{tab:phases_peg}
@@ -1031,7 +1033,7 @@ Phase index & Phase name & Description \\
 
 Alongside the sensor stream, every episode carries a fixed set of metadata fields describing the robot, task, condition, payload, and end-effector configuration (Table~\ref{tab:metadata}). These fields are constant within an episode and are used both as filters during question generation (e.g.\ to restrict a template to a specific payload regime) and as provenance in the released Q\&A pairs. This includes fault-specific fields (such as injection timestamp or physical offset).
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Default per-episode metadata fields.}
 \label{tab:metadata}
@@ -1118,7 +1120,7 @@ Counterfactual pairs are constructed for the subset of faults in Table~\ref{tab:
 
 The UR3 is recorded through the \texttt{ur\_rtde} Python interface at 125\,Hz, yielding 137 per-sample signals grouped by semantic role (Table~\ref{tab:ur3_signals}): controller \emph{setpoints}, actual \emph{effort / feedback} readings from joints and the TCP, \emph{context / health} signals covering joint temperatures, voltages, and internal controller state, a small block of controller \emph{status / mode} indicators, and digital/analog \emph{I/O} lines. Six episode-level provenance columns (\texttt{episode\_id}, \texttt{ctx\_robot\_type}, \texttt{ctx\_task}, \texttt{ctx\_fault\_label}, \texttt{ctx\_payload\_kg}, \texttt{ctx\_recording\_date}) are appended per episode but are constant within an episode.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{UR3 signal groups recorded at 125\,Hz via \texttt{ur\_rtde} (excluding episode-level provenance columns).}
 \label{tab:ur3_signals}
@@ -1140,7 +1142,7 @@ I/O                   &  6 & Digital inputs/outputs, two analog inputs, two anal
 
 The KUKA KR10 is controlled through the KRC4 controller. We stream 44 per-sample signals at 83\,Hz, grouped by semantic role in Table~\ref{tab:kuka_signals} using the same partition as the UR3 schema. A handful of signals that the UR3 exposes natively are unavailable on KSS 8.3, specifically joint velocities, commanded TCP pose, joint voltage, the tool-mounted accelerometer, and joint-level control outputs; TCP force/torque is also absent because no force sensor is fitted.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{KUKA KR10 signal groups recorded at 50\,Hz via RSI/KRL (excluding episode-level provenance columns).}
 \label{tab:kuka_signals}
@@ -1165,7 +1167,150 @@ I/O                   &  2 & Digital inputs bitmask and digital outputs bitmask.
 \section{Example question-answer pairs and question templates}
 \label{app:qa_examples}
 
-\todo[inline]{Add a one-page table showing representative Q\&A pairs sampled from the dataset (one example per level and per answer format), alongside the underlying question templates they were instantiated from. Include: rendered prompt, ground-truth answer, answer format, originating template, and dataset provenance.}
+Table~\ref{tab:qa_examples} presents seventeen representative Q\&A pairs spanning every causal level and every answer format the generator produces (single-select MCQ, multi-select MCQ, tensor, ranking, free-form). For readability we omit the underlying sensor context (tens to hundreds of time-series rows), truncate verbose boilerplate such as ``Answer only with $\ldots$'', and abbreviate long option strings.
+
+\begin{small}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.05\textwidth}>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.74\textwidth}@{}}
+\caption{Representative Q\&A pairs from FactoryBench spanning all four causal levels and every answer format.}\label{tab:qa_examples}\\
+\toprule
+\textbf{Level} & \textbf{Answer format} & \textbf{Prompt, options, and reference answer} \\
+\midrule
+\endfirsthead
+\multicolumn{3}{@{}l}{\footnotesize\emph{Table~\ref{tab:qa_examples} continued from previous page}}\\
+\toprule
+\textbf{Level} & \textbf{Answer format} & \textbf{Prompt, options, and reference answer} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{3}{r@{}}{\footnotesize\emph{continued on next page}}\\
+\endfoot
+\bottomrule
+\endlastfoot
+
+\textbf{L1} & Tensor &
+\textbf{Q:} The robot is performing a screwing task. We want to isolate the screwing phase in the robot's time series. Assuming a fixed window length of 10 timesteps, at which timestamp should the window begin? \newline
+\textbf{A:} \texttt{14}~~(accepted within $\pm3$) \\
+\midrule
+
+\textbf{L1} & Single-select MCQ &
+\textbf{Q:} What changed between the two instances of robotic time series data? \newline
+\textbf{Options:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & different anomalous states (exactly one anomalous, or both but distinct) \\
+\textbf{b.} & different tasks \\
+\textbf{c.} & different robots \\
+\textbf{d.} & same task, different phases \\
+\end{tabular} \newline
+\textbf{A:} \texttt{a} \\
+\midrule
+
+\textbf{L1} & Single-select MCQ &
+\textbf{Q:} What robot does this sensor data originate from? \newline
+\textbf{Options:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & Agile Robots Yu~5 Industrial \\
+\textbf{b.} & KUKA KR~10 R1100-2 \\
+\textbf{c.} & Universal Robots UR3e \\
+\end{tabular} \newline
+\textbf{A:} \texttt{c} \\
+\midrule
+
+\textbf{L1} & Tensor &
+\textbf{Q:} Given the sensor stream below, what is the expected value of the position of joint~2 at T+6\,ms? \newline
+\textbf{A:} \texttt{102.7777} \\
+\midrule
+
+\textbf{L2} & Tensor &
+\textbf{Q:} The sensor stream below is from a robot exhibiting a collision with a cardboard object. What is the expected value of the velocity of joint~3 at T+68\,ms? \newline
+\textbf{A:} \texttt{-0.272044}~~(accepted within $\pm2.42$) \\
+\midrule
+
+\textbf{L2} & Tensor &
+\textbf{Q:} The sensor stream below is from a robot exhibiting a collision with a cardboard object. What are the expected values of joint positions at T+506\,ms? \newline
+\textbf{A:} \texttt{[17.884, -115.897, 121.049, -95.595, -90.258, 293.860]} \\
+\midrule
+
+\textbf{L2} & Tensor &
+\textbf{Q:} Knowing that the robot suffers from a hole obstruction, we want to isolate the ``rise back above the object'' phase. Assuming a fixed window length of 16 timesteps, at which timestamp should the window begin? \newline
+\textbf{A:} \texttt{202}~~(accepted within $\pm3$) \\
+\midrule
+
+\textbf{L2} & Single-select MCQ &
+\textbf{Q:} Given the sensor data, determine what anomaly is present. \newline
+\textbf{Options:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & sustained command/measurement deviation \\
+\textbf{b.} & no anomaly \\
+\textbf{c.} & measured joint speeds drop abruptly with a TCP force spike (typical collision signature) \\
+\textbf{d.} & isolated unrealistic force-sensor spike inconsistent with motion \\
+\end{tabular} \newline
+\textbf{A:} \texttt{c} \\
+\midrule
+
+\textbf{L3} & Ranking &
+\textbf{Q:} Given the baseline stream and the counterfactual scenario where a collision foam object occurs at timestep 7366\,ms, rank the four labeled signal segments in the order they would appear as the event manifests. \newline
+\textbf{A:} \texttt{abdc} \\
+\midrule
+
+\textbf{L3} & Multi-select MCQ &
+\textbf{Q:} Given the counterfactual scenario where a collision hanging cable occurs at timestep 8363\,ms, select all statements that would apply. \newline
+\textbf{Options:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & motor current rises $\geq 33\%$ while speed stays $\leq 10\%$ of baseline (stall-like) \\
+\textbf{b.} & contact-force spike $\geq 36\%$ above baseline \\
+\textbf{c.} & tracking-error rise $\geq 34\%$ above pre-event mean \\
+\textbf{d.} & at least one joint speed drops sharply ($\geq 31\%$) \\
+\end{tabular} \newline
+\textbf{A:} \texttt{FFFT} \\
+\midrule
+
+\textbf{L3} & Tensor &
+\textbf{Q:} In the counterfactual scenario where a collision foam object occurs at timestep 7659\,ms, what would be the expected value of the position of joint~2 at T+100\,ms? \newline
+\textbf{A:} \texttt{72.144939}~~(accepted within $\pm2.77$) \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to fix it. \newline
+\textbf{A:} No anomalous behavior detected; the machine is operating normally; no remediation is required. \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to fix it. \newline
+\textbf{A:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & Inspect the workspace and remove any soft obstructions from the programmed trajectory. \\
+\textbf{b.} & If a protective stop occurred, acknowledge it in the robot controller and verify arm posture before resuming. \\
+\textbf{c.} & Reduce speed if repeated false-positive collision detections occur. \\
+\end{tabular} \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to fix it. \newline
+\textbf{A:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & Stop the robot and update the payload configuration to include the additional axis weight. \\
+\textbf{b.} & Set the correct CoG offset for the modified arm in the installation settings. \\
+\textbf{c.} & Reduce motion accelerations and speeds to account for increased effective inertia. \\
+\textbf{d.} & Run a slow-speed test cycle to verify dynamic loads stay within rated limits before resuming. \\
+\end{tabular} \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} An engineer wants to increase the effectiveness and accuracy of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this? \newline
+\textbf{A:} The payload mass is set to 0.0\,kg but the actual payload weighs 1.5\,kg. Update the payload mass in the installation settings to 1.5\,kg. \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} An engineer wants to increase the effectiveness and accuracy of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this? \newline
+\textbf{A:} The TCP offset is misconfigured at [0, 0.3, 55] instead of the correct [0, 0, 55]. Update the TCP position offset in the installation settings to [0, 0, 55]. \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} An engineer wants to increase the effectiveness and accuracy of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this? \newline
+\textbf{A:} The payload center of gravity is set to [25, 0, 20] but the correct value is [0, 0, 20]. Update the CoG offset in the installation settings to [0, 0, 20]. \\
+
+\end{longtable}
+\end{small}
 
 
 \section{Simulation setup}
