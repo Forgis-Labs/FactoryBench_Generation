@@ -1,91 +1,159 @@
 \documentclass{article}
 
 % to compile a preprint version, add the [preprint] option:
-%     \usepackage[preprint]{neurips_2024}
+% \usepackage[preprint]{neurips_2024}
 
 % to compile a camera-ready version, add the [final] option:
 \usepackage[final]{neurips_2024}
 
 \usepackage[utf8]{inputenc} % allow utf-8 input
-\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
-\usepackage{hyperref}       % hyperlinks
-\usepackage{url}            % simple URL typesetting
-\usepackage{booktabs}       % professional-quality tables
-\usepackage{amsfonts}       % blackboard math symbols
-\usepackage{amsmath}        % math environments
-\usepackage{nicefrac}       % compact symbols for 1/2, etc.
-\usepackage{microtype}      % microtypography
-\usepackage{xcolor}         % colors
+\usepackage[T1]{fontenc} % use 8-bit T1 fonts
+\usepackage{hyperref} % hyperlinks
+\usepackage{url} % simple URL typesetting
+\usepackage{booktabs} % professional-quality tables
+\usepackage{longtable} % multi-page tables
+\usepackage{array} % extended column specifiers
+\usepackage{amsfonts} % blackboard math symbols
+\usepackage{amsmath} % math environments
+\usepackage{nicefrac} % compact symbols for 1/2, etc.
+\usepackage{microtype} % microtypography
+\usepackage{xcolor} % colors
 \usepackage{graphicx}
+\graphicspath{{../../}{./}}
+\usepackage{float} % provides [H] for strict in-place float positioning
 \usepackage{multirow}
-\usepackage{todonotes}
-\usepackage{fontawesome5}
+\usepackage{enumerate}
+\usepackage[textcolor=black, backgroundcolor=orange!20]{todonotes}
+
+
+% Figures
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{amsmath,amssymb,amsfonts,bm}
+\usepackage{xcolor}
+
+% BRAND colors
+\definecolor{tiger}{HTML}{FF5A00}
+\definecolor{fire}{HTML}{FF4D00}
+\definecolor{flicker}{HTML}{DC4B07}
+\definecolor{black}{HTML}{878F92}
+\definecolor{gunmetal}{HTML}{122128}
+\definecolor{panel}{HTML}{202E35}
+
+% FIGURE colors
+\definecolor{dark_navy}{HTML}{122128}
+\definecolor{forgis_orange}{HTML}{FF5A00}
+\definecolor{forgis_fire}{HTML}{FF4D00}
+\definecolor{forgis_flicker}{HTML}{DC4B07}
+\definecolor{blue}{HTML}{3A7BD5}
+\definecolor{green}{HTML}{2ECC71}
+\definecolor{panelbg}{HTML}{F0F4F8}
+\definecolor{warm_amber}{HTML}{FFF3CD}
+
+% LEVEL colors
+\definecolor{L1bg}{HTML}{FCF0E0}
+\definecolor{L1border}{HTML}{FB9E6C}
+\definecolor{L2bg}{HTML}{FCF0E0}
+\definecolor{L2border}{HTML}{FF7F3A}
+\definecolor{L3bg}{HTML}{FCF0E0}
+\definecolor{L3border}{HTML}{FF5A00}
+\definecolor{L4bg}{HTML}{FCF0E0}
+\definecolor{L4border}{HTML}{81360F}
+
+% Additional colors for Pearl's ladder figure (figure_02)
+\definecolor{darknavy}{HTML}{122128}
+\definecolor{forgisorange}{HTML}{FF5A00}
+\definecolor{figgreen}{HTML}{2ECC71}
+\definecolor{figsteel}{HTML}{878F92}
+\definecolor{L1tint}{HTML}{FB9E6C}
+\definecolor{L2tint}{HTML}{FF7F3A}
+\definecolor{L3tint}{HTML}{FF5A00}
+
+\usetikzlibrary{arrows.meta, positioning, calc, fit, shapes.geometric, 
+  decorations.pathreplacing, backgrounds, patterns, shadows}
 
 \title{FactoryBench: Benchmarking Machine Understanding via Question-Answering}
 
 \author{%
-  Yanis Merzouki$^{1,*}$ \quad Coral Izquierdo Muniz$^{2}$ \quad Matei Ignuta-Ciuncanu$^{3}$ \\
-  Philipp Petersen$^{4}$ \quad Riccardo Maggioni$^{2}$ \quad Jonas Petersen$^{1,2}$ \\[0.6em]
-  \normalfont\small
-  $^{1}$ETH Zurich \quad $^{2}$Forgis AG \quad $^{3}$Imperial College London \quad $^{4}$University of Vienna \\[0.3em]
-  Correspondence: \texttt{ymerzouki@ethz.ch} \\[0.5em]
-  {\faGithub}\ Code: \href{https://github.com/Forgis-Research/FactoryBench}{\nolinkurl{https://github.com/Forgis-Research/FactoryBench}} \\[0.15em]
-  \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ \textsc{FactoryBench} Collection: \href{https://huggingface.co/datasets/forgis/factorybench}{\nolinkurl{forgis/factorybench}}
+  Yanis Merzouki \\
+  ETH Zurich \\
+  \texttt{ymerzouki@student.ethz.ch} \\
+  \And
+  Coral Izquierdo Muñiz \\
+  UC3M \\
+  \texttt{coral.izquierdo@alumnos.uc3m.es} \\
+  \And
+  Matei Ignuta-Ciuncanu \\
+  Imperial College London \\
+  \texttt{mic18@imperial.ac.uk} \\
+  \And
+  Philipp Petersen \\
+  University of Vienna \\
+  \texttt{philipp.petersen@univie.ac.at}
+  \And
+  Jonas Petersen \\
+  Forgis AG, ETH Zurich \\
+  \texttt{jonas.petersen@forgis.com}
 }
 
 \begin{document}
 
+\todo[inline]{Do all the references actually exist? If they do not, this is typically seen as a proof that we had this paper AI generated. It will then likely be desk-rejected.
+
+I could not find:
+
+- Abhimanyu Das et al. Time series foundation models and forecasting
+
+This one seems to have a slightly different name:
+
+Ya Su et al. Robust anomaly detection for multivariate time series through stochastic recurrent neural network (omnianomaly).
+
+This seems to have the wrong author:
+
+Gerald Woo et al. Chronos: Learning the language of time series. arXiv preprint, 2024a.
+
+Two more points:
+
+A) When citing arxiv papers it is usually so that one puts the identifier in the citation, such as arXiv:2201.12740.
+B) Sometimes capitalization is important. The references currently write everything in lowercase, but some abbreviations are chosen by their authors to capitalize some words. It is usually nice to follow their choices.
+}
+
 \maketitle
 
-\todo[inline]{I think the first paragraph of the abstract should be deleted. The abstract is not a place to discuss the state-of-the-art. The second paragraph is enough.}
-
 \begin{abstract}
-Time-series models are widely used in industrial monitoring tasks such as forecasting, anomaly detection, and signal analysis. While highly effective for these objectives, they are often opaque and limited in their ability to provide structured reasoning for engineering decision-making. Large language models (LLMs), in contrast, can generate coherent, context-aware explanations and support multi-step reasoning. However, general-purpose LLMs still struggle when applied directly to dense multivariate sensor streams and machine-specific diagnostics without adaptation or external tools. A promising direction is therefore to use LLM agents augmented with specialized numerical and signal-processing tools. This raises a central question: how can we verify that these systems truly understand machine behavior rather than only generating plausible text?
 
-We introduce \textbf{FactoryBench}, a benchmark for evaluating LLM agents on machine understanding over industrial time-series data. Our contributions are threefold. First, we propose a scalable framework for generating machine-understanding question-answering tasks, built around 80 structured question templates spanning diverse reasoning scenarios. Second, we present \textbf{FactoryWave}, a dense multivariate dataset generated from one-armed robotic systems, including both collaborative and industrial manufacturing robots. Third, we construct FactoryBench as a large-scale Q\&A dataset for time-series understanding in LLM agents, grounded in FactoryWave as well as open-source robotics datasets and simulations. Together, these components provide a rigorous testbed for evaluating reasoning, causal understanding, and decision support over real and simulated industrial signals.
+We introduce \textbf{FactoryBench}, a benchmark for evaluating time series models and LLMs on machine understanding over industrial time-series data. We propose a scalable Q\&A generation framework built around structured question templates, present \textbf{FactoryWave} (a dense, multitask and multivariate sensor dataset from real robotic systems) and construct FactoryBench as a large-scale benchmark grounded in FactoryWave alongside open-source datasets and simulations. Together, these provide a rigorous testbed for evaluating reasoning, causal understanding, and decision support over industrial signals.
 \end{abstract}
 
 \section{Introduction}
 
 Modern industrial systems generate large volumes of multivariate time-series data from sensors, actuators, and controllers. In robotic manufacturing settings, these signals encode joint states, torques, forces, velocities, contact events, task phases, and fault indicators. Extracting actionable knowledge from such data is central to monitoring, diagnostics, anomaly detection, and decision support.
-\todo[inline]{This first paragraph would be much better if it would refer to a real-world example. At least one or two modern industrail systems that fall into the category described here should be referenced.}
 
-Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection\todo{citation needed}. However, these models are often specialized and difficult to interpret. They typically output labels or numeric predictions without explicit reasoning or higher-level explanations and cannot do much more outside of the specific task they are trained on\todo{citation needed}, which limits their direct utility for automated engineering decision-making.
+Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection \cite{zhou2021informer,su2019omni,audibert2020usad}. However, these models are often specialized and difficult to interpret. They typically output labels or numeric predictions without explicit reasoning or higher-level explanations, and generalize poorly outside of the specific task they are trained on \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}, which limits their direct utility for automated engineering decision-making.
 
-Large language models, in contrast, exhibit strong general reasoning abilities and can produce structured explanations in technical contexts \cite{wei2022chain,yao2023tree}. They can integrate textual information, follow logical chains, and generate interpretable outputs. Yet, when applied directly to dense numerical time series, general LLMs still underperform without adaptation\todo{citation needed}. At the same time, transformer-based architectures have become increasingly effective for time-series forecasting and representation learning \cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst,woo2024chronos,das2024survey}.
-\todo[inline]{The last sentence seems to contradict the sentence before. Is this attempting to say that specialized transformer architectures are effective in contrast to general LLMs? Then I would add a quantifier like "specialized" here. }
+Large language models, in contrast, exhibit strong general reasoning abilities and can produce structured explanations in technical contexts \cite{wei2022chain,yao2023tree}. They can integrate textual information, follow logical chains, and generate interpretable outputs. Yet, when applied directly to dense numerical time series, general LLMs still underperform without adaptation \cite{gruver2023llmtime,jin2024timellm}. In contrast, specialized transformer-based architectures have become increasingly effective for time-series forecasting and representation learning \cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst,ansari2024chronos,das2024decoder}.
 
-A promising paradigm is to build LLM agents equipped with specialized tools, including time-series models and signal-processing modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These agents can combine language reasoning with domain-specific computation. 
-Nevertheless, evaluating whether such systems truly understand machine behavior remains challenging. Existing benchmarks mostly target textual reasoning, code generation, or generic multimodal understanding \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu}, leaving a gap in rigorous evaluation for machine-centered, time-series reasoning.
-\todo[inline]{In the previous paragraph there is the phrase " whether such systems truly understand machine behavior". This phrase is a) basically the most important concept for this paper because it is essentially the gap that we are attempting to fill and b) not really that clear. I think it would make sense to really spell out here how current models fall short in understanding and what understanding means for us exactly.}
+A promising paradigm is to build LLM agents equipped with specialized tools, including time-series models and signal-processing modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These agents can combine language reasoning with domain-specific computation. Nevertheless, evaluating whether such systems truly reason about machine behavior rather than pattern-matching on surface textual cues remains challenging. By machine-behavior understanding we mean the ability to (i)~interpret the current operational state from raw multivariate signals, (ii)~predict the effect of an intervention on the system, (iii)~reason counterfactually about what would have happened under alternative histories, and (iv)~recommend remedial actions grounded in physical and engineering constraints. To the best of our knowledge, how well current LLMs perform across these four competences on dense industrial telemetry has not yet been systematically measured. General reasoning benchmarks such as MMLU, BIG-bench, and MMMU \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} target textual, code, or multimodal understanding and are structurally unable to probe machine behavior; benchmarks closer in spirit, such as TimeSeriesExam, ChatTS, EngineMT-QA, TSAQA, Time-MQA, MTBench, and QuAnTS (Table~\ref{tab:benchmark_comparison}), evaluate aspects of time-series Q\&A but either restrict themselves to synthetic or univariate data, omit counterfactual reasoning, or do not involve a robotic system under closed-loop control, leaving a gap in rigorous evaluation of machine-behavior reasoning over industrial telemetry.
 
-To address this gap, we propose FactoryBench, a benchmark designed to evaluate machine understanding\todo{the phrase "machine understanding" is a bit ambiguous in our context. Does it mean understanding of machines like robots or machines/agents that understand something about the world. I would try to find a different phrase here.} in LLM agents. FactoryBench is grounded in FactoryWave, a dense multivariate time-series dataset collected from one-armed robotic systems, including collaborative and industrial manufacturing robots. The dataset captures rich dynamic behavior under diverse operational conditions.
+To address this gap, we propose FactoryBench, a benchmark designed to evaluate machine-behavior reasoning in time series models and LLMs. FactoryBench is grounded in FactoryWave, a dense multivariate time-series dataset collected from one-armed robotic systems spanning both collaborative and industrial manufacturing platforms, with synchronized setpoint, context, feedback, and effort signals recorded at 83 and 125 Hz (KUKA KR10 and UR3e respectively). Industrial-robot data of this kind is rare in public benchmarks: these systems are almost exclusively deployed in production environments with safety enclosures that restrict access, proprietary controllers that expose limited telemetry, and recordings that typically fall under plant-level confidentiality agreements. As a result, existing robotic datasets are dominated by cobot platforms, and to our knowledge FactoryWave is the first extensive anomaly dataset to (partly) cover an industrial robot, explicitly aimed at bridging this cobot-to-industrial-machine gap.
 
-We also introduce a scalable question-generation framework composed of 80 structured templates spanning a wide range of reasoning types and applicable to general machine data flows. These templates enable systematic construction of question-answering tasks that probe state understanding, intervention reasoning, counterfactual analysis, and decision-making in machine contexts. Using this framework and the FactoryWave dataset\todo{Currently I think FactoryWave is not really that well described. But this will probably still come.}, we build FactoryBench, a large-scale Q\&A dataset specifically designed to evaluate time-series understanding and engineering reasoning in LLM agents.
 
-By bridging the gap between general language reasoning and specialized time-series modeling, FactoryBench provides a principled foundation for studying machine-centered intelligence in industrial environments.
+We also introduce a scalable question-generation framework composed of 20 structured templates spanning a wide range of reasoning types and applicable to general machine data flows. These templates enable systematic construction of question-answering tasks that probe state understanding, intervention reasoning, counterfactual analysis, and decision-making in machine contexts. Using this framework and the FactoryWave dataset, we build FactoryBench, a large-scale Q\&A dataset specifically designed to evaluate time-series understanding and engineering reasoning in LLM agents.
+
+By bridging the gap between general language reasoning and specialized time-series modeling, FactoryBench provides a principled foundation for studying machine-behavior reasoning in industrial environments.
 
 \section{Related work}
 
-\subsection{LLM agents and tool use}
-
 Recent advances in LLM reasoning include prompting and deliberative strategies (e.g., Chain-of-Thought and Tree-of-Thought) that improve multi-step performance \cite{wei2022chain,yao2023tree}, alongside tool-augmented paradigms such as Toolformer and ReAct that enable grounded computation through external modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These ideas motivate industrial agent design where symbolic reasoning must be combined with numerical workflows.
 
-\subsection{Time-series learning for industrial signals}
+Time-series modeling has advanced through transformer-based architectures (Informer, Autoformer, FEDformer, PatchTST) \cite{zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst}, strong alternative baselines such as TFT and N-BEATS \cite{lim2021tft,oreshkin2020nbeats}, and critical comparisons against simpler linear models \cite{zeng2023transformers}. Foundation-model directions (e.g., Chronos) further explore transfer and zero/few-shot adaptation \cite{ansari2024chronos,das2024decoder}. In parallel, anomaly and reliability monitoring literature includes OmniAnomaly, USAD, and Deep SVDD \cite{su2019omni,audibert2020usad,ruff2018deep}, with surveys and benchmarks highlighting persistent gaps in interpretability and root-cause actionability \cite{chalapathy2019survey,lavin2015numenta}.
 
-Time-series modeling has advanced through transformer-based architectures (Informer, Autoformer, FEDformer, PatchTST) \cite{zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2023patchtst}, strong alternative baselines such as TFT and N-BEATS \cite{lim2021tft,oreshkin2020nbeats}, and critical comparisons against simpler linear models \cite{zeng2023transformers}. Foundation-model directions (e.g., Chronos) further explore transfer and zero/few-shot adaptation \cite{woo2024chronos,das2024survey}. In parallel, anomaly and reliability monitoring literature includes OmniAnomaly, USAD, and Deep SVDD \cite{su2019omni,audibert2020usad,ruff2018deep}, with surveys and benchmarks highlighting persistent gaps in interpretability and root-cause actionability \cite{chalapathy2019survey,lavin2015numenta}.
+Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969causal,runge2019causal}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support. Table~\ref{tab:benchmark_comparison} positions FactoryBench against closely related Q\&A and time-series benchmarks along eight axes. The column labels refer to concepts introduced later in the paper: Counterfactual denotes questions that reason about alternative histories (Level~3, Section~\ref{sec:levels}); Free-Form denotes open-ended natural-language answers evaluated via an LLM-as-judge protocol (Section~\ref{sec:answer-formats}); and Novel Dense TS indicates whether the benchmark contributes a new, high-frequency multivariate dataset rather than relying exclusively on public sources.
 
-\subsection{Causality and benchmark gaps}
-
-Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969causal,runge2019causal}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support.
-
-% TODO: ADD MORE DATASETS THAT TICK COUNTERFACTUAL AND ROBOTIC BOX
-
-\todo[inline]{Both tables \ref{tab:benchmark_comparison} and \ref{tab:levels} are not referenced in the text. First of all, all tables should be referenced, but second, I think the table \ref{tab:benchmark_comparison} cannot be understood on its own. The words "Counterfactual", "Free-Form", "Novel Dense TS" are explained at some point in the manuscript, but when I see the table I haven't read aby if these yet.}
-
-\begin{table}[t]
+\begin{table}[H]
 \centering
-\caption{Comparison of FactoryBench with existing benchmarks.}
+\caption{Comparison of FactoryBench with existing benchmarks. ``Counterfactual'' = questions reasoning over alternative histories; ``Free-Form'' = open-ended answers judged by LLMs; ``Novel Dense TS'' = contributes a new multivariate high-frequency dataset.}
 \label{tab:benchmark_comparison}
 \small
 \begin{tabular}{@{}lcccccccc@{}}
@@ -109,79 +177,576 @@ CLEVRER & \texttimes & \texttimes & $\sim$305k & \checkmark & \texttimes & \chec
 
 \section{FactoryBench framework}
 
-\subsection{Four levels of machine understanding}
+Figure~\ref{fig:factorybench_overview} provides a high-level overview of the FactoryBench framework. The left panel illustrates our four-level causal evaluation hierarchy from state interpretation to decision-making together with the setpoint--context--effort (SCE) schema that underlies the universal fault definition introduced in Section~\ref{sec:sce}. The right panel summarizes the scalable question-generation pipeline, which expands a small set of hand-authored templates into a large, semantically diverse Q\&A pool, and contrasts the resulting benchmark against existing time-series and robotics Q\&A datasets along the axes introduced in Table~\ref{tab:benchmark_comparison}.
 
-% TODO: REPLACE EXAMPLES WITH MORE UP TO DATE ONES
-
-\begin{table}[t]
+% Figure overview of factorybench
+\begin{figure}[H]
 \centering
-\caption{Four levels of machine understanding in FactoryBench.}
-\label{tab:levels}
+  \makebox[\textwidth][c]{
+    \resizebox{\textwidth}{!}{
+\begin{tikzpicture}[
+  every node/.style={font=\sffamily},
+  >=Stealth
+]
+ 
+% ====== LEFT COLUMN: HIERARCHY ======
+% Background panel
+\begin{scope}[xshift=-0.1cm]
+\fill[panelbg, rounded corners=6pt] (-0.5, 4.0) rectangle (7.8, 15.6);
+\node[font=\sffamily\bfseries\normalsize, text=gunmetal] at (3.65, 15.2) 
+  {Causal Evaluation Hierarchy};
+
+% L1
+\fill[L1bg, rounded corners=4pt] (0.0, 13.0) rectangle (7.3, 14.3);
+\draw[L1border, line width=1.5pt, rounded corners=4pt] (0.0, 13.0) rectangle (7.3, 14.3);
+\node[font=\sffamily\bfseries, text=L1border] at (1.15, 13.95) {L1};
+\node[font=\sffamily\bfseries\small, text=L1border, anchor=west] at (1.6, 13.95) {State Identification};
+\node[font=\sffamily\scriptsize, text=gunmetal, text width=5.0cm, anchor=west] at (1.6, 13.4) 
+  {Interpreting current machine states and detecting anomalies from sensor data.};
+
+% L2
+\fill[L2bg, rounded corners=4pt] (0.0, 11.3) rectangle (7.3, 12.6);
+\draw[L2border, line width=1.5pt, rounded corners=4pt] (0.0, 11.3) rectangle (7.3, 12.6);
+\node[font=\sffamily\bfseries, text=L2border] at (1.15, 12.25) {L2};
+\node[font=\sffamily\bfseries\small, text=L2border, anchor=west] at (1.6, 12.25) {Intervention Reasoning};
+\node[font=\sffamily\scriptsize, text=gunmetal, text width=5.0cm, anchor=west] at (1.6, 11.7) 
+  {Predicting the immediate impact of control changes or faults at the present timestep.};
+
+% L3
+\fill[L3bg, rounded corners=4pt] (0.0, 9.6) rectangle (7.3, 10.9);
+\draw[L3border, line width=1.5pt, rounded corners=4pt] (0.0, 9.6) rectangle (7.3, 10.9);
+\node[font=\sffamily\bfseries, text=L3border] at (1.15, 10.55) {L3};
+\node[font=\sffamily\bfseries\small, text=L3border, anchor=west] at (1.6, 10.55) {Counterfactual Analysis};
+\node[font=\sffamily\scriptsize, text=gunmetal, text width=5.0cm, anchor=west] at (1.6, 10.0) 
+  {Simulating alternative historical timelines to assess hypothetical past conditions.};
+
+% L4
+\fill[L4bg, rounded corners=4pt] (0.0, 7.9) rectangle (7.3, 9.2);
+\draw[L4border, line width=1.5pt, rounded corners=4pt] (0.0, 7.9) rectangle (7.3, 9.2);
+\node[font=\sffamily\bfseries, text=L4border] at (1.15, 8.85) {L4};
+\node[font=\sffamily\bfseries\small, text=L4border, anchor=west] at (1.6, 8.85) {Decision Support};
+\node[font=\sffamily\scriptsize, text=gunmetal, text width=5.0cm, anchor=west] at (1.6, 8.3) 
+  {Synthesizing multi-step recovery procedures using sensor fusion and technical manuals.};
+
+% Dependency arrows
+\draw[gunmetal, line width=1.2pt, ->, dashed] (3.65, 13.0) -- (3.65, 12.65);
+\draw[gunmetal, line width=1.2pt, ->, dashed] (3.65, 11.3) -- (3.65, 10.95);
+\draw[gunmetal, line width=1.2pt, ->, dashed] (3.65, 9.6) -- (3.65, 9.25);
+
+% Difficulty arrow on the side
+\draw[black, line width=1.5pt, -{Stealth[length=5pt]}] (-0.25, 14.3) -- (-0.25, 7.9);
+\node[font=\sffamily\small, text=black, rotate=90] at (-0.55, 11.1) {Increasing Causal Depth};
+
+\fill[warm_amber, rounded corners=4pt] (0.0, 4.5) rectangle (7.3, 7.5);
+\draw[flicker, line width=1.2pt, rounded corners=4pt] (0.0, 4.5) rectangle (7.3, 7.5);
+
+% ====== Physical Causal Schema ======
+\fill[warm_amber, rounded corners=4pt] (0.0, 4.2) rectangle (7.3, 7.5);
+\draw[flicker, line width=1.2pt, rounded corners=4pt] (0.0, 4.2) rectangle (7.3, 7.5);
+
+\node[font=\sffamily\bfseries\small, text=gunmetal] at (3.65, 7.25) {Physical Causal Schema};
+
+\tikzset{
+  causalNode/.style={
+    fill=white, rounded corners=3pt, align=center,
+    minimum width=1.7cm, minimum height=1.0cm, inner sep=2pt
+  }
+}
+
+\node[causalNode, draw=forgis_orange, line width=1pt] (nodeS) at (1.25, 6.0) {
+  \textbf{\textcolor{forgis_orange}{$S$}}\\[-0.5ex]
+  \scriptsize\textcolor{gunmetal}{Setpoint}\\[-0.5ex]
+  \scriptsize\textcolor{black}{(target commands)}
+};
+
+\node[causalNode, draw=blue, line width=1pt] (nodeC) at (3.65, 6.0) {
+  \textbf{\textcolor{blue}{$C$}}\\[-0.5ex]
+  \scriptsize\textcolor{gunmetal}{Context}\\[-0.5ex]
+  \scriptsize\textcolor{black}{(environment)}
+};
+
+\node[causalNode, draw=green, line width=1pt] (nodeE) at (6.05, 6.0) {
+  \textbf{\textcolor{green}{$E$}}\\[-0.5ex]
+  \scriptsize\textcolor{gunmetal}{Effort+Feedback}\\[-0.5ex]
+  \scriptsize\textcolor{black}{(response)}
+};
+
+\draw[forgis_orange, line width=1.2pt, ->] 
+  (nodeS.north) to[bend left=18] ([xshift=-0.1cm]nodeE.north);
+
+\draw[blue, line width=1.2pt, ->] (nodeC.east) -- (nodeE.west);
+
+\node[font=\sffamily\scriptsize, text=gunmetal] at (3.65, 4.9) 
+  {Healthy: $E = f(S, C)$ \quad \textbar \quad Fault: $E \neq f(S, C)$};
+
+\node[font=\sffamily\scriptsize, text=black] at (3.65, 4.5)
+  {Fault $\Leftrightarrow$ empirical deviation in \textit{Effort} given \textit{Setpoint} and \textit{Context}};
+\end{scope}
+
+% ====== RIGHT COLUMN: GENERATION + RESULTS ======
+% Q&A Generation Engine
+\begin{scope}[xshift=-0.6cm]
+\fill[panelbg, rounded corners=6pt] (8.5, 10.65) rectangle (18.1, 15.6);
+
+\node[font=\sffamily\bfseries\normalsize, text=gunmetal] at (13.3, 15.3) 
+  {Scalable Q\&A Generation Engine};
+
+% Template box
+\fill[white, rounded corners=3pt] (9.15, 13.5) rectangle (11.75, 14.8);
+\draw[forgis_orange, line width=1pt, rounded corners=3pt] (9.15, 13.5) rectangle (11.75, 14.8);
+\node[font=\sffamily\bfseries\scriptsize, text=forgis_orange] at (10.45, 14.45) {+20 Expert Templates};
+\node[font=\sffamily\scriptsize, text=gunmetal, text width=2.4cm, align=center] at (10.45, 13.95) 
+  {Expert-authored\\[0.3ex]across all 4 levels};
+
+% Datasets box
+\fill[white, rounded corners=3pt] (12.05, 13.5) rectangle (17.45, 14.8);
+\draw[blue, line width=1pt, rounded corners=3pt] (12.05, 13.5) rectangle (17.45, 14.8);
+\node[font=\sffamily\bfseries\scriptsize, text=blue] at (14.75, 14.45) {Industrial Datasets};
+\node[font=\sffamily\scriptsize, text=gunmetal, align=center] at (14.75, 13.95) 
+  {FactoryWave $\cdot$ AURSAD $\cdot$ Simulated Robotic\\[0.3ex]\textcolor{gray}{Real + simulated sensor streams}};
+
+% Dynamic sampling box
+\node[
+  draw=flicker, fill=white, line width=1pt, rounded corners=3pt, 
+  align=center, inner sep=4pt, minimum width=4.7cm
+] (sampling) at (13.3, 12.3) {
+  \textbf{\textcolor{flicker}{Dynamic Variable Sampling}}\\[0.5ex]
+  \scriptsize\textcolor{gunmetal}{Deterministic ground truth}
+};
+
+% ARROWS DOWN (Superiores: Enrutamiento ortogonal unificado)
+\coordinate (topbranch) at (13.3, 13.1);
+\draw[gunmetal, line width=1pt, rounded corners=3pt] (10.45, 13.5) -- (10.45, 13.1) -- (topbranch);
+\draw[gunmetal, line width=1pt, rounded corners=3pt] (16.15, 13.5) -- (16.15, 13.1) -- (topbranch);
+\draw[gunmetal, line width=1pt, ->, >=stealth] (topbranch) -- (sampling.north);
+
+% Output formats
+\tikzset{
+  outbox/.style={
+    draw=gunmetal, line width=0.8pt, fill=white, rounded corners=2pt, % Cambiado a gunmetal
+    font=\sffamily\scriptsize\bfseries, text=gunmetal, 
+    minimum height=0.5cm, inner sep=3pt, align=center
+  }
+}
+
+\node[outbox] (ms) at (9.3, 11.0) {Multi-Select};
+\node[outbox] (escalar) at (11.3, 11.0) {Scalar};
+\node[outbox] (tensor) at (13.3, 11.0) {Tensor};
+\node[outbox] (rank) at (15.3, 11.0) {Ranking};
+\node[outbox] (open) at (17.3, 11.0) {Free form};
+
+% ARROWS DOWN
+\coordinate (bottombranch) at (13.3, 11.6);
+\draw[gunmetal, line width=0.8pt] (sampling.south) -- (bottombranch);
+\draw[gunmetal, line width=0.8pt, ->, >=stealth, rounded corners=3pt] (bottombranch) -| (ms.north);
+\draw[gunmetal, line width=0.8pt, ->, >=stealth, rounded corners=3pt] (bottombranch) -| (escalar.north);
+\draw[gunmetal, line width=0.8pt, ->, >=stealth] (bottombranch) -- (tensor.north); 
+\draw[gunmetal, line width=0.8pt, ->, >=stealth, rounded corners=3pt] (bottombranch) -| (rank.north);
+\draw[gunmetal, line width=0.8pt, ->, >=stealth, rounded corners=3pt] (bottombranch) -| (open.north);
+
+\end{scope}
+
+% ====== WHY FACTORYBENCH (COMPARISON MATRIX) ======
+\begin{scope}[xshift=-0.6cm]
+\fill[panelbg, rounded corners=6pt] (8.5, 4.0) rectangle (18.2, 10.6);
+\node[font=\sffamily\bfseries\normalsize, text=gunmetal] at (12.85, 10.15) 
+  {Comparison with Existing Benchmarks};
+
+\def\cmark{\textcolor{green}{$\bm{\checkmark}$}}
+\def\xmark{\textcolor{forgis_fire}{$\bm{\times}$}}
+\def\pmark{\textcolor{black}{\textbf{Part.}}}
+
+\node[font=\sffamily\tiny, text=gunmetal, inner sep=0pt, align=center] at (13.3, 7.55) {
+  \renewcommand{\arraystretch}{1.25}
+  \setlength{\tabcolsep}{3.5pt}
+  \begin{tabular}{l c c c c c c c c}
+    \textbf{Benchmark} & \textbf{Robot} & \textbf{Multi. TS} & \textbf{Size} & \textbf{Counter.} & \textbf{Rank} & \textbf{Num.} & \textbf{Free} & \textbf{Novel TS} \\[0.5ex]
+    \hline\\[-1.5ex]
+    TimeSeriesExam & \xmark & \xmark & $\sim$700 & \xmark & \cmark & \xmark & \xmark & \xmark \\
+    ChatTS & \xmark & \cmark & $\sim$134k & \xmark & \cmark & \cmark & \xmark & \xmark \\
+    EngineMT-QA & \cmark & \cmark & $\sim$110k & \xmark & \cmark & \cmark & \cmark & \xmark \\
+    TSAQA & \pmark & \xmark & $\sim$210k & \xmark & \cmark & \xmark & \xmark & \xmark \\
+    Time-MQA & \xmark & \cmark & $\sim$200k & \xmark & \cmark & \cmark & \cmark & \xmark \\
+    MTBench & \xmark & \cmark & ? & \xmark & \cmark & \cmark & \cmark & \xmark \\
+    QuAnTS & \xmark & \cmark & $\sim$150k & \xmark & \cmark & \cmark & \cmark & \xmark \\
+    CLEVR & \xmark & \xmark & $\sim$1M & \xmark & \xmark & \cmark & \xmark & \xmark \\
+    CLEVRER & \xmark & \xmark & $\sim$305k & \cmark & \xmark & \cmark & \xmark & \xmark \\[0.5ex]
+    \hline\\[-1ex]
+    \textbf{\textcolor{forgis_flicker}{FactoryBench}} & 
+    \cmark & \cmark & \textbf{\textcolor{forgis_flicker}{TBD}} & 
+    \cmark & \cmark & \cmark & 
+    \cmark & \cmark \\
+  \end{tabular}
+};
+
+\fill[white, rounded corners=3pt] (9.0, 4.3) rectangle (16.7, 5.0);
+\draw[black, line width=0.8pt, rounded corners=3pt] (9.0, 4.3) rectangle (16.7, 5.0);
+\node[font=\sffamily\scriptsize, text=gunmetal, align=center] at (12.85, 4.65) 
+  {The only benchmark guaranteeing verifiable truth \\ across deep causal temporal reasoning on machine data.};
+
+\end{scope}
+
+\end{tikzpicture}
+}
+}
+\caption{Overview of the FactoryBench framework. The left panel shows the four-level causal evaluation hierarchy and the physical causal schema. The right panel details the scalable Q\&A generation engine and compares FactoryBench against existing benchmarks.\todo[inline]{The benchmark comparison table in the right panel is repeated elsewhere in the paper and should be removed. The two graphs on the left are talking about different concepts and should be separated}}
+  \label{fig:factorybench_overview}
+\end{figure}
+
+\subsection{Four levels of machine understanding}
+\label{sec:levels}
+
+
+\begin{table}[H]
+\centering
+\caption{FactoryBench levels, what they test, example questions, and expected answer formats.}
+\label{tab:levels_examples}
 \small
-\begin{tabular}{@{}clp{4.5cm}p{2.5cm}p{2.8cm}@{}}
+\begin{tabular}{@{}cp{5.5cm}lp{3.5cm}p{2.2cm}@{}}
 \toprule
-Level & Task & Example Question & Ground Truth Source & Commercial Value \\
+Level & Example Question & Task & What It Tests & Answer Format \\
 \midrule
-\textbf{1} & State & ``What's the current of joint 3 now?'' & Sensor data & Fleet monitoring \\
-\textbf{2} & Intervention & ``If force in joint 3 increases \textit{now} to X, what happens?'' & Simulation (present state) & Diagnostic intervention \\
-\textbf{3} & Counterfactual & ``If force had increased to X \textit{at t=20ms}, what would have happened?'' & Simulation (past state) & Root cause / Capacity planning \\
-\textbf{4} & Decision & ``Robot stopped with error C203A. What to do?'' & Manual + sensor fusion & Expert-free recovery \\
+\textbf{1} & ``We want to isolate the lifting phase in the robot's time series. Assuming a fixed window length of 15 timesteps, at which timestamp should the window begin?'' & State & Can the model understand what the machine is doing and how it is behaving? & Tensor \\
+\textbf{2} & ``A collision with a foam cube occurs at T=850ms. Rank the following signal segments (A--D) in the order you would expect them to appear after the event.'' & Intervention & Can the model reason about how the machine will behave in the face of an event? & Ranking (permutation) \\
+\textbf{3} & ``Had a payload misconfiguration occurred at T=200ms, what would be the expected value of the target torque on joint 2 at T+50ms in this counterfactual case?'' & Counterfactual & Can the model reason accurately about theoretical scenarios? & Scalar (float) \\
+\textbf{4} & ``Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and the steps to fix it.'' & Decision & Can the model make informed decisions about the machine? & Free-form text \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\todo[inline]{Is this some sort of standard design of levels to test understanding or did you come up with this yourself. If you created this, then it should probably be argued a bit more why this was chosen. Maybe this happens later. It would, however, be great, if this was to some extend grounded in previous work or general principles in robotics and not be adhoc. }
+Our four-tier hierarchy is explicitly built on top of Pearl's ladder of causation association, intervention, and counterfactual reasoning which has become the organizing principle for causal inference and is increasingly adopted as an evaluation axis for machine-learning systems \cite{pearl2009causality,peters2017elements,jin2023cladder,pawlowski2020deep_scm,peyrard2023ladder}. We extend the three causal rungs with a fourth decision-making rung that reflects how industrial robotic platforms are actually operated: after interpreting state and causal relationships, operators must select and execute corrective procedures, typically prescribed by vendor manuals (e.g., Universal Robots error-code handbooks). This final rung aligns with the diagnostic-then-act loop that is standard in fault-tolerant control. Grounding the hierarchy in these established principles ensures that each level probes a qualitatively distinct reasoning skill and that failure modes are interpretable in terms of the underlying causal or decision-theoretic primitive.
 
-To systematically evaluate machine understanding, we organize question-answering tasks according to a four-tier hierarchy, each probing distinct reasoning capabilities:
+To systematically evaluate machine-behavior reasoning, we organize question-answering tasks according to this four-tier hierarchy, each probing distinct reasoning capabilities:
 
-\textbf{Level 1: State.} This level assesses the agent's ability to interpret the current state of the machine, including detection of anomalies, identification of operational modes, and recognition of sensor patterns. Questions at this level require accurate extraction and interpretation of time series features.
+\begin{itemize}
 
-\textbf{Level 2: Intervention.} At this level, the agent must reason about the consequences of interventions or events occurring at the present timestep that might perturb the distribution of machine states. Tasks include predicting the immediate impact of control actions, diagnosing faults as they arise, and understanding causal relationships in real time.
+\item \textbf{Level 1: State.} This level assesses the agent's ability to interpret the current state of the machine, including detection of anomalies, identification of operational modes, and recognition of sensor patterns. Questions at this level require accurate extraction and interpretation of time series features.
 
-\textbf{Level 3: Counterfactual.} This level evaluates the agent's ability to reason about hypothetical scenarios, such as the effect of an event or intervention at a previous timestep. Questions require the agent to simulate alternative histories and assess how outcomes would differ under counterfactual conditions, while still considering the history they know.
+\item \textbf{Level 2: Intervention.} At this level, the agent must reason about the consequences of interventions or events occurring at the present timestep that might perturb the distribution of machine states. Tasks include predicting the immediate impact of control actions, diagnosing faults as they arise, and understanding causal relationships in real time.
 
-\textbf{Level 4: Decision Making.} The highest level encompasses complex decision-making tasks, where the agent must generate a sequence of actions or recommendations based on the time series and a prompt. This includes troubleshooting, optimization, and planning, requiring integration of state interpretation, causal reasoning, and goal-directed synthesis.
+\item \textbf{Level 3: Counterfactual.} This level evaluates the agent's ability to reason about hypothetical scenarios, such as the effect of an event or intervention at a previous timestep. Questions require the agent to simulate alternative histories and assess how outcomes would differ under counterfactual conditions, while still considering the history they know.
 
-By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous and granular assessment of machine understanding, from basic state recognition to advanced decision support.
+\item \textbf{Level 4: Decision Making.} The highest level encompasses complex decision-making tasks, where the agent must generate a sequence of actions or recommendations based on the time series and a prompt. This includes troubleshooting, optimization, and planning, requiring integration of state interpretation, causal reasoning, and goal-directed synthesis.
 
-\textbf{Design principle:} Each level builds on previous. Failure at Level $N$ implies failure at Level $N+1$. \todo{Why is this so?}
+\end{itemize}
+
+By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous and granular assessment of machine-behavior reasoning, from basic state recognition to advanced decision support. Figure~\ref{fig:pearl_ladder} instantiates Pearl's three causal rungs (L1--L3) on a concrete robotic arm; FactoryBench's L4 then layers decision-making on top of these rungs.
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  every node/.style={font=\sffamily},
+]
+
+\def\panelw{16.0}
+\def\panelh{5.6}
+\def\panelgap{0.5}
+
+\coordinate (P1center) at (0, 0);
+\coordinate (P2center) at (0, -\panelh-\panelgap);
+\coordinate (P3center) at (0, -2*\panelh-2*\panelgap);
+
+% MACRO: Draw robot arm
+\newcommand{\drawrobot}[4]{
+  \begin{scope}[shift={(#1,#2)}]
+    \fill[panelbg!80!figsteel] (-2.0,-1.6) rectangle (2.6,-1.35);
+    \draw[darknavy, line width=0.8pt] (-2.0,-1.35) -- (2.6,-1.35);
+    \draw[darknavy, line width=0.6pt] (-2.0,-1.6) rectangle (2.6,-1.35);
+    \draw[darknavy, line width=0.7pt] (-1.6,-1.6) -- (-1.6,-1.9);
+    \draw[darknavy, line width=0.7pt] (2.2,-1.6) -- (2.2,-1.9);
+    \fill[figsteel!30] (-0.45,-1.35) rectangle (0.45,-0.95);
+    \draw[darknavy, line width=1pt] (-0.45,-1.35) rectangle (0.45,-0.95);
+    \ifnum#3=2
+      \filldraw[darknavy!15, draw=darknavy!40, line width=0.7pt] (0,-0.95) circle (0.16);
+    \else
+      \filldraw[darknavy!20, draw=darknavy, line width=0.9pt] (0,-0.95) circle (0.16);
+    \fi
+    \ifnum#3=2
+      \draw[darknavy!40, line width=2pt, dashed] (0,-0.95) -- (0.7,0.05);
+    \else
+      \draw[darknavy, line width=2pt] (0,-0.95) -- (0.7,0.05);
+    \fi
+    \ifnum#3=2
+      \filldraw[darknavy!15, draw=darknavy!40, line width=0.8pt] (0.7,0.05) circle (0.14);
+    \else
+      \filldraw[darknavy!20, draw=darknavy, line width=0.9pt] (0.7,0.05) circle (0.14);
+    \fi
+    \ifnum#3=2
+      \draw[darknavy!40, line width=1.8pt, dashed] (0.7,0.05) -- (1.6,0.6);
+    \else
+      \draw[darknavy, line width=1.8pt] (0.7,0.05) -- (1.6,0.6);
+    \fi
+    \ifnum#3=2
+      \filldraw[darknavy!15, draw=darknavy!40, line width=0.7pt] (1.6,0.6) circle (0.12);
+    \else
+      \filldraw[darknavy!20, draw=darknavy, line width=0.8pt] (1.6,0.6) circle (0.12);
+    \fi
+    \ifnum#3=2
+      \draw[darknavy!40, line width=1.2pt, dashed] (1.6,0.6) -- (2.0,0.25);
+      \draw[darknavy!40, line width=1pt, dashed] (2.0,0.25) -- (1.85,-0.02);
+      \draw[darknavy!40, line width=1pt, dashed] (2.0,0.25) -- (2.15,-0.02);
+    \else
+      \draw[darknavy, line width=1.2pt] (1.6,0.6) -- (2.0,0.25);
+      \draw[darknavy, line width=1pt] (2.0,0.25) -- (1.85,-0.02);
+      \draw[darknavy, line width=1pt] (2.0,0.25) -- (2.15,-0.02);
+    \fi
+    \ifnum#3=2
+      \fill[#4!20] (1.85,-0.07) rectangle (2.15,-0.32);
+      \draw[#4!50, line width=0.7pt, dashed] (1.85,-0.07) rectangle (2.15,-0.32);
+    \else
+      \fill[#4!30] (1.85,-0.07) rectangle (2.15,-0.32);
+      \draw[#4, line width=0.8pt] (1.85,-0.07) rectangle (2.15,-0.32);
+    \fi
+  \end{scope}
+}
+
+% ============================================================
+% PANEL 1: L1 · Seeing (Association)
+% ============================================================
+\begin{scope}[shift={(P1center)}]
+  % Panel background
+  \fill[panelbg, rounded corners=6pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
+  \draw[L1tint, line width=1.8pt, rounded corners=6pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
+  
+  \node[anchor=north west, font=\sffamily\bfseries\large, L1tint!80!darknavy] at (-\panelw/2+0.4, \panelh/2-0.2) {L1 \,$\cdot$\, Seeing (Association) - What is?};
+  \node[anchor=north west, font=\sffamily, text=black] at (-\panelw/2+0.4, \panelh/2-0.8) {$P(E \mid S, C)$};
+    
+  % Robot arm (normal)
+  \drawrobot{-4.8}{0.3}{0}{L1tint}
+  
+  % Plot area (Centered)
+  \begin{scope}[shift={(0.5, -0.5)}]
+    \begin{axis}[
+      width=7.0cm, height=3.6cm,
+      xmin=0, xmax=500, ymin=0, ymax=10,
+      xlabel={Time (ms)}, ylabel={Signal},
+      xlabel style={font=\sffamily\scriptsize, darknavy},
+      ylabel style={font=\sffamily\scriptsize, darknavy},
+      tick label style={font=\sffamily\tiny, darknavy},
+      xtick={0,100,200,300,400,500},
+      ytick={0,2,4,6,8,10},
+      axis lines=left,
+      axis line style={darknavy, line width=0.5pt},
+      legend style={at={(0.98,0.98)}, anchor=north east, font=\sffamily\tiny,
+        draw=none, fill=panelbg, fill opacity=0.9, text opacity=1,
+        row sep=1pt, legend columns=1},
+      clip=true,
+      axis background/.style={fill=white},
+    ]
+      % Setpoint S (orange)
+      \addplot[forgisorange, line width=1.2pt, smooth] coordinates {
+        (0,4) (50,4) (100,4.1) (150,4) (200,4.05) (250,4) (300,4.1) (350,4) (400,4.05) (450,4) (500,4)
+      };
+      \addlegendentry{$S$ (setpoint)}
+      
+      % Effort E (green) with deviation
+      \addplot[figgreen, line width=1.2pt, smooth] coordinates {
+        (0,3.8) (50,3.9) (100,4.0) (150,4.1) (200,4.2) (250,5.5) (300,6.8) (350,7.2) (400,7.0) (450,6.5) (500,6.2)
+      };
+      \addlegendentry{$E$ (effort)}
+      
+      % Question bracket on deviation segment
+      \draw[decorate, decoration={brace, amplitude=4pt, mirror}, darknavy, line width=0.7pt]
+        (axis cs:220,3.2) -- (axis cs:420,3.2)
+        node[midway, below=5pt, font=\sffamily\tiny, darknavy] {$E$ deviates why?};
+    \end{axis}
+  \end{scope}
+  
+  % Tag line
+  \node[anchor=south, font=\sffamily\footnotesize\itshape, darknavy, text width=14.5cm, align=center]
+    at (0, -\panelh/2+0.55) {``I observe that when the payload is heavier, motor current is higher.''};
+  % Subtitle
+  \node[anchor=south, font=\sffamily\scriptsize, figsteel, text width=14.5cm, align=center]
+    at (0, -\panelh/2+0.15) {Correlation from passive observation no action taken.};
+\end{scope}
+
+% ============================================================
+% PANEL 2: L2 · Doing (Intervention)
+% ============================================================
+\begin{scope}[shift={(P2center)}]
+  % Panel background
+  \fill[panelbg, rounded corners=6pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
+  \draw[L2tint, line width=1.8pt, rounded corners=6pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
+  
+  % Título y texto de saludo
+  \node[anchor=north west, font=\sffamily\bfseries\large, L2tint!80!darknavy] at (-\panelw/2+0.4, \panelh/2-0.2) {L2 \,$\cdot$\, Doing (Intervention) - What if I do X?};
+  \node[anchor=north west, font=\sffamily, text=black] at (-\panelw/2+0.4, \panelh/2-0.8) {$P(E \mid \mathrm{do}(S))$};
+    
+  % Robot arm (normal with intervention arrow)
+  \drawrobot{-4.8}{0.2}{0}{L2tint}
+    
+  % Plot area (Centered)
+  \begin{scope}[shift={(0.5, -0.5)}]
+    \begin{axis}[
+      width=7.0cm, height=3.6cm,
+      xmin=0, xmax=500, ymin=0, ymax=10,
+      xlabel={Time (ms)}, ylabel={Signal},
+      xlabel style={font=\sffamily\scriptsize, darknavy},
+      ylabel style={font=\sffamily\scriptsize, darknavy},
+      tick label style={font=\sffamily\tiny, darknavy},
+      xtick={0,100,200,300,400,500},
+      ytick={0,2,4,6,8,10},
+      axis lines=left,
+      axis line style={darknavy, line width=0.5pt},
+      legend style={at={(0.98,0.98)}, anchor=north east, font=\sffamily\tiny,
+        draw=none, fill=panelbg, fill opacity=0.9, text opacity=1,
+        row sep=1pt, legend columns=1},
+      clip=true,
+      axis background/.style={fill=white},
+    ]
+      % Intervention line
+      \draw[darknavy, line width=0.7pt, dashed] (axis cs:200,0) -- (axis cs:200,9.5);
+      \node[font=\sffamily\tiny, darknavy, anchor=south, rotate=90] at (axis cs:210,6.5) {$t{=}200$\,ms};
+      
+      % Setpoint S (orange) — forcibly altered at t=200
+      \addplot[forgisorange, line width=1.2pt] coordinates {
+        (0,4) (50,4) (100,4) (150,4) (199,4) (200,4.8) (250,4.8) (300,4.8) (350,4.8) (400,4.8) (450,4.8) (500,4.8)
+      };
+      \addlegendentry{$S$ (forced)}
+      
+      % Effort E (green) responding
+      \addplot[figgreen, line width=1.2pt, smooth] coordinates {
+        (0,3.8) (50,3.9) (100,3.9) (150,3.8) (200,3.9) (220,4.8) (250,5.6) (300,6.0) (350,5.9) (400,5.8) (450,5.8) (500,5.7)
+      };
+      \addlegendentry{$E$ (response)}
+      
+      % Annotation for +20%
+      \draw[-{Stealth[length=3pt]}, forgisorange, line width=0.9pt]
+        (axis cs:160,4.05) -- (axis cs:160,4.75);
+      \node[font=\sffamily\tiny\bfseries, forgisorange, anchor=east] at (axis cs:155,4.4) {+20\%};
+    \end{axis}
+  \end{scope}
+  
+  % Tag line
+  \node[anchor=south, font=\sffamily\footnotesize\itshape, darknavy, text width=14.5cm, align=center]
+    at (0, -\panelh/2+0.55) {``If I command +20\% torque now, the motor current will rise to ${\sim}X$\,A.''};
+  % Subtitle
+  \node[anchor=south, font=\sffamily\scriptsize, figsteel, text width=14.5cm, align=center]
+    at (0, -\panelh/2+0.15) {Predicting the effect of an action at the present timestep.};
+\end{scope}
+
+% ============================================================
+% PANEL 3: L3 · Imagining (Counterfactual)
+% ============================================================
+\begin{scope}[shift={(P3center)}]
+  % Panel background
+  \fill[panelbg, rounded corners=6pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
+  \draw[L3tint, line width=1.8pt, rounded corners=6pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
+  
+  \node[anchor=north west, font=\sffamily\bfseries\large, L3tint!80!darknavy] at (-\panelw/2+0.4, \panelh/2-0.2) {L3 \,$\cdot$\, Imagining (Counterfactual) - What if I had acted differetly?};
+  \node[anchor=north west, font=\sffamily, text=black] at (-\panelw/2+0.4, \panelh/2-0.8) {$P(E_{S=x} \mid S{=}s, E{=}e)$};
+
+  % Real robot arm (solid)
+  \drawrobot{-4.8}{0.3}{0}{L3tint}
+  
+  % Ghost robot arm (dashed, shifted)
+  \drawrobot{-3.8}{0.75}{2}{L3tint}
+  
+  % Plot area (Centered)
+  \begin{scope}[shift={(0.5, -0.1)}]
+    \begin{axis}[
+      width=7.0cm, height=3.6cm,
+      xmin=0, xmax=500, ymin=0, ymax=10,
+      xlabel={Time (ms)}, ylabel={Signal},
+      xlabel style={font=\sffamily\scriptsize, darknavy},
+      ylabel style={font=\sffamily\scriptsize, darknavy},
+      tick label style={font=\sffamily\tiny, darknavy},
+      xtick={0,100,200,300,400,500},
+      ytick={0,2,4,6,8,10},
+      axis lines=left,
+      axis line style={darknavy, line width=0.5pt},
+      legend style={at={(0.98,0.98)}, anchor=north east, font=\sffamily\tiny,
+        draw=none, fill=panelbg, fill opacity=0.9, text opacity=1,
+        row sep=1pt, legend columns=1},
+      clip=true,
+      axis background/.style={fill=white},
+    ]
+      % Intervention line at t=20
+      \draw[darknavy, line width=0.7pt, dashed] (axis cs:20,0) -- (axis cs:20,9.5);
+      \node[font=\sffamily\tiny, darknavy, anchor=south, rotate=90] at (axis cs:30,6) {$t{=}20$\,ms};
+      
+      % Factual E (solid green)
+      \addplot[figgreen, line width=1.2pt, smooth] coordinates {
+        (0,3.8) (20,3.9) (50,4.0) (100,4.1) (150,4.0) (200,4.1) (250,4.0) (300,4.1) (350,4.0) (400,4.0) (450,4.1) (500,4.0)
+      };
+      \addlegendentry{$E$ (factual)}
+      
+      % Counterfactual E (dashed green)
+      \addplot[figgreen, line width=1.2pt, dashed, smooth] coordinates {
+        (0,3.8) (20,3.9) (50,4.5) (100,5.8) (150,7.2) (200,8.5) (250,9.0) (300,9.3) (350,9.4) (400,9.4) (450,9.4) (500,9.4)
+      };
+      \addlegendentry{$E$ (counterfactual)}
+      
+      % Stall annotation
+      \draw[-{Stealth[length=3pt]}, L3tint, line width=0.8pt]
+        (axis cs:300,7.8) -- (axis cs:280,9.2);
+      \node[font=\sffamily\tiny\bfseries, L3tint, anchor=north] at (axis cs:300,7.7) {stall};
+      
+      % Branch point
+      \filldraw[darknavy] (axis cs:20,3.9) circle (1.8pt);
+    \end{axis}
+  \end{scope}
+  
+  % Tag line
+  \node[anchor=south, font=\sffamily\footnotesize\itshape, darknavy, text width=14.5cm, align=center]
+    at (0, -\panelh/2+0.35) {``Given what actually happened, if torque had been raised to $X$ at t = 20ms instead, the arm would have stalled here.''};
+  % Subtitle
+  \node[anchor=south, font=\sffamily\scriptsize, figsteel, text width=14.5cm, align=center]
+    at (0, -\panelh/2+0.05) {Reasoning over alternative histories, conditioned on what we observed.};
+\end{scope}
+
+\end{tikzpicture}
+}
+\caption{Pearl's three levels of causal reasoning instantiated for robotic machine-behavior. \textbf{L1 (Seeing/Association)} captures correlations from passive observation. \textbf{L2 (Doing/Intervention)} predicts the effect of an active intervention at the present timestep. \textbf{L3 (Imagining/Counterfactual)} reasons over alternative histories conditioned on the observed trajectory. FactoryBench extends Pearl's three causal rungs with a fourth decision-making level (L4) that maps observed symptoms to remedial procedures.\todo[inline]{Drawing of robotic arm is cool but useless: it doesn't really represent the level being mentioned. Also Level 4 is missing, which is a weird choice. Furthermore, decrease size since we are way over the page limit.}}
+\label{fig:pearl_ladder}
+\end{figure}
+
 
 \subsection{Answer formats}
+\label{sec:answer-formats}
 
-FactoryBench uses three answer formats, chosen to balance evaluation rigor with scalability. Each format supports deterministic scoring (with the exception of free form), and has been chosen in order to make questions very easily checkable, but also hard to answer in the absence of correct reasoning.
+FactoryBench uses four answer formats, chosen to balance evaluation rigor with scalability. Each format supports deterministic scoring (with the exception of free form), and has been chosen in order to make questions very easily checkable, but also hard to answer in the absence of correct reasoning.
 
-\textbf{Multi-Select MC.} The model is presented with four independent statements (A--D) about the outcome of an event or intervention, and must select any subset of statements. Evaluation gives a score of 1 for exact match, 0.5 for 1 mistake and 0 otherwise (random guesser is expected to get 0).\todo{This just seems wrong. The expected points of a random guesser are clearly positive as all awarded points are nonnegative and there is a nonzero probability to achieve more than 0 points.}
+\begin{itemize}
 
-\textbf{Ranking.} The model is given four time-series segments or outcomes (A--D) and must order them according to a specified criterion (e.g., severity of deviation, magnitude of a signal). The answer is a permutation string (e.g., \texttt{DABC}). Evaluation uses exact-match rate and Kendall's $\tau$ rank correlation against the ground-truth ordering.
+\item \textbf{Multi-Select MC.} The model is presented with four independent statements (A--D) about the outcome of an event or intervention, and must select any subset of statements. Evaluation gives a score of 1 for exact match, 0.5 for 1 mistake, and 0 otherwise.
 
-\textbf{Tensor.} The model must output at least one specific scalar value---such as the expected sensor reading following an intervention---with no multiple-choice scaffolding. The answer is a list of floating-point numbers (possibly one). Evaluation is done on each scalar separately, and uses mean absolute percentage error (MAPE) and a threshold-based accuracy metric (prediction within $\pm k\%$ of ground truth), with partial points given to all correct scalars given.
+\item \textbf{Ranking.} The model is given four time-series segments or outcomes (A--D) and must order them according to a specified criterion (e.g., severity of deviation, magnitude of a signal). The answer is a permutation string (e.g., \texttt{DABC}). Evaluation uses exact-match rate and Kendall's $\tau$ rank correlation against the ground-truth ordering.
 
-\textbf{Free-Form.} The model produces an open-ended natural language response such as a diagnosis, recommended action sequence, or causal explanation. Because no single deterministic answer exists, evaluation is performed via an LLM-as-judge voting protocol: three independent frontier LLMs each compare the model's response against the ground-truth reference and cast a verdict of \textbf{Wrong} (0), \textbf{Neutral} (0.5), or \textbf{Correct} (1). The final score is the majority vote across the three judges, with ties broken by averaging.
-\todo[inline]{This invites the obvious criticism that your evaluation and hence the final score depends on the LLM judges and could therefore change with time. I don't think it is a big issue, but one could address it here. (E.g. one could say that the LLM judges actually have a very simple task and hence not much fluctuation is expected. You could support this by studying how often the current judges are vote unanimously, which I would think is essentially always.)}
+\item \textbf{Tensor.} The model must output at least one specific scalar value such as the expected sensor reading following an intervention with no multiple-choice scaffolding. The answer is a list of floating-point numbers (possibly one). Evaluation is done on each scalar separately, and uses mean absolute percentage error (MAPE) and a threshold-based accuracy metric (prediction within $\pm k\%$ of ground truth), with partial points given to all correct scalars given.
+
+\item \textbf{Free-Form.} The model produces an open-ended natural language response such as a diagnosis, recommended action sequence, or causal explanation. Because no single deterministic answer exists, evaluation is performed via an LLM-as-judge voting protocol: three independent frontier LLMs each compare the model's response against the ground-truth reference and cast a verdict of \textbf{Wrong} (0), \textbf{Neutral} (0.5), or \textbf{Correct} (1). The final score is the majority vote across the three judges, with ties broken by averaging.
+\end{itemize}
 
 \subsection{Time series data and causal schema (SCE)}
+\label{sec:sce}
 
 To ensure that the dataset structure itself encodes causality, FactoryBench organizes all time-series signals into three causal groups, answering the core question: \textit{``What was the machine told to do, and what did it actually do?''}
 
 \begin{itemize}
-    \item \textbf{Setpoint:} The controller's command---target position, velocity, and acceleration per axis.
-    \item \textbf{Context:} Physical conditions affecting behavior---payload, temperature, material properties. Split into \textit{static} (episode metadata) and \textit{dynamic} (time-series columns).
-    \item \textbf{Effort + Feedback:} The machine's response---motor current (effort), actual position (feedback), vibration, and acoustic emission.
+    \item \textbf{Setpoint:} The controller's command target position, velocity, and acceleration per axis.
+    \item \textbf{Context:} Physical conditions affecting behavior payload, temperature, material properties. Split into \textit{static} (episode metadata) and \textit{dynamic} (time-series columns).
+    \item \textbf{Effort + Feedback:} The machine's response motor current (effort), actual position (feedback), vibration, and acoustic emission.
 \end{itemize}
 
-This structure enables a universal fault definition: under healthy operation, Effort is a lawful function\todo{unclear what a lawful function is} of Setpoint. Faults manifest as deviations in the $f(\text{Setpoint})$\todo{here a function $f$ is used that was never defined} vs Effort relationship. The dataset provides the paired signals that make this comparison possible.
+This structure enables a universal fault definition. Under healthy operation, the measured Effort+Feedback response $\mathbf{y}_t$ is defined as a direct function of the Setpoint command $\mathbf{S}$ and the Context $\mathbf{C}_t$:
+
+$$\mathbf{y}_t = f(\mathbf{S}, \mathbf{C}_t)$$
+
+where $f$ represents the nominal plant dynamics (inverse-dynamics-plus-controller transfer) calibrated per robot. Faults manifest as structured deviations from this expected baseline specifically, residuals $\mathbf{y}_t - f(\mathbf{S}, \mathbf{C}_t)$ that form a clear, fault-specific spatiotemporal pattern. Because FactoryBench supplies the paired $(\mathbf{S}, \mathbf{C}_t, \mathbf{y}_t)$ streams, this residual can be computed directly, establishing a single operational definition of a fault that applies across machines and tasks.
 
 This data is sourced from:
 
 \begin{itemize}
     \item \textbf{FactoryWave:} A custom dataset generated from one-arm robotic platforms executing canonical industrial tasks (e.g., pick-and-place) under varied conditions and systematically injected anomalies.
     \item \textbf{Open Source Datasets:} Adapted datasets such as Aursad and Vorausad, offering diverse industrial scenarios and preprocessed to conform to the unified episode structure.
-	\item \textbf{Simulations:} Synthetic time-series data generated from simulated robotic systems to enable controlled experimentation, ablation studies, and validation across both physical and virtual domains.
+	\item \textbf{Simulations:} Synthetic time-series data generated from simulated robotic systems to enable controlled experimentation, ablation studies, and validation across both physical and virtual domains.\todo{Consider removing simulations from this list since we're only using that dataset for sim2real analysis.}
 \end{itemize}
 
-\todo[inline]{table \ref{tab:datasets} is never mentioned in the text.}
+The two open-source datasets integrated into FactoryBench are summarized in Table~\ref{tab:datasets}; both provide the full setpoint--context--effort triplet at 100\,Hz or higher and have been relabelled to conform to our unified episode schema.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Open-source datasets incorporated into FactoryBench.}
 \label{tab:datasets}
@@ -198,89 +763,101 @@ voraus-AD & UR5 & ? & 100/500 Hz & Pick and Place & 12 \\
 
 % TODO: INSERT TABLE TO SUMMARIZE PROPORTIONS OF DATA COMING FROM EACH SOURCE
 
-\section{Reliable Q\&A generation (key contribution)}
+\section{Reliable Q\&A generation}
 
 \subsection{At scale generation via extensive labelling}
 
-Scalable ground-truth generation is the central challenge of any Q\&A benchmark grounded in raw sensor data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by PhD-level experts in robotics. Rather than annotating individual questions by hand, each template is parameterized: concrete values are filled at generation time from the episode data and its associated labels. The context time series used to fill the variables of the question is sampled uniformly by datasource (sim vs open source vs FactoryWave), dataset (if looking at open source), experiment, difficulty, length and then placement in that order. This yields a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
-\todo[inline]{Every referee will ask if the reliance on templates can lead to models finding shortcuts. If the template structure can be learned then the task can be learned simply by emulating those and no understanding is achieved. One needs to address this issue here.}
+Scalable ground-truth generation is the central challenge of any Q\&A benchmark grounded in raw data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by PhD-level experts in robotics. Rather than annotating individual questions by hand, each template is parameterized: concrete values are filled at generation time from the episode data and its associated labels. The context time series used to fill the variables of the question is sampled uniformly by datasource (sim vs open source vs FactoryWave), dataset (if looking at open source), experiment, difficulty, length and then placement in that order. This yields a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
 
-% \begin{figure}[t]
-% \centering
-% \includegraphics[width=0.8\textwidth]{figures/question_generation.png}
-% \caption{Question generation pipeline.}
-% \label{fig:question_generation}
-% \end{figure}
+\paragraph{Guarding against template shortcuts.} A natural concern is that template-generated benchmarks can be solved by learning the surface structure of templates rather than the underlying reasoning. Our primary defense is structural: each template admits a combinatorially large instantiation space over signal names, timestamps, prediction horizons, payload conditions, and injected-fault types, so two questions sharing the same template rarely share more than a fraction of their variable slots. Crucially, the correct answer is never recoverable from the question text alone it is determined by the paired time series, which varies across instantiations.
 
-\textbf{Variable sampling.} Each question template contains multiple variable slots that are filled at generation time via variable-specific sampling distributions. Continuous variables---such as signal names, timestamps, prediction horizons, and numerical thresholds---are sampled directly from the episode data or drawn from predefined distributions. Discrete variables---such as tasks, anomaly types, and root causes---are sampled from curated vocabularies. These vocabularies were initially aggregated from the open-source datasets used in FactoryBench, then substantially expanded by PhD-level robotics experts to cover a broader range of operationally realistic scenarios\todo{Reference to experts is a bit dangerous, if it is not clearly described how they operated. Was some protocol followed to identify the variables?}, while remaining fully reproducible for FactoryWave episodes. This separation between template structure and sampled content is what allows a small number of hand-authored templates to generate a large and semantically diverse question pool.
+%
+\begin{figure}[H]
+%
+\centering
+%
+\includegraphics[width=0.8\textwidth]{figures/question_generation.png}
+%
+\caption{Question generation pipeline.}
+%
+\label{fig:question_generation}
+%
+\end{figure}
 
-\textbf{Template design.} Each of the 40 question templates was manually authored to probe one specific reasoning capability at the appropriate level of the hierarchy, while remaining general enough to admit a wide range of concrete instantiations. Templates are parameterized over episode segments, signal names, event descriptions, timestamps, and predicted values. Answer options for multi-select questions are drawn from a shared pool of verifiable statements, each paired with a rule that can be evaluated deterministically against the time series, given the densely labelled data. This design ensures that ground truth is never imputed or inferred---it is computed directly from labeled episode data---making the benchmark both reliable and fully reproducible.
+\textbf{Variable sampling.} Each question template contains variable slots that are filled at generation time from one of two sources: (i) label information read directly from the episode data (e.g., signal names, timestamps, anomaly labels, root causes), or (ii) a predefined sampling distribution attached to that variable (e.g., prediction horizons, numerical thresholds, or curated vocabularies for discrete slots). The discrete vocabularies are seeded from the label sets of AURSAD and voraus-AD and extended to cover cases specific to FactoryWave; they are released in full so every question instantiation is inspectable and reproducible.
+
+\textbf{Template design.} Each of the 20 \todo{[TODO: check the exact number when level 4 implemented]} question templates was manually authored to probe one specific machine understanding level, while remaining general enough to admit a wide range of concrete instantiations. Templates are parameterized over episode segments, signal names, event descriptions, timestamps, and predicted values. Answer options for single and multi-select questions are drawn from a shared pool of predifined verifiable statements, each paired with a rule that can be evaluated deterministically against the time series, given the densely labelled data. This design ensures that ground truth is never imputed or inferred it is computed directly from labeled episode data making the benchmark both reliable and fully reproducible.
+
 
 \subsection{Density of FactoryWave}
 
-% TODO: TALK ABOUT DATA GENERATION FOR ALL LEVELS (ESPECIALLY LEVEL 3), MENTION HOW LABELLING IS COLLECTED AUTOMATICALLY
 
-\subsection{Adapting labelling to open datasets and simulations}
+FactoryWave is collected from two physical robots (UR3e and the KUKA KR10) executing up to three canonical industrial tasks each: pick-and-place, screwing (UR3e only), and peg-in-hole. Each complete task cycle constitutes one episode, recorded at 500\,Hz across \todo{find number} sensor channels covering joint setpoints, feedback, torques, speeds, estimated contact forces, TCP pose, gripper state, and task-phase labels.
 
-% TODO: TALK ABOUT HOW LABELLING WAS DONE ON OPEN DATASETS AND SIMULATIONS
+Episodes are organized into four experiment types. \textbf{Normal} episodes capture nominal operation across three payload levels (light, medium, heavy for pick-and-place). \textbf{Trajectory optimization} episodes run the same task with randomly varied waypoint sequences, recording episode-level duration and energy metadata to support Level 4 ranking questions. \textbf{Fault} episodes inject one of 37 fault types (spanning gripper failures, payload misconfigurations, software faults, collisions, and peg-in-hole-specific anomalies), each recorded with fault-specific metadata and, where applicable, a precise injection timestep. \textbf{Counterfactual} episodes pair a clean baseline run with a fault run whose pre-injection segment most closely matches the baseline (selected by minimum KL divergence), providing ground truth for Level 3 causal reasoning.
 
-\subsection{Dataset diversity \& quality assurance}
+\todo[inline]{Table to summarize all number of episodes and categories.}
 
-% TODO: GENERATE GRAPHS AND ADD PARAGRAPHS ABOUT Q&A DISTRIBUTIONS (LEVEL, DIFFICULTY, ETC)
+\subsection{Knowledge graph and protocol extraction}
+\label{sec:knowledge-graph}
 
-A critical risk in template-generated benchmarks is a lack of semantic diversity, leading models to memorize structural patterns rather than perform true reasoning. To ensure our dataset evaluates robust machine understanding, we utilize the \textbf{Vendi Score}\todo{citation needed} on the embeddings of our Q\&A pairs to measure and maximize effective population diversity.
+Reliable ground truth for Level 4 troubleshooting questions requires more than episode labels: it demands machine-specific recovery protocols grounded in manufacturer documentation. To produce this at scale, we implement a structured parsing pipeline over robot technical manuals.
 
-We iteratively evaluate dataset diversity across three primary axes during generation:
+\paragraph{Error-to-protocol extraction.} For each robot in FactoryBench, we parse the manufacturer's runtime error documentation to extract a structured mapping from error codes to error names, descriptions, and recommended recovery steps. Each entry captures what the controller reports when a fault occurs and what an operator should do to resolve it.
 
-\begin{itemize}
-    \item \textbf{Low Diversity (Parameter Variation):} Varying only parameters like time windows and joint indices yields a low Vendi Score, confirming that simple parameter randomization is insufficient.
-    \item \textbf{Moderate Diversity (Format Variation):} Semantically identical questions expressed across different formats (Open-ended, Multiple Choice, True/False) measurably increase the effective diversity.
-    \item \textbf{High Diversity (Template \& Type Variation):} Introducing mixed reasoning templates across levels (e.g., kinematic comparison, derivative estimation like friction/acceleration, anomaly detection) drives the highest Vendi Score. By enforcing high Vendi Scores across our generated subsets, we ensure the benchmark tests versatile analytical capabilities.
-\end{itemize}
+\paragraph{Anomaly-to-error mapping.} We then map every anomaly type studied in FactoryBench to the most likely corresponding manufacturer error code. This mapping is established by PhD-level robotics experts who reason about the physical cause of each anomaly and identify which runtime error it would most plausibly trigger on the target robot. The result is a fault-indexed lookup table linking each root cause to a specific error code and its associated protocol.
+
+\paragraph{Expert-authored gap-filling.} Not all anomalies correspond to a documented runtime error. Physical fault injections (such as gripper misactivation, peg misalignment, or external collisions) may not produce a well-defined controller error at all. For these cases, robotics experts author recovery protocols directly, following the same structure as the manufacturer documentation to maintain consistency.
+
+\paragraph{Knowledge graph integration.} The complete mapping (error-derived and expert-authored protocols alike) is ingested into a knowledge graph alongside robot specifications, task definitions, and signal schema. At question generation time, the pipeline queries this graph to automatically assemble the relevant protocol context and inject it as ground truth into Level 4 troubleshooting Q\&A pairs, without requiring per-question human review.
+
+\subsection{FactoryBench-Lite: a representative 10\% subset}
+\label{sec:lite}
+
+\todo[inline]{FactoryBench-Lite not yet implemented.
+
+IDEA: 
+\\1. run full dataset
+\\2. implement stratified selection preserving per-stratum mean/std of reference-model scores (GHOSTS-style, \cite{frieder2023ghosts})
+\\3. validate via Spearman/Kendall rank correlation and per-level MAE \cite{polo2024tinybenchmarks,bean2025scales}}
 
 \subsection{Pipeline overview}
 
 \todo[inline]{Some practical questions: How can people employ the benchmark? Where can it be found. Will it be maintained and expanded? Will incorrect labels be corrected? Is there a private dataset too? Are parts of the dataset designated for training and parts for testing?}
 
-% TODO: ADD GRAPH OR SCHEMA SUMMARIZING IT
+FactoryBench and FactoryWave are released under a \todo{check license} license and distributed via a public Hugging Face repository. The release includes the episode data, the generator source code, the full set of 20 question templates \todo{Check the number of question templates when level 4 finished}
+with their paraphrase banks, all LLM-as-judge prompts, and both the full benchmark and the FactoryBench-Lite subset (Section~\ref{sec:lite}). We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file.
+
 
 \section{Experiments}
 
 \subsection{Models to evaluate}
 
-\textbf{Frontier LLMs:}
-\begin{itemize}
-    \item GPT-4o, GPT-4-Turbo
-    \item Gemini-2.5-Pro, Gemini-2.5-Flash
-    \item Claude-3.5-Sonnet, Claude-3-Opus
-\end{itemize}
-
-\textbf{Specialized Methods:}
-\begin{itemize}
-    \item Time-series encoders + LLM (Chronos, Moirai)
-    \item Multimodal industrial models (FD-LLM)
-    \item RAG with manual retrieval
-\end{itemize}
-
-\textbf{Baselines:}
-\begin{itemize}
-    \item Random
-    \item Rule-based (threshold detection)
-    \item Human expert (ceiling)
-\end{itemize}
+We evaluate a cross-vendor panel of frontier LLMs covering both closed-weight and open-weight releases available at submission time (April 2026): on the closed-weight side, GPT-5-mini \cite{openai2025gpt5mini} and Claude Haiku 4.5 \cite{anthropic2025claudehaiku45}; on the open-weight side, Qwen-3.5 \cite{qwen2026qwen35}, DeepSeek V3.1 \cite{deepseek2025v31}, and Mistral-Large-3 \cite{mistral2025large3}. Alongside these general-purpose models we also run two specialized time-series foundation models, Chronos-2 \cite{ansari2024chronos} and Moirai \cite{woo2024unified}, restricted to the forecasting-style subset of FactoryBench whose ground truth is a future scalar or segment of the time series (Tensor-type questions); since these models do not ingest natural-language prompts they are not applicable to the MC, Multi-Select, Ranking, or Free-Form subsets. Finally, we report two baselines for calibration: a random-choice baseline and a simple rule-based threshold detector.\todo{Replace Claude Haiku 4.5 with a stronger Anthropic model (Opus or Sonnet, whichever fits the final inference budget) so the closed-weight panel is not capped at the small tier. If the combined budget becomes too tight after this switch, drop Mistral-Large-3 to free up capacity.}
 
 \subsection{Experimental configurations}
 
 Beyond out-of-the-box evaluation, we investigate how different interventions improve performance:
 
 \begin{itemize}
-    \item \textbf{Finetuning:} We optionally finetune open-source models on the FactoryBench Q\&A dataset to establish the limit of specialized training versus general reasoning.
-    \item \textbf{Tool-Augmented Agents:} The best-performing foundational models are granted access to external time-series prediction and anomaly detection modules, testing the synergy between LLM reasoning and domain-specific computation.
+    \item \textbf{Finetuning:} We finetune open-source models on the FactoryBench Q\&A dataset to test learnability of machine understanding, as well as generalizability beyond cobot data.
 \end{itemize}
 
-\subsection{Results (expected)}
+\subsection{Sim2real gap analysis on counterfactual pick-and-place}
+\label{sec:sim2real}
 
-\begin{table}[t]
+Counterfactual questions (Level~3) require comparing what \emph{did} happen in an episode against what \emph{would have} happened under a different intervention, holding the rest of the world fixed. In a physical lab this ground truth is impossible to obtain exactly: two real executions never share identical initial conditions, micro-disturbances, or stochastic contact dynamics, so any real-world ``counterfactual pair'' is only an approximation of the intended do-operation. Simulation removes this obstacle: the simulator state can be deterministically forked at an arbitrary timestep, one branch continues under the baseline policy, the other under the intervention, and the two trajectories share a bit-identical pre-intervention history. This makes simulation the only setting in which Level~3 ground truth can be produced without approximation error. However, simulation gains exact counterfactual fidelity but loses realism: contact dynamics, sensor noise, actuator latency, and manufacturing variability all deviate from the physical system. A model that learns to exploit simulator-specific artefacts may score well on simulated counterfactuals without genuinely understanding the underlying robotic behaviour. We therefore treat the simulated and physical counterfactuals as complementary rather than interchangeable.
+
+\textbf{FactoryWave counterfactual pipeline (physical).} For each selected fault whose injection moment can be precisely timed, we: (i) fix initial conditions (object identity, pose, payload, controller config), (ii) record one clean \textit{baseline} run of the full episode, (iii) record 3--5 \textit{fault} runs under the same initial conditions with the fault event injected at a randomly sampled but fixed timestep, (iv) score each fault run against the baseline on the pre-injection segment using KL divergence, and (v) retain the run with the lowest KL divergence as the counterfactual partner for the baseline. All other candidate runs are discarded. The pair is stored with \texttt{cf\_fault\_id}, \texttt{cf\_injection\_timestep}, \texttt{cf\_injection\_time\_s}, and \texttt{cf\_baseline\_episode\_id}. Full protocol details are in Appendix~\ref{app:data_recording}.
+
+\textbf{IsaacSim counterfactual pipeline (simulation).} We reproduce the pick-and-place task in NVIDIA IsaacSim with a URDF-matched UR3 and a matching gripper, workspace layout, and fault applicators. For each simulated episode we run the baseline to completion, then re-run from a snapshot of the simulator state taken at the injection timestep with the fault applicator enabled. Because both branches are initialised from the identical saved state, the pre-intervention trajectories are bit-identical by construction; no KL-based selection or discarding is required. The simulation pipeline can therefore generate arbitrarily many counterfactual pairs at negligible marginal cost, including for faults that are too disruptive or unsafe to stage repeatedly on the physical robot.
+
+
+\textbf{Sim2real gap experiment.} \todo{Fill in concrete numbers, plots, and per-template gap tables once the IsaacSim pipeline is frozen; see Appendix~\ref{app:simulation_setup}.}
+
+\subsection{Results}
+
+\begin{table}[H]
 \centering
 \caption{Expected performance across levels (accuracy \%).}
 \label{tab:results}
@@ -295,8 +872,14 @@ Level & Random & Current LLMs & Target (w/ prior) & Human Expert \\
 \bottomrule
 \end{tabular}
 \end{table}
+\todo{Update values when final results are computed.}
 
-\textbf{Hypothesis:} Semantic priors (ManualsGraph) will show largest gains at Level 4.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/heatmap_models_x_levels.pdf}
+\caption{Measured accuracy of four frontier models evaluated via Microsoft Foundry across FactoryBench's four reasoning levels. Each cell reports the mean accuracy over $n$ evaluated Q\&A pairs. Levels 1--3 and Level 4 ranking templates use deterministic scoring; Level 4 free-form templates (troubleshooting and optimization) are scored against the reference root cause and remediation protocol under a $\{0, 0.5, 1\}$ rubric.}
+\label{fig:results_heatmap}
+\end{figure}
 
 \section{Discussion}
 
@@ -318,17 +901,13 @@ Level & Random & Current LLMs & Target (w/ prior) & Human Expert \\
     \item Reliance on LLMs-as-Judge for evaluation of Free-Form questions
 \end{itemize}
 
-\subsection{Relation to FactoryNet}
-
-This benchmark evaluates on a \textbf{subset} of FactoryNet. The full dataset (50k+ episodes, 200k+ Q\&A) will be released separately with a focus on \textit{training} industrial world models, not just evaluation.
-
-% TODO: CONFIRM WE WANT TO KEEP THIS SUBSECTION. NOT SURE IF IT IS FITTING TO SAY THAT
-
 \section{Conclusion}
 
-FactoryBench introduces a systematic approach to evaluating machine understanding via Q\&A. By focusing deeply on one machine family and providing reliable answer generation at scale, we enable rigorous comparison of methods across four levels of reasoning---from basic state identification to procedure generation grounded in technical manuals.
+FactoryBench introduces a systematic approach to evaluating machine understanding via Q\&A. By focusing deeply on one machine family and providing reliable answer generation at scale, we enable rigorous comparison of methods across four levels of reasoning from basic state identification to procedure generation grounded in technical manuals.
 
 Our physical validation protocol closes the loop from benchmark to reality, addressing the fundamental question: can AI systems that excel at industrial Q\&A actually help in the real world?
+
+\todo[inline]{Double-check every reference in \texttt{references.bib} before submission: verify authors, title, venue, and year against the original source; check for fabricated or near-duplicate entries; and ensure arXiv identifiers and capitalization follow the authors' preferred formatting.}
 
 \bibliography{references}
 \bibliographystyle{plainnat}
@@ -336,144 +915,407 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 \newpage
 \appendix
 
-\section{Q\&A pair structure}
+\section{Question template inventory}
+\label{app:templates}
 
-\textbf{Level 2 Example (Intervention):}
+Table~\ref{tab:template_inventory} lists the number of question templates currently implemented per level, broken down by answer format. Totals reflect the templates shipped in the FactoryBench release at the time of writing and are expected to grow as new templates are added.\todo{Update counts when new templates are merged.}
 
-\begin{verbatim}
-{
-  "id": "4fabb9ab-e476-48ff-812d-8fc33bb63ac3",
-  "level": 2,
-  "template_id": 2,
-  "template_type": "intervention_outcome",
-  "question": "If a continual increase of feedback_tcp_speed_5
-    lasting 15 timesteps happened at the current timestep
-    (T=4640ms), what would most likely happen next?
-    Answer only with a 4 letter string using F and T ...",
-  "options": {
-    "A": "No significant effect: safety stays normal ...",
-    "B": "Following the event, command and measured TCP ...",
-    "C": "Following the event, the system remains ...",
-    "D": "Following the event, robot current increases ..."
-  },
-  "answer": "FTTF",
-  "provenance": {
-    "dataset": "inter_aursad",
-    "episode": "experiment_1",
-    "subseries_start_index": 131,
-    "subseries_length": 62
-  },
-  "context": {...}
+\begin{table}[H]
+\centering
+\caption{Number of question templates per level, by answer format.}
+\label{tab:template_inventory}
+\small
+\begin{tabular}{@{}lccccc|c@{}}
+\toprule
+Level & MC single-select & MC multi-select & Ranking & Tensor / Numerical & Free-form & Total \\
+\midrule
+\textbf{1} (State)         & 1 & 1 & 1 & 1 & 0 & 4 \\
+\textbf{2} (Intervention)  & 0 & 2 & 1 & 2 & 0 & 5 \\
+\textbf{3} (Counterfactual)& 0 & 2 & 1 & 2 & 0 & 5 \\
+\textbf{4} (Decision)      & 0 & 0 & 2 & 0 & 2 & 4 \\
+\midrule
+\textbf{Total}             & 1 & 5 & 5 & 5 & 2 & \textbf{18} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\section{FactoryBench-Lite: distillation methodology and validation}
+\label{app:lite}
+
+\todo[inline]{FactoryBench-Lite appendix: not yet implemented. Add details like:}
+\begin{itemize}
+  \item \textbf{Motivation and prior art:} anchor on miniGHOSTS \cite{frieder2023ghosts} (stratified selection preserving per-file mean/std); contrast with rank-preservation \cite{polo2024tinybenchmarks} and cognitive-scales \cite{bean2025scales}.
+  \item \textbf{Selection procedure:} stratify by $(\ell, f, d, \delta)$ = level $\times$ format $\times$ source $\times$ difficulty; within each stratum select $\lceil 0.1\,|\mathcal{Q}_{\ell,f,d,\delta}|\rceil$ items minimising $\sum_{m \in \mathcal{M}_{\text{ref}}} (|\mu_m(\mathcal{S})-\mu_m(\mathcal{Q})| + |\sigma_m(\mathcal{S})-\sigma_m(\mathcal{Q})|)$; greedy swap from stratified uniform init.
+  \item \textbf{Up-front cost:} $|\mathcal{M}_{\text{ref}}| \times C_{\text{full}}$, paid once.
+  \item \textbf{Validation:} Spearman $\rho$ / Kendall $\tau$ between per-model aggregates on $\mathcal{S}$ vs.\ $\mathcal{Q}$, plus per-level MAE; acceptance $\rho \geq 0.9$ and MAE $\leq 3$ pp.
+  \item \textbf{Scope:} extrapolation caveat \cite{zhang2025benchmark_prediction}; Lite for development/ablations/budget-constrained runs, full benchmark remains authoritative for leaderboard claims.
+\end{itemize}
+
+
+\section{Details of the FactoryWave dataset}
+\label{app:data_recording}
+
+FactoryWave was collected on two one-armed platforms: the \textbf{Universal Robots UR3} (cobot; OnRobot Screwdriver and two-finger gripper variants) and the \textbf{KUKA KR10} (industrial arm). Each episode corresponds to one complete task cycle; episodes are recorded under four conditions (normal, fault, trajectory-optimization, and counterfactual), described below. Because state interpretation rather than policy quality is the object of study, motion is generated by a deterministic scripted controller. Every sample carries extensive labelling metadata, and the full native-rate sensor stream is logged without online feature selection.
+
+\subsection{Tasks and phase structure}
+
+Three canonical tasks are represented in the dataset: Pick-and-Place, Screwing, and Peg-in-Hole. All three are executed on both robots, using matched scripted controllers and task layouts so that cross-embodiment comparisons hold the task fixed. We structure each task as a deterministic sequence of phases (Tables~\ref{tab:phases_pp}, \ref{tab:phases_screw}, \ref{tab:phases_peg}); the phase index is written as a discrete label at every timestep, providing an interpretable segmentation that downstream models can condition on or that can be used to localize questions to a specific stage of the cycle. Within this fixed phase skeleton, we randomize as much of the episode as the task permits so that a question template that targets a given phase does not accidentally learn a fixed pose, timing, or trajectory. Pick and place locations are sampled uniformly from predefined workspace regions; phase-specific joint velocities, accelerations, and end-effector rotations are drawn from bounded per-phase ranges; and approach angles to contact events are perturbed within the tolerances of the controller. This forces the Q\&A pairs generated from FactoryWave to reflect phase-level reasoning rather than memorisation of a single scripted trajectory, which in turn makes them generalizable to a wide variety of trajectories and variation found in real recordings.
+
+\begin{table}[H]
+\centering
+\caption{Task phases for Pick-and-Place.}
+\label{tab:phases_pp}
+\small
+\begin{tabular}{clp{8cm}}
+\toprule
+Phase index & Phase name & Description \\
+\midrule
+0 & \texttt{above\_pick}  & EEF moves to a waypoint directly above the object \\
+1 & \texttt{descend}      & EEF lowers toward the object \\
+2 & \texttt{settle}       & Brief hold to let physics settle before grasping \\
+3 & \texttt{close}        & Gripper closes around the object \\
+4 & \texttt{lift}         & EEF lifts the grasped object off the surface \\
+5 & \texttt{move\_xy}     & Lateral transfer toward the bin \\
+6 & \texttt{lower}        & EEF lowers into the bin \\
+7 & \texttt{open}         & Gripper opens, object released \\
+8 & \texttt{retract}      & EEF moves away from the bin \\
+9 & \texttt{return}       & EEF returns to home configuration \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Task phases for Screwing.}
+\label{tab:phases_screw}
+\small
+\begin{tabular}{clp{8cm}}
+\toprule
+Phase index & Phase name & Description \\
+\midrule
+0 & \texttt{approach}  & EEF moves to a pre-contact waypoint above the fastener \\
+1 & \texttt{descend}   & EEF lowers to engage the fastener \\
+2 & \texttt{screw}     & Continuous downward force + wrist rotation to thread \\
+3 & \texttt{disengage} & Gripper opens / tool lifts off \\
+4 & \texttt{retract}   & EEF returns to a safe height \\
+5 & \texttt{descend}   & EEF lowers to engage the fastener (loosening pass) \\
+6 & \texttt{loosen}    & Loosen the screw \\
+7 & \texttt{engage}    & Gripper closes on the retrieved screw \\
+8 & \texttt{retract}   & EEF returns to home position \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Task phases for Peg-in-Hole.}
+\label{tab:phases_peg}
+\small
+\begin{tabular}{clp{8cm}}
+\toprule
+Phase index & Phase name & Description \\
+\midrule
+0 & \texttt{above\_hole}   & EEF moves above the hole and aligns \\
+1 & \texttt{insert}        & EEF pushes peg downward into the hole \\
+2 & \texttt{disengage}     & Gripper opens \\
+3 & \texttt{above\_hole}   & EEF rises back to the waypoint above the hole \\
+4 & \texttt{retract}       & EEF returns to home position \\
+5 & \texttt{above\_object} & EEF moves above the object and aligns with it \\
+6 & \texttt{engage}        & Gripper closes \\
+7 & \texttt{above\_object} & EEF rises back to the waypoint above the object \\
+8 & \texttt{retract}       & EEF returns to home position \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Episode metadata}
+
+Alongside the sensor stream, every episode carries a fixed set of metadata fields describing the robot, task, condition, payload, and end-effector configuration (Table~\ref{tab:metadata}). These fields are constant within an episode and are used both as filters during question generation (e.g.\ to restrict a template to a specific payload regime) and as provenance in the released Q\&A pairs. This includes fault-specific fields (such as injection timestamp or physical offset).
+
+\begin{table}[H]
+\centering
+\caption{Default per-episode metadata fields.}
+\label{tab:metadata}
+\small
+\begin{tabular}{lp{9.5cm}}
+\toprule
+Field & Description \\
+\midrule
+\texttt{episode\_id}                 & Unique identifier for the episode \\
+\texttt{robot\_model}                & Robot model (UR3, KUKA KR10) \\
+\texttt{task}                        & Task (pick-and-place, screwing, peg-in-hole) \\
+\texttt{condition}                   & Episode condition (normal, fault, optimization, trajectory-opt, counterfactual) \\
+\texttt{fault\_id}                   & Fault index for fault episodes; null otherwise \\
+\texttt{weight\_of\_box}             & Mass of the transported object in kg (pick-and-place only) \\
+\texttt{shape\_of\_box}              & Shape/dimensions of the transported object (pick-and-place only) \\
+\texttt{position\_of\_box}           & Initial XYZ position of the object on the table, where measurable \\
+\texttt{gripper\_model}              & Gripper model and type (vacuum, two-finger, screwdriver) \\
+\texttt{payload\_mass\_configured}   & Payload mass configured at the controller (kg) \\
+\texttt{payload\_cog\_configured}    & Payload CoG offset configured at the controller (x, y, z in mm) \\
+\texttt{tcp\_offset\_configured}     & TCP position offset configured at the controller (x, y, z in mm) \\
+\texttt{tcp\_orientation\_configured}& TCP orientation configured at the controller (rx, ry, rz in radians) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Fault taxonomy}
+
+FactoryWave includes 28 task-specific fault types together with 2 task-independent software faults, for a total of 30 distinct root causes (Table~\ref{tab:faults}). Each fault is paired with a plain-language description of the underlying physical or control-level mechanism and the injection procedure used to induce it during data collection. The last three columns indicate which tasks include the fault in the collected dataset; faults that apply to all three tasks (e.g.\ collisions with a shared workspace object, misconfigurations of the shared controller) are recorded under each applicable task with task-specific signal imprints.
+
+{\renewcommand{\arraystretch}{1.35}
+\begin{longtable}{@{}p{3.1cm}p{4.2cm}p{4.6cm}ccc@{}}
+\caption{Fault catalogue. Columns \textit{PP}, \textit{Scr}, \textit{PiH} indicate whether the fault is included in the Pick-and-Place, Screwing, and Peg-in-Hole recordings.}
+\label{tab:faults}\\
+\toprule
+Fault & Explanation & Injection & PP & Scr & PiH \\
+\midrule
+\endfirsthead
+\multicolumn{6}{l}{\small\textit{Table \ref{tab:faults} (cont.)}} \\
+\toprule
+Fault & Explanation & Injection & PP & Scr & PiH \\
+\midrule
+\endhead
+Damaged screw thread            & Screw thread physically damaged, preventing proper engagement during tightening. & Pre-damaged the screw thread with sandpaper. & \texttimes & \checkmark & \texttimes \\
+Missing screw                   & Tightening is attempted with no screw present. & Removed the screw from screwdriver before the cycle. & \texttimes & \checkmark & \texttimes \\
+Damaged plate thread            & The threaded hole in the plate is damaged, preventing engagement. & Pre-damaged the plate hole with a metal screwdriver. & \texttimes & \checkmark & \texttimes \\
+Loosening phase                 & A counterclockwise loosening rotation replaces tightening; a normal phase with a distinct signal. It is counted here as an anomaly to match the fault schema of the AURSAD dataset \cite{leporowski2022aursad}. & Reversed the rotation direction in the controller program to execute a counterclockwise loosening pass in place of tightening. & \texttimes & \checkmark & \texttimes \\
+Gripper activation failure      & The vacuum gripper fails to activate and never picks up the box. & Disabled the gripper activation command in the robot program so the pick cycle completes without a grasp. & \checkmark & \texttimes & \texttimes \\
+Gripper release during motion   & The gripper releases the payload mid-trajectory, causing an abrupt payload loss. & Triggered a programmatic gripper-release command at a scripted timestep mid-trajectory. & \checkmark & \texttimes & \texttimes \\
+Additional axis payload         & A dead weight attached to one link increases inertia and gravity loading on all joints. & Bolted calibrated weights of varying mass to one robot link. & \checkmark & \checkmark & \texttimes \\
+Collision with foam object      & Contact with a soft foam block produces a brief TCP force spike without a protective stop. & Placed a foam cube directly in the programmed TCP trajectory. & \checkmark & \checkmark & \checkmark \\
+Unexpected payload weight       & The transported box has a weight that deviates from the nominal payload configuration. & Swapped the nominal box for a known heavier or lighter one. This is done in a counterfactual context, ie. switching weights and asking about alternate weight scenario.  & \checkmark & \texttimes & \texttimes \\
+Invalid gripping position       & Timing error: the gripper closes after the arm has begun lifting, gripping the object off-centre. & Added a \texttt{sleep()} call in the controller program so gripper closure lags the lift motion. & \checkmark & \texttimes & \texttimes \\
+Unstable mounting platform      & Base instability introduces low-frequency vibrations into the arm. & Placed 8 layers of towels under the base plate. & \checkmark & \texttimes & \texttimes \\
+Joint position limit violation  & A joint moves outside its configured soft or hard position limits, triggering a safety stop. & Random waypoint slightly beyond the configured soft joint limit. & \checkmark & \texttimes & \texttimes \\
+TCP frame misconfiguration      & TCP frame or mounting orientation misconfigured at the controller; gravity torques deviate. & Entered an incorrect TCP offset or mounting angle in the controller installation settings. & \checkmark & \checkmark & \checkmark \\
+Payload weight misconfiguration & Payload mass misconfigured while a tool or workpiece is physically attached. & Left the configured payload weight at multiple wrong mass configurations while a task-dependant gripper remained mounted. & \checkmark & \checkmark & \texttimes \\
+External arm disturbance        & A continuous external force pulls or pushes the TCP during motion. & Anchored an elastic rope between the bench frame and the tool flange. & \checkmark & \checkmark & \checkmark \\
+Mild payload CoG misconfiguration & Payload CoG specified at an incorrect offset from the tool flange; gravity compensation is wrong. & Entered a CoG offset in the payload configuration that differs from the physical tool CoG. & \checkmark & \checkmark & \checkmark \\
+Collision with hanging cable    & A loose cable drags along a robot link or the tool flange during motion. & Suspended a loose cable across the trajectory at arm height. & \checkmark & \checkmark & \checkmark \\
+Collision with cardboard object & A cardboard carton in the trajectory provides moderate resistance; may trigger a protective stop. & Placed a free-standing or braced cardboard box in the programmed trajectory. & \checkmark & \checkmark & \checkmark \\
+Collision with rigid object     & A rigid plastice block in the TCP path triggers an immediate protective stop. & Clamped a rigid plastic block in the programmed TCP path. Contrarily to the other collisions, this fault consistantly causes safety stops. & \checkmark & \checkmark & \checkmark \\
+Peg insertion misalignment      & Peg approaches the hole at an angular or lateral offset and jams against the rim. & Added a recorded lateral offset at the insertion approach waypoint. & \texttimes & \texttimes & \checkmark \\
+Hole obstruction                & Foreign object or debris in the hole prevents full insertion. & Placed a small object (metal screw) inside the hole before insertion. & \texttimes & \texttimes & \checkmark \\
+Incorrect insertion depth       & Insertion terminates at an incorrect Z depth due to a misconfigured waypoint. & Shifted the insertion endpoint waypoint Z by recorded offset from nominal. & \texttimes & \texttimes & \checkmark \\
+Peg surface contamination       & Contamination or roughness on the peg raises insertion friction and produces stick-slip. & Applied dry chalk powder to the peg surface. & \texttimes & \texttimes & \checkmark \\
+Fixture displacement            & Insertion fixture shifted laterally, breaking the match between programmed approach and actual hole. & Physically shifted the hole fixture by recorded offset without updating the robot program. & \texttimes & \texttimes & \checkmark \\
+Self-collision                  & Arm configuration causes a link to contact the robot body or mounting fixture, triggering a protective stop. & Random waypoint that forces a self-colliding configuration or offset the mounting fixture into the trajectory. & \checkmark & \texttimes & \texttimes \\
+Missing box                     & Box absent from the pick position; the gripper closes on empty air. & Removed the box from the pick position before the episode started. & \checkmark & \texttimes & \texttimes \\
+Missing peg                     & Arm descends into the hole empty-handed; insertion produces no contact force. & Removed the peg from the gripper before the episode started. & \texttimes & \texttimes & \checkmark \\
+\bottomrule
+\end{longtable}
 }
-\end{verbatim}
 
-\section{Benchmark inference cost}
-\label{app:cost}
+\subsection{Trajectory-optimization episodes}
 
-A practical concern when deploying large-scale Q\&A benchmarks is the monetary cost of running inference across all questions. We derive a simple cost model and tabulate estimates for three representative frontier models under batch-API pricing.
+Trajectory-optimization episodes capture the variability of executions that all complete the same task goal. Rather than following the fixed scripted path, the controller is driven between fixed waypoints using randomly sampled intermediate waypoint sequences, so that approach angles, intermediate poses, joint configurations, and motion speeds vary across episodes. This randomized experiment provide a proper source of comparisons for Level~4 optimization-centered templates.
 
-\subsection{Cost model}
+\subsection{Counterfactual episodes}
 
-Let $Q$ denote the total number of question--answer pairs in the benchmark. For each question $q$, the API call consumes $t_{\text{in}}^{(q)}$ input tokens (prompt, context time series, and answer options) and $t_{\text{out}}^{(q)}$ output tokens (model response). We denote the per-token prices as $p_{\text{in}}$ and $p_{\text{out}}$ respectively (in USD per token). The total cost is:
+Counterfactual pairs are constructed for the subset of faults in Table~\ref{tab:faults} whose injection moment can be controlled at a specific timestep rather than being present throughout the episode. For each such fault, the initial conditions of the physical setup (object identity and pose, payload configuration, controller settings) are held as constant as the platform allows, one baseline execution is recorded without any injection, and several fault executions are then recorded under the same initial conditions with the fault applied at a shared sampled timestep. Because the physical system is not perfectly reproducible, the pre-injection sensor trajectories of the baseline and the fault candidates diverge slightly; we retain, as the counterfactual partner of the baseline, the fault candidate whose pre-injection window is closest to the baseline in KL divergence, and discard the others. This yields an approximate counterfactual pair in which the early history is as matched as the real platform permits, while the post-injection divergence isolates the effect of the intervention. The approximation error introduced by this procedure, relative to the exact counterfactuals available in simulation, motivates the sim2real analysis in Section~\ref{sec:sim2real}. Each retained pair stores four additional fields, \texttt{cf\_fault\_id}, \texttt{cf\_injection\_timestep}, \texttt{cf\_injection\_time\_s}, and \texttt{cf\_baseline\_episode\_id}, so that the baseline and fault episodes can be reassembled at analysis time.
 
-\begin{equation}
-    C = \sum_{q=1}^{Q} \bigl( p_{\text{in}} \cdot t_{\text{in}}^{(q)} + p_{\text{out}} \cdot t_{\text{out}}^{(q)} \bigr).
-    \label{eq:cost_exact}
-\end{equation}
 
-Since individual token counts vary by question, we work with corpus-level averages. Let $\bar{t}_{\text{in}}$ and $\bar{t}_{\text{out}}$ denote the mean input and output tokens per question. Then:
+\subsection{Signal schema}
 
-\begin{equation}
-    C \approx Q \cdot \bigl( p_{\text{in}} \cdot \bar{t}_{\text{in}} + p_{\text{out}} \cdot \bar{t}_{\text{out}} \bigr).
-    \label{eq:cost_approx}
-\end{equation}
+The UR3 is recorded through the \texttt{ur\_rtde} Python interface at 125\,Hz, yielding 137 per-sample signals grouped by semantic role (Table~\ref{tab:ur3_signals}): controller \emph{setpoints}, actual \emph{effort / feedback} readings from joints and the TCP, \emph{context / health} signals covering joint temperatures, voltages, and internal controller state, a small block of controller \emph{status / mode} indicators, and digital/analog \emph{I/O} lines. Six episode-level provenance columns (\texttt{episode\_id}, \texttt{ctx\_robot\_type}, \texttt{ctx\_task}, \texttt{ctx\_fault\_label}, \texttt{ctx\_payload\_kg}, \texttt{ctx\_recording\_date}) are appended per episode but are constant within an episode.
 
-It is convenient to express prices per million tokens. Writing $P_{\text{in}}$ and $P_{\text{out}}$ for the price in USD per million tokens:
-
-\begin{equation}
-    C = Q \cdot \left( \frac{P_{\text{in}} \cdot \bar{t}_{\text{in}} + P_{\text{out}} \cdot \bar{t}_{\text{out}}}{10^6} \right).
-    \label{eq:cost_final}
-\end{equation}
-
-\subsection{Assumptions}
-
-\paragraph{Input tokens.} Each question payload averages approximately 30\,KB, comprising the system prompt, question text, serialized time-series context window, and answer options. At an empirical ratio of 0.25 tokens per byte, this yields:
-\[
-    \bar{t}_{\text{in}} = 30{,}000 \;\text{bytes} \times 0.25 \;\text{tokens/byte} = 7{,}500 \;\text{tokens}.
-\]
-
-\paragraph{Output tokens.} The majority of FactoryBench answer formats---Multi-Select MC (\texttt{FTTF}), Ranking (\texttt{DABC}), and Tensor (a scalar)---require only $\sim$2 output tokens. Free-form answers, which constitute at most 10\% of the benchmark, produce longer responses ($\sim$300 tokens). The weighted average is therefore:
-\[
-    \bar{t}_{\text{out}} = 0.9 \times 2 + 0.1 \times 300 = 31.8 \approx 32 \;\text{tokens}.
-\]
-
-\paragraph{Batch constraints.} Most batch APIs impose a maximum request file size of 50\,MB. At 30\,KB per question, each batch accommodates $\lfloor 50{,}000 / 30 \rfloor \approx 1{,}666$ questions. A full benchmark run of $Q = 200{,}000$ therefore requires $\lceil 200{,}000 / 1{,}666 \rceil = 120$ batches. This affects throughput scheduling but not per-token pricing.
-
-All models are evaluated via their respective \textbf{batch processing APIs}, which offer reduced pricing with longer turnaround times (typically up to 24 hours). This is the natural choice for offline benchmark evaluation.
-
-\subsection{Model pricing}
-
-Table~\ref{tab:pricing} summarizes the batch-API pricing for three frontier models as of April 2026.
-
-\begin{table}[h]
+\begin{table}[H]
 \centering
-\caption{Batch-API pricing for selected frontier models (USD per million tokens, April 2026).}
-\label{tab:pricing}
+\caption{UR3 signal groups recorded at 125\,Hz via \texttt{ur\_rtde} (excluding episode-level provenance columns).}
+\label{tab:ur3_signals}
 \small
-\begin{tabular}{@{}lcc@{}}
+\begin{tabular}{@{}lrp{7.5cm}@{}}
 \toprule
-Model & $P_{\text{in}}$ (\$/M tokens) & $P_{\text{out}}$ (\$/M tokens) \\
+Group & \# signals & Contents \\
 \midrule
-Claude Opus 4.6 (Anthropic) & 2.50 & 12.50 \\
-GPT-4o (OpenAI) & 1.25 & 5.00 \\
-Gemini 2.5 Pro (Google) & 0.625 & 5.00 \\
+Setpoint (intent)     & 42 & Target joint position, velocity, acceleration, current, torque; target TCP pose and speed. \\
+Effort / feedback     & 48 & Actual joint position, velocity, current, current-as-torque, joint control output; actual TCP pose, speed, and force/torque. \\
+Context / health      & 33 & Joint temperatures, joint voltages, joint modes, tool accelerometer, raw F/T wrench, main/robot voltage and current, momentum, speed scaling, execution time. \\
+Status / mode         &  7 & Timestamp, robot mode, robot status, safety mode, safety status bits, runtime state, configured payload mass. \\
+I/O                   &  6 & Digital inputs/outputs, two analog inputs, two analog outputs. \\
+\midrule
+\textbf{Total}        & \textbf{137} & \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Sample calculation for $Q = 200{,}000$}
+The KUKA KR10 is controlled through the KRC4 controller. We stream 44 per-sample signals at 83\,Hz, grouped by semantic role in Table~\ref{tab:kuka_signals} using the same partition as the UR3 schema. A handful of signals that the UR3 exposes natively are unavailable on KSS 8.3, specifically joint velocities, commanded TCP pose, joint voltage, the tool-mounted accelerometer, and joint-level control outputs; TCP force/torque is also absent because no force sensor is fitted.
 
-Substituting into Equation~\ref{eq:cost_final} with $Q = 200{,}000$, $\bar{t}_{\text{in}} = 7{,}500$, and $\bar{t}_{\text{out}} = 32$:
-
-\paragraph{Claude Opus 4.6.}
-\begin{align}
-    C_{\text{Opus}} &= 200{,}000 \times \frac{2.50 \times 7{,}500 + 12.50 \times 32}{10^6} \notag \\
-    &= 200{,}000 \times \frac{18{,}750 + 400}{10^6} \notag \\
-    &= 200{,}000 \times 0.01915 = \mathbf{\$3{,}830}.
-\end{align}
-
-\paragraph{GPT-4o.}
-\begin{align}
-    C_{\text{GPT-4o}} &= 200{,}000 \times \frac{1.25 \times 7{,}500 + 5.00 \times 32}{10^6} \notag \\
-    &= 200{,}000 \times \frac{9{,}375 + 160}{10^6} \notag \\
-    &= 200{,}000 \times 0.009535 = \mathbf{\$1{,}907}.
-\end{align}
-
-\paragraph{Gemini 2.5 Pro.}
-\begin{align}
-    C_{\text{Gemini}} &= 200{,}000 \times \frac{0.625 \times 7{,}500 + 5.00 \times 32}{10^6} \notag \\
-    &= 200{,}000 \times \frac{4{,}687.5 + 160}{10^6} \notag \\
-    &= 200{,}000 \times 0.0048475 = \mathbf{\$969.50}.
-\end{align}
-
-\subsection{Summary}
-
-\begin{table}[h]
+\begin{table}[H]
 \centering
-\caption{Estimated benchmark inference cost for $Q = 200{,}000$ questions (batch API).}
-\label{tab:cost_summary}
+\caption{KUKA KR10 signal groups recorded at 50\,Hz via RSI/KRL (excluding episode-level provenance columns).}
+\label{tab:kuka_signals}
 \small
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular}{@{}lrp{7.5cm}@{}}
 \toprule
-Model & Input cost & Output cost & \textbf{Total cost} & Cost per question \\
+Group & \# signals & Contents \\
 \midrule
-Claude Opus 4.6 & \$3,750.00 & \$80.00 & \textbf{\$3,830.00} & \$0.0192 \\
-GPT-4o & \$1,875.00 & \$32.00 & \textbf{\$1,907.00} & \$0.0095 \\
-Gemini 2.5 Pro & \$937.50 & \$32.00 & \textbf{\$969.50} & \$0.0049 \\
+Setpoint (intent)     &  6 & Commanded joint positions (degrees). \\
+Effort / feedback     & 24 & Actual joint positions (degrees), actual TCP pose (mm / degrees), per-axis motor current (\% of max), and per-axis motor torque (Nm). \\
+Context / health      & 11 & Per-axis motor temperature (Kelvin), Cartesian acceleration on X, Y, Z and absolute magnitude (m/s$^2$), and speed override (\%). \\
+Status / mode         &  1 & Controller process state (FREE / ACTIVE / STOP / END). \\
+I/O                   &  2 & Digital inputs bitmask and digital outputs bitmask. \\
+\midrule
+\textbf{Total}        & \textbf{44} & \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-These estimates show that a full benchmark run of 200k questions on a frontier model costs between roughly \$1,000 and \$4,000 using batch APIs. Costs are heavily input-dominated: output tokens contribute less than 5\% of the total, since 90\% of FactoryBench answers are short structured strings (2 tokens). Standard (non-batch) API pricing is typically $2\times$ higher. Note that these costs are for a \emph{single} evaluation pass; repeated runs (e.g., for variance estimation or ablation studies) scale linearly. The per-question cost (\$0.005--\$0.02) confirms that FactoryBench is economically feasible to evaluate at scale, even on the most expensive frontier models.
+
+
+\section{Example question-answer pairs and question templates}
+\label{app:qa_examples}
+
+Table~\ref{tab:qa_examples} presents seventeen representative Q\&A pairs spanning every causal level and every answer format the generator produces (single-select MCQ, multi-select MCQ, tensor, ranking, free-form). For readability we omit the underlying sensor context (tens to hundreds of time-series rows), truncate verbose boilerplate such as ``Answer only with $\ldots$'', and abbreviate long option strings.
+
+\begin{small}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.05\textwidth}>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.74\textwidth}@{}}
+\caption{Representative Q\&A pairs from FactoryBench spanning all four causal levels and every answer format.}\label{tab:qa_examples}\\
+\toprule
+\textbf{Level} & \textbf{Answer format} & \textbf{Prompt, options, and reference answer} \\
+\midrule
+\endfirsthead
+\multicolumn{3}{@{}l}{\footnotesize\emph{Table~\ref{tab:qa_examples} continued from previous page}}\\
+\toprule
+\textbf{Level} & \textbf{Answer format} & \textbf{Prompt, options, and reference answer} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{3}{r@{}}{\footnotesize\emph{continued on next page}}\\
+\endfoot
+\bottomrule
+\endlastfoot
+
+\textbf{L1} & Tensor &
+\textbf{Q:} The robot is performing a screwing task. We want to isolate the screwing phase in the robot's time series. Assuming a fixed window length of 10 timesteps, at which timestamp should the window begin? \newline
+\textbf{A:} \texttt{14}~~(accepted within $\pm3$) \\
+\midrule
+
+\textbf{L1} & Single-select MCQ &
+\textbf{Q:} What changed between the two instances of robotic time series data? \newline
+\textbf{Options:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & different anomalous states (exactly one anomalous, or both but distinct) \\
+\textbf{b.} & different tasks \\
+\textbf{c.} & different robots \\
+\textbf{d.} & same task, different phases \\
+\end{tabular} \newline
+\textbf{A:} \texttt{a} \\
+\midrule
+
+\textbf{L1} & Single-select MCQ &
+\textbf{Q:} What robot does this sensor data originate from? \newline
+\textbf{Options:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & Agile Robots Yu~5 Industrial \\
+\textbf{b.} & KUKA KR~10 R1100-2 \\
+\textbf{c.} & Universal Robots UR3e \\
+\end{tabular} \newline
+\textbf{A:} \texttt{c} \\
+\midrule
+
+\textbf{L1} & Tensor &
+\textbf{Q:} Given the sensor stream below, what is the expected value of the position of joint~2 at T+6\,ms? \newline
+\textbf{A:} \texttt{102.7777} \\
+\midrule
+
+\textbf{L2} & Tensor &
+\textbf{Q:} The sensor stream below is from a robot exhibiting a collision with a cardboard object. What is the expected value of the velocity of joint~3 at T+68\,ms? \newline
+\textbf{A:} \texttt{-0.272044}~~(accepted within $\pm2.42$) \\
+\midrule
+
+\textbf{L2} & Tensor &
+\textbf{Q:} The sensor stream below is from a robot exhibiting a collision with a cardboard object. What are the expected values of joint positions at T+506\,ms? \newline
+\textbf{A:} \texttt{[17.884, -115.897, 121.049, -95.595, -90.258, 293.860]} \\
+\midrule
+
+\textbf{L2} & Tensor &
+\textbf{Q:} Knowing that the robot suffers from a hole obstruction, we want to isolate the ``rise back above the object'' phase. Assuming a fixed window length of 16 timesteps, at which timestamp should the window begin? \newline
+\textbf{A:} \texttt{202}~~(accepted within $\pm3$) \\
+\midrule
+
+\textbf{L2} & Single-select MCQ &
+\textbf{Q:} Given the sensor data, determine what anomaly is present. \newline
+\textbf{Options:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & sustained command/measurement deviation \\
+\textbf{b.} & no anomaly \\
+\textbf{c.} & measured joint speeds drop abruptly with a TCP force spike (typical collision signature) \\
+\textbf{d.} & isolated unrealistic force-sensor spike inconsistent with motion \\
+\end{tabular} \newline
+\textbf{A:} \texttt{c} \\
+\midrule
+
+\textbf{L3} & Ranking &
+\textbf{Q:} Given the baseline stream and the counterfactual scenario where a collision foam object occurs at timestep 7366\,ms, rank the four labeled signal segments in the order they would appear as the event manifests. \newline
+\textbf{A:} \texttt{abdc} \\
+\midrule
+
+\textbf{L3} & Multi-select MCQ &
+\textbf{Q:} Given the counterfactual scenario where a collision hanging cable occurs at timestep 8363\,ms, select all statements that would apply. \newline
+\textbf{Options:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & motor current rises $\geq 33\%$ while speed stays $\leq 10\%$ of baseline (stall-like) \\
+\textbf{b.} & contact-force spike $\geq 36\%$ above baseline \\
+\textbf{c.} & tracking-error rise $\geq 34\%$ above pre-event mean \\
+\textbf{d.} & at least one joint speed drops sharply ($\geq 31\%$) \\
+\end{tabular} \newline
+\textbf{A:} \texttt{FFFT} \\
+\midrule
+
+\textbf{L3} & Tensor &
+\textbf{Q:} In the counterfactual scenario where a collision foam object occurs at timestep 7659\,ms, what would be the expected value of the position of joint~2 at T+100\,ms? \newline
+\textbf{A:} \texttt{72.144939}~~(accepted within $\pm2.77$) \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to fix it. \newline
+\textbf{A:} No anomalous behavior detected; the machine is operating normally; no remediation is required. \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to fix it. \newline
+\textbf{A:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & Inspect the workspace and remove any soft obstructions from the programmed trajectory. \\
+\textbf{b.} & If a protective stop occurred, acknowledge it in the robot controller and verify arm posture before resuming. \\
+\textbf{c.} & Reduce speed if repeated false-positive collision detections occur. \\
+\end{tabular} \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to fix it. \newline
+\textbf{A:} \newline
+\hspace*{1.2em}\begin{tabular}{@{}l@{\,\,}p{0.63\textwidth}@{}}
+\textbf{a.} & Stop the robot and update the payload configuration to include the additional axis weight. \\
+\textbf{b.} & Set the correct CoG offset for the modified arm in the installation settings. \\
+\textbf{c.} & Reduce motion accelerations and speeds to account for increased effective inertia. \\
+\textbf{d.} & Run a slow-speed test cycle to verify dynamic loads stay within rated limits before resuming. \\
+\end{tabular} \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} An engineer wants to increase the effectiveness and accuracy of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this? \newline
+\textbf{A:} The payload mass is set to 0.0\,kg but the actual payload weighs 1.5\,kg. Update the payload mass in the installation settings to 1.5\,kg. \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} An engineer wants to increase the effectiveness and accuracy of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this? \newline
+\textbf{A:} The TCP offset is misconfigured at [0, 0.3, 55] instead of the correct [0, 0, 55]. Update the TCP position offset in the installation settings to [0, 0, 55]. \\
+\midrule
+
+\textbf{L4} & Free form &
+\textbf{Q:} An engineer wants to increase the effectiveness and accuracy of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this? \newline
+\textbf{A:} The payload center of gravity is set to [25, 0, 20] but the correct value is [0, 0, 20]. Update the CoG offset in the installation settings to [0, 0, 20]. \\
+
+\end{longtable}
+\end{small}
+
+
+\section{Simulation setup}
+\label{app:simulation_setup}
+
+\todo[inline]{After Karim finishes the simulations, we fill this section up. Describe the simulation pipeline used for sim2real analysis: physics engine and version, robot URDFs, controller stack, supported tasks and fault applicators, randomization strategy, logging frequency and signal coverage, and how simulated episodes are aligned with the FactoryWave schema.}
 
 \end{document}
