@@ -5,7 +5,7 @@ evaluate against Microsoft Foundry models, and produce figures + Opik traces.
 
 | Scripts | Purpose |
 | --- | --- |
-| [run_pipeline.py](run_pipeline.py) | Single entry point for levels 1-3 and all Foundry models. Use `--levels`, `--stages`, `--models` to scope the run. |
+| [run_pipeline.py](run_pipeline.py) | Single entry point for levels 1-4 and all Foundry models. Use `--levels`, `--stages`, `--models` to scope the run. |
 | [upload_qa_pairs.py](upload_qa_pairs.py) | Upload generated QA JSONs to a HF dataset repo under `<dataset_folder>/level_<N>/`. |
 
 ## Stages

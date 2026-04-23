@@ -27,6 +27,26 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+_TENSOR_NUM_RE = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+
+
+def _parse_tensor_answer(value: Any) -> list:
+    """Parse a tensor answer formatted as a JSON-like array, e.g. "[1, 2.5, 3]".
+
+    Accepts surrounding whitespace, brackets, and trailing text; returns a list
+    of floats. Raises if no numbers are found.
+    """
+    if value is None:
+        raise ValueError("empty tensor")
+    s = str(value).strip()
+    if not s:
+        raise ValueError("empty tensor")
+    matches = _TENSOR_NUM_RE.findall(s)
+    if not matches:
+        raise ValueError(f"no numeric tokens in {s!r}")
+    return [float(x) for x in matches]
+
+
 def load_dotenv_file(env_file: Path) -> None:
     if not env_file.exists() or not env_file.is_file():
         return
@@ -430,8 +450,8 @@ def run_direct_requests(
                                 score = int(abs(pred_val - gt_val) < 1e-4)
                     elif answer_format == "tensor":
                         try:
-                            gt_vals = [float(x) for x in str(gt).split("_")]
-                            pred_vals = [float(x) for x in str(pred).split("_")]
+                            gt_vals = _parse_tensor_answer(gt)
+                            pred_vals = _parse_tensor_answer(pred)
                         except Exception:
                             score = 0
                         else:

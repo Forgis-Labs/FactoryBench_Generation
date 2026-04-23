@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 from dotenv import load_dotenv
 from huggingface_hub import hf_hub_download, snapshot_download
@@ -33,18 +33,28 @@ LEVEL_CONFIGS = {
         "output_flag": "--output-dir",
         "supports_test_mode": True,
         "supports_questions_per_template": True,
+        "supports_dataset_repo": True,
     },
     2: {
         "module": "src.question_generation.level2.level2",
         "output_flag": "--output",
         "supports_test_mode": True,
         "supports_questions_per_template": True,
+        "supports_dataset_repo": True,
     },
     3: {
         "module": "src.question_generation.level3.level3",
         "output_flag": "--output",
         "supports_test_mode": True,
         "supports_questions_per_template": True,
+        "supports_dataset_repo": True,
+    },
+    4: {
+        "module": "src.question_generation.level4.level4",
+        "output_flag": "--output",
+        "supports_test_mode": False,
+        "supports_questions_per_template": False,
+        "supports_dataset_repo": False,
     },
 }
 
@@ -69,9 +79,10 @@ def stage_generate(level: int, args: argparse.Namespace, q_dir: Path) -> None:
     cmd = [
         sys.executable, "-m", cfg["module"],
         "-n", str(args.num_questions),
-        "--dataset-repo", args.dataset_repo,
         cfg["output_flag"], str(q_dir),
     ]
+    if cfg.get("supports_dataset_repo", True):
+        cmd.extend(["--dataset-repo", args.dataset_repo])
     if args.questions_per_template is not None and cfg["supports_questions_per_template"]:
         cmd.extend(["--questions-per-template", str(args.questions_per_template)])
     if args.test_mode and cfg["supports_test_mode"]:
@@ -138,15 +149,25 @@ def stage_eval(
         "--questions", str(q_dir),
         "--model", model,
         "--eval-level", eval_level_tag,
-        "--overwrite",
     ]
+    if args.overwrite:
+        cmd.append("--overwrite")
     if args.judge_model:
         cmd.extend(["--judge-model", args.judge_model])
     if args.max_output_tokens is not None:
         cmd.extend(["--max-output-tokens", str(args.max_output_tokens)])
     if args.cost_limit is not None:
         cmd.extend(["--cost-limit", str(args.cost_limit)])
+    if args.concurrency is not None:
+        cmd.extend(["--concurrency", str(args.concurrency)])
+    if args.no_batch:
+        cmd.append("--no-batch")
+    if args.poll_interval is not None:
+        cmd.extend(["--poll-interval", str(args.poll_interval)])
+    summary_path = r_dir / "_summary.json"
+    cmd.extend(["--summary-file", str(summary_path)])
     _run(cmd)
+    return summary_path
 
 
 def run_level(
@@ -155,15 +176,15 @@ def run_level(
     stages: set[str],
     args: argparse.Namespace,
     kg_path: Optional[str],
+    totals: Dict[str, int],
 ) -> None:
     header = f" LEVEL {level} "
     print("#" * 60)
     print(f"#{header.center(58)}#")
     print("#" * 60)
 
-    base_name = f"level{level}_pipeline"
-    q_dir = Path(f"datasets/questions/{base_name}")
-    p_dir = Path(f"datasets/prompts/{base_name}")
+    q_dir = Path(args.questions_dir.format(level=level))
+    p_dir = Path(args.prompts_dir.format(level=level))
 
     if "generate" in stages:
         stage_generate(level, args, q_dir)
@@ -176,16 +197,42 @@ def run_level(
     if "eval" not in stages:
         return
 
-    for model in models:
+    def _run_one(model: str) -> Optional[Path]:
         slug = _model_slug(model)
-        r_dir = Path(f"datasets/replies/{base_name}/{slug}")
-
+        r_dir = Path(args.replies_dir.format(level=level, slug=slug))
         banner = f" L{level} x {model} "
         print("*" * 60)
         print(f"*{banner.center(58)}*")
         print("*" * 60)
+        return stage_eval(level, model, args, q_dir, p_dir, r_dir)
 
-        stage_eval(level, model, args, q_dir, p_dir, r_dir)
+    model_conc = max(1, args.model_concurrency)
+    if model_conc <= 1 or len(models) <= 1:
+        summary_paths = [_run_one(m) for m in models]
+    else:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        print(f"Running {len(models)} models in parallel (model-concurrency={model_conc})")
+        with ThreadPoolExecutor(max_workers=model_conc) as ex:
+            future_map = {ex.submit(_run_one, m): m for m in models}
+            summary_paths = []
+            for fut in as_completed(future_map):
+                try:
+                    summary_paths.append(fut.result())
+                except Exception as exc:
+                    print(f"WARN: eval for {future_map[fut]} raised: {exc}")
+                    summary_paths.append(None)
+
+    import json as _json
+    for summary_path in summary_paths:
+        if summary_path and summary_path.exists():
+            try:
+                with open(summary_path) as _f:
+                    s = _json.load(_f)
+                totals["completed"] += int(s.get("completed", 0))
+                totals["failed"] += int(s.get("failed", 0))
+                totals["skipped"] += int(s.get("skipped", 0))
+            except Exception as exc:
+                print(f"WARN: failed to read {summary_path}: {exc}")
 
 
 def _parse_csv(value: str, label: str) -> list[str]:
@@ -199,9 +246,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Unified FactoryBench pipeline runner. Generates Q&A, builds prompts, "
-            "and evaluates Foundry models for levels 1-3. "
+            "and evaluates Foundry models for levels 1-4. "
             "Use --stages to restrict which steps run (e.g. --stages generate,prompts "
-            "to skip inference). Level 4 is not yet implemented. "
+            "to skip inference). "
             "Post-run figures are produced via scripts/evaluate_opik_results.ipynb."
         )
     )
@@ -217,8 +264,8 @@ def main() -> None:
                         help="Run generation in test mode (faster)")
     parser.add_argument("--seed", type=int, default=None,
                         help="Random seed for reproducibility")
-    parser.add_argument("--levels", type=str, default="1,2,3",
-                        help="Comma-separated levels to run (default: 1,2,3)")
+    parser.add_argument("--levels", type=str, default="1,2,3,4",
+                        help="Comma-separated levels to run (default: 1,2,3,4)")
     parser.add_argument("--stages", type=str, default=",".join(DEFAULT_STAGES),
                         help=(
                             f"Comma-separated stages to run. "
@@ -249,6 +296,28 @@ def main() -> None:
                         help="Max output tokens forwarded to eval")
     parser.add_argument("--cost-limit", type=float, default=None,
                         help="Max USD spend per model/level eval run")
+    parser.add_argument("--questions-dir", type=str,
+                        default="output/questions/level{level}",
+                        help="Questions dir template with {level} placeholder "
+                             "(default: output/questions/level{level})")
+    parser.add_argument("--prompts-dir", type=str,
+                        default="output/prompts/level{level}",
+                        help="Prompts dir template with {level} placeholder "
+                             "(default: output/prompts/level{level})")
+    parser.add_argument("--replies-dir", type=str,
+                        default="output/replies/level{level}/{slug}",
+                        help="Replies dir template with {level} and {slug} placeholders "
+                             "(default: output/replies/level{level}/{slug})")
+    parser.add_argument("--overwrite", action="store_true",
+                        help="Overwrite existing per-prompt replies (default: skip already-computed)")
+    parser.add_argument("--concurrency", type=int, default=8,
+                        help="Number of concurrent API calls per model (default: 8)")
+    parser.add_argument("--model-concurrency", type=int, default=4,
+                        help="Number of models to run in parallel per level (default: 4)")
+    parser.add_argument("--no-batch", action="store_true",
+                        help="Disable provider batch APIs; force concurrent sync for all models")
+    parser.add_argument("--poll-interval", type=int, default=30,
+                        help="Batch polling interval in seconds (default: 30)")
 
     args = parser.parse_args()
 
@@ -299,8 +368,9 @@ def main() -> None:
         f"| models={models_to_run if eval_active else '(n/a)'}\n"
     )
 
+    totals: Dict[str, int] = {"completed": 0, "failed": 0, "skipped": 0}
     for level in levels_to_run:
-        run_level(level, models_to_run, stages, args, kg_path)
+        run_level(level, models_to_run, stages, args, kg_path, totals)
 
     print("=" * 60)
     print("Pipeline Completed Successfully!")
@@ -308,6 +378,12 @@ def main() -> None:
     print(f"  Stages : {ordered_stages}")
     if eval_active:
         print(f"  Models : {models_to_run}")
+        print(
+            f"  Aggregate totals across all models and levels: "
+            f"Completed={totals['completed']}, "
+            f"Failed={totals['failed']}, "
+            f"Skipped={totals['skipped']}"
+        )
     print("=" * 60)
 
 

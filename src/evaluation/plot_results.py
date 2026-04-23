@@ -51,7 +51,7 @@ def _infer_answer_type(answer: Any) -> str:
     s = str(answer).strip().upper()
     if s and all(c in "TF" for c in s) and len(s) > 1:
         return "multi_select"
-    if "_" in s:
+    if s.startswith("[") and s.endswith("]"):
         return "tensor"
     if s and all(c in "ABCD" for c in s) and len(s) > 1:
         return "ranking"
