@@ -875,7 +875,7 @@ def fill_template(
             vals = [float(r[key]) for r in subseries if isinstance(r.get(key), (int, float, np.floating))]
             tensor_stds.append(round(float(np.std(vals)) if vals else 0.0, 6))
 
-        answer = "_".join(str(v) for v in tensor_values)
+        answer = "[" + ",".join(str(v) for v in tensor_values) + "]"
         _JOINT_SIGNAL_DISPLAY = {
             "setpoint_pos": "commanded joint positions",
             "setpoint_speed": "commanded joint velocities",

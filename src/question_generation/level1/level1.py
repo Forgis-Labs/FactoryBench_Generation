@@ -19,6 +19,7 @@ import math
 import random
 import re
 import uuid
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -360,57 +361,78 @@ def build_anomaly_single_select(
     return options, answer
 
 
-def build_comparative_single_select(
+_COMPARATIVE_OPTION_ORDER = ["mc_020", "mc_022", "mc_023", "mc_026"]
+
+
+def _modal_phase(rows: List[Dict[str, Any]]) -> Optional[str]:
+    phases = [
+        str(r.get("task_phase"))
+        for r in rows
+        if r.get("task_phase") not in (None, "None", "")
+    ]
+    if not phases:
+        return None
+    return Counter(phases).most_common(1)[0][0]
+
+
+def build_comparative_multi_select(
     fault_a: int,
     fault_b: int,
     machine_id_a: int,
     machine_id_b: int,
     task_id_a: str,
     task_id_b: str,
+    rows_a: List[Dict[str, Any]],
+    rows_b: List[Dict[str, Any]],
     mc_lookup: Dict[str, str],
 ) -> Optional[Tuple[Dict[str, str], str]]:
-    """
-    Build 4 single-select options + answer letter for template 3.
-    Priority: different robot > different task > different anomalous state.
-    Returns None if no meaningful difference can be determined.
+    """Build fixed-order options + TFFT answer for template 3.
+
+    Options are always presented in the order
+    [mc_020, mc_022, mc_023, mc_026] (labels A..D) and the answer encodes
+    whether each corresponding statement holds, independently:
+      - mc_020: different robots
+      - mc_022: different anomalous states
+      - mc_023: different tasks
+      - mc_026: same task but different modal phase
+
+    Returns None when no statement is true (no meaningful change).
     """
     if not mc_lookup:
         return None
 
+    option_ids = [normalize_mc_option_id(x) for x in _COMPARATIVE_OPTION_ORDER]
+    statements = [mc_lookup.get(oid) for oid in option_ids]
+    if not all(statements):
+        return None
+
     different_robots = machine_id_a != machine_id_b
-    different_tasks = task_id_a != task_id_b
     different_anomalous_state = (fault_a == 0) != (fault_b == 0) or (
         fault_a != 0 and fault_b != 0 and fault_a != fault_b
     )
+    different_tasks = task_id_a != task_id_b
 
-    if different_robots:
-        correct_id = normalize_mc_option_id("mc_020")
-    elif different_tasks:
-        correct_id = normalize_mc_option_id("mc_023")
-    elif different_anomalous_state:
-        correct_id = normalize_mc_option_id("mc_022")
-    else:
+    mode_a = _modal_phase(rows_a)
+    mode_b = _modal_phase(rows_b)
+    same_task_different_phases = (
+        (not different_tasks)
+        and mode_a is not None
+        and mode_b is not None
+        and mode_a != mode_b
+    )
+
+    flags = [
+        different_robots,
+        different_anomalous_state,
+        different_tasks,
+        same_task_different_phases,
+    ]
+    if not any(flags):
         return None
-
-    correct_stmt = mc_lookup.get(correct_id)
-    if not correct_stmt:
-        return None
-
-    distractor_ids = [k for k in mc_lookup if k != correct_id]
-    random.shuffle(distractor_ids)
-
-    all_entries: List[Tuple[str, bool]] = [(correct_stmt, True)]
-    for did in distractor_ids[:3]:
-        all_entries.append((mc_lookup[did], False))
-    random.shuffle(all_entries)
 
     labels = ["A", "B", "C", "D"]
-    options: Dict[str, str] = {}
-    answer = "A"
-    for i, (stmt, is_correct) in enumerate(all_entries[:4]):
-        options[labels[i]] = stmt
-        if is_correct:
-            answer = labels[i]
+    options: Dict[str, str] = {lbl: stmt for lbl, stmt in zip(labels, statements)}
+    answer = "".join("T" if f else "F" for f in flags)
     return options, answer
 
 
@@ -479,7 +501,7 @@ def fill_template(
     Template IDs:
       1 - phase segmentation (numerical)
       2 - anomaly detection (single-select)
-      3 - comparative change detection (single-select)
+      3 - comparative change detection (multi-select, TFFT)
       5 - severity ranking
       6 - robot identification (single-select)
     """
@@ -536,8 +558,9 @@ def fill_template(
         if rows_b is None:
             return None
         fault_b = pick_fault_label(rows_b)
-        result = build_comparative_single_select(
-            fault_label, fault_b, machine_id, machine_id_b, task_id, task_id_b, mc_option_lookup
+        result = build_comparative_multi_select(
+            fault_label, fault_b, machine_id, machine_id_b,
+            task_id, task_id_b, rows, rows_b, mc_option_lookup,
         )
         if result is None:
             return None

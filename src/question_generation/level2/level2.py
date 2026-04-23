@@ -42,7 +42,6 @@ from src.question_generation.utils.time_series import (
 from src.question_generation.level2.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
 from src.question_generation.level1.level1 import (
     build_anomaly_single_select as l1_build_anomaly_single_select,
-    build_comparative_single_select as l1_build_comparative_single_select,
     build_severity_ranking as l1_build_severity_ranking,
     get_severity_rank as l1_get_severity_rank,
     load_anomaly_lookup as l1_load_anomaly_lookup,
@@ -754,7 +753,7 @@ def fill_template(
             vals = [float(r[key]) for r in subseries if isinstance(r.get(key), (int, float, np.floating))]
             tensor_stds.append(round(float(np.std(vals)) if vals else 0.0, 6))
 
-        answer = "_".join(str(v) for v in tensor_values)
+        answer = "[" + ",".join(str(v) for v in tensor_values) + "]"
         _JOINT_SIGNAL_DISPLAY = {
             "setpoint_pos": "commanded joint positions",
             "setpoint_speed": "commanded joint velocities",

@@ -81,7 +81,7 @@
     "type": "comparative",
     "template": "What changed between the two instances of robotic time series data?  Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
-      "type": "multiple_choice_single_select",
+      "type": "multiple_choice_multi_select",
       "n_choices": 4,
       "fixed_options": ["mc_020", "mc_022", "mc_023", "mc_026"],
       "notes": "Options include: robot, mounting configuration (e.g., inverted or repositioned), task, presence of a specific anomaly. Ground truth is generated from instance metadata. Easily scalable."

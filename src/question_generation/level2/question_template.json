@@ -152,7 +152,7 @@
   {
     "id": 5,
     "type": "predictive",
-    "template": "The sensor stream below is from a robot exhibiting {anomaly}. What are the expected values of {joint_signal} at T+{n}ms? Answer only with a tensor of length 6 where each value is either integer or decimal. The values should be separated by the '_' character (ie. 10.2_9_2.1_1_7_0.21). Do not return anything else.",
+    "template": "The sensor stream below is from a robot exhibiting {anomaly}. What are the expected values of {joint_signal} at T+{n}ms? Answer only with a list of 6 numbers (integer or decimal) formatted as a JSON array, ie. [10.2,9,2.1,1,7,0.21]. Do not return anything else.",
     "answer_format": {
       "type": "tensor",
       "shape": [6],
