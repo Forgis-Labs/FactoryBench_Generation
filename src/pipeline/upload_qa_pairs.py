@@ -33,6 +33,7 @@ from typing import List
 
 from dotenv import load_dotenv
 from huggingface_hub import HfApi
+from huggingface_hub.errors import HfHubHTTPError, RepositoryNotFoundError
 
 load_dotenv()
 
@@ -103,12 +104,25 @@ def upload_qa_pairs(
     print("=" * 60)
     print(f"Ensuring repo exists: {repo_id} (private={private})")
     print("=" * 60)
-    api.create_repo(
-        repo_id=repo_id,
-        repo_type="dataset",
-        private=private,
-        exist_ok=True,
-    )
+    # Probe first: tokens with only write-access to existing repos can't call create_repo
+    # (it 403s on the namespace). Skip creation if the repo is already there.
+    try:
+        api.repo_info(repo_id=repo_id, repo_type="dataset")
+        print(f"Repo {repo_id} already exists; skipping create.")
+    except RepositoryNotFoundError:
+        try:
+            api.create_repo(
+                repo_id=repo_id,
+                repo_type="dataset",
+                private=private,
+                exist_ok=True,
+            )
+        except HfHubHTTPError as exc:
+            raise RuntimeError(
+                f"Repo {repo_id} does not exist and your token cannot create it. "
+                f"Either create the repo manually on the Hugging Face web UI, or "
+                f"use a token with create-repo rights on the '{repo_id.split('/')[0]}' namespace."
+            ) from exc
 
     remote_dir = f"{dataset_folder}/level_{level}"
     print("=" * 60)
