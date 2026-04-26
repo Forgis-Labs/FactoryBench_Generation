@@ -43,7 +43,7 @@ from src.question_generation.level3.mc_truth import DEFAULT_THRESHOLDS, evaluate
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad", "factorywave"]
+VALID_DATASETS = ["factorywave"]
 STEPS_AHEAD_RANGE = (1, 10)
 CONTEXT_MIN = 16
 CONTEXT_MAX = 90
@@ -53,7 +53,7 @@ CONTEXT_MAX = 90
 EXCLUDED_JOINT_SIGNALS = {"joint_voltage", "joint_temp", "joint_mode"}
 JOINT_INDEX_RANGE = set(range(6))
 MIN_POST_EVENT_TIMESTAMPS_AFTER = 5
-CF_DATASET_FOLDERS = ["cf_aursad", "cf_vorausad", "simulations", "factorywave"]  # full list; filtered at runtime via --datasets
+CF_DATASET_FOLDERS = ["factorywave"]  # full list; filtered at runtime via --datasets
 
 # MC option IDs that require signals absent from simulation data
 NON_SIMULATION_EXCLUDED_MC_IDS = {

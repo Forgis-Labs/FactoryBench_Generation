@@ -37,10 +37,17 @@ from src.question_generation.utils.template import (
 from src.question_generation.utils.time_series import (
     pick_fault_label,
 )
+from src.question_generation.utils.relevance import (
+    is_enabled as relevance_enabled,
+    load_specs as load_relevance_specs,
+    relevance_report,
+    sample_with_relevance,
+    validate_relevance,
+)
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad", "factorywave"]
+VALID_DATASETS = ["aursad", "vorausad", "factorywave"]
 SEVERITY_ORDER: Dict[str, int] = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
 # Precise per-fault ranking loaded from anomaly_ranking.json (fault_id → rank 1..N, higher = more severe)
@@ -48,8 +55,8 @@ _ANOMALY_RANKING: Dict[int, int] = {}
 
 # Maps dataset name → machine_id as defined in machines.json
 DATASET_MACHINE_ID: Dict[str, int] = {
-    "inter_aursad": 0,    # UR3e
-    "inter_vorausad": 2,  # Yu cobot
+    "aursad": 0,    # UR3e
+    "vorausad": 2,  # Yu cobot
     "factorywave": 0,     # UR3e (FactoryWave real-robot recordings)
 }
 
@@ -61,38 +68,38 @@ CONTEXT_MAX = 90
 # Phase index → human-readable name per task
 PHASE_NAMES: Dict[str, Dict[str, str]] = {
     "pick_and_place": {
-        "0": "approach above the pick position",
-        "1": "descent toward the object",
-        "2": "settling pause before grasping",
-        "3": "gripper closing phase",
-        "4": "lifting phase",
-        "5": "lateral transfer toward the bin",
-        "6": "lowering into the bin",
-        "7": "gripper opening phase",
-        "8": "retraction away from the bin",
-        "9": "return to home position",
+        "0": "approach to the object",
+        "1": "descent to the object",
+        "2": "pre-grasp pause",
+        "3": "grasp of the object",
+        "4": "lift of the object",
+        "5": "transfer to the bin",
+        "6": "descent to the bin",
+        "7": "release of the object",
+        "8": "retreat from the bin",
+        "9": "return to home",
     },
     "screwing": {
-        "0": "approach above the fastener",
-        "1": "descent to engage the fastener",
-        "2": "screwing phase",
+        "0": "approach to the fastener",
+        "1": "descent to the fastener",
+        "2": "tightening of the fastener",
         "3": "disengagement from the fastener",
-        "4": "retraction to safe height",
-        "5": "descent to re-engage the fastener",
-        "6": "loosening phase",
-        "7": "gripper engagement phase",
-        "8": "retraction to home position",
+        "4": "retreat to a safe height",
+        "5": "re-descent to the fastener",
+        "6": "loosening of the fastener",
+        "7": "re-engagement with the fastener",
+        "8": "return to home",
     },
     "peg_in_hole": {
-        "0": "alignment above the hole",
-        "1": "insertion into the hole",
-        "2": "disengagement from the peg",
-        "3": "rise back above the hole",
-        "4": "retraction to home position",
-        "5": "alignment above the object",
-        "6": "gripper engagement phase",
-        "7": "rise back above the object",
-        "8": "retraction to home position",
+        "0": "approach to the hole",
+        "1": "insertion of the peg",
+        "2": "release of the peg",
+        "3": "retreat from the hole",
+        "4": "return to home",
+        "5": "approach to the peg",
+        "6": "grasp of the peg",
+        "7": "lift of the peg",
+        "8": "return to home",
     },
 }
 
@@ -192,6 +199,24 @@ def sample_subseries(
     length = random.randint(min_len, min(max_len, n))
     start = random.randint(0, n - length)
     return rows[start : start + length], start
+
+
+def _episode_task(
+    ep_path: Path,
+    dataset: str,
+    dataset_index: Dict[str, Dict[str, Any]],
+) -> str:
+    """Resolve task for an episode: prefer per-episode metadata, fall back to dataset.json."""
+    meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
+    if meta_path.exists():
+        try:
+            meta = load_json(meta_path)
+            task = meta.get("task")
+            if task:
+                return str(task)
+        except Exception:
+            pass
+    return str(dataset_index.get(dataset, {}).get("task_id", ""))
 
 
 def load_anomaly_ranking(path: Path) -> Dict[int, int]:
@@ -442,25 +467,34 @@ def build_severity_ranking(
     important_features: Optional[List[str]] = None,
     min_chunk: int = 5,
     max_chunk: int = 7,
+    relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
+    tasks: Optional[List[str]] = None,
 ) -> Optional[Tuple[Dict[str, str], str]]:
     """
     Build ranking options + answer string for template 5.
     Each option is a short encoded chunk from one episode filtered by important_features.
     Answer ranks options from most to least severe.
+
+    When relevance_specs and tasks are provided, each chunk is anchored on the
+    episode's fault-relevance spec so the ranking compares evidence-bearing
+    segments, not arbitrary slices.
     """
     keep = set(important_features) if important_features else None
     labels = ["A", "B", "C", "D"]
     labeled: List[Tuple[str, str, int]] = []
+    specs = relevance_specs or {}
+    tasks = tasks or []
 
     for i, (rows, fault_label) in enumerate(segments[:4]):
         rc = root_causes.get(fault_label, root_causes.get(0, {}))
         srank = get_severity_rank(fault_label, rc)
 
-        chunk_len = random.randint(min_chunk, min(max_chunk, len(rows)))
-        if len(rows) < chunk_len:
+        spec = specs.get(fault_label)
+        task = tasks[i] if i < len(tasks) else ""
+        chunk_result = sample_with_relevance(rows, fault_label, spec, task, min_chunk, max_chunk)
+        if chunk_result is None:
             return None
-        start = random.randint(0, len(rows) - chunk_len)
-        chunk = rows[start : start + chunk_len]
+        chunk, _, _ = chunk_result
         stripped = [
             {k: v for k, v in r.items() if k != "timestamp_ms" and (keep is None or k in keep)}
             for r in chunk
@@ -494,6 +528,8 @@ def fill_template(
     task_id: str = "",
     task_id_b: str = "",
     severity_segments: Optional[List[Tuple[List[Dict[str, Any]], int]]] = None,
+    severity_relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
+    severity_tasks: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 1 question template.
@@ -572,7 +608,9 @@ def fill_template(
             return None
         important_features = template.get("important_features")
         result = build_severity_ranking(
-            severity_segments, root_causes, important_features=important_features
+            severity_segments, root_causes, important_features=important_features,
+            relevance_specs=severity_relevance_specs,
+            tasks=severity_tasks,
         )
         if result is None:
             return None
@@ -647,6 +685,7 @@ def generate_level1_questions(
     anomaly_lookup: Dict[str, str],
     mc_option_lookup: Dict[str, str],
     dataset_index: Dict[str, Dict[str, Any]],
+    relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     n: int = 100,
     seed: Optional[int] = None,
     datasets: Optional[List[str]] = None,
@@ -656,6 +695,8 @@ def generate_level1_questions(
         np.random.seed(seed)
 
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    relevance_specs = relevance_specs or {}
 
     allowed = datasets if datasets else VALID_DATASETS
     by_dataset = discover_episodes_by_dataset(datasets_dir, allowed)
@@ -696,8 +737,93 @@ def generate_level1_questions(
         _normal_cache[key] = result
         return result
 
-    # Exclude anomaly-related templates for now (IDs 2 and 5)
-    _DISABLED_TEMPLATE_IDS = {2, 5}
+    def _episode_is_nominal_fast(path: Path) -> bool:
+        """Cheap nominal check: prefer metadata, fall back to first-row peek.
+
+        Avoids parsing/caching the full episode (multi-MB) when all we need is
+        fault_label. fault_label is episode-wide in all current datasets, so the
+        first row's value is authoritative.
+        """
+        key = str(path)
+        if key in _normal_cache:
+            return _normal_cache[key]
+        meta_path = path.with_name(path.stem + "_metadata.json")
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                if "fault_id" in meta:
+                    fid = meta.get("fault_id")
+                    result = fid is None or int(float(fid)) == 0
+                    _normal_cache[key] = result
+                    return result
+            except Exception:
+                pass
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                raw = raw.get("baseline", raw.get("flat", []))
+            if isinstance(raw, list) and raw:
+                fl = raw[0].get("fault_label")
+                result = fl is None or int(fl) == 0
+            else:
+                result = True
+        except Exception:
+            result = False
+        _normal_cache[key] = result
+        return result
+
+    # Level 1 operates on nominal episodes only (no faults). Filter once so every
+    # template branch — single, paired, or quadrupled — picks from the same pool.
+    # The result is cached on disk because the first scan reads ~14k episode JSONs;
+    # subsequent runs load the cache (a tiny file mapping path → bool) instead.
+    nominal_cache_path = datasets_dir / ".level1_nominal_cache.json"
+    cache: Dict[str, bool] = {}
+    if nominal_cache_path.exists():
+        try:
+            cache = json.loads(nominal_cache_path.read_text(encoding="utf-8"))
+            if not isinstance(cache, dict):
+                cache = {}
+        except Exception:
+            cache = {}
+    _normal_cache.update({k: v for k, v in cache.items() if isinstance(v, bool)})
+
+    all_paths = [p for paths in episodes_by_dataset.values() for p in paths]
+    uncached = [p for p in all_paths if str(p) not in _normal_cache]
+    if uncached:
+        from concurrent.futures import ThreadPoolExecutor
+        logger.info(f"First-pass nominal filter: scanning {len(uncached)} new episodes (cached: {len(all_paths) - len(uncached)}) ...")
+        with ThreadPoolExecutor(max_workers=16) as ex:
+            list(ex.map(_episode_is_nominal_fast, uncached))
+        try:
+            nominal_cache_path.write_text(json.dumps(_normal_cache), encoding="utf-8")
+        except Exception as exc:
+            logger.warning(f"Could not persist nominal cache: {exc}")
+    else:
+        logger.info(f"Loaded nominal-cache for {len(all_paths)} episodes from {nominal_cache_path.name}")
+
+    nominal_episodes_by_dataset: Dict[str, List[Path]] = {}
+    for ds, paths in episodes_by_dataset.items():
+        nominals = [p for p in paths if _normal_cache.get(str(p), False)]
+        if nominals:
+            nominal_episodes_by_dataset[ds] = nominals
+    available_datasets = list(nominal_episodes_by_dataset.keys())
+    if not available_datasets:
+        raise FileNotFoundError(
+            f"No nominal episodes found under {datasets_dir / 'normalized_episodes'} "
+            f"for datasets: {allowed}. Level 1 requires fault-free episodes."
+        )
+    episodes_by_dataset = nominal_episodes_by_dataset
+    all_episode_paths = [
+        (ds, ep) for ds, eps in episodes_by_dataset.items() for ep in eps
+    ]
+    logger.info(
+        f"Filtered to nominal episodes: "
+        + ", ".join(f"{ds}={len(p)}" for ds, p in episodes_by_dataset.items())
+    )
+
+    # Templates 2 (anomaly detection) and 5 (severity ranking) require faulty
+    # episodes to be meaningful — disabled in the nominal-only regime.
+    _DISABLED_TEMPLATE_IDS: set = {2, 5}
     usable_templates = [t for t in templates if t["id"] not in _DISABLED_TEMPLATE_IDS]
     if not usable_templates:
         raise ValueError("No usable templates for Level 1 generation.")
@@ -789,11 +915,17 @@ def generate_level1_questions(
             if not isinstance(rows, list) or len(rows) < CONTEXT_MIN:
                 continue
 
-            sampled = sample_subseries(rows)
+            ep_fault_id = pick_fault_label(rows)
+            ep_task = _episode_task(ep_path, ds, dataset_index)
+            spec = relevance_specs.get(ep_fault_id)
+            sampled = sample_with_relevance(rows, ep_fault_id, spec, ep_task, CONTEXT_MIN, CONTEXT_MAX)
             if sampled is None:
                 continue
-            subseries, start_idx = sampled
+            subseries, start_idx, sampler_tag = sampled
             subseries = normalize_timestamps(subseries, _first_timestamp_ms(subseries))
+
+            if not validate_relevance(subseries, spec, ep_task):
+                continue
 
             filled = fill_template(
                 template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
@@ -824,6 +956,7 @@ def generate_level1_questions(
                     "episode": ep_path.stem,
                     "subseries_start_index": start_idx,
                     "subseries_length": len(subseries),
+                    "relevance": relevance_report(subseries, ep_fault_id, spec, ep_task, sampler_tag),
                 },
                 "context": context,
             }
@@ -838,14 +971,24 @@ def generate_level1_questions(
             if not isinstance(rows, list) or len(rows) < CONTEXT_MIN + 10:
                 continue
 
-            # Sample a subseries leaving room for future steps
-            max_start = len(rows) - CONTEXT_MIN - 10
-            if max_start < 0:
+            # Anchored sampling on the "prefix" (all rows except the last 10 reserved
+            # for future values); this ensures the context still ends with room for
+            # lookahead.
+            prefix_rows = rows[:len(rows) - 10]
+            ep_fault_id = pick_fault_label(rows)
+            ep_task = _episode_task(ep_path, ds, dataset_index)
+            spec = relevance_specs.get(ep_fault_id)
+            sampled = sample_with_relevance(
+                prefix_rows, ep_fault_id, spec, ep_task, CONTEXT_MIN, CONTEXT_MAX,
+            )
+            if sampled is None:
                 continue
-            context_len = random.randint(CONTEXT_MIN, min(CONTEXT_MAX, len(rows) - 10))
-            start_idx = random.randint(0, len(rows) - context_len - 10)
-            subseries = rows[start_idx:start_idx + context_len]
-            subseries = normalize_timestamps(subseries, _first_timestamp_ms(subseries))
+            raw_sub, start_idx, sampler_tag = sampled
+            context_len = len(raw_sub)
+            subseries = normalize_timestamps(raw_sub, _first_timestamp_ms(raw_sub))
+
+            if not validate_relevance(subseries, spec, ep_task):
+                continue
 
             filled = fill_template(
                 template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
@@ -890,6 +1033,7 @@ def generate_level1_questions(
                     "subseries_start_index": start_idx,
                     "subseries_length": context_len,
                     "prediction_index": future_idx,
+                    "relevance": relevance_report(subseries, ep_fault_id, spec, ep_task, sampler_tag),
                 },
                 "context": context,
             }
@@ -913,23 +1057,35 @@ def generate_level1_questions(
             if len(rows_a) < CONTEXT_MIN or len(rows_b_raw) < CONTEXT_MIN:
                 continue
 
-            sampled_a = sample_subseries(rows_a)
-            sampled_b = sample_subseries(rows_b_raw)
+            fault_a = pick_fault_label(rows_a)
+            fault_b = pick_fault_label(rows_b_raw)
+            task_a = _episode_task(ep_a, ds_a, dataset_index)
+            task_b = _episode_task(ep_b, ds_b, dataset_index)
+            spec_a = relevance_specs.get(fault_a)
+            spec_b = relevance_specs.get(fault_b)
+
+            sampled_a = sample_with_relevance(rows_a, fault_a, spec_a, task_a, CONTEXT_MIN, CONTEXT_MAX)
+            sampled_b = sample_with_relevance(rows_b_raw, fault_b, spec_b, task_b, CONTEXT_MIN, CONTEXT_MAX)
             if sampled_a is None or sampled_b is None:
                 continue
 
-            sub_a, start_a = sampled_a
-            sub_b, start_b = sampled_b
+            sub_a, start_a, sampler_a = sampled_a
+            sub_b, start_b, sampler_b = sampled_b
             sub_a = normalize_timestamps(sub_a, _first_timestamp_ms(sub_a))
             sub_b = normalize_timestamps(sub_b, _first_timestamp_ms(sub_b))
+
+            if not validate_relevance(sub_a, spec_a, task_a):
+                continue
+            if not validate_relevance(sub_b, spec_b, task_b):
+                continue
 
             filled = fill_template(
                 template, sub_a, root_causes, anomaly_lookup, mc_option_lookup,
                 rows_b=sub_b,
                 machine_id=DATASET_MACHINE_ID.get(ds_a, -1),
                 machine_id_b=DATASET_MACHINE_ID.get(ds_b, -1),
-                task_id=dataset_index.get(ds_a, {}).get("task_id", ""),
-                task_id_b=dataset_index.get(ds_b, {}).get("task_id", ""),
+                task_id=task_a,
+                task_id_b=task_b,
             )
             if filled is None:
                 continue
@@ -965,6 +1121,8 @@ def generate_level1_questions(
                     "machine_id_b": DATASET_MACHINE_ID.get(ds_b, -1),
                     "episode_b": ep_b.stem,
                     "subseries_start_b": start_b,
+                    "relevance_a": relevance_report(sub_a, fault_a, spec_a, task_a, sampler_a),
+                    "relevance_b": relevance_report(sub_b, fault_b, spec_b, task_b, sampler_b),
                 },
                 "context": context,
             }
@@ -978,6 +1136,7 @@ def generate_level1_questions(
             sampled_eps = random.sample(all_episode_paths, 4)
 
             segments: List[Tuple[List[Dict[str, Any]], int]] = []
+            severity_tasks: List[str] = []
             valid = True
             for ds, ep_path in sampled_eps:
                 ep_rows = load_episode(ep_path)
@@ -986,12 +1145,15 @@ def generate_level1_questions(
                     break
                 fl = pick_fault_label(ep_rows)
                 segments.append((ep_rows, fl))
+                severity_tasks.append(_episode_task(ep_path, ds, dataset_index))
             if not valid or len(segments) < 4:
                 continue
 
             filled = fill_template(
                 template, segments[0][0], root_causes, anomaly_lookup, mc_option_lookup,
                 severity_segments=segments,
+                severity_relevance_specs=relevance_specs,
+                severity_tasks=severity_tasks,
             )
             if filled is None:
                 continue
@@ -1022,7 +1184,16 @@ def generate_level1_questions(
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(item, f, indent=2)
 
-        logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template {tid})")
+        prov = item.get("provenance", {})
+        if "dataset" in prov:
+            ds_label = prov["dataset"]
+        elif "dataset_a" in prov and "dataset_b" in prov:
+            ds_label = f"{prov['dataset_a']}+{prov['dataset_b']}"
+        elif "episodes" in prov and isinstance(prov["episodes"], list):
+            ds_label = "+".join(sorted({str(e.get("dataset", "?")) for e in prov["episodes"]}))
+        else:
+            ds_label = "?"
+        logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template {tid}, {ds_label})")
         generated += 1
 
     if generated < n:
@@ -1087,6 +1258,16 @@ def main() -> None:
     )
     dataset_index = load_dataset_index(args.datasets_dir / "labelling" / "dataset.json")
 
+    relevance_specs = (
+        load_relevance_specs(args.datasets_dir / "labelling" / "rca" / "relevance_specs.json")
+        if relevance_enabled()
+        else {}
+    )
+    if relevance_enabled():
+        logger.info(f"Relevance-aware sampling enabled ({len(relevance_specs)} fault specs loaded)")
+    else:
+        logger.info("Relevance-aware sampling disabled (FB_RELEVANCE=0)")
+
     generate_level1_questions(
         datasets_dir=args.datasets_dir,
         output_dir=args.output,
@@ -1095,6 +1276,7 @@ def main() -> None:
         anomaly_lookup=anomaly_lookup,
         mc_option_lookup=mc_option_lookup,
         dataset_index=dataset_index,
+        relevance_specs=relevance_specs,
         n=args.n,
         seed=args.seed,
         datasets=args.datasets,

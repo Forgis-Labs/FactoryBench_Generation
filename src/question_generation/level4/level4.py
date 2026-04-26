@@ -35,10 +35,17 @@ from src.question_generation.utils.template import (
     discover_episodes_by_dataset,
 )
 from src.question_generation.utils.time_series import parse_event_id
+from src.question_generation.utils.relevance import (
+    is_enabled as relevance_enabled,
+    load_specs as load_relevance_specs,
+    relevance_report,
+    sample_with_relevance,
+    validate_relevance,
+)
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad", "simulations", "factorywave"]
+VALID_DATASETS = ["aursad", "vorausad", "factorywave"]
 RANKING_LABELS = ["A", "B", "C", "D"]
 RANKING_TEMPLATE_IDS = {3, 4}
 RANKING_METRIC = {3: "duration", 4: "energy"}
@@ -267,12 +274,15 @@ def generate_level4_questions(
     seed: Optional[int] = None,
     datasets: Optional[List[str]] = None,
     ur3_mapping: Optional[Dict[str, Dict[str, Any]]] = None,
+    relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
 
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    relevance_specs = relevance_specs or {}
 
     allowed = datasets if datasets else VALID_DATASETS
     by_dataset = discover_episodes_by_dataset(datasets_dir, allowed)
@@ -369,17 +379,20 @@ def generate_level4_questions(
             if not rows:
                 continue
 
-            context_len = random.randint(CONTEXT_MIN, CONTEXT_MAX)
+            ep_fault_id, ep_meta = load_meta(ep_path)
+            ep_task = str(ep_meta.get("task") or "")
+            spec = relevance_specs.get(ep_fault_id) if ep_fault_id is not None else None
 
-            if len(rows) < context_len:
+            sampled = sample_with_relevance(rows, ep_fault_id or 0, spec, ep_task, CONTEXT_MIN, CONTEXT_MAX)
+            if sampled is None:
                 continue
-            start_idx = random.randint(0, len(rows) - context_len)
-            subseries = rows[start_idx : start_idx + context_len]
+            subseries, start_idx, sampler_tag = sampled
+            context_len = len(subseries)
 
             if not subseries:
                 continue
-
-            ep_fault_id, ep_meta = load_meta(ep_path)
+            if not validate_relevance(subseries, spec, ep_task):
+                continue
 
             answer = None
             root_cause = None
@@ -393,6 +406,11 @@ def generate_level4_questions(
                 if rc_info.get("anomaly_present"):
                     ur3_entry = (ur3_mapping or {}).get(root_cause, {})
                     answer = ur3_entry.get("ur3_protocol")
+                    if not answer:
+                        # No remediation protocol for this root cause (typically
+                        # placeholder/undocumented faults like fault 6, 12) — skip
+                        # rather than ship an item with answer=null.
+                        continue
                 else:
                     answer = (
                         "No anomalous behavior detected in the sensor stream. "
@@ -460,6 +478,7 @@ def generate_level4_questions(
                     "episode": ep_path.stem,
                     "subseries_start_index": start_idx,
                     "subseries_length": context_len,
+                    "relevance": relevance_report(subseries, ep_fault_id or 0, spec, ep_task, sampler_tag),
                 },
                 "context": context,
             }
@@ -470,7 +489,7 @@ def generate_level4_questions(
 
         logger.info(
             f"✓ [{generated + 1}/{n}] {out_path.name} "
-            f"(template {template['id']} '{template['type']}')"
+            f"(template {template['id']} '{template['type']}', {item.get('provenance', {}).get('dataset', '?')})"
         )
         generated += 1
 
@@ -525,6 +544,11 @@ def main() -> None:
     ur3_mapping_path = args.datasets_dir / "labelling" / "rca" / "root_cause_error_mapping.json"
     ur3_mapping = load_ur3_mapping(ur3_mapping_path) if ur3_mapping_path.exists() else None
 
+    relevance_specs = (
+        load_relevance_specs(args.datasets_dir / "labelling" / "rca" / "relevance_specs.json")
+        if relevance_enabled() else {}
+    )
+
     generate_level4_questions(
         datasets_dir=args.datasets_dir,
         output_dir=args.output,
@@ -533,6 +557,7 @@ def main() -> None:
         events=events,
         n=args.n,
         seed=args.seed,
+        relevance_specs=relevance_specs,
         datasets=args.datasets,
         ur3_mapping=ur3_mapping,
     )

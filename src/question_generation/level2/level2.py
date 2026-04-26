@@ -102,7 +102,7 @@ def _anomaly_inline_name(fault_id: int, root_cause: Dict[str, Any], capitalize: 
         return name[0].upper() + name[1:]
     return name
 
-VALID_DATASETS = ["inter_aursad", "inter_vorausad", "simulations", "factorywave"]
+VALID_DATASETS = ["aursad", "vorausad", "factorywave"]
 
 STEPS_AHEAD_RANGE = (1, 10)
 CONTEXT_MIN = 16
@@ -798,6 +798,7 @@ def generate_level2_questions(
     seed: Optional[int] = None,
     mc_option_lookup: Optional[Dict[str, str]] = None,
     datasets: Optional[List[str]] = None,
+    relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -805,6 +806,8 @@ def generate_level2_questions(
 
     if mc_option_lookup is None:
         mc_option_lookup = {}
+
+    relevance_specs = relevance_specs or {}
 
     # Load anomaly lookup for L1-style templates (7 = anomaly detection)
     anomaly_lookup = l1_load_anomaly_lookup(
@@ -943,12 +946,19 @@ def generate_level2_questions(
                 except Exception:
                     pass
 
-            from src.question_generation.level1.level1 import sample_subseries as l1_sample
-            _sampled = l1_sample(_raw)
+            from src.question_generation.utils.relevance import (
+                sample_with_relevance as _sample_with_relevance,
+                validate_relevance as _validate_relevance,
+                relevance_report as _relevance_report,
+            )
+            _spec = relevance_specs.get(_fl) if relevance_specs else None
+            _sampled = _sample_with_relevance(_raw, _fl, _spec, _ep_task, CONTEXT_MIN, CONTEXT_MAX)
             if _sampled is None:
                 continue
-            _sub, _start = _sampled
+            _sub, _start, _sampler_tag = _sampled
             _sub = normalize_timestamps(_sub, _first_timestamp_ms(_sub))
+            if not _validate_relevance(_sub, _spec, _ep_task):
+                continue
 
             _tmpl = template["template"]
             _af = template["answer_format"]
@@ -1022,7 +1032,7 @@ def generate_level2_questions(
                 "options": _opts,
                 "answer": _ans,
                 "acceptance_bounds": _bounds,
-                "provenance": {"dataset": _ds, "episode": _ep_path.stem, "fault_label": _fl, "subseries_start_index": _start, "subseries_length": len(_sub)},
+                "provenance": {"dataset": _ds, "episode": _ep_path.stem, "fault_label": _fl, "subseries_start_index": _start, "subseries_length": len(_sub), "relevance": _relevance_report(_sub, _fl, _spec, _ep_task, _sampler_tag)},
                 "context": build_context(_ctx_rows),
             }
 
@@ -1153,6 +1163,15 @@ def main() -> None:
         level=2,
     )
 
+    from src.question_generation.utils.relevance import (
+        is_enabled as _relevance_enabled,
+        load_specs as _load_relevance_specs,
+    )
+    relevance_specs = (
+        _load_relevance_specs(args.datasets_dir / "labelling" / "rca" / "relevance_specs.json")
+        if _relevance_enabled() else {}
+    )
+
     generate_level2_questions(
         datasets_dir=args.datasets_dir,
         output_dir=args.output,
@@ -1163,6 +1182,7 @@ def main() -> None:
         n=args.n,
         seed=args.seed,
         datasets=args.datasets,
+        relevance_specs=relevance_specs,
     )
 
 
