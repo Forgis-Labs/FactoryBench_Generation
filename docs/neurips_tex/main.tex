@@ -303,7 +303,7 @@ Figure~\ref{fig:factorybench_overview} provides a high-level overview of the Fac
 \draw[blue, line width=1pt, rounded corners=3pt] (12.05, 13.5) rectangle (17.45, 14.8);
 \node[font=\sffamily\bfseries\scriptsize, text=blue] at (14.75, 14.45) {Industrial Datasets};
 \node[font=\sffamily\scriptsize, text=gunmetal, align=center] at (14.75, 13.95) 
-  {FactoryWave $\cdot$ AURSAD $\cdot$ Simulated Robotic\\[0.3ex]\textcolor{gray}{Real + simulated sensor streams}};
+  {FactoryWave $\cdot$ AURSAD $\cdot$ voraus-AD $\cdot$ Simulated Robotic\\[0.3ex]\textcolor{gray}{Real + simulated sensor streams}};
 
 % Dynamic sampling box
 \node[
@@ -404,7 +404,7 @@ Figure~\ref{fig:factorybench_overview} provides a high-level overview of the Fac
 \small
 \begin{tabular}{@{}cp{5.5cm}lp{3.5cm}p{2.2cm}@{}}
 \toprule
-Level & Example Question & Task & What It Tests & Answer Format \\
+Level & Example Question & Level & What It Tests & Answer Format \\
 \midrule
 \textbf{1} & ``We want to isolate the lifting phase in the robot's time series. Assuming a fixed window length of 15 timesteps, at which timestamp should the window begin?'' & State & Can the model understand what the machine is doing and how it is behaving? & Tensor \\
 \textbf{2} & ``A collision with a foam cube occurs at T=850ms. Rank the following signal segments (A--D) in the order you would expect them to appear after the event.'' & Intervention & Can the model reason about how the machine will behave in the face of an event? & Ranking (permutation) \\
@@ -634,7 +634,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
   \fill[panelbg, rounded corners=6pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
   \draw[L3tint, line width=1.8pt, rounded corners=6pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
   
-  \node[anchor=north west, font=\sffamily\bfseries\large, L3tint!80!darknavy] at (-\panelw/2+0.4, \panelh/2-0.2) {L3 \,$\cdot$\, Imagining (Counterfactual) - What if I had acted differetly?};
+  \node[anchor=north west, font=\sffamily\bfseries\large, L3tint!80!darknavy] at (-\panelw/2+0.4, \panelh/2-0.2) {L3 \,$\cdot$\, Imagining (Counterfactual) - What if I had acted differently?};
   \node[anchor=north west, font=\sffamily, text=black] at (-\panelw/2+0.4, \panelh/2-0.8) {$P(E_{S=x} \mid S{=}s, E{=}e)$};
 
   % Real robot arm (solid)
@@ -740,8 +740,7 @@ This data is sourced from:
 
 \begin{itemize}
     \item \textbf{FactoryWave:} A custom dataset generated from one-arm robotic platforms executing canonical industrial tasks (e.g., pick-and-place) under varied conditions and systematically injected anomalies.
-    \item \textbf{Open Source Datasets:} Adapted datasets such as Aursad and Vorausad, offering diverse industrial scenarios and preprocessed to conform to the unified episode structure.
-	\item \textbf{Simulations:} Synthetic time-series data generated from simulated robotic systems to enable controlled experimentation, ablation studies, and validation across both physical and virtual domains.\todo{Consider removing simulations from this list since we're only using that dataset for sim2real analysis.}
+    \item \textbf{Open Source Datasets:} Adapted datasets such as AURSAD and voraus-AD, offering diverse industrial scenarios and preprocessed to conform to the unified episode structure.
 \end{itemize}
 
 The two open-source datasets integrated into FactoryBench are summarized in Table~\ref{tab:datasets}; both provide the full setpoint--context--effort triplet at 100\,Hz or higher and have been relabelled to conform to our unified episode schema.
@@ -753,10 +752,10 @@ The two open-source datasets integrated into FactoryBench are summarized in Tabl
 \small
 \begin{tabular}{@{}lccccc@{}}
 \toprule
-Dataset & Robot & Size & Frequency & Task & \# Anomaly Types \\
+Dataset & Robot & \# of episodes & Frequency & Task & \# Anomaly Types \\
 \midrule
-AURSAD & UR3e & ? & 100 Hz & Screwing & 4 \\
-voraus-AD & UR5 & ? & 100/500 Hz & Pick and Place & 12 \\
+AURSAD & UR3e & 4094 (with loosening phases) & 100 Hz & Screwing & 4 \\
+voraus-AD & Yu-Cobot & 2122 & 100/500 Hz & Pick and Place & 12 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -769,7 +768,7 @@ voraus-AD & UR5 & ? & 100/500 Hz & Pick and Place & 12 \\
 
 Scalable ground-truth generation is the central challenge of any Q\&A benchmark grounded in raw data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by PhD-level experts in robotics. Rather than annotating individual questions by hand, each template is parameterized: concrete values are filled at generation time from the episode data and its associated labels. The context time series used to fill the variables of the question is sampled uniformly by datasource (sim vs open source vs FactoryWave), dataset (if looking at open source), experiment, difficulty, length and then placement in that order. This yields a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
 
-\paragraph{Guarding against template shortcuts.} A natural concern is that template-generated benchmarks can be solved by learning the surface structure of templates rather than the underlying reasoning. Our primary defense is structural: each template admits a combinatorially large instantiation space over signal names, timestamps, prediction horizons, payload conditions, and injected-fault types, so two questions sharing the same template rarely share more than a fraction of their variable slots. Crucially, the correct answer is never recoverable from the question text alone it is determined by the paired time series, which varies across instantiations.
+A natural concern is that template-generated benchmarks can be solved by learning the surface structure of templates rather than the underlying reasoning. Our primary defense is structural: each template admits a combinatorially large instantiation space over signal names, timestamps, prediction horizons, payload conditions, and injected-fault types, so two questions sharing the same template rarely share more than a fraction of their variable slots. Crucially, the correct answer is never recoverable from the question text alone it is determined by the paired time series, which varies across instantiations.
 
 %
 \begin{figure}[H]
@@ -786,30 +785,49 @@ Scalable ground-truth generation is the central challenge of any Q\&A benchmark 
 
 \textbf{Variable sampling.} Each question template contains variable slots that are filled at generation time from one of two sources: (i) label information read directly from the episode data (e.g., signal names, timestamps, anomaly labels, root causes), or (ii) a predefined sampling distribution attached to that variable (e.g., prediction horizons, numerical thresholds, or curated vocabularies for discrete slots). The discrete vocabularies are seeded from the label sets of AURSAD and voraus-AD and extended to cover cases specific to FactoryWave; they are released in full so every question instantiation is inspectable and reproducible.
 
-\textbf{Template design.} Each of the 20 \todo{[TODO: check the exact number when level 4 implemented]} question templates was manually authored to probe one specific machine understanding level, while remaining general enough to admit a wide range of concrete instantiations. Templates are parameterized over episode segments, signal names, event descriptions, timestamps, and predicted values. Answer options for single and multi-select questions are drawn from a shared pool of predifined verifiable statements, each paired with a rule that can be evaluated deterministically against the time series, given the densely labelled data. This design ensures that ground truth is never imputed or inferred it is computed directly from labeled episode data making the benchmark both reliable and fully reproducible.
+\textbf{Template design.} Each of the 20 question templates was manually authored to probe one specific machine understanding level, while remaining general enough to admit a wide range of concrete instantiations. Templates are parameterized over episode segments, signal names, event descriptions, timestamps, and predicted values. Answer options for single and multi-select questions are drawn from a shared pool of predifined verifiable statements, each paired with a rule that can be evaluated deterministically against the time series, given the densely labelled data. This design ensures that ground truth is never imputed or inferred it is computed directly from labeled episode data making the benchmark both reliable and fully reproducible.
 
 
 \subsection{Density of FactoryWave}
 
 
-FactoryWave is collected from two physical robots (UR3e and the KUKA KR10) executing up to three canonical industrial tasks each: pick-and-place, screwing (UR3e only), and peg-in-hole. Each complete task cycle constitutes one episode, recorded at 500\,Hz across \todo{find number} sensor channels covering joint setpoints, feedback, torques, speeds, estimated contact forces, TCP pose, gripper state, and task-phase labels.
+FactoryWave is collected from two physical robots (UR3e and the KUKA KR10) executing up to three canonical industrial tasks each: pick-and-place, screwing (UR3e only), and peg-in-hole. Each complete task cycle constitutes one episode, recorded at 125 and 83\,Hz across \todo{find number} sensor channels covering joint setpoints, feedback, torques, speeds, estimated contact forces, TCP pose, gripper state, and task-phase labels.
 
-Episodes are organized into four experiment types. \textbf{Normal} episodes capture nominal operation across three payload levels (light, medium, heavy for pick-and-place). \textbf{Trajectory optimization} episodes run the same task with randomly varied waypoint sequences, recording episode-level duration and energy metadata to support Level 4 ranking questions. \textbf{Fault} episodes inject one of 37 fault types (spanning gripper failures, payload misconfigurations, software faults, collisions, and peg-in-hole-specific anomalies), each recorded with fault-specific metadata and, where applicable, a precise injection timestep. \textbf{Counterfactual} episodes pair a clean baseline run with a fault run whose pre-injection segment most closely matches the baseline (selected by minimum KL divergence), providing ground truth for Level 3 causal reasoning.
+Episodes are organized into four experiment types. \textbf{Normal} episodes capture nominal operation across three payload levels (light, medium, heavy for pick-and-place). \textbf{Trajectory optimization} episodes run the same task with randomly varied waypoint sequences, recording episode-level duration and energy metadata to support Level 4 ranking questions. \textbf{Fault} episodes inject one of 27 fault types (spanning gripper failures, payload misconfigurations, collisions, and peg-in-hole-specific anomalies), each recorded with fault-specific metadata and, where applicable, a precise injection timestep. \textbf{Counterfactual} episodes pair a clean baseline run with a fault run whose pre-injection segment most closely matches the baseline (selected by minimum KL divergence), providing ground truth for Level 3 causal reasoning.
 
-\todo[inline]{Table to summarize all number of episodes and categories.}
+Table~\ref{tab:factorywave_distribution} summarises the resulting distribution of episodes across conditions and tasks. \textbf{Counterfactual} entries count CF \textit{groups}: each group is stored as a single paired episode bundling the baseline run with its retained fault counterpart (selected from 3 fault candidates by minimum pre-injection KL divergence, as described in Section~\ref{sec:sim2real}).
+
+\begin{table}[H]
+\centering
+\caption{Distribution of FactoryWave episodes by condition and task. Counterfactual entries count CF groups (one baseline plus one retained fault run per group).}
+\label{tab:factorywave_distribution}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Condition & Pick-and-Place & Screwing & Peg-in-Hole & Total \\
+\midrule
+Normal              & 1053 & 230  & 322  & 1605 \\
+Fault               & 3237 & 850  & 1200 & 5287 \\
+Trajectory-opt      &  394 &   0  &   0  &  394 \\
+Counterfactual (groups) & 109 & 40 & 100 &  249 \\
+\midrule
+\textbf{Total}      & \textbf{4793} & \textbf{1120} & \textbf{1622} & \textbf{7535} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Knowledge graph and protocol extraction}
 \label{sec:knowledge-graph}
 
 Reliable ground truth for Level 4 troubleshooting questions requires more than episode labels: it demands machine-specific recovery protocols grounded in manufacturer documentation. To produce this at scale, we implement a structured parsing pipeline over robot technical manuals.
 
-\paragraph{Error-to-protocol extraction.} For each robot in FactoryBench, we parse the manufacturer's runtime error documentation to extract a structured mapping from error codes to error names, descriptions, and recommended recovery steps. Each entry captures what the controller reports when a fault occurs and what an operator should do to resolve it.
+For each robot in FactoryBench, we parse the manufacturer's runtime error documentation to extract a structured mapping from error codes to error names, descriptions, and recommended recovery steps. Each entry captures what the controller reports when a fault occurs and what an operator should do to resolve it.
 
-\paragraph{Anomaly-to-error mapping.} We then map every anomaly type studied in FactoryBench to the most likely corresponding manufacturer error code. This mapping is established by PhD-level robotics experts who reason about the physical cause of each anomaly and identify which runtime error it would most plausibly trigger on the target robot. The result is a fault-indexed lookup table linking each root cause to a specific error code and its associated protocol.
+We then map every anomaly type studied in FactoryBench to the most likely corresponding manufacturer error code. This mapping is established by PhD-level robotics experts who reason about the physical cause of each anomaly and identify which runtime error it would most plausibly trigger on the target robot. The result is a fault-indexed lookup table linking each root cause to a specific error code and its associated protocol.
 
-\paragraph{Expert-authored gap-filling.} Not all anomalies correspond to a documented runtime error. Physical fault injections (such as gripper misactivation, peg misalignment, or external collisions) may not produce a well-defined controller error at all. For these cases, robotics experts author recovery protocols directly, following the same structure as the manufacturer documentation to maintain consistency.
+Not all anomalies correspond to a documented runtime error. Physical fault injections (such as gripper misactivation, peg misalignment, or external collisions) may not produce a well-defined controller error at all. For these cases, robotics experts author recovery protocols directly, following the same structure as the manufacturer documentation to maintain consistency.
 
-\paragraph{Knowledge graph integration.} The complete mapping (error-derived and expert-authored protocols alike) is ingested into a knowledge graph alongside robot specifications, task definitions, and signal schema. At question generation time, the pipeline queries this graph to automatically assemble the relevant protocol context and inject it as ground truth into Level 4 troubleshooting Q\&A pairs, without requiring per-question human review.
+The complete mapping (error-derived and expert-authored protocols alike) is ingested into a knowledge graph alongside robot specifications, task definitions, and signal schema. At question generation time, the pipeline queries this graph to automatically assemble the relevant protocol context and inject it as ground truth into Level 4 troubleshooting Q\&A pairs, without requiring per-question human review.
 
 \subsection{FactoryBench-Lite: a representative 10\% subset}
 \label{sec:lite}
@@ -821,12 +839,6 @@ IDEA:
 \\2. implement stratified selection preserving per-stratum mean/std of reference-model scores (GHOSTS-style, \cite{frieder2023ghosts})
 \\3. validate via Spearman/Kendall rank correlation and per-level MAE \cite{polo2024tinybenchmarks,bean2025scales}}
 
-\subsection{Pipeline overview}
-
-\todo[inline]{Some practical questions: How can people employ the benchmark? Where can it be found. Will it be maintained and expanded? Will incorrect labels be corrected? Is there a private dataset too? Are parts of the dataset designated for training and parts for testing?}
-
-FactoryBench and FactoryWave are released under a \todo{check license} license and distributed via a public Hugging Face repository. The release includes the episode data, the generator source code, the full set of 20 question templates \todo{Check the number of question templates when level 4 finished}
-with their paraphrase banks, all LLM-as-judge prompts, and both the full benchmark and the FactoryBench-Lite subset (Section~\ref{sec:lite}). We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file.
 
 
 \section{Experiments}
@@ -848,9 +860,9 @@ Beyond out-of-the-box evaluation, we investigate how different interventions imp
 
 Counterfactual questions (Level~3) require comparing what \emph{did} happen in an episode against what \emph{would have} happened under a different intervention, holding the rest of the world fixed. In a physical lab this ground truth is impossible to obtain exactly: two real executions never share identical initial conditions, micro-disturbances, or stochastic contact dynamics, so any real-world ``counterfactual pair'' is only an approximation of the intended do-operation. Simulation removes this obstacle: the simulator state can be deterministically forked at an arbitrary timestep, one branch continues under the baseline policy, the other under the intervention, and the two trajectories share a bit-identical pre-intervention history. This makes simulation the only setting in which Level~3 ground truth can be produced without approximation error. However, simulation gains exact counterfactual fidelity but loses realism: contact dynamics, sensor noise, actuator latency, and manufacturing variability all deviate from the physical system. A model that learns to exploit simulator-specific artefacts may score well on simulated counterfactuals without genuinely understanding the underlying robotic behaviour. We therefore treat the simulated and physical counterfactuals as complementary rather than interchangeable.
 
-\textbf{FactoryWave counterfactual pipeline (physical).} For each selected fault whose injection moment can be precisely timed, we: (i) fix initial conditions (object identity, pose, payload, controller config), (ii) record one clean \textit{baseline} run of the full episode, (iii) record 3--5 \textit{fault} runs under the same initial conditions with the fault event injected at a randomly sampled but fixed timestep, (iv) score each fault run against the baseline on the pre-injection segment using KL divergence, and (v) retain the run with the lowest KL divergence as the counterfactual partner for the baseline. All other candidate runs are discarded. The pair is stored with \texttt{cf\_fault\_id}, \texttt{cf\_injection\_timestep}, \texttt{cf\_injection\_time\_s}, and \texttt{cf\_baseline\_episode\_id}. Full protocol details are in Appendix~\ref{app:data_recording}.
+\textbf{FactoryWave counterfactual pipeline (physical).} For each selected fault whose injection moment can be precisely timed, we: (i) fix initial conditions (object identity, pose, payload, controller config), (ii) record one clean \textit{baseline} run of the full episode, (iii) record 3--5 \textit{fault} runs under the same initial conditions with the fault event injected at a randomly sampled but fixed timestep, (iv) score each fault run against the baseline on the pre-injection segment using KL divergence, and (v) retain the run with the lowest KL divergence as the counterfactual partner for the baseline. All other candidate runs are discarded. Full protocol details are in Appendix~\ref{app:data_recording}.
 
-\textbf{IsaacSim counterfactual pipeline (simulation).} We reproduce the pick-and-place task in NVIDIA IsaacSim with a URDF-matched UR3 and a matching gripper, workspace layout, and fault applicators. For each simulated episode we run the baseline to completion, then re-run from a snapshot of the simulator state taken at the injection timestep with the fault applicator enabled. Because both branches are initialised from the identical saved state, the pre-intervention trajectories are bit-identical by construction; no KL-based selection or discarding is required. The simulation pipeline can therefore generate arbitrarily many counterfactual pairs at negligible marginal cost, including for faults that are too disruptive or unsafe to stage repeatedly on the physical robot.
+\textbf{IsaacSim counterfactual pipeline (simulation).} We reproduce the pick-and-place task in NVIDIA IsaacSim with a URDF-matched UR3e and a matching gripper, workspace layout, and fault applicators. For each simulated episode we run the baseline to completion, then re-run from a snapshot of the simulator state taken at the injection timestep with the fault applicator enabled. Because both branches are initialised from the identical saved state, the pre-intervention trajectories are bit-identical by construction; no KL-based selection or discarding is required. The simulation pipeline can therefore generate arbitrarily many counterfactual pairs at negligible marginal cost, including for faults that are too disruptive or unsafe to stage repeatedly on the physical robot.
 
 
 \textbf{Sim2real gap experiment.} \todo{Fill in concrete numbers, plots, and per-template gap tables once the IsaacSim pipeline is frozen; see Appendix~\ref{app:simulation_setup}.}
@@ -872,7 +884,7 @@ Level & Random & Current LLMs & Target (w/ prior) & Human Expert \\
 \bottomrule
 \end{tabular}
 \end{table}
-\todo{Update values when final results are computed.}
+\todo{Update values when final results are computed. add line or rule based or traditional }
 
 \begin{figure}[H]
 \centering
@@ -909,6 +921,15 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 
 \todo[inline]{Double-check every reference in \texttt{references.bib} before submission: verify authors, title, venue, and year against the original source; check for fabricated or near-duplicate entries; and ensure arXiv identifiers and capitalization follow the authors' preferred formatting.}
 
+
+\subsection{License}
+
+\todo[inline]{Some practical questions: How can people employ the benchmark? Where can it be found. Will it be maintained and expanded? Will incorrect labels be corrected? Is there a private dataset too? Are parts of the dataset designated for training and parts for testing?}
+
+FactoryBench and FactoryWave are released under a \todo{check license} license and distributed via a public Hugging Face repository. The release includes the episode data, the generator source code, the full set of 20 question templates with their paraphrase banks, all LLM-as-judge prompts, and both the full benchmark and the FactoryBench-Lite subset (Section~\ref{sec:lite}). We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file.
+
+
+
 \bibliography{references}
 \bibliographystyle{plainnat}
 
@@ -918,27 +939,29 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 \section{Question template inventory}
 \label{app:templates}
 
-Table~\ref{tab:template_inventory} lists the number of question templates currently implemented per level, broken down by answer format. Totals reflect the templates shipped in the FactoryBench release at the time of writing and are expected to grow as new templates are added.\todo{Update counts when new templates are merged.}
+Table~\ref{tab:template_inventory} lists the number of question templates currently implemented per level, broken down by answer format. Several Level~1 templates are reinstantiated at Level~2 on anomalous episodes; those are counted only at the level where they are first introduced, so per-level rows and the overall total reflect unique templates.
 
 \begin{table}[H]
 \centering
-\caption{Number of question templates per level, by answer format.}
+\caption{Number of unique question templates per level, by answer format. Templates reused across levels (e.g.\ Level 1 templates reapplied at Level 2 with anomalous instances) are counted once at the level where they are first introduced.}
 \label{tab:template_inventory}
 \small
 \begin{tabular}{@{}lccccc|c@{}}
 \toprule
 Level & MC single-select & MC multi-select & Ranking & Tensor / Numerical & Free-form & Total \\
 \midrule
-\textbf{1} (State)         & 1 & 1 & 1 & 1 & 0 & 4 \\
+\textbf{1} (State)         & 1 & 2 & 1 & 2 & 0 & 6 \\
 \textbf{2} (Intervention)  & 0 & 2 & 1 & 2 & 0 & 5 \\
 \textbf{3} (Counterfactual)& 0 & 2 & 1 & 2 & 0 & 5 \\
 \textbf{4} (Decision)      & 0 & 0 & 2 & 0 & 2 & 4 \\
 \midrule
-\textbf{Total}             & 1 & 5 & 5 & 5 & 2 & \textbf{18} \\
+\textbf{Total}             & 1 & 6 & 5 & 6 & 2 & \textbf{20} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+
+\todo{Add details about how questions are marked. Also, research how to show questions are answerable}
 
 \section{FactoryBench-Lite: distillation methodology and validation}
 \label{app:lite}
@@ -956,7 +979,7 @@ Level & MC single-select & MC multi-select & Ranking & Tensor / Numerical & Free
 \section{Details of the FactoryWave dataset}
 \label{app:data_recording}
 
-FactoryWave was collected on two one-armed platforms: the \textbf{Universal Robots UR3} (cobot; OnRobot Screwdriver and two-finger gripper variants) and the \textbf{KUKA KR10} (industrial arm). Each episode corresponds to one complete task cycle; episodes are recorded under four conditions (normal, fault, trajectory-optimization, and counterfactual), described below. Because state interpretation rather than policy quality is the object of study, motion is generated by a deterministic scripted controller. Every sample carries extensive labelling metadata, and the full native-rate sensor stream is logged without online feature selection.
+FactoryWave was collected on two one-armed platforms: the \textbf{Universal Robots UR3e} (cobot; OnRobot Screwdriver and two-finger gripper variants) and the \textbf{KUKA KR10} (industrial arm). Each episode corresponds to one complete task cycle; episodes are recorded under four conditions (normal, fault, trajectory-optimization, and counterfactual), described below. Because state interpretation rather than policy quality is the object of study, motion is generated by a deterministic scripted controller. Every sample carries extensive labelling metadata, and the full native-rate sensor stream is logged without online feature selection.
 
 \subsection{Tasks and phase structure}
 
@@ -984,6 +1007,8 @@ Phase index & Phase name & Description \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\todo{check eef is common to use}
 
 \begin{table}[H]
 \centering
@@ -1043,9 +1068,9 @@ Alongside the sensor stream, every episode carries a fixed set of metadata field
 Field & Description \\
 \midrule
 \texttt{episode\_id}                 & Unique identifier for the episode \\
-\texttt{robot\_model}                & Robot model (UR3, KUKA KR10) \\
+\texttt{robot\_model}                & Robot model (UR3e, KUKA KR10) \\
 \texttt{task}                        & Task (pick-and-place, screwing, peg-in-hole) \\
-\texttt{condition}                   & Episode condition (normal, fault, optimization, trajectory-opt, counterfactual) \\
+\texttt{condition}                   & Episode condition (normal, fault, trajectory-opt, counterfactual) \\
 \texttt{fault\_id}                   & Fault index for fault episodes; null otherwise \\
 \texttt{weight\_of\_box}             & Mass of the transported object in kg (pick-and-place only) \\
 \texttt{shape\_of\_box}              & Shape/dimensions of the transported object (pick-and-place only) \\
@@ -1061,7 +1086,10 @@ Field & Description \\
 
 \subsection{Fault taxonomy}
 
-FactoryWave includes 28 task-specific fault types together with 2 task-independent software faults, for a total of 30 distinct root causes (Table~\ref{tab:faults}). Each fault is paired with a plain-language description of the underlying physical or control-level mechanism and the injection procedure used to induce it during data collection. The last three columns indicate which tasks include the fault in the collected dataset; faults that apply to all three tasks (e.g.\ collisions with a shared workspace object, misconfigurations of the shared controller) are recorded under each applicable task with task-specific signal imprints.
+FactoryWave includes 27 distinct fault types (Table~\ref{tab:faults}). Each fault is paired with a plain-language description of the underlying physical or control-level mechanism and the injection procedure used to induce it during data collection. The last three columns indicate which tasks include the fault in the collected dataset; faults that apply to all three tasks (e.g.\ collisions with a shared workspace object, misconfigurations of the shared controller) are recorded under each applicable task with task-specific signal imprints.
+
+
+\todo{add images of experiments}
 
 {\renewcommand{\arraystretch}{1.35}
 \begin{longtable}{@{}p{3.1cm}p{4.2cm}p{4.6cm}ccc@{}}
@@ -1094,7 +1122,7 @@ External arm disturbance        & A continuous external force pulls or pushes th
 Mild payload CoG misconfiguration & Payload CoG specified at an incorrect offset from the tool flange; gravity compensation is wrong. & Entered a CoG offset in the payload configuration that differs from the physical tool CoG. & \checkmark & \checkmark & \checkmark \\
 Collision with hanging cable    & A loose cable drags along a robot link or the tool flange during motion. & Suspended a loose cable across the trajectory at arm height. & \checkmark & \checkmark & \checkmark \\
 Collision with cardboard object & A cardboard carton in the trajectory provides moderate resistance; may trigger a protective stop. & Placed a free-standing or braced cardboard box in the programmed trajectory. & \checkmark & \checkmark & \checkmark \\
-Collision with rigid object     & A rigid plastice block in the TCP path triggers an immediate protective stop. & Clamped a rigid plastic block in the programmed TCP path. Contrarily to the other collisions, this fault consistantly causes safety stops. & \checkmark & \checkmark & \checkmark \\
+Collision with rigid object     & A rigid plastic block in the TCP path triggers an immediate protective stop. & Clamped a rigid plastic block in the programmed TCP path. Unlike the other collisions, this fault consistently causes safety stops. & \checkmark & \checkmark & \checkmark \\
 Peg insertion misalignment      & Peg approaches the hole at an angular or lateral offset and jams against the rim. & Added a recorded lateral offset at the insertion approach waypoint. & \texttimes & \texttimes & \checkmark \\
 Hole obstruction                & Foreign object or debris in the hole prevents full insertion. & Placed a small object (metal screw) inside the hole before insertion. & \texttimes & \texttimes & \checkmark \\
 Incorrect insertion depth       & Insertion terminates at an incorrect Z depth due to a misconfigured waypoint. & Shifted the insertion endpoint waypoint Z by recorded offset from nominal. & \texttimes & \texttimes & \checkmark \\
@@ -1111,6 +1139,8 @@ Missing peg                     & Arm descends into the hole empty-handed; inser
 
 Trajectory-optimization episodes capture the variability of executions that all complete the same task goal. Rather than following the fixed scripted path, the controller is driven between fixed waypoints using randomly sampled intermediate waypoint sequences, so that approach angles, intermediate poses, joint configurations, and motion speeds vary across episodes. This randomized experiment provide a proper source of comparisons for Level~4 optimization-centered templates.
 
+\todo{rerecord trajectory episodes}
+
 \subsection{Counterfactual episodes}
 
 Counterfactual pairs are constructed for the subset of faults in Table~\ref{tab:faults} whose injection moment can be controlled at a specific timestep rather than being present throughout the episode. For each such fault, the initial conditions of the physical setup (object identity and pose, payload configuration, controller settings) are held as constant as the platform allows, one baseline execution is recorded without any injection, and several fault executions are then recorded under the same initial conditions with the fault applied at a shared sampled timestep. Because the physical system is not perfectly reproducible, the pre-injection sensor trajectories of the baseline and the fault candidates diverge slightly; we retain, as the counterfactual partner of the baseline, the fault candidate whose pre-injection window is closest to the baseline in KL divergence, and discard the others. This yields an approximate counterfactual pair in which the early history is as matched as the real platform permits, while the post-injection divergence isolates the effect of the intervention. The approximation error introduced by this procedure, relative to the exact counterfactuals available in simulation, motivates the sim2real analysis in Section~\ref{sec:sim2real}. Each retained pair stores four additional fields, \texttt{cf\_fault\_id}, \texttt{cf\_injection\_timestep}, \texttt{cf\_injection\_time\_s}, and \texttt{cf\_baseline\_episode\_id}, so that the baseline and fault episodes can be reassembled at analysis time.
@@ -1118,11 +1148,11 @@ Counterfactual pairs are constructed for the subset of faults in Table~\ref{tab:
 
 \subsection{Signal schema}
 
-The UR3 is recorded through the \texttt{ur\_rtde} Python interface at 125\,Hz, yielding 137 per-sample signals grouped by semantic role (Table~\ref{tab:ur3_signals}): controller \emph{setpoints}, actual \emph{effort / feedback} readings from joints and the TCP, \emph{context / health} signals covering joint temperatures, voltages, and internal controller state, a small block of controller \emph{status / mode} indicators, and digital/analog \emph{I/O} lines. Six episode-level provenance columns (\texttt{episode\_id}, \texttt{ctx\_robot\_type}, \texttt{ctx\_task}, \texttt{ctx\_fault\_label}, \texttt{ctx\_payload\_kg}, \texttt{ctx\_recording\_date}) are appended per episode but are constant within an episode.
+The UR3e is recorded through the \texttt{ur\_rtde} Python interface at 125\,Hz, yielding 136 per-sample signals grouped by semantic role (Table~\ref{tab:ur3_signals}): controller \emph{setpoints}, actual \emph{effort / feedback} readings from joints and the TCP, \emph{context / health} signals covering joint temperatures, voltages, and internal controller state, a small block of controller \emph{status / mode} indicators, and digital/analog \emph{I/O} lines. Six episode-level provenance columns (\texttt{episode\_id}, \texttt{ctx\_robot\_type}, \texttt{ctx\_task}, \texttt{ctx\_fault\_label}, \texttt{ctx\_payload\_kg}, \texttt{ctx\_recording\_date}) are appended per episode but are constant within an episode.
 
 \begin{table}[H]
 \centering
-\caption{UR3 signal groups recorded at 125\,Hz via \texttt{ur\_rtde} (excluding episode-level provenance columns).}
+\caption{UR3e signal groups recorded at 125\,Hz via \texttt{ur\_rtde} (excluding episode-level provenance columns).}
 \label{tab:ur3_signals}
 \small
 \begin{tabular}{@{}lrp{7.5cm}@{}}
@@ -1135,16 +1165,16 @@ Context / health      & 33 & Joint temperatures, joint voltages, joint modes, to
 Status / mode         &  7 & Timestamp, robot mode, robot status, safety mode, safety status bits, runtime state, configured payload mass. \\
 I/O                   &  6 & Digital inputs/outputs, two analog inputs, two analog outputs. \\
 \midrule
-\textbf{Total}        & \textbf{137} & \\
+\textbf{Total}        & \textbf{136} & \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The KUKA KR10 is controlled through the KRC4 controller. We stream 44 per-sample signals at 83\,Hz, grouped by semantic role in Table~\ref{tab:kuka_signals} using the same partition as the UR3 schema. A handful of signals that the UR3 exposes natively are unavailable on KSS 8.3, specifically joint velocities, commanded TCP pose, joint voltage, the tool-mounted accelerometer, and joint-level control outputs; TCP force/torque is also absent because no force sensor is fitted.
+The KUKA KR10 is controlled through the KRC4 controller. We stream 44 per-sample signals at 83\,Hz, grouped by semantic role in Table~\ref{tab:kuka_signals} using the same partition as the UR3e schema. A handful of signals that the UR3e exposes natively are unavailable on KSS 8.3, specifically joint velocities, commanded TCP pose, joint voltage, the tool-mounted accelerometer, and joint-level control outputs; TCP force/torque is also absent because no force sensor is fitted.
 
 \begin{table}[H]
 \centering
-\caption{KUKA KR10 signal groups recorded at 50\,Hz via RSI/KRL (excluding episode-level provenance columns).}
+\caption{KUKA KR10 signal groups recorded at 83\,Hz via RSI/KRL (excluding episode-level provenance columns).}
 \label{tab:kuka_signals}
 \small
 \begin{tabular}{@{}lrp{7.5cm}@{}}
