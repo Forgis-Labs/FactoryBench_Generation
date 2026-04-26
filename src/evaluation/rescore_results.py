@@ -13,7 +13,7 @@ Usage:
 
     # single model:
     python -m src.evaluation.rescore_results \
-        --replies-root output/replies/level1/gpt-5-mini \
+        --replies-root output/replies/level1/gpt-5.1 \
         --questions-root output/questions
 """
 from __future__ import annotations
@@ -132,7 +132,7 @@ def main() -> None:
                         help="Directory containing level*/<model>/*_answer.json (default: output/replies)")
     parser.add_argument("--questions-root", type=Path, default=Path("output/questions"),
                         help="Directory containing level*/* question JSONs (default: output/questions)")
-    parser.add_argument("--judge-model", type=str, default="gpt-5-mini",
+    parser.add_argument("--judge-model", type=str, default="gpt-5.1",
                         help="LLM-as-judge model for free-form (only used if --rerun-judge)")
     parser.add_argument("--rerun-judge", action="store_true",
                         help="Re-invoke the LLM judge for free-form answers (costs API calls)")

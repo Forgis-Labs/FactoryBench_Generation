@@ -114,7 +114,7 @@ def call_openai_style(
     api_style: str = "openai",
     api_version: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
-    """Call an OpenAI-compatible endpoint (gpt-5-mini, DeepSeek, Mistral)."""
+    """Call an OpenAI-compatible endpoint (gpt-5.1, DeepSeek, Mistral)."""
     client = _openai_client(base_url, api_key, api_version=api_version)
 
     # Mistral on Azure doesn't support /responses and uses `max_tokens` on chat.completions.
@@ -217,7 +217,7 @@ def foundry_llm_judge(
     judge_model: str = DEFAULT_JUDGE_MODEL,
     max_tokens: int = 256,
 ) -> Tuple[float, str]:
-    """Score a free-form prediction with gpt-5-mini as judge (cheap + consistent)."""
+    """Score a free-form prediction with the default judge model (gpt-5.1)."""
     user_msg = (
         f"Question: {question}\n\n"
         f"Reference answer: {reference}\n\n"
