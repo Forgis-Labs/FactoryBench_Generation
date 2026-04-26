@@ -102,37 +102,33 @@ def export_by_experiments(
 ) -> None:
     """
     Export DataFrame organized by experiments based on 'sample_nr' column.
-    Each experiment is written as experiment_{i}.csv in the output directory.
+    Each experiment is written as experiment_{i}.parquet in the output directory.
     Multiplies any timestamp columns by 1000 to convert to milliseconds.
     """
     if "sample_nr" not in data_frame.columns:
-        print("⚠ 'sample_nr' column not found. Exporting as single CSV instead.")
-        csv_path = out_dir / "AURSAD.csv"
+        print("⚠ 'sample_nr' column not found. Exporting as single parquet instead.")
+        parquet_path = out_dir / "AURSAD.parquet"
         out_dir.mkdir(parents=True, exist_ok=True)
-        data_frame.to_csv(csv_path, index=False)
+        data_frame.to_parquet(parquet_path, index=False)
         return
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Multiply timestamp columns by 1000 to convert to milliseconds
     for col in data_frame.columns:
         if "timestamp" in col.lower():
             # Convert to float first if needed, then multiply and convert to int
             data_frame[col] = (data_frame[col] * 1000).astype('int64')
-    
+
     # Group by sample_nr (experiment ID)
-    grouped = data_frame.groupby("sample_nr", sort=True)
-    
-    print(f"\nExporting {len(grouped)} experiments to subfolders...")
-    
-    for sample_nr, group_df in grouped:
+    grouped = list(data_frame.groupby("sample_nr", sort=True))
+
+    for sample_nr, group_df in tqdm(grouped, desc="Exporting experiments", unit="exp"):
         exp_num = int(sample_nr) if isinstance(sample_nr, (int, np.integer)) else sample_nr
-        csv_path = out_dir / f"experiment_{exp_num}.csv"
-        group_df.to_csv(csv_path, index=False)
-        
-        print(f"  ✓ experiment_{exp_num}: {len(group_df)} rows")
-    
-    print(f"✓ All experiments exported to {out_dir}\n")
+        parquet_path = out_dir / f"experiment_{exp_num}.parquet"
+        group_df.to_parquet(parquet_path, index=False)
+
+    print(f"✓ All {len(grouped)} experiments exported to {out_dir}\n")
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Download AURSAD and export experiments to separate CSVs")
@@ -196,15 +192,17 @@ def main() -> None:
     with pd.HDFStore(h5_path, mode="r") as store:
         if "/complete_data" in store.keys():
             try:
+                print("Loading /complete_data from HDF5 (this may take a minute) ...")
                 result = store["complete_data"]
                 if not isinstance(result, pd.DataFrame):
                     result = result.to_frame()
                 data_frame = result
-                
+
                 if data_frame is not None and hdf5_read_limit is not None:
                     data_frame = data_frame.head(hdf5_read_limit)
 
                 if data_frame is not None:
+                    print(f"  Loaded {len(data_frame):,} rows × {len(data_frame.columns)} cols")
                     metadata["/complete_data"] = {
                         "rows_exported": int(len(data_frame)),
                         "columns": list(data_frame.columns),
@@ -242,18 +240,60 @@ def main() -> None:
             data_frame = pd.concat(frames, axis=1)
 
     if data_frame is not None:
-        # Anti-aliased downsample (10x) per experiment to avoid cross-experiment filter artifacts
-        _NON_CONTINUOUS = {"sample_nr", "label"}
+        # Anti-aliased downsample (10x) per experiment to avoid cross-experiment filter artifacts.
+        # Discrete / categorical columns (pin bits, int registers, mode codes, bit-packed digital
+        # inputs/outputs, label, sample_nr) must NOT be filtered — running a low-pass FIR over
+        # step-shaped boolean signals destroys them into float ringing noise.
+        _NON_CONTINUOUS = {
+            "sample_nr", "label",
+            "robot_mode", "safety_mode", "runtime_state",
+            "joint_mode_0", "joint_mode_1", "joint_mode_2",
+            "joint_mode_3", "joint_mode_4", "joint_mode_5",
+            "actual_digital_input_bits", "actual_digital_output_bits",
+            "output_int_register_24", "output_int_register_25", "output_int_register_26",
+            "output_bit_register_64", "output_bit_register_65",
+            "output_bit_register_66", "output_bit_register_67",
+            "output_bit_register_70", "output_bit_register_71", "output_bit_register_72",
+        }
+        # Only subtract columns that actually exist; extras in the set are harmless.
         _continuous = set(data_frame.columns) - _NON_CONTINUOUS
         if "sample_nr" in data_frame.columns:
+            groups = list(data_frame.groupby("sample_nr", sort=True))
             decimated_groups = []
-            for _, group_df in data_frame.groupby("sample_nr", sort=True):
+            for _, group_df in tqdm(groups, desc="Decimating experiments", unit="exp"):
                 decimated_groups.append(
                     decimate_dataframe(group_df, q=10, continuous_cols=_continuous)
                 )
             data_frame = pd.concat(decimated_groups, ignore_index=True)
         else:
             data_frame = decimate_dataframe(data_frame, q=10, continuous_cols=_continuous)
+
+        # Derive task_phase from the four pin-bit registers raised by the URCap program at
+        # phase transitions. Per AURSAD paper Sec. 2.2 each bit is "Toggled to True then False"
+        # — a one-shot pulse marking the *start* of a phase, not its duration. We assign the
+        # phase id on the pulse row and forward-fill within each experiment so the value
+        # persists until the next pulse.
+        #   bit_64 (move_to_pin)  → 0  (approach)
+        #   bit_65 (move_to_home) → 4  (retract / return to safe height)
+        #   bit_66 (loosen)       → 6  (loosen)
+        #   bit_67 (tighten)      → 2  (screw / tighten)
+        bit_cols = {
+            "output_bit_register_64": 0,
+            "output_bit_register_67": 2,
+            "output_bit_register_65": 4,
+            "output_bit_register_66": 6,
+        }
+        if all(c in data_frame.columns for c in bit_cols):
+            phase = pd.Series(pd.NA, index=data_frame.index, dtype="Int8")
+            # Threshold at 0.5 in case a bit was decimated to a fractional value.
+            for col, phase_id in bit_cols.items():
+                phase = phase.mask(data_frame[col].astype("float") >= 0.5, phase_id)
+            # Forward-fill within each experiment so the active phase persists until the next pulse.
+            if "sample_nr" in data_frame.columns:
+                phase = phase.groupby(data_frame["sample_nr"], group_keys=False).ffill()
+            else:
+                phase = phase.ffill()
+            data_frame["task_phase"] = phase
 
         # Apply max_timestamps limit after downsampling
         if max_timestamps is not None and len(data_frame) > max_timestamps:

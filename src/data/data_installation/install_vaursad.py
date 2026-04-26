@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-Download voraus-AD (100 Hz or 500 Hz) and convert to per-experiment CSVs.
+Download voraus-AD (100 Hz or 500 Hz) and split into per-experiment parquet files.
 
 Features:
 - Validates parquet file size
-- Streams parquet in batches (low RAM)
-- Shows progress bar during CSV conversion
-- Creates one CSV file per unique "sample" value (named experiment_{i}.csv)
+- Streams the source parquet in batches (low RAM)
+- Creates one parquet file per unique "sample" value (named experiment_{i}.parquet)
 """
 
 from __future__ import annotations
@@ -15,6 +14,7 @@ import argparse
 from pathlib import Path
 import requests
 import time
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pandas as pd
 from tqdm import tqdm
@@ -61,13 +61,13 @@ def verify_file(path: Path, variant: int) -> bool:
     return path.exists() and path.stat().st_size >= MIN_SIZE[variant]
 
 
-def convert_to_csv_streaming(
+def convert_to_parquet_streaming(
     parquet_path: Path,
-    csv_dir: Path,
+    out_dir: Path,
     max_timestamps: int | None = None,
     decimate_q: int = 10,
 ) -> None:
-    """Stream parquet → per-sample CSVs at full rate, then anti-alias decimate each CSV.
+    """Stream parquet → per-sample parquet at full rate, then anti-alias decimate in place.
 
     Two-pass approach avoids cross-batch filter artifacts that would arise from
     decimating inside the streaming loop (a single sample can span many batches).
@@ -78,11 +78,11 @@ def convert_to_csv_streaming(
     total_rows = parquet_file.metadata.num_rows
     print(f"Total rows: {total_rows:,}")
 
-    # --- Pass 1: stream full-rate data into per-sample CSVs -----------------
-    sample_files: dict = {}
+    # --- Pass 1: stream full-rate data into per-sample parquet files --------
+    writers: dict = {}
     rows_written: dict = {}
 
-    csv_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     # Read 10x more than requested to account for decimation
     read_limit = max_timestamps * decimate_q if max_timestamps is not None else None
@@ -105,40 +105,33 @@ def convert_to_csv_streaming(
 
                 for sample_val, group in df.groupby("sample", sort=False):
                     safe_val = str(sample_val).replace("/", "_").replace("\\", "_")
-                    csv_path = csv_dir / f"experiment_{safe_val}.csv"
+                    out_path = out_dir / f"experiment_{safe_val}.parquet"
 
-                    if sample_val not in sample_files:
-                        sample_files[sample_val] = {
-                            "file": csv_path.open("w", newline="", encoding="utf-8"),
-                            "first_batch": True,
-                        }
+                    table = pa.Table.from_pandas(group, preserve_index=False)
+                    if sample_val not in writers:
+                        writers[sample_val] = pq.ParquetWriter(out_path, table.schema)
                         rows_written[sample_val] = 0
-
-                    entry = sample_files[sample_val]
-                    group.to_csv(
-                        entry["file"],
-                        index=False,
-                        header=entry["first_batch"],
-                    )
-                    entry["first_batch"] = False
+                    else:
+                        table = table.cast(writers[sample_val].schema)
+                    writers[sample_val].write_table(table)
                     rows_written[sample_val] += len(group)
 
                 total_read += len(df)
                 pbar.update(len(df))
 
     finally:
-        for entry in sample_files.values():
-            entry["file"].close()
+        for w in writers.values():
+            w.close()
 
-    # --- Pass 2: anti-alias decimate each per-sample CSV in-place -----------
+    # --- Pass 2: anti-alias decimate each per-sample parquet in-place -------
     _NON_CONTINUOUS = {"sample", "category"}
-    print(f"\nDecimating {len(sample_files)} experiments by {decimate_q}x ...")
+    print(f"\nDecimating {len(writers)} experiments by {decimate_q}x ...")
 
-    for sample_val in tqdm(sample_files, desc="Decimating", unit="exp"):
+    for sample_val in tqdm(writers, desc="Decimating", unit="exp"):
         safe_val = str(sample_val).replace("/", "_").replace("\\", "_")
-        csv_path = csv_dir / f"experiment_{safe_val}.csv"
+        out_path = out_dir / f"experiment_{safe_val}.parquet"
 
-        sample_df = pd.read_csv(csv_path)
+        sample_df = pd.read_parquet(out_path)
         continuous = set(sample_df.columns) - _NON_CONTINUOUS
         decimated = decimate_dataframe(sample_df, q=decimate_q, continuous_cols=continuous)
 
@@ -147,14 +140,14 @@ def convert_to_csv_streaming(
             if col.lower() == "time" or "timestamp" in col.lower():
                 decimated[col] = (decimated[col] * 1000).astype("int64")
 
-        decimated.to_csv(csv_path, index=False)
+        decimated.to_parquet(out_path, index=False)
 
-    print(f"✓ All {len(sample_files)} experiments decimated and exported to {csv_dir}\n")
+    print(f"✓ All {len(writers)} experiments decimated and exported to {out_dir}\n")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Download voraus-AD and export experiments to separate CSVs"
+        description="Download voraus-AD and split into per-experiment parquet files"
     )
     repo_root = Path(__file__).resolve().parents[3]
     default_out_dir = repo_root / "data" / "open_datasets" / "vorausad"
@@ -188,7 +181,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     parquet_path = out_dir / f"vorausad-{args.variant}hz.parquet"
-    csv_dir = out_dir / f"vorausad"
+    experiments_dir = out_dir / "vorausad"
 
     if verify_file(parquet_path, args.variant):
         print(f"Found existing dataset: {parquet_path}")
@@ -205,13 +198,13 @@ def main() -> None:
         if max_timestamps < 1:
             raise ValueError("--max-timestamps must be >= 1")
 
-    if not csv_dir.exists() or not any(csv_dir.iterdir()):
-        convert_to_csv_streaming(parquet_path, csv_dir, args.max_timestamps)
+    if not experiments_dir.exists() or not any(experiments_dir.iterdir()):
+        convert_to_parquet_streaming(parquet_path, experiments_dir, args.max_timestamps)
     else:
-        print(f"CSV directory already exists and is non-empty: {csv_dir}")
+        print(f"Experiments directory already exists and is non-empty: {experiments_dir}")
 
     print(f"OK: {parquet_path}")
-    print(f"CSV files: {csv_dir}/")
+    print(f"Per-experiment parquet files: {experiments_dir}/")
 
 
 if __name__ == "__main__":
