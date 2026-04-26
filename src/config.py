@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 
 
 FOUNDRY_MODELS: Dict[str, Dict[str, Any]] = {
-    "gpt-5-mini": {
+    "gpt-5.1": {
         "endpoint_env": "CHAT_ENDPOINT",
         "endpoint_default": "https://student-research-lab-resource.services.ai.azure.com/openai/v1",
         "api_style": "openai",
@@ -46,4 +46,4 @@ FOUNDRY_MODELS: Dict[str, Dict[str, Any]] = {
 
 FOUNDRY_MODEL_NAMES: List[str] = list(FOUNDRY_MODELS.keys())
 
-DEFAULT_JUDGE_MODEL: str = "gpt-5-mini"
+DEFAULT_JUDGE_MODEL: str = "gpt-5.1"

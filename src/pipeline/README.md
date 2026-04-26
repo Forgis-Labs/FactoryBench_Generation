@@ -23,7 +23,7 @@ Default stages are `generate,prompts,eval`. Swap `generate` for `fetch`
 to use Q&A pairs that are already uploaded to Hugging Face.
 
 Outputs land under `datasets/{questions,prompts,replies}/level{N}_pipeline/`.
-Replies are sharded by model slug (e.g. `.../gpt-5-mini/`).
+Replies are sharded by model slug (e.g. `.../gpt-5_1/`).
 
 Post-run figures and aggregate analysis are produced manually via
 [scripts/evaluate_opik_results.ipynb](../../scripts/evaluate_opik_results.ipynb).
@@ -48,7 +48,7 @@ python -m src.pipeline.run_pipeline \
     --stages fetch,prompts,eval \
     --hf-dataset-folder factorynet_qa_260 \
     --levels 1 \
-    --models gpt-5-mini,claude-haiku-4-5
+    --models gpt-5.1,claude-haiku-4-5
 ```
 
 ## Flags
