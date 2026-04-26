@@ -1,6 +1,6 @@
 [
   {
-    "dataset_id": "inter_aursad",
+    "dataset_id": "aursad",
     "name": "AURSAD (interpolated)",
     "description": "Automated UR3e Screwdriving Anomaly Dataset, interpolated to uniform timestep. Collected on a UR3e cobot performing automated screwdriving tasks with injected faults.",
     "machine_id": 0,
@@ -10,7 +10,7 @@
     "license": "MIT"
   },
   {
-    "dataset_id": "inter_vorausad",
+    "dataset_id": "vorausad",
     "name": "voraus-AD (interpolated)",
     "description": "Voraus Anomaly Detection dataset, interpolated to uniform timestep. Collected on a UR5 cobot performing pick-and-place tasks with injected faults.",
     "machine_id": 2,

@@ -18,7 +18,11 @@
       "persistent_tracking_error",
       "acoustic_spike_without_force"
     ],
-    "simulation_procedure": "Physically damage the screw thread with a file or by cross-threading before placing it in the feeder. Run the tightening cycle and observe torque signature anomaly."
+    "simulation_procedure": "Physically damage the screw thread with a file or by cross-threading before placing it in the feeder. Run the tightening cycle and observe torque signature anomaly.",
+    "datasets": [
+      "factorywave",
+      "aursad"
+    ]
   },
   {
     "fault_id": 2,
@@ -41,7 +45,11 @@
       "speed_drop_with_force_spike",
       "protective_stop_event"
     ],
-    "simulation_procedure": "Place an additional washer or shim in the assembly location before the tightening cycle. The robot will detect abnormal contact geometry."
+    "simulation_procedure": "Place an additional washer or shim in the assembly location before the tightening cycle. The robot will detect abnormal contact geometry.",
+    "datasets": [
+      "factorywave",
+      "aursad"
+    ]
   },
   {
     "fault_id": 3,
@@ -61,7 +69,11 @@
       "persistent_tracking_error",
       "unexpected_low_current_during_tightening"
     ],
-    "simulation_procedure": "Remove the screw from the feeder or skip the pick step so the robot attempts to tighten an empty hole."
+    "simulation_procedure": "Remove the screw from the feeder or skip the pick step so the robot attempts to tighten an empty hole.",
+    "datasets": [
+      "factorywave",
+      "aursad"
+    ]
   },
   {
     "fault_id": 4,
@@ -83,7 +95,11 @@
       "acoustic_spike_without_force",
       "protective_stop_event"
     ],
-    "simulation_procedure": "Pre-damage the threaded plate hole with an oversized tap or by cross-threading a screw manually. Confirm thread engagement fails during the tightening cycle."
+    "simulation_procedure": "Pre-damage the threaded plate hole with an oversized tap or by cross-threading a screw manually. Confirm thread engagement fails during the tightening cycle.",
+    "datasets": [
+      "factorywave",
+      "aursad"
+    ]
   },
   {
     "fault_id": 5,
@@ -104,7 +120,44 @@
       "spurious_force_spike",
       "spurious_current_spike"
     ],
-    "simulation_procedure": "Program the robot to execute a loosening (counterclockwise) rotation instead of tightening. No hardware modification required."
+    "simulation_procedure": "Program the robot to execute a loosening (counterclockwise) rotation instead of tightening. No hardware modification required.",
+    "datasets": [
+      "aursad"
+    ]
+  },
+  {
+    "fault_id": 6,
+    "root_cause": "voraus_ad_class_0_undocumented",
+    "description": "Voraus-AD dataset anomaly class 0. Semantic description pending curation.",
+    "severity_levels": [
+      "unknown"
+    ],
+    "injectable": false,
+    "possible_anomalies": [],
+    "simulation_procedure": "Pending curation.",
+    "datasets": [
+      "vorausad"
+    ],
+    "needs_documentation": true
+  },
+  {
+    "fault_id": 7,
+    "root_cause": "motor_miscommutation",
+    "description": "Motor commutation error producing inconsistent torque-forming behaviour on an affected joint, logged as max current deviation failure.",
+    "severity_levels": [
+      "medium",
+      "high"
+    ],
+    "injectable": false,
+    "possible_anomalies": [
+      "broadband_torque_noise",
+      "persistent_tracking_error",
+      "joint_current_imbalance"
+    ],
+    "simulation_procedure": "Power-cycle the controller; re-run a slow diagnostic cycle on the affected joint; inspect motor winding connections if the fault recurs.",
+    "datasets": [
+      "vorausad"
+    ]
   },
   {
     "fault_id": 8,
@@ -123,7 +176,11 @@
       "sustained_low_torque",
       "torque_deviation_from_nominal"
     ],
-    "simulation_procedure": "Disconnect the vacuum line or disable the solenoid valve command in the gripper control I/O, then run a pick-and-place cycle."
+    "simulation_procedure": "Disconnect the vacuum line or disable the solenoid valve command in the gripper control I/O, then run a pick-and-place cycle.",
+    "datasets": [
+      "factorywave",
+      "vorausad"
+    ]
   },
   {
     "fault_id": 9,
@@ -143,7 +200,11 @@
       "sustained_low_torque",
       "torque_deviation_from_nominal"
     ],
-    "simulation_procedure": "Inject a timed solenoid OFF pulse into the gripper control line mid-trajectory via a programmable relay or script-triggered digital output."
+    "simulation_procedure": "Inject a timed solenoid OFF pulse into the gripper control line mid-trajectory via a programmable relay or script-triggered digital output.",
+    "datasets": [
+      "factorywave",
+      "vorausad"
+    ]
   },
   {
     "fault_id": 10,
@@ -180,7 +241,11 @@
       "C173A5"
     ],
     "primary_error_code": "C153A0",
-    "simulation_procedure": "Attach a calibrated dead weight (e.g. 0.5-2 kg) directly to one of the robot links using a mechanical fixture, then run the standard program."
+    "simulation_procedure": "Attach a calibrated dead weight (e.g. 0.5-2 kg) directly to one of the robot links using a mechanical fixture, then run the standard program.",
+    "datasets": [
+      "factorywave",
+      "vorausad"
+    ]
   },
   {
     "fault_id": 11,
@@ -201,7 +266,45 @@
       "C157A"
     ],
     "primary_error_code": "C157A",
-    "simulation_procedure": "Place a foam cube or foam block directly in the programmed trajectory of the TCP. The robot will push through or deflect it with only a brief force spike recorded."
+    "simulation_procedure": "Place a foam cube or foam block directly in the programmed trajectory of the TCP. The robot will push through or deflect it with only a brief force spike recorded.",
+    "datasets": [
+      "factorywave",
+      "vorausad"
+    ]
+  },
+  {
+    "fault_id": 12,
+    "root_cause": "voraus_ad_class_7_undocumented",
+    "description": "Voraus-AD dataset anomaly class 7. Semantic description pending curation.",
+    "severity_levels": [
+      "unknown"
+    ],
+    "injectable": false,
+    "possible_anomalies": [],
+    "simulation_procedure": "Pending curation.",
+    "datasets": [
+      "vorausad"
+    ],
+    "needs_documentation": true
+  },
+  {
+    "fault_id": 13,
+    "root_cause": "cable_routed_on_robot",
+    "description": "A cable or tether is routed along the robot arm, adding asymmetric drag and torque bias on one or more joints throughout motion.",
+    "severity_levels": [
+      "low",
+      "medium"
+    ],
+    "injectable": true,
+    "possible_anomalies": [
+      "persistent_tracking_error",
+      "sustained_contact_force",
+      "oscillation_around_setpoint"
+    ],
+    "simulation_procedure": "Reroute the cable off the robot link or add a service loop; run a test cycle and verify joint torques return to nominal.",
+    "datasets": [
+      "vorausad"
+    ]
   },
   {
     "fault_id": 14,
@@ -217,7 +320,11 @@
       "tcp_force_spike",
       "speed_drop_with_force_spike"
     ],
-    "simulation_procedure": "Introduce a software time delay (e.g. a sleep() call) in the URScript before the gripper activation command, so the gripper closes after the arm has already begun its lift motion, causing it to grip the can at an off-center or tilted position."
+    "simulation_procedure": "Introduce a software time delay (e.g. a sleep() call) in the URScript before the gripper activation command, so the gripper closes after the arm has already begun its lift motion, causing it to grip the can at an off-center or tilted position.",
+    "datasets": [
+      "factorywave",
+      "vorausad"
+    ]
   },
   {
     "fault_id": 15,
@@ -248,7 +355,46 @@
       "C173A5"
     ],
     "primary_error_code": "C173A0",
-    "simulation_procedure": "Release the wheel brakes of the robot trolley, or place calibrated foam pads of varying thickness under the base mounting plate."
+    "simulation_procedure": "Release the wheel brakes of the robot trolley, or place calibrated foam pads of varying thickness under the base mounting plate.",
+    "datasets": [
+      "factorywave",
+      "vorausad"
+    ]
+  },
+  {
+    "fault_id": 16,
+    "root_cause": "gearbox_overload",
+    "description": "A joint gearbox is loaded beyond its rated torque, producing elevated current draw and eventual stall or protective stop.",
+    "severity_levels": [
+      "medium",
+      "high",
+      "critical"
+    ],
+    "injectable": false,
+    "possible_anomalies": [
+      "high_current_low_motion",
+      "gradual_current_force_temperature_rise",
+      "protective_stop_event"
+    ],
+    "simulation_procedure": "Stop the program; reduce payload or trajectory aggressiveness; inspect the gearbox for damage before resuming.",
+    "datasets": []
+  },
+  {
+    "fault_id": 17,
+    "root_cause": "motor_encoder_stall",
+    "description": "Motor encoder readings stall or drift, leading to position tracking failure on the affected joint.",
+    "severity_levels": [
+      "medium",
+      "high"
+    ],
+    "injectable": false,
+    "possible_anomalies": [
+      "persistent_tracking_error",
+      "high_current_low_motion",
+      "protective_stop_event"
+    ],
+    "simulation_procedure": "Power-cycle the joint; check encoder wiring and seating; replace the joint if the stall persists.",
+    "datasets": []
   },
   {
     "fault_id": 19,
@@ -267,7 +413,26 @@
       "C1A"
     ],
     "primary_error_code": "C39A3",
-    "simulation_procedure": "Program a waypoint slightly beyond the configured soft joint limit and execute the move, or manually shift a joint limit in the safety configuration to encroach on the normal trajectory."
+    "simulation_procedure": "Program a waypoint slightly beyond the configured soft joint limit and execute the move, or manually shift a joint limit in the safety configuration to encroach on the normal trajectory.",
+    "datasets": [
+      "factorywave"
+    ]
+  },
+  {
+    "fault_id": 20,
+    "root_cause": "idle_power_overconsumption",
+    "description": "The robot draws abnormally high current while nominally idle, indicating a parasitic load or controller fault.",
+    "severity_levels": [
+      "low",
+      "medium"
+    ],
+    "injectable": false,
+    "possible_anomalies": [
+      "sustained_low_torque",
+      "joint_current_imbalance"
+    ],
+    "simulation_procedure": "Inspect for stuck brakes, shorted windings, or misconfigured standby modes; clear fault and re-verify idle current draw.",
+    "datasets": []
   },
   {
     "fault_id": 22,
@@ -287,7 +452,10 @@
       "C155A"
     ],
     "primary_error_code": "C156A",
-    "simulation_procedure": "Enter an incorrect TCP offset (e.g. shift X by 100 mm) or wrong mounting angle in the Installation > TCP configuration in PolyScope, then run the program."
+    "simulation_procedure": "Enter an incorrect TCP offset (e.g. shift X by 100 mm) or wrong mounting angle in the Installation > TCP configuration in PolyScope, then run the program.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 23,
@@ -307,7 +475,10 @@
       "C162A"
     ],
     "primary_error_code": "C158A",
-    "simulation_procedure": "Ensure the installation payload is set to 0 kg while a tool (e.g. gripper, 300 g) is physically mounted, then run a standard pick-and-place cycle."
+    "simulation_procedure": "Ensure the installation payload is set to 0 kg while a tool (e.g. gripper, 300 g) is physically mounted, then run a standard pick-and-place cycle.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 25,
@@ -328,7 +499,10 @@
       "C111A"
     ],
     "primary_error_code": "C111A",
-    "simulation_procedure": "Anchor a spring or elastic band between a fixed point in the workspace (e.g. the bench frame) and the robot tool flange, with no contact along the arm links. Run the standard trajectory so the arm experiences a continuously varying external pull force at the TCP only. Alternatively, have an operator apply a steady manual push/pull force on the tool flange during motion."
+    "simulation_procedure": "Anchor a spring or elastic band between a fixed point in the workspace (e.g. the bench frame) and the robot tool flange, with no contact along the arm links. Run the standard trajectory so the arm experiences a continuously varying external pull force at the TCP only. Alternatively, have an operator apply a steady manual push/pull force on the tool flange during motion.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 28,
@@ -348,7 +522,10 @@
       "C156A"
     ],
     "primary_error_code": "C162A",
-    "simulation_procedure": "Set the center of gravity offset in the payload configuration to a position far from the actual tool CoG (e.g. 150 mm offset in Z), then execute a multi-pose trajectory."
+    "simulation_procedure": "Set the center of gravity offset in the payload configuration to a position far from the actual tool CoG (e.g. 150 mm offset in Z), then execute a multi-pose trajectory.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 29,
@@ -372,7 +549,11 @@
       "C111A"
     ],
     "primary_error_code": "C157A",
-    "simulation_procedure": "Suspend a loose cable or wire across the robot trajectory at arm height so it drags along the robot link or tool flange during the motion cycle."
+    "simulation_procedure": "Suspend a loose cable or wire across the robot trajectory at arm height so it drags along the robot link or tool flange during the motion cycle.",
+    "datasets": [
+      "factorywave",
+      "vorausad"
+    ]
   },
   {
     "fault_id": 30,
@@ -396,7 +577,11 @@
       "C283A26"
     ],
     "primary_error_code": "C157A",
-    "simulation_procedure": "Place a cardboard box (free-standing or lightly braced) in the robot trajectory. A free box will be pushed, recording a moderate spike; brace the box against a wall to increase resistance and provoke a protective stop."
+    "simulation_procedure": "Place a cardboard box (free-standing or lightly braced) in the robot trajectory. A free box will be pushed, recording a moderate spike; brace the box against a wall to increase resistance and provoke a protective stop.",
+    "datasets": [
+      "factorywave",
+      "vorausad"
+    ]
   },
   {
     "fault_id": 31,
@@ -419,7 +604,10 @@
       "C158A"
     ],
     "primary_error_code": "C157A",
-    "simulation_procedure": "Place a rigid metal block or clamp a solid fixture at a position that intersects the programmed TCP path. Run the program at normal speed; the collision will trigger an immediate protective stop."
+    "simulation_procedure": "Place a rigid metal block or clamp a solid fixture at a position that intersects the programmed TCP path. Run the program at normal speed; the collision will trigger an immediate protective stop.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 32,
@@ -438,7 +626,10 @@
       "persistent_tracking_error",
       "protective_stop_event"
     ],
-    "simulation_procedure": "Introduce a small angular offset (e.g. 2-5 degrees) or lateral offset (e.g. 3-8 mm) in the insertion approach waypoint in the robot program, so the peg contacts the hole rim instead of entering cleanly."
+    "simulation_procedure": "Introduce a small angular offset (e.g. 2-5 degrees) or lateral offset (e.g. 3-8 mm) in the insertion approach waypoint in the robot program, so the peg contacts the hole rim instead of entering cleanly.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 33,
@@ -457,7 +648,10 @@
       "tcp_force_spike",
       "protective_stop_event"
     ],
-    "simulation_procedure": "Place a small object (e.g. a metal chip, rubber disc, or folded paper) inside the hole before the insertion cycle. The peg will contact the obstruction mid-insertion, producing a distinct force anomaly."
+    "simulation_procedure": "Place a small object (e.g. a metal chip, rubber disc, or folded paper) inside the hole before the insertion cycle. The peg will contact the obstruction mid-insertion, producing a distinct force anomaly.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 34,
@@ -475,7 +669,10 @@
       "persistent_tracking_error",
       "sustained_contact_force"
     ],
-    "simulation_procedure": "Modify the insertion endpoint waypoint Z offset in the robot program by +/- 10-20 mm from the nominal value. Too shallow leaves the peg proud; too deep drives it against the fixture bottom."
+    "simulation_procedure": "Modify the insertion endpoint waypoint Z offset in the robot program by +/- 10-20 mm from the nominal value. Too shallow leaves the peg proud; too deep drives it against the fixture bottom.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 35,
@@ -493,7 +690,10 @@
       "sustained_contact_force",
       "speed_drop_with_force_spike"
     ],
-    "simulation_procedure": "Apply a thin layer of dry chalk powder, fine abrasive paste, or low-tack adhesive to the peg surface before the insertion cycle to increase surface friction."
+    "simulation_procedure": "Apply a thin layer of dry chalk powder, fine abrasive paste, or low-tack adhesive to the peg surface before the insertion cycle to increase surface friction.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 36,
@@ -513,7 +713,10 @@
       "persistent_tracking_error",
       "protective_stop_event"
     ],
-    "simulation_procedure": "Deliberately shift the hole fixture by a controlled lateral offset (e.g. 5-15 mm) from its nominal position without updating the robot program waypoints."
+    "simulation_procedure": "Deliberately shift the hole fixture by a controlled lateral offset (e.g. 5-15 mm) from its nominal position without updating the robot program waypoints.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 37,
@@ -534,7 +737,10 @@
       "C158A"
     ],
     "primary_error_code": "C157A",
-    "simulation_procedure": "Program a waypoint that requires the arm to fold into a self-colliding configuration, or deliberately offset the mounting fixture so the standard trajectory causes a link to contact it."
+    "simulation_procedure": "Program a waypoint that requires the arm to fold into a self-colliding configuration, or deliberately offset the mounting fixture so the standard trajectory causes a link to contact it.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 38,
@@ -554,7 +760,10 @@
       "gripper_close_no_force",
       "torque_deviation_from_nominal"
     ],
-    "simulation_procedure": "Remove the box from the pick position before the episode starts. The robot runs the standard pick-and-place program unmodified."
+    "simulation_procedure": "Remove the box from the pick position before the episode starts. The robot runs the standard pick-and-place program unmodified.",
+    "datasets": [
+      "factorywave"
+    ]
   },
   {
     "fault_id": 39,
@@ -574,6 +783,9 @@
       "sustained_low_torque",
       "torque_deviation_from_nominal"
     ],
-    "simulation_procedure": "Remove the peg from the gripper or skip the peg pick-up step before the episode starts. The robot runs the standard insertion program unmodified."
+    "simulation_procedure": "Remove the peg from the gripper or skip the peg pick-up step before the episode starts. The robot runs the standard insertion program unmodified.",
+    "datasets": [
+      "factorywave"
+    ]
   }
 ]
