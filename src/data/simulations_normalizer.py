@@ -201,7 +201,7 @@ def normalize_row(row: "pd.Series", first_timestamp_ms: float) -> Dict[str, Any]
     return result
 
 
-def normalize_csv(csv_path: Path, src_hz: int = 60, target_hz: int = 5) -> List[Dict[str, Any]]:
+def normalize_csv(csv_path: Path, src_hz: int = 60, target_hz: int = 10) -> List[Dict[str, Any]]:
     df = pd.read_csv(csv_path)
     if df.empty:
         return []
