@@ -177,7 +177,7 @@ def _build_ranking_context(
     {"streams": {"A": <context>, "B": <context>, ...}}.
     """
     max_len = max((len(rows) for _, rows in labeled_rows), default=0)
-    keep = (set(important_features) | {"timestamp_ms", "task_phase"}) if important_features else None
+    keep = (set(important_features) | {"timestamp_ms"}) if important_features else None
 
     streams: Dict[str, Any] = {}
     for label, rows in labeled_rows:
@@ -456,7 +456,7 @@ def generate_level4_questions(
             important_features = template.get("important_features")
             context_subseries = subseries
             if important_features:
-                keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+                keep = set(important_features) | {"timestamp_ms"}
                 context_subseries = [
                     {k: v for k, v in row.items() if k in keep} for row in subseries
                 ]

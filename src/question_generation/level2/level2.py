@@ -968,10 +968,15 @@ def generate_level2_questions(
             _bounds = None
 
             if _tid == 6:
+                # Detect phases in the SAMPLED SUBSERIES (which is what the model sees as t=0..),
+                # so the answer index lines up with the rendered context.
+                # First and last phase segments may be partial (the sampler can cut mid-phase),
+                # so they are excluded; everything between is by construction entirely contained.
+                # If no inner phase is fully contained, reject and let the loop try another episode.
                 _phases: List[Tuple[str, int, int]] = []
                 _cur = None
                 _ps = 0
-                for _i, _r in enumerate(_raw):
+                for _i, _r in enumerate(_sub):
                     _p = _r.get("task_phase")
                     if _p != _cur:
                         if _cur is not None and str(_cur) not in ("None", "none", ""):
@@ -979,7 +984,7 @@ def generate_level2_questions(
                         _cur = _p
                         _ps = _i
                 if _cur is not None and str(_cur) not in ("None", "none", ""):
-                    _phases.append((str(_cur), _ps, len(_raw) - _ps))
+                    _phases.append((str(_cur), _ps, len(_sub) - _ps))
                 if len(_phases) < 3:
                     continue
                 _inner = [(n_, s_, l_) for n_, s_, l_ in _phases[1:-1] if l_ >= 3]
@@ -1017,7 +1022,7 @@ def generate_level2_questions(
 
             _imp = template.get("important_features")
             if _imp:
-                _keep = set(_imp) | {"timestamp_ms", "fault_label", "task_phase"}
+                _keep = set(_imp) | {"timestamp_ms"}
                 _ctx_rows = [{k: v for k, v in r.items() if k in _keep} for r in _sub]
             else:
                 _ctx_rows = _sub
@@ -1077,7 +1082,7 @@ def generate_level2_questions(
         subseries_with_event = subseries + event_segment_rows
         important_features = template.get("important_features")
         if important_features:
-            keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+            keep = set(important_features) | {"timestamp_ms"}
             subseries_with_event = [{k: v for k, v in row.items() if k in keep} for row in subseries_with_event]
         context = build_context(subseries_with_event)
 

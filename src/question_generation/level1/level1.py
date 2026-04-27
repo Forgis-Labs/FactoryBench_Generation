@@ -839,76 +839,12 @@ def generate_level1_questions(
         important_features = template.get("important_features")
 
         # ------------------------------------------------------------------
-        # Template 1: single episode, full time series as context
+        # Templates 1, 2, 6: single episode, sampled subseries
+        # (template 1 isolates a phase; the subseries must contain at least one
+        # entirely-contained phase, otherwise we reject and try another episode —
+        # see fill_template's tid==1 branch which returns None on no inner phase.)
         # ------------------------------------------------------------------
-        if tid == 1:
-            _MAX_EPISODE_STEPS = 64
-            ds = random.choice(available_datasets)
-            ep_path = random.choice(episodes_by_dataset[ds])
-            rows = load_episode(ep_path)
-            if not isinstance(rows, list) or len(rows) < CONTEXT_MIN:
-                continue
-
-            full_rows = normalize_timestamps(rows, _first_timestamp_ms(rows))
-
-            # Anti-aliased downsample to at most _MAX_EPISODE_STEPS
-            downsample_factor = 1
-            if len(full_rows) > _MAX_EPISODE_STEPS:
-                downsample_factor = math.ceil(len(full_rows) / _MAX_EPISODE_STEPS)
-                _NON_CONTINUOUS = {"timestamp_ms", "fault_label", "task_phase"}
-                df = pd.DataFrame(full_rows)
-                continuous = set(df.columns) - _NON_CONTINUOUS
-                df = decimate_dataframe(df, q=downsample_factor, continuous_cols=continuous)
-                full_rows = df.where(df.notna(), None).to_dict(orient="records")
-
-            # Try to determine task from metadata file
-            meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
-            ep_task = ""
-            if meta_path.exists():
-                try:
-                    meta = load_json(meta_path)
-                    ep_task = meta.get("task", "")
-                except Exception:
-                    pass
-
-            filled = fill_template(
-                template, full_rows, root_causes, anomaly_lookup, mc_option_lookup,
-                machine_id=DATASET_MACHINE_ID.get(ds, -1),
-                task_id=ep_task,
-            )
-            if filled is None:
-                continue
-
-            if important_features:
-                keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
-                context_rows = [{k: v for k, v in row.items() if k in keep} for row in full_rows]
-            else:
-                context_rows = full_rows
-            context = build_context(context_rows)
-
-            item = {
-                "id": str(uuid.uuid4()),
-                "level": 1,
-                "template_id": tid,
-                "template_type": template["type"],
-                "hides": template.get("hides", []),
-                "question": filled["question"],
-                "options": filled["options"],
-                "answer": filled["answer"],
-                "acceptance_bounds": filled.get("acceptance_bounds"),
-                "provenance": {
-                    "dataset": ds,
-                    "episode": ep_path.stem,
-                    "episode_length": len(full_rows),
-                    "downsample_factor": downsample_factor,
-                },
-                "context": context,
-            }
-
-        # ------------------------------------------------------------------
-        # Templates 2 and 6: single episode, sampled subseries
-        # ------------------------------------------------------------------
-        elif tid in (2, 6):
+        if tid in (1, 2, 6):
             ds = random.choice(available_datasets)
             ep_path = random.choice(episodes_by_dataset[ds])
             rows = load_episode(ep_path)
@@ -935,7 +871,7 @@ def generate_level1_questions(
                 continue
 
             if important_features:
-                keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+                keep = set(important_features) | {"timestamp_ms"}
                 context_rows = [{k: v for k, v in row.items() if k in keep} for row in subseries]
             else:
                 context_rows = subseries
@@ -1011,7 +947,7 @@ def generate_level1_questions(
             filled["acceptance_bounds"]["actual_value"] = filled["answer"]
 
             if important_features:
-                keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+                keep = set(important_features) | {"timestamp_ms"}
                 context_rows = [{k: v for k, v in row.items() if k in keep} for row in subseries]
             else:
                 context_rows = subseries
@@ -1091,7 +1027,7 @@ def generate_level1_questions(
                 continue
 
             if important_features:
-                keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+                keep = set(important_features) | {"timestamp_ms"}
                 sub_a_ctx = [{k: v for k, v in row.items() if k in keep} for row in sub_a]
                 sub_b_ctx = [{k: v for k, v in row.items() if k in keep} for row in sub_b]
             else:

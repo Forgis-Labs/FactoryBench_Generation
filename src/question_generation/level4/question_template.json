@@ -47,8 +47,7 @@
       "setpoint_pos_5",
       "setpoint_tcp_x",
       "setpoint_tcp_y",
-      "setpoint_tcp_z",
-      "task_phase"
+      "setpoint_tcp_z"
     ]
   },
   {
@@ -79,8 +78,7 @@
       "feedback_speed_3",
       "feedback_speed_4",
       "feedback_speed_5",
-      "ctx_robot_current",
-      "task_phase"
+      "ctx_robot_current"
     ]
   }
 ]

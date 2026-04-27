@@ -1100,7 +1100,7 @@ def generate_level3_questions(
         important_features = template.get("important_features")
         context_subseries = subseries
         if important_features:
-            keep = set(important_features) | {"timestamp_ms", "fault_label", "task_phase"}
+            keep = set(important_features) | {"timestamp_ms"}
             context_subseries = [{k: v for k, v in row.items() if k in keep} for row in subseries]
         context = build_context(context_subseries)
 
