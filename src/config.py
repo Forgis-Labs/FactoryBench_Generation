@@ -56,10 +56,10 @@ MODELS: Dict[str, Dict[str, Any]] = {
         "api_style": "mistral",
         "supports_batch": True,
     },
-    "deepseek-v3.1": {
+    "deepseek-v3.2": {
         "provider": "bedrock",
-        "model_id_env": "DEEPSEEK_V31_MODEL_ID",            # deepseek.v3-1
-        "region_env": "DEEPSEEK_V31_REGION",                # eu-west-2 or eu-north-1
+        "model_id_env": "DEEPSEEK_V32_MODEL_ID",            # deepseek.v3.2
+        "region_env": "DEEPSEEK_V32_REGION",                # eu-west-2 or eu-north-1
         "api_style": "deepseek",
         "supports_batch": True,
     },

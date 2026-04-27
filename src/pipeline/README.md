@@ -110,8 +110,8 @@ CLAUDE_SONNET_46_MODEL_ID="eu.anthropic.claude-sonnet-4-6"   # CRIS profile
 CLAUDE_SONNET_46_REGION="eu-central-1"
 MISTRAL_LARGE_3_MODEL_ID="mistral.mistral-large-3-675b-instruct"
 MISTRAL_LARGE_3_REGION="us-west-2"                            # no EU region yet
-DEEPSEEK_V31_MODEL_ID="deepseek.v3-1"
-DEEPSEEK_V31_REGION="eu-west-2"                               # or eu-north-1
+DEEPSEEK_V32_MODEL_ID="deepseek.v3.2"
+DEEPSEEK_V32_REGION="eu-west-2"                               # or eu-north-1
 
 # SageMaker Async Inference (Qwen via JumpStart, scale-to-zero)
 SAGEMAKER_ROLE_ARN="arn:aws:iam::<acct>:role/factorybench-sagemaker"
