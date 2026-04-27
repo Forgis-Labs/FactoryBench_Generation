@@ -33,7 +33,7 @@
       "setpoint_tcp_0",
       "setpoint_tcp_1",
       "setpoint_tcp_2",
-      "gripper_command"
+      "setpoint_tcp_3"
     ]
   },
   {

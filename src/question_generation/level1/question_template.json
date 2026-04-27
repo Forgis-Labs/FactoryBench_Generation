@@ -79,6 +79,7 @@
   {
     "id": 3,
     "type": "comparative",
+    "hides": ["robot", "gripper"],
     "template": "What changed between the two instances of robotic time series data?  Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
@@ -114,7 +115,7 @@
       "est_contact_force_0",
       "est_contact_force_1",
       "est_contact_force_2",
-      "gripper_command"
+      "est_contact_force_3"
     ]
   },
   {
@@ -159,7 +160,7 @@
   {
     "id": 6,
     "type": "identification",
-    "hides": ["robot"],
+    "hides": ["robot", "gripper"],
     "template": "What robot does this sensor data originate from? Answer only with the letter of the correct option (ie. A), nothing else.",
     "answer_format": {
       "type": "multiple_choice_single_select",

@@ -33,7 +33,7 @@
       "setpoint_tcp_0",
       "setpoint_tcp_1",
       "setpoint_tcp_2",
-      "gripper_command"
+      "setpoint_tcp_3"
     ]
   },
   {
@@ -71,7 +71,7 @@
       "setpoint_pos_0",
       "setpoint_pos_1",
       "setpoint_pos_2",
-      "gripper_command"
+      "setpoint_pos_3"
     ]
   },
   {
@@ -108,7 +108,7 @@
       "setpoint_pos_0",
       "setpoint_pos_1",
       "setpoint_pos_2",
-      "gripper_command"
+      "setpoint_pos_3"
     ]
   },
   {
@@ -306,7 +306,7 @@
       "est_contact_force_0",
       "est_contact_force_1",
       "est_contact_force_2",
-      "gripper_command"
+      "est_contact_force_3"
     ]
   },
   {
@@ -351,7 +351,7 @@
   {
     "id": 10,
     "type": "identification",
-    "hides": ["robot"],
+    "hides": ["robot", "gripper"],
     "template": "Knowing that the robot suffers from {anomaly} in the given context time series, what robot does this sensor data originate from? Answer only with the letter of the correct option (ie. A), nothing else.",
     "answer_format": {
       "type": "multiple_choice_single_select",
