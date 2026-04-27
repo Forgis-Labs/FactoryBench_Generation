@@ -836,37 +836,37 @@ Level & MC single-select & MC multi-select & Ranking & Tensor / Numerical & Free
 
 \todo{Add details about how questions are marked. Also, research how to show questions are answerable}
 
-\section{Falsifiability check: noised time-series experiment}
-\label{app:noised_experiment}
+\section{Noise-substitution check}
+\label{app:noise_substitution}
 
-To probe whether the model scores in Table~\ref{tab:results} reflect actual reading of the time-series context or merely priors over question templates and option positions, we constructed a noised counterpart of the dataset and re-ran every model against it.
+To probe whether the model scores in Table~\ref{tab:results} reflect actual reading of the time-series context or merely priors over question templates and option positions, we constructed a noise-substituted counterpart of the dataset and re-ran every model against it.
 
-\paragraph{Construction.} For each of the 400 generated Q\&A pairs (100 per level), we duplicate the item and rewrite only the numerical time-series content. For each numeric \emph{float} feature we preserve the original first value and replace every subsequent value with a Gaussian random walk:
+\paragraph{Construction.} For each of the 400 generated Q\&A pairs (100 per level), we duplicate the item and rewrite only the numerical time-series content. For each numeric \emph{float} feature we preserve the original first value and substitute every subsequent value with the cumulative sum of independent Gaussian increments:
 \begin{equation*}
 v'_0 = v_0, \qquad v'_{t+1} = v'_t + \mathcal{N}(0, \sigma^2), \qquad \sigma = 0.5,
 \end{equation*}
-where $\sigma$ is shared across all features. The same noising is applied to time-series chunks embedded in option strings (Level~1 severity-ranking, Level~2/3 chunk-ranking).
+where $\sigma$ is shared across all features. The same substitution is applied to time-series chunks embedded in option strings (Level~1 severity-ranking, Level~2/3 chunk-ranking).
 
-\paragraph{Expected behaviour.} A model that scores by genuinely reading the time series should drop sharply on the noised variant, because the random walk destroys the signal-trajectory information that the gold answer hinges on. A model that scores by template-level priors (e.g.\ guessing the most plausible MC option given the question wording) or by option-position bias should be roughly invariant, since the question text and options are unchanged.
+\paragraph{Expected behaviour.} A model that scores by genuinely reading the time series should drop sharply on the noise-substituted variant, because the substitution destroys the signal-trajectory information that the gold answer hinges on. A model that scores by template-level priors (e.g.\ guessing the most plausible MC option given the question wording) or by option-position bias should be roughly invariant, since the question text and options are unchanged.
 
-\paragraph{Result.} Table~\ref{tab:noised_vs_normal} reports the side-by-side mean rubric scores. Three patterns emerge.
+\paragraph{Result.} Table~\ref{tab:noise_substitution} reports the side-by-side mean rubric scores. Three patterns emerge.
 
 \begin{enumerate}
-\item On Level~1 every model is essentially flat or improves slightly when the data is noised. This is consistent with L1 templates being substantially answerable from the question wording, the option set, and the still-present discrete schema fields (\texttt{task\_phase}, \texttt{fault\_label}). It also flags L1 as the level where overlap between LLM scores and a random/regression baseline is most expected.
+\item On Level~1 every model is essentially flat or improves slightly under substitution. This is consistent with L1 templates being substantially answerable from the question wording, the option set, and the still-present discrete schema fields (\texttt{task\_phase}, \texttt{fault\_label}). It also flags L1 as the level where overlap between LLM scores and a random/regression baseline is most expected.
 \item On Level~2 and Level~3 every model drops, often substantially: DeepSeek and Mistral lose 9--11 points on L3, and gpt-5.1 loses 7.7 on L2. The L3 drops are particularly informative because L3 templates ask counterfactual ``what would have happened'' questions where the answer hinges on the actual signal trajectory rather than on a discrete annotation.
-\item On Level~4, gpt-5.1's $7.6\%$ normal score collapses to $0.5\%$ on the noised variant --- a $15{\times}$ drop. Inspection of the per-item rubric notes shows that gpt-5.1's L4 mass on the normal data came almost entirely from correctly emitting ``no anomaly is present'' on truly nominal episodes; once the time series is replaced by a random walk, the same nominal episodes look anomalous to the model and it now hallucinates faults on them, losing its only mode of scoring. The other three models score $\leq 0.005$ in either condition and have no comparable mode to lose.
+\item On Level~4, gpt-5.1's $7.6\%$ original score collapses to $0.5\%$ under noise substitution --- a $15{\times}$ drop. Inspection of the per-item rubric notes shows that gpt-5.1's L4 mass on the original data came almost entirely from correctly emitting ``no anomaly is present'' on truly nominal episodes; once the time series is replaced by Gaussian noise, the same nominal episodes look anomalous to the model and it now hallucinates faults on them, losing its only mode of scoring. The other three models score $\leq 0.005$ in either condition and have no comparable mode to lose.
 \end{enumerate}
 
 \begin{table}[htbp]
 \centering
-\caption{Falsifiability check: measured mean scores (\%) on the original FactoryBench Q\&A pairs (Norm) vs.\ the noised variant (Nois) constructed by replacing every numerical time-series value with a Gaussian random walk seeded at the original first value ($\sigma=0.5$). Integer-valued schema fields are preserved. Questions, options, and gold answers are identical between the two runs. $\Delta = \text{Nois} - \text{Norm}$; large negative values are evidence that the model was reading the time series rather than the question alone.}
-\label{tab:noised_vs_normal}
+\caption{Noise-substitution check: measured mean scores (\%) on the original FactoryBench Q\&A pairs (Orig) vs.\ the noise-substituted variant (Sub) constructed by replacing every numerical time-series value with cumulative Gaussian increments seeded at the original first value ($\sigma=0.5$). Integer-valued schema fields are preserved. Questions, options, and gold answers are identical between the two runs. $\Delta = \text{Sub} - \text{Orig}$; large negative values are evidence that the model was reading the time series rather than the question alone.}
+\label{tab:noise_substitution}
 \scriptsize
 \begin{tabular}{@{}l ccc ccc ccc ccc@{}}
 \toprule
  & \multicolumn{3}{c}{L1} & \multicolumn{3}{c}{L2} & \multicolumn{3}{c}{L3} & \multicolumn{3}{c}{L4} \\
 \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}
-Method            & Norm & Nois & $\Delta$ & Norm & Nois & $\Delta$ & Norm & Nois & $\Delta$  & Norm & Nois & $\Delta$ \\
+Method            & Orig & Sub  & $\Delta$ & Orig & Sub  & $\Delta$ & Orig & Sub  & $\Delta$  & Orig & Sub  & $\Delta$ \\
 \midrule
 Claude Haiku 4.5  & 19.0 & 19.5 & +0.5 & 25.5 & 26.7 & +1.2 & 6.3  & 4.4  & -1.9  & 0.5  & 0.0  & -0.5 \\
 DeepSeek V3.1     & 16.5 & 15.0 & -1.5 & 23.7 & 19.5 & -4.2 & 24.7 & 15.7 & -9.0  & 3.5  & 4.0  & +0.5 \\
