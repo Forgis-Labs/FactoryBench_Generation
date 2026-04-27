@@ -22,7 +22,12 @@ from typing import Dict, Optional
 from dotenv import load_dotenv
 from huggingface_hub import hf_hub_download, snapshot_download
 
-from src.config import DEFAULT_JUDGE_MODEL, FOUNDRY_MODEL_NAMES
+from src.config import (
+    DEFAULT_JUDGE_MODEL,
+    FOUNDRY_MODEL_NAMES,
+    MODEL_NAMES,
+    get_provider,
+)
 
 load_dotenv()
 
@@ -138,18 +143,32 @@ def stage_eval(
     p_dir: Path,
     r_dir: Path,
 ) -> None:
+    """Dispatch evaluation to the right backend based on provider.
+
+    Foundry models -> src.evaluation.run_foundry_eval (Azure)
+    Bedrock + SageMaker models -> src.evaluation.run_aws_eval (AWS)
+    """
     eval_level_tag = args.eval_level or f"level_{level}"
+    provider = get_provider(model)
+    if provider in ("bedrock", "sagemaker"):
+        eval_module = "src.evaluation.run_aws_eval"
+    else:
+        eval_module = "src.evaluation.run_foundry_eval"
+
     print("-" * 60)
-    print(f"[L{level} | {model}] Running evaluation -> {r_dir}")
+    print(f"[L{level} | {model} | {provider or 'unknown'}] Running evaluation -> {r_dir}")
     print("-" * 60)
     cmd = [
-        sys.executable, "-m", "src.evaluation.run_foundry_eval",
+        sys.executable, "-m", eval_module,
         "--input", str(p_dir),
         "--output-dir", str(r_dir),
         "--questions", str(q_dir),
         "--model", model,
-        "--eval-level", eval_level_tag,
     ]
+    # --eval-level is foundry-only (used for Opik tagging); the AWS path
+    # doesn't accept it.
+    if eval_module.endswith("run_foundry_eval"):
+        cmd.extend(["--eval-level", eval_level_tag])
     if args.overwrite:
         cmd.append("--overwrite")
     if args.judge_model:
@@ -158,9 +177,12 @@ def stage_eval(
         cmd.append("--no-judge")
     if args.max_output_tokens is not None:
         cmd.extend(["--max-output-tokens", str(args.max_output_tokens)])
+    # --cost-limit applies to both providers (different semantics: Foundry
+    # tracks live cost mid-run, AWS pre-flight-estimates batch and tracks
+    # live in the sync fallback). --concurrency is foundry-only.
     if args.cost_limit is not None:
         cmd.extend(["--cost-limit", str(args.cost_limit)])
-    if args.concurrency is not None:
+    if eval_module.endswith("run_foundry_eval") and args.concurrency is not None:
         cmd.extend(["--concurrency", str(args.concurrency)])
     if args.no_batch:
         cmd.append("--no-batch")
@@ -282,10 +304,11 @@ def main() -> None:
     parser.add_argument("--hf-dataset-folder", type=str, default=None,
                         help="Top-level folder inside --hf-qa-repo to fetch from "
                              "(e.g. factorynet_qa_260). Required when 'fetch' stage is active.")
-    parser.add_argument("--models", type=str, default=",".join(FOUNDRY_MODEL_NAMES),
+    parser.add_argument("--models", type=str, default=",".join(MODEL_NAMES),
                         help=(
-                            f"Comma-separated Foundry models to evaluate. "
-                            f"Default: {','.join(FOUNDRY_MODEL_NAMES)}"
+                            f"Comma-separated models to evaluate (Foundry, Bedrock, "
+                            f"or SageMaker; provider is resolved automatically from "
+                            f"src/config.py). Default: {','.join(MODEL_NAMES)}"
                         ))
     parser.add_argument("--no-judge", action="store_true",
                         help="Disable LLM-as-judge across all eval calls. Free-form items get score=None.")
@@ -350,10 +373,10 @@ def main() -> None:
 
     models_to_run = _parse_csv(args.models, "models")
     eval_active = "eval" in stages
-    unknown_models = [m for m in models_to_run if m not in FOUNDRY_MODEL_NAMES]
+    unknown_models = [m for m in models_to_run if m not in MODEL_NAMES]
     if eval_active and unknown_models:
         parser.error(
-            f"Unknown model(s): {unknown_models}. Supported: {FOUNDRY_MODEL_NAMES}"
+            f"Unknown model(s): {unknown_models}. Supported: {MODEL_NAMES}"
         )
 
     kg_path: Optional[str] = None

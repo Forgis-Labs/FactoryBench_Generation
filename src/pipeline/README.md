@@ -95,4 +95,26 @@ HF_API_TOKEN="<your_hf_token>"
 OPIK_API_KEY="<your_opik_key>"
 OPIK_PROJECT_NAME="FactoryBench"
 OPIK_WORKSPACE="forgis"
+
+# AWS routing (used by src/evaluation/run_aws_eval.py for Bedrock + SageMaker)
+# Full setup walkthrough: src/evaluation/aws-setup.md
+AWS_PROFILE="factorybench"                      # or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
+FB_S3_BUCKET="factorybench-batch-io"             # any bucket the IAM roles can read+write
+FB_S3_PREFIX="factorybench/"                    # optional, default 'factorybench/'
+
+# Bedrock IAM
+BEDROCK_BATCH_ROLE_ARN="arn:aws:iam::<acct>:role/factorybench-bedrock-batch"
+
+# Bedrock per-model id + region (regions differ; see aws-setup.md)
+CLAUDE_SONNET_46_MODEL_ID="eu.anthropic.claude-sonnet-4-6"   # CRIS profile
+CLAUDE_SONNET_46_REGION="eu-central-1"
+MISTRAL_LARGE_3_MODEL_ID="mistral.mistral-large-3-675b-instruct"
+MISTRAL_LARGE_3_REGION="us-west-2"                            # no EU region yet
+DEEPSEEK_V31_MODEL_ID="deepseek.v3-1"
+DEEPSEEK_V31_REGION="eu-west-2"                               # or eu-north-1
+
+# SageMaker Async Inference (Qwen via JumpStart, scale-to-zero)
+SAGEMAKER_ROLE_ARN="arn:aws:iam::<acct>:role/factorybench-sagemaker"
+QWEN_SAGEMAKER_ENDPOINT="qwen-3-5-4b-async-endpoint"
+QWEN_SAGEMAKER_REGION="eu-central-1"
 ```
