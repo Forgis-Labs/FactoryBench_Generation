@@ -210,6 +210,19 @@ def call_model(model: str, prompt: str, max_tokens: int) -> Tuple[str, Dict[str,
     )
 
 
+def _is_judge_disabled(judge_model: Optional[str]) -> bool:
+    """Return True when LLM-as-judge should be skipped (no API call, score=None).
+
+    Triggered by env var FB_DISABLE_JUDGE=1, an empty/falsy --judge-model, or
+    --judge-model=none/off/disabled (case-insensitive).
+    """
+    if os.environ.get("FB_DISABLE_JUDGE", "").strip() in ("1", "true", "yes", "on"):
+        return True
+    if not judge_model:
+        return True
+    return str(judge_model).strip().lower() in ("none", "off", "disabled", "no")
+
+
 def foundry_llm_judge(
     question: str,
     prediction: str,
@@ -333,15 +346,21 @@ def score_prediction(
 
     try:
         if answer_format == "free_form":
-            ref_answer = str(gt) if gt is not None else ""
-            judge_score, judge_reason = foundry_llm_judge(
-                question=question_text,
-                prediction=str(pred) if pred is not None else "",
-                reference=ref_answer,
-                judge_model=judge_model,
-            )
-            score = judge_score
-            judge_result = (judge_score, judge_reason)
+            # LLM-as-judge can be disabled via --no-judge / FB_DISABLE_JUDGE=1.
+            # Free-form items then get score=None (treated as ungraded downstream).
+            if _is_judge_disabled(judge_model):
+                score = None
+                judge_result = None
+            else:
+                ref_answer = str(gt) if gt is not None else ""
+                judge_score, judge_reason = foundry_llm_judge(
+                    question=question_text,
+                    prediction=str(pred) if pred is not None else "",
+                    reference=ref_answer,
+                    judge_model=judge_model,
+                )
+                score = judge_score
+                judge_result = (judge_score, judge_reason)
 
         elif answer_format == "numerical":
             try:
@@ -1278,6 +1297,8 @@ def main() -> None:
                         help="Foundry model to evaluate")
     parser.add_argument("--judge-model", type=str, default=DEFAULT_JUDGE_MODEL,
                         help=f"Model used for free-form scoring (default: {DEFAULT_JUDGE_MODEL})")
+    parser.add_argument("--no-judge", action="store_true",
+                        help="Disable LLM-as-judge entirely. Free-form items get score=None instead of being graded.")
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
     parser.add_argument("--max-output-tokens", type=int, default=2000)
     parser.add_argument("--overwrite", action="store_true")
@@ -1323,6 +1344,9 @@ def main() -> None:
         logger.error("No prompts to process")
         return
 
+    effective_judge = "" if args.no_judge else args.judge_model
+    if args.no_judge:
+        logger.info("LLM-as-judge disabled (--no-judge); free-form items will get score=None")
     completed, failed, skipped = run_foundry_eval(
         entries=entries,
         model=args.model,
@@ -1331,7 +1355,7 @@ def main() -> None:
         overwrite=args.overwrite,
         ground_truth_index=ground_truth_index,
         eval_level=args.eval_level,
-        judge_model=args.judge_model,
+        judge_model=effective_judge,
         cost_limit=args.cost_limit,
         concurrency=args.concurrency,
         use_batch=args.use_batch,

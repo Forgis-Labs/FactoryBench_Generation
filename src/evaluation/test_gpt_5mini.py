@@ -304,31 +304,73 @@ def parse_llm_answer(text):
     return matches[-1] if matches else None
 
 def _estimate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
-    """Return estimated USD cost for a single call given token counts."""
+    """Return estimated USD cost for a single call given token counts.
+
+    Prices are USD per 1M tokens (input, output) sourced from each vendor's
+    published list price (Azure-hosted prices match the vendor list for
+    OpenAI, Anthropic and Mistral; open-weight models use the median Together /
+    Fireworks rate at the matched parameter scale). The table is checked in
+    order, so more-specific patterns must come before more-generic ones.
+    Forecasting foundation models served from local checkpoints incur no API
+    fee and are recorded at zero cost.
+    """
     model_name = model_name.lower()
-    if "gpt-4o-mini" in model_name:
-        price_in, price_out = 0.15, 0.60
-    elif "gpt-5.1" in model_name:
-        price_in, price_out = 1.25, 10.00
-    elif "gpt-5-mini" in model_name:
-        price_in, price_out = 0.25, 2.00
-    elif "gpt-4o" in model_name:
-        price_in, price_out = 2.50, 10.00
-    elif "o1-mini" in model_name:
-        price_in, price_out = 3.00, 12.00
-    elif "o1-preview" in model_name or model_name == "o1":
-        price_in, price_out = 15.00, 60.00
-    elif "gpt-4-turbo" in model_name:
-        price_in, price_out = 10.00, 30.00
-    elif "gpt-4" in model_name:
-        price_in, price_out = 30.00, 60.00
-    elif "gpt-3.5-turbo" in model_name:
-        price_in, price_out = 0.50, 1.50
-    elif "mini" in model_name:
-        price_in, price_out = 0.15, 0.60
-    else:
-        price_in, price_out = 5.0, 15.0
-    return (prompt_tokens / 1_000_000 * price_in) + (completion_tokens / 1_000_000 * price_out)
+
+    pricing = [
+        # OpenAI
+        ("gpt-4o-mini",       0.15,   0.60),
+        ("gpt-5.1",           1.25,  10.00),
+        ("gpt-5-mini",        0.25,   2.00),
+        ("gpt-5",             1.25,  10.00),
+        ("gpt-4o",            2.50,  10.00),
+        ("o1-mini",           3.00,  12.00),
+        ("o1-preview",       15.00,  60.00),
+        ("gpt-4-turbo",      10.00,  30.00),
+        ("gpt-4",            30.00,  60.00),
+        ("gpt-3.5-turbo",     0.50,   1.50),
+        # Anthropic Claude (4.x family)
+        ("claude-haiku-4-5",  1.00,   5.00),
+        ("claude-haiku-4",    1.00,   5.00),
+        ("claude-sonnet-4",   3.00,  15.00),
+        ("claude-opus-4",    15.00,  75.00),
+        ("claude-3.5-haiku",  0.80,   4.00),
+        ("claude-3.5-sonnet", 3.00,  15.00),
+        ("claude-3-opus",    15.00,  75.00),
+        ("claude-haiku",      1.00,   5.00),
+        ("claude-sonnet",     3.00,  15.00),
+        ("claude-opus",      15.00,  75.00),
+        ("haiku",             1.00,   5.00),
+        # DeepSeek (cache-miss list price; cache-hit input is ~$0.07)
+        ("deepseek-v3.1",     0.27,   1.10),
+        ("deepseek-v3",       0.27,   1.10),
+        ("deepseek",          0.27,   1.10),
+        # Mistral
+        ("mistral-large-3",   0.50,   1.50),
+        ("mistral-large",     2.00,   6.00),
+        ("mistral-medium",    0.40,   2.00),
+        ("mistral-small",     0.20,   0.60),
+        # Qwen (open-weight; representative hosted-inference rate)
+        ("qwen-3.5",          0.50,   1.50),
+        ("qwen-3",            0.50,   1.50),
+        ("qwen2.5-72b",       0.90,   0.90),
+        ("qwen",              0.50,   1.50),
+        # Time-series foundation models served from local checkpoints
+        ("chronos",           0.00,   0.00),
+        ("moirai",            0.00,   0.00),
+        # Generic small-tier OpenAI-style fallback
+        ("mini",              0.15,   0.60),
+    ]
+    for pattern, p_in, p_out in pricing:
+        if pattern in model_name:
+            return (prompt_tokens / 1_000_000) * p_in + (completion_tokens / 1_000_000) * p_out
+
+    # Unknown model: log a warning and use a conservative default so the
+    # cost-limit guard still trips at a sensible spend.
+    logger.warning(
+        "_estimate_cost: unknown model %r, using fallback rate $5/$15 per 1M tokens",
+        model_name,
+    )
+    return (prompt_tokens / 1_000_000) * 5.0 + (completion_tokens / 1_000_000) * 15.0
 
 
 def run_direct_requests(

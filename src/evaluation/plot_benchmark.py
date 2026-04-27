@@ -133,6 +133,8 @@ LEVEL_NAMES = {
 MODEL_DISPLAY = {
     "gpt-5.1": "GPT-5.1",
     "gpt-5_1": "GPT-5.1",
+    "gpt-5.1-1": "GPT-5.1",
+    "gpt-5_1-1": "GPT-5.1",
     "claude-haiku-4-5": "Claude Haiku 4.5",
     "DeepSeek-V3_1": "DeepSeek V3.1",
     "DeepSeek-V3.1": "DeepSeek V3.1",
