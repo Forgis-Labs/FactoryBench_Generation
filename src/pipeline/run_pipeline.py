@@ -154,6 +154,8 @@ def stage_eval(
         cmd.append("--overwrite")
     if args.judge_model:
         cmd.extend(["--judge-model", args.judge_model])
+    if getattr(args, "no_judge", False):
+        cmd.append("--no-judge")
     if args.max_output_tokens is not None:
         cmd.extend(["--max-output-tokens", str(args.max_output_tokens)])
     if args.cost_limit is not None:
@@ -285,6 +287,8 @@ def main() -> None:
                             f"Comma-separated Foundry models to evaluate. "
                             f"Default: {','.join(FOUNDRY_MODEL_NAMES)}"
                         ))
+    parser.add_argument("--no-judge", action="store_true",
+                        help="Disable LLM-as-judge across all eval calls. Free-form items get score=None.")
     parser.add_argument("--judge-model", type=str, default=DEFAULT_JUDGE_MODEL,
                         help=(
                             f"LLM-as-judge model for free-form scoring "
