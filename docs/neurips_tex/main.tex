@@ -503,7 +503,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
 \subsection{Answer formats}
 \label{sec:answer-formats}
 
-FactoryBench uses four answer formats, chosen to balance evaluation rigor with scalability. Each format supports deterministic scoring (with the exception of free form), and has been chosen in order to make questions very easily checkable, but also hard to answer in the absence of correct reasoning.
+FactoryBench uses four answer formats, chosen to balance evaluation rigor with scalability. Each format supports deterministic scoring (with the exception of free form), and has been chosen in order to make questions very easily checkable, but also hard to answer in the absence of correct reasoning. The procedure that turns these per-format rubrics into a per-item score --- including how non-canonical model outputs are recovered without delegating the verdict to an LLM --- is described in Section~\ref{sec:eval-pipeline}, with the full three-step implementation specified in Appendix~\ref{app:eval_protocol}.
 
 \begin{table}[htbp]
     \centering
@@ -640,7 +640,21 @@ In FactoryWave we approximate the do-operation by fixing initial conditions (obj
 
 \todo{Fill in concrete numbers, plots, and per-template gap tables once the IsaacSim pipeline is frozen; see Appendix~\ref{app:simulation_setup}.}
 
+\subsection{Evaluation of LLM answers}
+\label{sec:eval-pipeline}
+Free-form answers are LLM-judged by construction (Section~\ref{sec:answer-formats}); the other five answer formats admit a canonical answer string and therefore a deterministic check. Every L1--L3 answer is graded by a strict three-step cascade that uses an LLM only as a transcriber when the model's output cannot be parsed, never as the source of the score.
+
+\textbf{Scoring cascade: a three-step verifier.} Whether a model's answer is correct is decided by a strict three-step procedure that keeps every L1--L3 score \emph{deterministic by construction} while still tolerating chatty or off-format model outputs:
+\begin{enumerate}
+    \item \textbf{Step 1 --- Deterministic parsing.} The raw model response is fed to a per-format parser keyed by \texttt{answer\_format}: single-select MCQ (final letter in $\{A,B,C,D\}$), multi-select MCQ ($n$-character T/F string), ranking (permutation over the option alphabet), numerical (scalar with per-question tolerance), or tensor (underscore-separated floats). This handles the overwhelming majority of well-behaved responses.
+    \item \textbf{Step 2 --- Judge extraction.} When Step~1 cannot recover an answer (e.g.\ the model embeds it in long prose), a single LLM-as-judge call is made with a per-format extraction prompt. The judge's job is to recover the model's intended answer in the canonical string format ($A/B/C/D$, the $n$-character T/F string, the permutation, or the underscore-separated tensor).
+    \item \textbf{Step 3 --- Re-parse and verify.} The extracted string from Step~2 is fed back to the same deterministic parser of Step~1, which produces the final score against the ground truth answer.
+\end{enumerate}
+Every L1--L3 score is reducible to the deterministic parser, the judge is invoked only on the long tail of unparseable outputs, and only free-form scoring depends on the judge's rubric judgement. Free-form Level~4 answers are out of this cascade by design: they are scored directly by the same judge under the $\{0, 0.5, 1\}$ rubric of Section~\ref{sec:answer-formats}. Full implementation detail (parser logic per format, tolerance bands, judge prompts, escalation policy) is given in Appendix~\ref{app:eval_protocol}.
+
+
 \subsection{Results}
+\label{sec:results}
 
 Table~\ref{tab:results} reports measured mean rubric scores for our cross-vendor LLM panel and the simple non-LLM baseline. The baseline dispatches per template type (linear regression on the target signal for tensor-prediction templates, and seeded uniform random over the option set for MC, multi-select and ranking templates) and is therefore deliberately weak: it cannot read the question or use the rest of the context. Level~4 is free-form and excluded from the baseline column because no traditional method maps cleanly to ``produce a remediation protocol''.
 
@@ -708,7 +722,7 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 
 \todo[inline]{Some practical questions: How can people employ the benchmark? Where can it be found. Will it be maintained and expanded? Will incorrect labels be corrected? Is there a private dataset too? Are parts of the dataset designated for training and parts for testing?}
 
-FactoryBench and FactoryWave are released under a \todo{check license} license and distributed via a public Hugging Face repository. The release includes the episode data, the generator source code, the full set of 20 question templates with their paraphrase banks, all LLM-as-judge prompts, and both the full benchmark and the FactoryBench-Lite subset (Section~\ref{sec:lite}). We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file.
+FactoryBench and FactoryWave are released under a \todo{check license} license and distributed via a public Hugging Face repository. The release is split into two repos: \texttt{Forgis/FactoryNet\_Dataset} hosts the raw episode data and labels, while \texttt{Forgis/FactoryBench\_QA\_pairs} hosts the generated Q\&A snapshots organised by level (\texttt{level\_1/}, \texttt{\dots}, \texttt{level\_4/}) and by source dataset folder, so that any model can be evaluated against a fixed Q\&A set without re-running the generator. The release also includes the generator source code, the full set of 20 question templates with their paraphrase banks, all LLM-as-judge prompts, and both the full benchmark and the FactoryBench-Lite subset (Section~\ref{sec:lite}). We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file.
 
 
 
@@ -718,7 +732,6 @@ FactoryBench and FactoryWave are released under a \todo{check license} license a
 \newpage
 \appendix
 
-\todo[inline]{Add an appendix section describing the evaluation protocol: scoring rules per answer format (Multi-Select, Ranking, Tensor, Free-Form), tolerance bands for numerical answers, the LLM-as-judge voting setup (judges used, prompt, tie-breaking), aggregation across templates and levels, and how partial credit is assigned. Should mirror the per-format definitions in Section~\ref{sec:answer-formats} but with full implementation detail (exact metrics, formulas, example calls).}
 
 \section{Question template inventory}
 \label{app:templates}
@@ -786,6 +799,40 @@ where $\sigma$ is shared across all features. The same substitution is applied t
         \bottomrule
     \end{tabular}
 \end{table}
+
+\section{Evaluation protocol: the three-step scoring cascade}
+\label{app:eval_protocol}
+
+This appendix specifies the implementation of the three-step scoring cascade summarised in Section~\ref{sec:eval-pipeline}, mirroring the per-format definitions in Section~\ref{sec:answer-formats}. Every Q\&A item carries an \texttt{answer\_format} tag, a \texttt{ground\_truth} field, and (for numerical and tensor formats) an \texttt{acceptance\_bounds} block specifying the per-question margin. The cascade dispatches on \texttt{answer\_format}: free-form is handled separately (judge-only); every other format goes through the three steps below.
+
+\begin{enumerate}
+    \item \textbf{Parse} $\;\;r_1 \leftarrow \texttt{parser}_{\text{fmt}}(\text{prediction}, \text{ground\_truth})$. \\ If $r_1.\texttt{provenance} \neq \texttt{unparseable}$, return $r_1$.
+    \item \textbf{Extract} $\;\;e \leftarrow \texttt{judge.extract}(\text{fmt}, \text{prediction})$ using a per-format extraction prompt. \\ If $e = \texttt{NO\_ANSWER}$, return $(\text{score}=0, \texttt{provenance}=\texttt{judge})$.
+    \item \textbf{Re-parse} $\;\;r_2 \leftarrow \texttt{parser}_{\text{fmt}}(e, \text{ground\_truth})$. \\ Return $r_2$ with $\texttt{provenance}=\texttt{judge}$ (recording that an LLM mediated the extraction).
+\end{enumerate}
+The judge is never the source of the score for L1--L3: it only translates a non-canonical model output into a canonical string that the deterministic parser can read. This is what makes the protocol auditable.
+
+\paragraph{Step 1 --- Per-format parsers.} The deterministic parsers consume the model's raw output string and emit a triple $(\text{score}, \text{parsed}, \texttt{provenance})$ where provenance is one of \{\texttt{parser}, \texttt{judge}, \texttt{unparseable}\}.
+\begin{itemize}
+    \item \emph{Multiple-choice single-select.} The parser extracts the final letter in $\{A,B,C,D\}$ from the response (after stripping intermediate options used in chain-of-thought) and compares against the ground-truth letter. Score is $1$ on exact match, $0$ otherwise.
+    \item \emph{Multiple-choice multi-select.} The model is asked for an $n$-character T/F string (one position per option statement). The parser reconstructs that string and compares position-by-position against the gold T/F vector; partial credit follows Section~\ref{sec:answer-formats} (1 for exact match, 0.5 for one mismatch, 0 otherwise).
+    \item \emph{Ranking.} Output is parsed as a permutation of $\{A,B,C,D\}$ (or the shorter alphabet for 3-option templates). The parser reports both exact-match rate against the gold permutation and Kendall's $\tau$ rank correlation.
+    \item \emph{Numerical / Tensor.} The parser reads either a single scalar or an underscore-separated tensor. Each scalar is compared against the corresponding gold scalar with the per-question tolerance $|p - g| \leq \tau$ pulled from \texttt{acceptance\_bounds.margin}. When that field is absent, the parser falls back to a $\pm 10\%$ band of $|g|$ (floored at $10^{-3}$), matching the generator's default $k = 0.10 \cdot \mathrm{window\_range}$. Tensor scores are the per-element mean.
+\end{itemize}
+If any parser cannot recover an answer in its canonical format, it returns $\texttt{provenance}=\texttt{unparseable}$ and the cascade falls through to Step~2.
+
+\paragraph{Step 2 --- Judge extraction.} Each format has a dedicated extraction prompt that instructs the judge to recover the model's final canonical answer (ignoring intermediate options or reasoning steps) and to respond with only that canonical string, or with \texttt{NO\_ANSWER} if the model refused. Examples:
+\begin{itemize}
+    \item Single-select: ``\textit{Identify the model's FINAL chosen letter $\dots$ Respond with ONLY a single letter (A, B, C, or D), or \texttt{NO\_ANSWER}.}''
+    \item Multi-select: ``\textit{Reconstruct the $n$-character T/F string. Respond with ONLY the string (e.g.\ \texttt{TFTF}), or \texttt{NO\_ANSWER}.}''
+    \item Ranking: ``\textit{Identify the model's FINAL ranking string. Respond with ONLY the $n$-letter permutation (e.g.\ \texttt{BDCA}), or \texttt{NO\_ANSWER}.}''
+    \item Numerical / Tensor: ``\textit{Respond with ONLY the number / underscore-separated values, or \texttt{NO\_ANSWER}.}''
+\end{itemize}
+The default extraction model is \texttt{gpt-5-mini}. The judge's role is purely transcription: it never sees the ground truth answer, and it never returns a score.
+
+\paragraph{Step 3 --- Re-parse and final verdict.} The extracted string from Step~2 is fed back into the same Step~1 parser. The output of that re-parse is the final score, recorded with $\texttt{provenance}=\texttt{judge}$ together with the judge's brief reason string, so any reader can later distinguish ``model answered cleanly'' (provenance $=$ \texttt{parser}) from ``model answered correctly but the judge had to canonicalise'' (provenance $=$ \texttt{judge}). If the re-parse still fails (judge returned something the parser cannot read), the score is logged as $0$ with the same \texttt{judge} provenance.
+
+\paragraph{Free-form scoring (out of cascade).} Level~4 free-form templates bypass the three-step cascade and go directly to the judge. The judge is prompted with the question, the reference answer (root cause and/or remediation protocol), and the model's free-form response, and is asked to emit a single JSON line of the form \texttt{\{"score": $s$, "reason": "$\dots$"\}} with $s \in \{0, 0.5, 1\}$ following the rubric of Section~\ref{sec:answer-formats}: $1$ for semantically equivalent (correct direction, signal, magnitude, time window), $0.5$ for partially correct or imprecise but on-topic, $0$ for incorrect, irrelevant, or refused. The same prompt and parser tolerate either a single-judge or three-judge voting backend (Section~\ref{sec:answer-formats}) without changes to the cascade.
 
 \section{FactoryBench-Lite: distillation methodology and validation}
 \label{app:lite}
