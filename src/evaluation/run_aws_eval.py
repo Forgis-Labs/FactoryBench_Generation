@@ -62,6 +62,7 @@ from src.config import (
 # Reuse existing helpers (scoring / GT index / IO / reply finalisation)
 from src.evaluation.run_foundry_eval import (
     _estimate_cost,
+    build_question_index,
     infer_answer_format,
     score_prediction,
 )
@@ -78,7 +79,6 @@ BEDROCK_BATCH_MIN_RECORDS: int = 100
 # (real billing is done from the API's reported usage). 1 token ≈ 4 chars.
 _CHARS_PER_TOKEN = 4
 from src.evaluation.test_gpt_5mini import (
-    build_ground_truth_index,
     load_dotenv_file,
     load_json,
     load_prompt_entries,
@@ -911,7 +911,7 @@ def main() -> None:
     if args.limit is not None and args.limit > 0:
         entries = entries[: args.limit]
         logger.info(f"Limited to first {len(entries)} prompts (--limit {args.limit})")
-    ground_truth_index = build_ground_truth_index(args.questions)
+    ground_truth_index = build_question_index(args.questions)
 
     cost_limit = None if (args.cost_limit is not None and args.cost_limit <= 0) else args.cost_limit
     completed, failed, skipped = run_aws_eval(

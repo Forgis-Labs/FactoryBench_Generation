@@ -30,7 +30,6 @@ from src.evaluation.test_gpt_5mini import (
     _estimate_cost,
     _extract_output_text_from_responses_body,
     _to_dict,
-    build_ground_truth_index,
     load_dotenv_file,
     load_json,
     load_prompt_entries,
@@ -521,10 +520,12 @@ def _build_openai_batch_jsonl(
     max_tokens: int,
 ) -> str:
     """JSONL body for OpenAI /v1/batches with /chat/completions endpoint."""
+    from src.config import get_batch_deployment
+    deployment = get_batch_deployment(model)
     lines = []
     for prompt_path, prompt_text, prompt_idx, custom_id in entries:
         body = {
-            "model": model,
+            "model": deployment,
             "messages": [{"role": "user", "content": prompt_text}],
             "max_completion_tokens": max_tokens,
         }
