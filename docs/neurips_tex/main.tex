@@ -4,7 +4,7 @@
 % \usepackage[preprint]{neurips_2026}
 
 % to compile a camera-ready version, add the [final] option:
-\usepackage[final]{neurips_2026}
+\usepackage[eandd, final]{neurips_2026}
 
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc} % use 8-bit T1 fonts
@@ -89,25 +89,6 @@
 
 \begin{document}
 
-\todo[inline]{Do all the references actually exist? If they do not, this is typically seen as a proof that we had this paper AI generated. It will then likely be desk-rejected.
-
-    I could not find:
-
-    - Abhimanyu Das et al. Time series foundation models and forecasting
-
-    This one seems to have a slightly different name:
-
-    Ya Su et al. Robust anomaly detection for multivariate time series through stochastic recurrent neural network (omnianomaly).
-
-    This seems to have the wrong author:
-
-    Gerald Woo et al. Chronos: Learning the language of time series. arXiv preprint, 2024a.
-
-    Two more points:
-
-    A) When citing arxiv papers it is usually so that one puts the identifier in the citation, such as arXiv:2201.12740.
-    B) Sometimes capitalization is important. The references currently write everything in lowercase, but some abbreviations are chosen by their authors to capitalize some words. It is usually nice to follow their choices.
-}
 
 \maketitle
 
@@ -527,7 +508,7 @@ FactoryBench uses four answer formats, chosen to balance evaluation rigor with s
 
     \item \textbf{Tensor.} The model must output at least one specific scalar value such as the expected sensor reading following an intervention with no multiple-choice scaffolding. The answer is a list of floating-point numbers (possibly one). Evaluation is done on each scalar separately, and uses mean absolute percentage error (MAPE) and a threshold-based accuracy metric (prediction within $\pm k\%$ of ground truth), with partial points given to all correct scalars given.
 
-    \item \textbf{Free-Form.} The model produces an open-ended natural language response such as a diagnosis, recommended action sequence, or causal explanation. Because no single deterministic answer exists, evaluation is performed via an LLM-as-judge voting protocol: three independent frontier LLMs each compare the model's response against the ground-truth reference and cast a verdict of \textbf{Wrong} (0), \textbf{Neutral} (0.5), or \textbf{Correct} (1). The final score is the majority vote across the three judges, with ties broken by averaging.
+    \item \textbf{Free-Form.} The model produces an open-ended natural language response such as a diagnosis, recommended action sequence, or causal explanation. Because no single deterministic answer exists, evaluation is performed via an LLM-as-judge voting protocol: three independent frontier LLMs each compare the model's response against the ground-truth reference and cast a verdict of \textbf{Wrong} (0), \textbf{Neutral} (0.5), or \textbf{Correct} (1). The final score is the majority vote across the three judges, with ties broken by averaging. \todo{PP: There is only one way a tie can happen, i.e., if all scores are awarded exactly once. So we could just say that a tie is evaluated as a neural score. Seems easier than to say averaging. Especially, since "averaging" is a bit ambiguous (mean, median, mode).}
 \end{itemize}
 
 \subsection{Time series data and causal schema (SCE)}
@@ -569,8 +550,11 @@ FactoryWave (ours) & UR3, KUKA KR10 & 7142 & 125/83\,Hz   & PnP, Scr, PiH     & 
 
 Scalable ground-truth generation is the central challenge of any Q\&A benchmark grounded in raw data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by PhD-level experts in robotics. Each template contains variable slots filled at generation time from one of two sources: label information read directly from the episode data (signal names, timestamps, anomaly labels, root causes), or a predefined sampling distribution attached to that slot (prediction horizons, numerical thresholds, curated vocabularies for discrete options). The discrete vocabularies are seeded from the label sets of AURSAD and voraus-AD, extended to cover FactoryWave-specific cases, and released in full so every instantiation is inspectable and reproducible. The context time series used to fill the variables is sampled uniformly by data source (open source vs FactoryWave), then dataset, experiment, length within controlled bounds, and finally placement, yielding a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
 
+\todo[inline]{PP: I found figure \ref{fig:question_generation} to be a bit too big for the information it contains. So I scaled it to 80\%. Feel free to revert this. }
+
 \begin{figure}[htbp]
 \centering
+\scalebox{0.8}{
 {\sffamily
 \definecolor{cardink}{HTML}{1A2530}
 \definecolor{cardline}{HTML}{D8DEE3}
@@ -643,7 +627,7 @@ Scalable ground-truth generation is the central challenge of any Q\&A benchmark 
 };
 
 \end{tikzpicture}
-}
+}}
 \caption{The question-generation pipeline. A parameterised template (Step 1) defines the question skeleton with typed placeholder slots. Slot binding (Step 2) maps each placeholder to a concrete value sampled from the scenario context. The resulting instantiated question (Step 3) is ready for inclusion in the FactoryBench Q\&A dataset.}
 \label{fig:question_generation}
 \end{figure}
@@ -710,6 +694,7 @@ Beyond out-of-the-box evaluation, we investigate how different interventions imp
 \begin{itemize}
     \item \textbf{Finetuning:} We finetune open-source models on the FactoryBench Q\&A dataset to test learnability of machine understanding, as well as generalizability beyond cobot data.
 \end{itemize}
+\todo[inline]{PP: I am not the biggest fan of bullet point lists with a single item }
 
 \subsection{Sim2real gap analysis on counterfactual pick-and-place}
 \label{sec:sim2real}
@@ -752,6 +737,8 @@ Two facts in Table~\ref{tab:results} stand out. First, every model is at or belo
 \caption{Measured accuracy of four frontier models evaluated via Microsoft Foundry across FactoryBench's four reasoning levels. Each cell reports the mean accuracy over $n$ evaluated Q\&A pairs. Levels 1--3 and Level 4 ranking templates use deterministic scoring; Level 4 free-form templates (troubleshooting and optimization) are scored against the reference root cause and remediation protocol under a $\{0, 0.5, 1\}$ rubric.}
 \label{fig:results_heatmap}
 \end{figure}
+
+\todo[inline]{PP: I find it pretty remarkable that Deepseek scores a flat 0.00 in Figure \ref{fig:results_heatmap}, even though it did not fail completely in Table \ref{tab:results}. I think this should be discussed. It appears though as if Figure \ref{fig:results_heatmap} is not referenced in the text.}
 
 \section{Discussion}
 
