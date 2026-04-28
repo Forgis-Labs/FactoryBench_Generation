@@ -1,0 +1,37 @@
+FactoryBench is a rigorous question-answering benchmark designed to 
+evaluate Large Language Model (LLM) agents on causal machine 
+understanding using dense, multivariate industrial time-series data. 
+While existing benchmarks focus on textual or general multimodal 
+reasoning, FactoryBench uniquely targets machine-centered temporal 
+reasoning, bridging the gap between raw sensor interpretation and 
+complex, manual-grounded troubleshooting.To systematically probe 
+these capabilities, we introduce a Four-Level Causal Evaluation Hierarchy governed by a strict dependency principle (success at Level $N$ requires Level $N-1$):L1 (State Identification): Interpreting current machine states and detecting anomalies from sensor data.L2 (Intervention Reasoning): Predicting the immediate impact of control changes or faults at the present timestep.L3 (Counterfactual Analysis): Simulating alternative historical timelines to assess hypothetical past conditions.L4 (Decision Support): Synthesizing multi-step recovery procedures using sensor fusion and technical manuals.All tasks are grounded in a physical causal schema: Setpoint ($S$, target commands), Context ($C$, environmental conditions), and Effort + Feedback ($E$, actual machine response). Under healthy operation, the system follows $E = f(S)$, with faults manifesting as empirical deviations.To overcome manual annotation bottlenecks, we deploy a scalable Q&A generation engine utilizing 80 expert-authored templates. By dynamically sampling variables from real (FactoryWave, AURSAD) and simulated robotic datasets, we ensure a fully deterministic ground truth and high semantic diversity (validated via Vendi Score). We benchmark frontier LLMs and specialized time-series models across verifiable formats (Multi-Select, Ranking, Tensor Prediction). Initial baselines reveal a sharp performance degradation across causal depth—from 85-95% accuracy at L1 to just 15-30% at L4—highlighting the critical need for integrating semantic priors to achieve expert-level decision-making.
+
+
+----- COLOR PALETTE (use these exact hex values) -----
+
+BRAND:
+  - tiger: #FF5A00
+  - fire: #FF4D00
+  - flicker: #DC4B07
+  - steel: #878F92
+  - gunmetal: #122128
+  - panel: #202E35
+
+FIGURE:
+  - dark_navy: #122128
+  - forgis_orange: #FF5A00
+  - forgis_fire: #FF4D00
+  - forgis_flicker: #DC4B07
+  - blue: #3A7BD5
+  - green: #2ECC71
+  - steel: #878F92
+  - panel_bg: #F0F4F8
+  - warm_amber: #FFF3CD
+  - white: #FFFFFF
+
+LEVELS:
+  - L1: label=State, bg=#E0F2F1, border=#00796B
+  - L2: label=Intervention, bg=#FFF8E1, border=#F57F17
+  - L3: label=Counterfactual, bg=#F3E5F5, border=#6A1B9A
+  - L4: label=Decision, bg=#FFEBEE, border=#B71C1C

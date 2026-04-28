@@ -1,0 +1,188 @@
+% Figure: Two-part QA Generation Pipeline (Level 3, Template 5 — counterfactual tensor prediction)
+% LEFT column:  Template → slot binding (on arrow) → Instantiated Question
+% RIGHT column: Deterministic Answer Rules → Ground-Truth Answer
+% Small time-series schematic feeds into right-column arrow
+% Two font sizes only: \scriptsize (main), \fontsize{5.5}{7.5} (secondary)
+%
+% Layout plan:
+% - Two columns separated by a dashed divider
+% - Left column (x=0): box width 5.4cm text + 2×8pt padding ≈ 5.96cm
+% - Divider at x ≈ 6.4cm (0.4cm gap from left box edge)
+% - Right column at x ≈ 6.85cm: box width 6.4cm text + 2×8pt padding ≈ 6.96cm
+% - Total width ≈ 13.8cm, close to NeurIPS \textwidth (13.97cm)
+% - Left inter-box gap: 2.6cm (fits 4 annotation lines comfortably)
+% - Right inter-box gap: 2.3cm (fits waveform + labels with clearance)
+
+\begin{figure}[t]
+    \centering
+    \begin{tikzpicture}[
+            font=\sffamily\scriptsize\color{darknavy},
+            arr/.style={
+                    -{Latex[length=2.5pt, width=2pt]},
+                    forgisorange, line width=0.7pt,
+                },
+            stdpanel/.style={
+                    rectangle, rounded corners=3pt, fill=panelbg,
+                    inner xsep=8pt, inner ysep=8pt, align=left,
+                },
+            outpanel/.style={
+                    rectangle, rounded corners=3pt,
+                    fill=forgisorange!6, draw=forgisorange!25, line width=0.4pt,
+                    inner xsep=8pt, inner ysep=8pt, align=left,
+                },
+        ]
+
+        % ============================================================
+        % LAYOUT CONSTANTS
+        % ============================================================
+        \newcommand{\lcolx}{0}           % left column x origin
+        \newcommand{\lboxw}{5.4cm}       % left column text width
+        \newcommand{\divx}{6.4}          % dashed divider x
+        \newcommand{\rcolx}{6.85}        % right column x origin
+        \newcommand{\rboxw}{6.4cm}       % right column text width
+        \newcommand{\interboxgapL}{2.6cm}% vertical gap left column
+        \newcommand{\interboxgapR}{2.3cm}% vertical gap right column
+
+        % ============================================================
+        % COLUMN TITLES
+        % ============================================================
+        \node[font=\sffamily\bfseries\scriptsize, text=darknavy, anchor=south west]
+        (titleL) at (\lcolx, 0.15) {Question Generation};
+        \node[font=\sffamily\bfseries\scriptsize, text=darknavy, anchor=south west]
+        (titleR) at (\rcolx, 0.15) {Ground Truth: Answer Generation};
+
+        % ============================================================
+        % LEFT COLUMN
+        % ============================================================
+
+        % -- Box 1: Template --
+        \node[stdpanel, text width=\lboxw, anchor=north west] (b1) at (\lcolx,0) {%
+            {\sffamily\bfseries\scriptsize\color{darknavy} Template}\\[3pt]
+            {\scriptsize\itshape\color{darknavy}%
+                Had {\bfseries\color{forgisorange}\{event\}} occurred at time
+                    {\bfseries\color{forgisorange}\{t\}}\,ms, what would be the
+                expected values of {\bfseries\color{forgisorange}\{joint\_signal\}}
+                at T+{\bfseries\color{forgisorange}\{n\}}\,ms in this counterfactual case?}%
+        };
+
+        % -- Box 2: Instantiated Question --
+        \node[outpanel, text width=\lboxw, anchor=north west]
+        (b2) at ([yshift=-\interboxgapL]b1.south west) {%
+            {\sffamily\bfseries\scriptsize\color{darknavy} Instantiated Question}\\[3pt]
+            {\scriptsize\itshape\color{darknavy}%
+                ``Had {\bfseries\color{forgisorange}an increase of 0.5\,kg to the payload}
+                occurred at time {\bfseries\color{forgisorange}4\,329}\,ms, what would be
+                the expected values of {\bfseries\color{forgisorange}joint accelerations}
+                at T+{\bfseries\color{forgisorange}500}\,ms in this counterfactual case?''}%
+        };
+
+        % -- Vertical arrow (shifted left to make room for annotations) --
+        \coordinate (arrmid) at ([xshift=-0.6cm]b1.south);
+        \draw[arr] ([yshift=-4pt]arrmid) -- ([yshift=4pt]arrmid |- b2.north);
+
+        % -- Slot binding annotations (to the right of the arrow, vertically centered) --
+        \coordinate (mid1) at ($(arrmid)!0.5!(arrmid |- b2.north)$);
+        \node[anchor=west, align=left, inner sep=0pt] at ([xshift=8pt]mid1) {%
+            {\fontsize{5.5}{7.5}\selectfont
+                {\bfseries\color{forgisorange}\{event\}}%
+                \hspace{8pt}{\color{figsteel}$\leftarrow$}%
+                \;+0.5\,kg payload}\\[1.5pt]
+            {\fontsize{5.5}{7.5}\selectfont
+                {\bfseries\color{forgisorange}\{t\}}%
+                \hspace{26pt}{\color{figsteel}$\leftarrow$}%
+                \;4\,329}\\[1.5pt]
+            {\fontsize{5.5}{7.5}\selectfont
+                {\bfseries\color{forgisorange}\{joint\_signal\}}%
+                \;{\color{figsteel}$\leftarrow$}%
+                \;joint accel.}\\[1.5pt]
+            {\fontsize{5.5}{7.5}\selectfont
+                {\bfseries\color{forgisorange}\{n\}}%
+                \hspace{25pt}{\color{figsteel}$\leftarrow$}%
+                \;500}%
+        };
+
+        % ============================================================
+        % DASHED DIVIDER
+        % ============================================================
+        \draw[figsteel!40, densely dashed, line width=0.4pt]
+        ([yshift=3pt]\divx, 0.15 |- titleL.north) -- ([yshift=-3pt]\divx, 0 |- b2.south);
+
+        % ============================================================
+        % RIGHT COLUMN
+        % ============================================================
+
+        % -- Box 3: Deterministic Answer Rules (top-aligned with b1) --
+        \node[stdpanel, text width=\rboxw, anchor=north west]
+        (b3) at (\rcolx, 0) {%
+            {\sffamily\bfseries\scriptsize\color{darknavy} Deterministic Answer Rules}\\[3pt]
+            {\scriptsize\color{darknavy}%
+                {\bfseries Algorithm} (Template L3-5, Tensor):}\\[2pt]
+            {\fontsize{5.5}{7.5}\selectfont\color{darknavy}%
+                {\bfseries\color{forgisorange}1.}\;Load counterfactual episode (fault-injected)}\\[1.5pt]
+            {\fontsize{5.5}{7.5}\selectfont\color{darknavy}%
+                {\bfseries\color{forgisorange}2.}\;Find row at timestamp $t + n$\,ms}\\[1.5pt]
+            {\fontsize{5.5}{7.5}\selectfont\color{darknavy}%
+                {\bfseries\color{forgisorange}3.}\;Extract joint\_accel\_0\,\ldots\,joint\_accel\_5}\\[1.5pt]
+            {\fontsize{5.5}{7.5}\selectfont\color{darknavy}%
+                {\bfseries\color{forgisorange}4.}\;Ground truth $= [a_0,\, a_1,\, a_2,\, a_3,\, a_4,\, a_5]$}\\[4pt]
+            {\fontsize{5.5}{7.5}\selectfont\color{figsteel}%
+                Other L3 formats: Multi-Select, Ranking}%
+        };
+
+        % -- Box 4: Ground-Truth Answer (bottom-aligned with b2) --
+        \node[outpanel, text width=\rboxw, anchor=south west]
+        (b4) at (b3.south west |- b2.south) {%
+            {\sffamily\bfseries\scriptsize\color{darknavy} Ground-Truth Answer}\\[3pt]
+            {\scriptsize\color{darknavy}%
+                \textbf{Format:}\;Tensor\;[6]}\\[2pt]
+            {\scriptsize\color{darknavy}%
+                \textbf{Answer:}\;{\bfseries\color{forgisorange}%
+                    1.23\_0.87\_$-$0.42\_0.15\_2.01\_$-$0.03}}\\[4pt]
+            {\fontsize{5.5}{7.5}\selectfont\color{figsteel}%
+                Also generated for Level\,3:}\\[1.5pt]
+            {\fontsize{5.5}{7.5}\selectfont\color{figsteel}%
+                \hspace*{6pt}Multi-Select (T/F string)\;--\;2 templates}\\[1.5pt]
+            {\fontsize{5.5}{7.5}\selectfont\color{figsteel}%
+                \hspace*{6pt}Ranking (permutation ABCD)\;--\;1 template}%
+        };
+
+        % -- Vertical arrow between b3 and b4 --
+        \coordinate (r3bot) at ([yshift=-4pt]b3.south);
+        \coordinate (r4top) at ([yshift=4pt]b4.north);
+        \draw[arr] (r3bot) -- (r4top);
+
+        % -- Midpoint of right arrow --
+        \coordinate (rmid) at ($(r3bot)!0.5!(r4top)$);
+
+        % -- "evaluate against data" annotation (right of arrow) --
+        \node[anchor=west, inner sep=0pt] (evalabel) at ([xshift=12pt]rmid)
+        {{\fontsize{5.5}{7.5}\selectfont\itshape\color{figsteel}evaluate against data}};
+
+        % -- Time-series waveform schematic (left of arrow, above midpoint) --
+        \coordinate (wavecenter) at ([xshift=-1.1cm, yshift=-6pt]rmid);
+        \begin{scope}[shift={(wavecenter)}]
+            % Mini waveform (~0.9cm wide, centered at scope origin)
+            \draw[forgisorange, line width=0.4pt]
+                (-0.45,0) .. controls (-0.3,0.08) and (-0.15,-0.06) ..
+                (0,0.02) .. controls (0.15,0.1) and (0.3,-0.05) ..
+                (0.45,0.03);
+            \draw[figsteel, line width=0.35pt]
+                (-0.45,-0.06) .. controls (-0.3,-0.12) and (-0.15,0.0) ..
+                (0,-0.08) .. controls (0.15,-0.02) and (0.3,-0.1) ..
+                (0.45,-0.05);
+            \draw[darknavy!35, line width=0.35pt]
+                (-0.45,0.06) .. controls (-0.3,0.14) and (-0.15,0.0) ..
+                (0,0.1) .. controls (0.15,0.02) and (0.3,0.1) ..
+                (0.45,0.06);
+            % Label above the waveform
+            \node[anchor=south, inner sep=0pt] at (0, 0.18)
+                {{\fontsize{5.5}{7.5}\selectfont\itshape\color{figsteel}episode data}};
+        \end{scope}
+        % Feed arrow from waveform right edge to the vertical arrow
+        \draw[figsteel!60, line width=0.4pt, -{Latex[length=1.5pt, width=1.5pt]}]
+            ([xshift=0.5cm]wavecenter) -- ([xshift=-3pt, yshift=-6pt]rmid);
+
+    \end{tikzpicture}
+    \caption{Question-and-answer generation pipeline (Level~3 Template~5 shown; full inventory in Table~\ref{tab:template_inventory} and Appendix~\ref{app:qa_examples}). \textbf{Left:} Typed placeholder slots are bound to episode-specific values. \textbf{Right:} Ground-truth answers are computed deterministically from paired episode data via template-specific rules.}
+    \label{fig:question_generation}
+\end{figure}
