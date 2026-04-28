@@ -225,6 +225,14 @@ def compute_kl_divergence(baseline_df: pd.DataFrame, cf_df: pd.DataFrame, n_rows
 _FAULT_FLIP_INJECTION_IDS = {32, 34}
 _PEG_IN_HOLE_INSERT_PHASE_LABEL = "1"
 
+# Fault labels (joint-limit, self-collision) where the protective stop is the
+# ground-truth onset and the fault_label flip should be re-aligned to the
+# safety_mode NORMAL(1) -> PROTECTIVE_STOP(3) transition. Anything else in the
+# raw `fault` column is overridden when such a transition is present.
+_FAULT_FLIP_AT_PROTECTIVE_STOP_IDS = {19, 37}
+_SAFETY_MODE_NORMAL = 1
+_SAFETY_MODE_PROTECTIVE_STOP = 3
+
 
 _PEG_IN_HOLE_FAULTS = {32, 33, 34, 35, 36, 39}
 _SCREWING_FAULTS = {1, 2, 3, 4, 5}
@@ -269,6 +277,38 @@ def _inject_fault_flip_if_missing(
                 r2["fault_label"] = fault_id
             return True
     return False
+
+
+def _align_fault_flip_to_protective_stop(
+    rows: List[Dict[str, Any]],
+    fault_id: Optional[int],
+) -> bool:
+    """For fault 19 (joint-limit) and 37 (self-collision) episodes, force
+    fault_label/event to flip from 0 to fault_id at the first safety_mode
+    NORMAL(1) -> PROTECTIVE_STOP(3) transition. Mutates `rows`. Returns True
+    if a transition was found and the rewrite was applied; otherwise leaves
+    rows untouched (e.g. when the protective stop is outside the recorded
+    window and safety_mode never reaches 3).
+    """
+    if fault_id not in _FAULT_FLIP_AT_PROTECTIVE_STOP_IDS:
+        return False
+    flip_idx: Optional[int] = None
+    prev = None
+    for i, r in enumerate(rows):
+        sm = r.get("safety_mode")
+        if prev == _SAFETY_MODE_NORMAL and sm == _SAFETY_MODE_PROTECTIVE_STOP:
+            flip_idx = i
+            break
+        prev = sm
+    if flip_idx is None:
+        return False
+    for r in rows[:flip_idx]:
+        r["fault_label"] = 0
+        r["event"] = 0
+    for r in rows[flip_idx:]:
+        r["fault_label"] = fault_id
+        r["event"] = fault_id
+    return True
 
 
 def _to_float(value) -> Optional[float]:
@@ -856,6 +896,10 @@ def normalize_dataset(
 
         # Synthesize the missing fault flip for peg-in-hole fault 32/34 episodes.
         _inject_fault_flip_if_missing(normalized_rows, metadata.get("fault_id"))
+
+        # Re-align fault 19 / 37 flips to the safety_mode 1->3 protective-stop
+        # transition (when present in the recorded window).
+        _align_fault_flip_to_protective_stop(normalized_rows, metadata.get("fault_id"))
 
         # Write as flat list
         with open(out_file, "w", encoding="utf-8") as f:
