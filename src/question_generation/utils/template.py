@@ -14,8 +14,6 @@ import numpy as np
 
 from src.question_generation.utils.time_series import (
     encode_time_series,
-    format_note_value,
-    remove_constant_features,
     remove_feature,
     sort_feature_keys,
     strip_null_features,
@@ -177,24 +175,14 @@ def sample_chunks(
 def build_context(subseries: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Build the context dict attached to every generated question.
-    Contains the encoded time series and any constant-feature notes.
+    Contains the encoded time series with all features inlined per row.
     """
     ts = strip_null_features(subseries)
     ts = sort_feature_keys(ts)
     ts = remove_feature(ts, "fault_label")
-    ts, constant_features = remove_constant_features(ts)
-    ts = sort_feature_keys(ts)
     encoded, acronym_mapping = encode_time_series(ts)
 
     ctx: Dict[str, Any] = {}
-    if constant_features:
-        ctx["notes"] = {
-            "disclaimer": "these features stayed constant at the following values",
-            "constant_features": {
-                k: format_note_value(constant_features[k])
-                for k in sorted(constant_features.keys())
-            },
-        }
     ctx["time_series_format"] = {
         "description": (
             "Each row in time_series is one timestep encoded as "
