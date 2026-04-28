@@ -248,7 +248,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
             % Common plot style: shared so each panel call is short
             \pgfplotsset{
                 pearlplot/.style={
-                        width=5.4cm, height=2.5cm,
+                        width=4.3cm, height=2.8cm,
                         xmin=0, xmax=500, ymin=0, ymax=10,
                         xlabel={Time (ms)}, ylabel={Signal},
                         xlabel style={font=\sffamily\scriptsize, darknavy},
@@ -257,7 +257,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                         xtick={0,250,500}, ytick={0,5,10},
                         axis lines=left,
                         axis line style={darknavy, line width=0.4pt},
-                        legend style={at={(0.98,0.98)}, anchor=north east, font=\sffamily\tiny,
+                        legend style={at={(1.0,1.6)}, anchor=north east, font=\sffamily\tiny,
                                 draw=none, fill=panelbg, fill opacity=0.9, text opacity=1,
                                 row sep=0pt, legend columns=1, inner sep=2pt},
                         clip=true,
@@ -380,10 +380,10 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 % outcome. Three small "thinking" dots connect them. Inside the bubble:
                 % a tiny ghost-pose mini-robot, marked with a STALL warning, captures
                 % "what would have happened if".
-                \drawminirobot{-3.1}{-0.50}{0}{L3tint}
+                \drawminirobot{-3.1}{-0.30}{0}{L3tint}
                 % "Actual" annotation under the real robot
                 \node[font=\sffamily\tiny\bfseries, L3tint!80!darknavy, anchor=north]
-                at (-2.65, -1.18) {actual run};
+                at (-2.65, -0.98) {actual run};
 
                 % Trail of three growing thinking-dots from the robot toward the bubble
                 \fill[L3tint!80!darknavy, opacity=0.6] (-2.35, 0.25) circle (0.045);
@@ -407,13 +407,13 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                     \fill[L3tint!30] (1.85,-0.45) rectangle (2.15,-0.70);
                 \end{scope}
                 \node[font=\sffamily\tiny\bfseries, red!60!darknavy, anchor=west]
-                at (-1.50, 1.15) {STALL!};
+                at (-1.80, 1.15) {STALL!};
                 \node[font=\sffamily\tiny\itshape, L3tint!80!darknavy, anchor=west]
-                at (-1.50, 0.90) {(if forced)};
+                at (-1.80, 0.90) {(if forced)};
 
                 % Large floating "what if?" label to the right of the bubble
                 \node[font=\sffamily\scriptsize\bfseries\itshape, L3tint!80!darknavy, anchor=west]
-                at (-0.55, 0.55) {what if?};
+                at (-1.25, 0.55) {what if?};
 
                 \begin{scope}[shift={(1.0, -0.05)}]
                     \begin{axis}[pearlplot]
@@ -477,7 +477,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 \node[draw=darknavy!40, fill=white, rounded corners=2pt, line width=0.5pt,
                     font=\sffamily\scriptsize, text=darknavy, align=left,
                     minimum width=3.8cm, minimum height=2.2cm, inner sep=6pt]
-                (plan) at (1.85, -0.40) {%
+                (plan) at (1.85, -0.10) {%
                     \textbf{\textcolor{L4tint!80!darknavy}{Diagnosis:}} \emph{collision\_foam}\\[0.2em]
                     \textbf{\textcolor{L4tint!80!darknavy}{Plan:}}\\[0.05em]
                     \;a) stop \& verify\\
@@ -485,7 +485,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                     \;c) resume at low speed
                 };
                 \draw[-{Stealth[length=3.5pt]}, L4tint, line width=0.7pt]
-                (-0.40, -0.40) -- (0.05, -0.40);
+                (-0.40, -0.10) -- (0.05, -0.10);
 
                 \node[anchor=south, font=\sffamily\scriptsize\itshape, darknavy, text width=7.8cm, align=center]
                 at (0, -\panelh/2+0.45) {``Given the observed torque spike, recommend a multi-step recovery procedure.''};
