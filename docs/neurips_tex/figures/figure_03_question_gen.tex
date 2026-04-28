@@ -183,8 +183,6 @@
             ([xshift=0.5cm]wavecenter) -- ([xshift=-3pt, yshift=-6pt]rmid);
 
     \end{tikzpicture}
-    \caption{Question-and-answer generation pipeline, illustrated with Level~3 Template~5 (counterfactual tensor prediction) out of 20 templates total (see Table~\ref{tab:template_inventory} for the full inventory and Appendix~\ref{app:qa_examples} for worked examples).
-        \textbf{Left:} A parameterised \emph{template} defines the question skeleton with typed placeholder slots ({\bfseries\color{forgisorange}orange}); slot binding maps each placeholder to a concrete value sampled from the episode context, yielding an \emph{instantiated question}.
-        \textbf{Right:} Ground-truth answers are computed deterministically: template-specific rules extract the answer from paired episode data, producing the \emph{ground-truth answer} without manual annotation.}
+    \caption{Question-and-answer generation pipeline (Level~3 Template~5 shown; full inventory in Table~\ref{tab:template_inventory} and Appendix~\ref{app:qa_examples}). \textbf{Left:} Typed placeholder slots are bound to episode-specific values. \textbf{Right:} Ground-truth answers are computed deterministically from paired episode data via template-specific rules.}
     \label{fig:question_generation}
 \end{figure}
