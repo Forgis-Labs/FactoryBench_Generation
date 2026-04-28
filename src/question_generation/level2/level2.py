@@ -720,7 +720,7 @@ def fill_template(
         question = fill(tmpl_text, anomaly=anomaly_description, signal=_signal_display_name(signal), n=n_ms)
         vals = [float(r[signal]) for r in subseries if isinstance(r.get(signal), (int, float, np.floating))]
         std = float(np.std(vals)) if vals else 0.0
-        acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std * 0.5, 6)}
+        acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std * 0.75, 6)}
 
     elif tid == 5:
         important_features = template.get("important_features")
@@ -767,7 +767,7 @@ def fill_template(
         }
         joint_signal_display = _JOINT_SIGNAL_DISPLAY.get(joint_signal, joint_signal.replace("_", " "))
         question = fill(tmpl_text, anomaly=anomaly_description, joint_signal=joint_signal_display, n=n_ms)
-        acceptance_bounds = {"signal": joint_signal, "std": tensor_stds, "margin": [round(s * 0.5, 6) for s in tensor_stds]}
+        acceptance_bounds = {"signal": joint_signal, "std": tensor_stds, "margin": [round(s * 0.75, 6) for s in tensor_stds]}
 
     else:
         logger.warning(f"Unknown template id: {tid}")
