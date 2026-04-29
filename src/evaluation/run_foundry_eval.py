@@ -41,23 +41,78 @@ logger = logging.getLogger(__name__)
 
 
 _TENSOR_NUM_RE = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+_TENSOR_BRACKET_RE = re.compile(r"\[\s*[^\[\]]*?-?\d[^\[\]]*?\]")
 
 
-def _parse_tensor_answer(value: Any) -> list[float]:
+def _parse_tensor_answer(value: Any, expected_len: Optional[int] = None) -> list[float]:
     """Parse a tensor answer formatted as a JSON-like array, e.g. "[1, 2.5, 3]".
 
-    Accepts optional surrounding whitespace, square brackets, and trailing text
-    from less-cooperative models. Returns a list of floats.
+    Accepts surrounding whitespace, brackets, and trailing reasoning. When the
+    response is prose with the answer at the end (e.g. claude), prefer the
+    LAST ``[...]`` block; if no bracket-shaped block matches the expected
+    length, fall back to the LAST ``expected_len`` numbers in the text. This
+    avoids treating timestamps/setpoints from the reasoning as the answer.
     """
     if value is None:
         raise ValueError("empty tensor")
     s = str(value).strip()
     if not s:
         raise ValueError("empty tensor")
+
+    if expected_len is not None:
+        # Prefer the last bracket block whose number count matches.
+        for seg in reversed(_TENSOR_BRACKET_RE.findall(s)):
+            nums = _TENSOR_NUM_RE.findall(seg)
+            if len(nums) == expected_len:
+                return [float(x) for x in nums]
+        # Fall back to the LAST expected_len numbers in the text.
+        all_nums = _TENSOR_NUM_RE.findall(s)
+        if len(all_nums) >= expected_len:
+            return [float(x) for x in all_nums[-expected_len:]]
+
     matches = _TENSOR_NUM_RE.findall(s)
     if not matches:
         raise ValueError(f"no numeric tokens in {s!r}")
     return [float(x) for x in matches]
+
+
+_MCMS_TF_CACHE: Dict[int, "re.Pattern[str]"] = {}
+
+
+def _parse_mcms_answer(value: Any, expected_len: int) -> Optional[str]:
+    """Extract a length-N T/F answer from a model response. Tolerates models
+    that emit reasoning around the final TFTF-style token.
+    """
+    if value is None:
+        return None
+    s = str(value).strip().upper()
+    if len(s) == expected_len and set(s) <= {"T", "F"}:
+        return s
+    pat = _MCMS_TF_CACHE.get(expected_len)
+    if pat is None:
+        pat = re.compile(r"\b([TF]{" + str(expected_len) + r"})\b")
+        _MCMS_TF_CACHE[expected_len] = pat
+    matches = pat.findall(s)
+    return matches[-1] if matches else None
+
+
+def _parse_numerical_answer(value: Any) -> float:
+    """Parse a numerical answer; if the raw value isn't a float, fall back to
+    the last numerical token in the text (e.g. claude wraps its answer like
+    ``**1810**`` after multi-paragraph reasoning despite being asked for just
+    a number).
+    """
+    if value is None:
+        raise ValueError("empty numerical")
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        pass
+    s = str(value).strip()
+    matches = _TENSOR_NUM_RE.findall(s)
+    if not matches:
+        raise ValueError(f"no numeric tokens in {s!r}")
+    return float(matches[-1])
 
 
 def resolve_api_key() -> str:
@@ -364,11 +419,15 @@ def score_prediction(
         elif answer_format == "numerical":
             try:
                 gt_val = round(float(gt), 4)
-                pred_val = round(float(pred), 4)
+                pred_val = round(_parse_numerical_answer(pred), 4)
             except Exception:
                 score = 0.0
             else:
-                if acceptance_bounds:
+                if acceptance_bounds and "min" in acceptance_bounds and "max" in acceptance_bounds:
+                    score = float(
+                        float(acceptance_bounds["min"]) <= pred_val <= float(acceptance_bounds["max"])
+                    )
+                elif acceptance_bounds:
                     margin = acceptance_bounds.get("margin", 0)
                     score = float(abs(pred_val - gt_val) <= margin)
                 else:
@@ -377,7 +436,7 @@ def score_prediction(
         elif answer_format == "tensor":
             try:
                 gt_vals = _parse_tensor_answer(gt)
-                pred_vals = _parse_tensor_answer(pred)
+                pred_vals = _parse_tensor_answer(pred, expected_len=len(gt_vals))
             except Exception:
                 score = 0.0
             else:
@@ -394,16 +453,25 @@ def score_prediction(
 
         elif answer_format == "multiple_choice_multi_select":
             gt_str = str(gt).strip().upper()
-            pred_str = str(pred).strip().upper()
-            if len(gt_str) == len(pred_str) and set(gt_str) <= {"T", "F"} and set(pred_str) <= {"T", "F"}:
+            pred_str = _parse_mcms_answer(pred, len(gt_str))
+            # Previous scheme (commented): tiered 1.0 / 0.5 / 0.0 (all-correct,
+            # off-by-one, otherwise zero). Now: positional fraction so each
+            # correctly answered T/F position contributes 1/n.
+            # if pred_str is not None and set(gt_str) <= {"T", "F"}:
+            #     n = len(gt_str)
+            #     n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
+            #     if n_correct == n:
+            #         score = 1.0
+            #     elif n_correct >= n - 1:
+            #         score = 0.5
+            #     else:
+            #         score = 0.0
+            # else:
+            #     score = 0.0
+            if pred_str is not None and set(gt_str) <= {"T", "F"}:
                 n = len(gt_str)
                 n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
-                if n_correct == n:
-                    score = 1.0
-                elif n_correct >= n - 1:
-                    score = 0.5
-                else:
-                    score = 0.0
+                score = n_correct / n
             else:
                 score = 0.0
 
@@ -416,7 +484,16 @@ def score_prediction(
             gt_str = str(gt).strip().upper()
             match = re.search(r"\b([A-D]{4})\b", str(pred).strip().upper())
             pred_str = match.group(1) if match else ""
-            score = float(gt_str == pred_str)
+            # Previous scheme (commented): exact match only (1.0 or 0.0).
+            # Now: positional fraction so a near-miss like ABCD vs ABDC
+            # gets credit for the 2 correctly-placed items.
+            # score = float(gt_str == pred_str)
+            if pred_str and len(pred_str) == len(gt_str):
+                n = len(gt_str)
+                n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
+                score = n_correct / n
+            else:
+                score = 0.0
 
         else:
             score = float(str(gt) == str(pred))
