@@ -30,10 +30,15 @@
       "est_contact_force_0",
       "est_contact_force_1",
       "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5",
       "setpoint_tcp_0",
       "setpoint_tcp_1",
       "setpoint_tcp_2",
-      "setpoint_tcp_3"
+      "setpoint_tcp_3",
+      "setpoint_tcp_4",
+      "setpoint_tcp_5"
     ]
   },
   {
@@ -43,7 +48,9 @@
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "n_choices": 4,
-      "fixed_options": ["mc_0019"],
+      "fixed_options": [
+        "mc_0019"
+      ],
       "notes": "One correct consequence, one plausible-but-wrong distractor, one unrelated distractor, and one 'nothing extraordinary happens' option. Target ~30% of generated instances where the correct answer IS 'nothing extraordinary happens'."
     }
   },
@@ -54,7 +61,7 @@
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "fixed_options": [],
-      "notes": "Always include both fixed statements (one or both may be correct depending on the scenario). Add 2 random additional statements with a 50/50 correct/incorrect split. mc_003 tests sharp speed drop, mc_004 tests stable speeds — they are natural opposites."
+      "notes": "Always include both fixed statements (one or both may be correct depending on the scenario). Add 2 random additional statements with a 50/50 correct/incorrect split. mc_003 tests sharp speed drop, mc_004 tests stable speeds \u00e2\u20ac\u201d they are natural opposites."
     }
   },
   {
@@ -92,17 +99,21 @@
       "effort_target_torque_5",
       "est_contact_force_0",
       "est_contact_force_1",
-      "est_contact_force_2"
+      "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5"
     ]
   },
-
   {
     "id": 5,
     "type": "predictive",
     "template": "In the counterfactual scenario where {event}, what would be the expected values of {joint_signal} at T+{n}ms? Answer only with a list of 6 numbers (integer or decimal) formatted as a JSON array, ie. [10.2,9,2.1,1,7,0.21]. Do not return anything else.",
     "answer_format": {
       "type": "tensor",
-      "shape": [6],
+      "shape": [
+        6
+      ],
       "notes": "A 6-element vector of floats, one per joint axis (0-indexed). Format as a JSON array."
     },
     "important_features": [
@@ -130,7 +141,12 @@
       "setpoint_speed_3",
       "setpoint_speed_4",
       "setpoint_speed_5",
-      "effort_target_torque_0"
+      "effort_target_torque_0",
+      "effort_target_torque_1",
+      "effort_target_torque_2",
+      "effort_target_torque_3",
+      "effort_target_torque_4",
+      "effort_target_torque_5"
     ]
   }
 ]

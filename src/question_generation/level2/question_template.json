@@ -30,10 +30,15 @@
       "est_contact_force_0",
       "est_contact_force_1",
       "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5",
       "setpoint_tcp_0",
       "setpoint_tcp_1",
       "setpoint_tcp_2",
-      "setpoint_tcp_3"
+      "setpoint_tcp_3",
+      "setpoint_tcp_4",
+      "setpoint_tcp_5"
     ]
   },
   {
@@ -68,20 +73,25 @@
       "est_contact_force_0",
       "est_contact_force_1",
       "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5",
       "setpoint_pos_0",
       "setpoint_pos_1",
       "setpoint_pos_2",
-      "setpoint_pos_3"
+      "setpoint_pos_3",
+      "setpoint_pos_4",
+      "setpoint_pos_5"
     ]
   },
   {
     "id": 3,
     "type": "anomaly detection",
-    "template": "The sensor stream below is from a robot exhibiting {anomaly}. Select all statements that apply in the 'options' field. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
+    "template": "The sensor stream below is from a robot exhibiting {anomaly}. Select all statements that apply in the options provided. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "fixed_options": ["mc_003", "mc_004"],
-      "notes": "Always include both fixed statements (one or both may be correct depending on the scenario). Add 2 random additional statements with a 50/50 correct/incorrect split. mc_003 tests sharp speed drop, mc_004 tests stable speeds — they are natural opposites."
+      "notes": "Always include both fixed statements (one or both may be correct depending on the scenario). Add 2 random additional statements with a 50/50 correct/incorrect split. mc_003 tests sharp speed drop, mc_004 tests stable speeds \u00e2\u20ac\u201d they are natural opposites."
     },
     "important_features": [
       "feedback_speed_0",
@@ -105,10 +115,15 @@
       "est_contact_force_0",
       "est_contact_force_1",
       "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5",
       "setpoint_pos_0",
       "setpoint_pos_1",
       "setpoint_pos_2",
-      "setpoint_pos_3"
+      "setpoint_pos_3",
+      "setpoint_pos_4",
+      "setpoint_pos_5"
     ]
   },
   {
@@ -146,7 +161,10 @@
       "effort_target_torque_5",
       "est_contact_force_0",
       "est_contact_force_1",
-      "est_contact_force_2"
+      "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5"
     ]
   },
   {
@@ -226,7 +244,10 @@
       "effort_target_torque_5",
       "est_contact_force_0",
       "est_contact_force_1",
-      "est_contact_force_2"
+      "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5"
     ]
   },
   {
@@ -254,6 +275,9 @@
       "est_contact_force_0",
       "est_contact_force_1",
       "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5",
       "feedback_pos_0",
       "feedback_pos_1",
       "feedback_pos_2",
@@ -306,7 +330,9 @@
       "est_contact_force_0",
       "est_contact_force_1",
       "est_contact_force_2",
-      "est_contact_force_3"
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5"
     ]
   },
   {
@@ -334,6 +360,9 @@
       "est_contact_force_0",
       "est_contact_force_1",
       "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5",
       "feedback_pos_0",
       "feedback_pos_1",
       "feedback_pos_2",
@@ -390,7 +419,10 @@
       "setpoint_pos_5",
       "est_contact_force_0",
       "est_contact_force_1",
-      "est_contact_force_2"
+      "est_contact_force_2",
+      "est_contact_force_3",
+      "est_contact_force_4",
+      "est_contact_force_5"
     ]
   }
 ]
