@@ -92,3 +92,8 @@ figures/paperbanana_runs
 *.nav
 *.snm
 *.vrb
+
+# Generator caches and ad-hoc scratch outputs
+data/.*_cache.json
+phase_files.json
+t7_files.json
