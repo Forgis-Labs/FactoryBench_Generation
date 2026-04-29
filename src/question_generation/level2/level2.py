@@ -18,11 +18,17 @@ import logging
 import random
 import re
 import uuid
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
 
+from src.question_generation.utils.hf_streaming import (
+    HfStreamUploader,
+    add_streaming_args,
+    make_uploader_from_args,
+)
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
 from src.question_generation.utils.template import (
     build_context,
@@ -42,6 +48,7 @@ from src.question_generation.utils.time_series import (
 from src.question_generation.level2.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
 from src.question_generation.level1.level1 import (
     build_anomaly_single_select as l1_build_anomaly_single_select,
+    build_comparative_multi_select as l1_build_comparative_multi_select,
     build_severity_ranking as l1_build_severity_ranking,
     get_severity_rank as l1_get_severity_rank,
     load_anomaly_lookup as l1_load_anomaly_lookup,
@@ -105,8 +112,8 @@ def _anomaly_inline_name(fault_id: int, root_cause: Dict[str, Any], capitalize: 
 VALID_DATASETS = ["aursad", "vorausad", "factorywave"]
 
 STEPS_AHEAD_RANGE = (1, 10)
-CONTEXT_MIN = 16
-CONTEXT_MAX = 90
+CONTEXT_MIN = 32
+CONTEXT_MAX = 64
 
 
 
@@ -799,6 +806,8 @@ def generate_level2_questions(
     mc_option_lookup: Optional[Dict[str, str]] = None,
     datasets: Optional[List[str]] = None,
     relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
+    enumerate_mode: bool = False,
+    uploader: Optional[HfStreamUploader] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -830,17 +839,23 @@ def generate_level2_questions(
         raise FileNotFoundError(
             f"No usable datasets with episodes found under {datasets_dir / 'normalized_episodes'}"
         )
-    episode_cache: Dict[str, List[Dict[str, Any]]] = {}
+    # LRU-bounded so enumerate-mode runs (which touch every episode) don't OOM.
+    episode_cache: "OrderedDict[str, List[Dict[str, Any]]]" = OrderedDict()
+    _EPISODE_CACHE_MAX = 50
     meta_cache: Dict[str, Dict[str, Any]] = {}
 
     def load_episode(path: Path) -> List[Dict[str, Any]]:
         key = str(path)
-        if key not in episode_cache:
-            raw = load_json(path)
-            # Combined format {"baseline": [...], "counterfactual": [...]}
-            if isinstance(raw, dict):
-                raw = raw.get("counterfactual") or raw.get("baseline", [])
-            episode_cache[key] = raw
+        if key in episode_cache:
+            episode_cache.move_to_end(key)
+            return episode_cache[key]
+        raw = load_json(path)
+        # Combined format {"baseline": [...], "counterfactual": [...]}
+        if isinstance(raw, dict):
+            raw = raw.get("counterfactual") or raw.get("baseline", [])
+        episode_cache[key] = raw
+        while len(episode_cache) > _EPISODE_CACHE_MAX:
+            episode_cache.popitem(last=False)
         return episode_cache[key]
 
     def load_meta(ep_path: Path) -> Dict[str, Any]:
@@ -869,17 +884,36 @@ def generate_level2_questions(
 
     logger.info(f"L2 eligible episodes: {len(anomalous_episodes)}")
 
+    enum_iter = None
+    if enumerate_mode:
+        enum_combos = [
+            (t, ds, ep)
+            for t in templates
+            for (ds, ep) in anomalous_episodes
+        ]
+        enum_iter = iter(enum_combos)
+        max_total_attempts = len(enum_combos)
+        logger.info(f"[enumerate] {len(enum_combos)} (template, episode) combos to attempt; -n={n} caps output")
+    else:
+        max_total_attempts = n * 20
+
     generated = 0
     attempts = 0
-    max_total_attempts = n * 20
 
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
-        template = random.choice(templates)
-        steps_ahead = random.randint(*STEPS_AHEAD_RANGE)
+        if enum_iter is not None:
+            try:
+                template, ds, ep_path = next(enum_iter)
+            except StopIteration:
+                logger.info(f"[enumerate] all combos exhausted at {generated} questions")
+                break
+        else:
+            template = random.choice(templates)
+            ds, ep_path = random.choice(anomalous_episodes)
 
-        ds, ep_path = random.choice(anomalous_episodes)
+        steps_ahead = random.randint(*STEPS_AHEAD_RANGE)
         rows = load_episode(ep_path)
         if not isinstance(rows, list) or len(rows) < CONTEXT_MIN:
             continue
@@ -920,11 +954,17 @@ def generate_level2_questions(
             if not event_segment_rows:
                 continue
 
-        # L1-style templates: handle inline on anomalous episodes
+        # L1-style templates: handle inline on anomalous episodes.
+        # The enumerated combo's episode is already drawn from anomalous_episodes
+        # (built by load_meta(p).get("fault_id") earlier), so we use it directly
+        # instead of re-picking. In random mode we restrict the pool to
+        # anomalous_episodes too, so every L2 question is grounded in an actual
+        # anomaly — never a nominal episode.
         if template["id"] in _L1_STYLE_TEMPLATE_IDS:
-            # Pick a random anomalous episode (not necessarily the CF one)
-            _all_eps = [(d, p) for d, ps in episodes_by_dataset.items() for p in ps]
-            _ds, _ep_path = random.choice(_all_eps)
+            if enum_iter is not None:
+                _ds, _ep_path = ds, ep_path
+            else:
+                _ds, _ep_path = random.choice(anomalous_episodes)
             _raw = load_json(_ep_path)
             if isinstance(_raw, dict):
                 _raw = _raw.get("baseline", _raw.get("flat", []))
@@ -932,6 +972,9 @@ def generate_level2_questions(
                 continue
             _fl = pick_fault_label(_raw)
             if _fl == 0:
+                # Defensive: anomalous_episodes is filtered by metadata fault_id,
+                # but pick_fault_label reads the per-row fault label which can
+                # differ for episodes whose anomaly is non-injectable.
                 continue
             _rc = root_causes.get(_fl, {})
             _anomaly = _anomaly_inline_name(_fl, _rc)
@@ -991,9 +1034,16 @@ def generate_level2_questions(
                 if not _inner:
                     continue
                 _pn, _pi, _pl = random.choice(_inner)
-                _ans = _pi
+                # Answer is the t= value the model sees, not the row index. Acceptance
+                # is any t inside the t-window of the GT row's ±3 neighbors.
+                _gt_t = int(round(float(_sub[_pi]["timestamp_ms"])))
+                _low_idx = max(0, _pi - 3)
+                _high_idx = min(len(_sub) - 1, _pi + 3)
+                _t_low = int(round(float(_sub[_low_idx]["timestamp_ms"])))
+                _t_high = int(round(float(_sub[_high_idx]["timestamp_ms"])))
+                _ans = _gt_t
                 _tmpl_filled = fill(_tmpl, anomaly=_anomaly, phase=_phase_display_name(_pn, _ep_task), window_length=_pl + 5)
-                _bounds = {"tolerance": 3}
+                _bounds = {"min": _t_low, "max": _t_high}
 
             elif _tid == 7:
                 _opts, _ans = l1_build_anomaly_single_select(_fl, root_causes, anomaly_lookup)
@@ -1016,8 +1066,160 @@ def generate_level2_questions(
                         _ans = _labels[_i]
                 _tmpl_filled = fill(_tmpl, anomaly=_anomaly)
 
+            elif _tid == 8:
+                # Comparative multi-select on TWO anomalous episodes (mirror of
+                # L1 t3 but both streams have anomalies). Enumerated ep is one
+                # stream; the second is sampled at random from anomalous_episodes.
+                if len(anomalous_episodes) < 2:
+                    continue
+                _other_pool = [(d, p) for (d, p) in anomalous_episodes if p != _ep_path]
+                if not _other_pool:
+                    continue
+                _ds_b, _ep_path_b = random.choice(_other_pool)
+                _raw_b = load_json(_ep_path_b)
+                if isinstance(_raw_b, dict):
+                    _raw_b = _raw_b.get("baseline", _raw_b.get("flat", []))
+                if not isinstance(_raw_b, list) or len(_raw_b) < CONTEXT_MIN:
+                    continue
+                _fl_b = pick_fault_label(_raw_b)
+                _meta_b_path = _ep_path_b.with_name(_ep_path_b.stem + "_metadata.json")
+                _ep_task_b = ""
+                if _meta_b_path.exists():
+                    try:
+                        _ep_task_b = load_json(_meta_b_path).get("task", "")
+                    except Exception:
+                        pass
+                _spec_b = relevance_specs.get(_fl_b) if relevance_specs else None
+                _sampled_b = _sample_with_relevance(
+                    _raw_b, _fl_b, _spec_b, _ep_task_b, CONTEXT_MIN, CONTEXT_MAX
+                )
+                if _sampled_b is None:
+                    continue
+                _sub_b, _start_b, _sampler_b = _sampled_b
+                _sub_b = normalize_timestamps(_sub_b, _first_timestamp_ms(_sub_b))
+                if not _validate_relevance(_sub_b, _spec_b, _ep_task_b):
+                    continue
+                _machine_id_b = DATASET_MACHINE_ID.get(_ds_b, -1)
+                _result = l1_build_comparative_multi_select(
+                    fault_a=_fl, fault_b=_fl_b,
+                    machine_id_a=_machine_id, machine_id_b=_machine_id_b,
+                    task_id_a=_ep_task, task_id_b=_ep_task_b,
+                    rows_a=_sub, rows_b=_sub_b,
+                    mc_lookup=mc_option_lookup,
+                )
+                if _result is None:
+                    continue
+                _opts, _ans = _result
+                _tmpl_filled = _tmpl  # comparative prompt has no placeholders
+
+                # Build dual-stream context and override the default emit path.
+                _imp = template.get("important_features")
+                if _imp:
+                    _keep = set(_imp) | {"timestamp_ms"}
+                    _ctx_a = [{k: v for k, v in r.items() if k in _keep} for r in _sub]
+                    _ctx_b = [{k: v for k, v in r.items() if k in _keep} for r in _sub_b]
+                else:
+                    _ctx_a, _ctx_b = _sub, _sub_b
+                _context_dual = {
+                    "series_a": build_context(_ctx_a),
+                    "series_b": build_context(_ctx_b),
+                }
+                item = {
+                    "id": str(uuid.uuid4()),
+                    "level": 2,
+                    "template_id": _tid,
+                    "template_type": template["type"],
+                    "hides": template.get("hides", []),
+                    "question": _tmpl_filled,
+                    "options": _opts,
+                    "answer": _ans,
+                    "acceptance_bounds": None,
+                    "provenance": {
+                        "dataset_a": _ds, "episode_a": _ep_path.stem,
+                        "fault_label_a": _fl, "machine_id_a": _machine_id,
+                        "dataset_b": _ds_b, "episode_b": _ep_path_b.stem,
+                        "fault_label_b": _fl_b, "machine_id_b": _machine_id_b,
+                    },
+                    "context": _context_dual,
+                }
+                out_path = output_dir / f"level2_{generated:04d}.json"
+                with out_path.open("w", encoding="utf-8") as f:
+                    json.dump(item, f, indent=2)
+                logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template 8, {_ds}+{_ds_b})")
+                generated += 1
+                if uploader is not None:
+                    uploader.maybe_flush(generated)
+                continue
+
+            elif _tid == 9:
+                # Severity ranking on 4 anomalous segments (mirror of L1 t5).
+                if len(anomalous_episodes) < 4:
+                    continue
+                _other_pool = [(d, p) for (d, p) in anomalous_episodes if p != _ep_path]
+                if len(_other_pool) < 3:
+                    continue
+                _sampled_eps = [(_ds, _ep_path)] + random.sample(_other_pool, 3)
+                _segments: List[Tuple[List[Dict[str, Any]], int]] = []
+                _seg_tasks: List[str] = []
+                _bad = False
+                for (_sd, _sp) in _sampled_eps:
+                    _srows = load_json(_sp)
+                    if isinstance(_srows, dict):
+                        _srows = _srows.get("baseline", _srows.get("flat", []))
+                    if not isinstance(_srows, list) or len(_srows) < 5:
+                        _bad = True
+                        break
+                    _sfl = pick_fault_label(_srows)
+                    _segments.append((_srows, _sfl))
+                    _smeta = _sp.with_name(_sp.stem + "_metadata.json")
+                    _stask = ""
+                    if _smeta.exists():
+                        try:
+                            _stask = load_json(_smeta).get("task", "")
+                        except Exception:
+                            pass
+                    _seg_tasks.append(_stask)
+                if _bad or len(_segments) < 4:
+                    continue
+                _result = l1_build_severity_ranking(
+                    _segments, root_causes,
+                    important_features=template.get("important_features"),
+                    relevance_specs=relevance_specs,
+                    tasks=_seg_tasks,
+                )
+                if _result is None:
+                    continue
+                _opts, _ans = _result
+                _tmpl_filled = _tmpl  # ranking prompt has no placeholders
+                item = {
+                    "id": str(uuid.uuid4()),
+                    "level": 2,
+                    "template_id": _tid,
+                    "template_type": template["type"],
+                    "hides": template.get("hides", []),
+                    "question": _tmpl_filled,
+                    "options": _opts,
+                    "answer": _ans,
+                    "acceptance_bounds": None,
+                    "provenance": {
+                        "episodes": [
+                            {"dataset": d, "episode": p.stem}
+                            for (d, p) in _sampled_eps
+                        ],
+                    },
+                    "context": {},
+                }
+                out_path = output_dir / f"level2_{generated:04d}.json"
+                with out_path.open("w", encoding="utf-8") as f:
+                    json.dump(item, f, indent=2)
+                logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template 9, severity-rank)")
+                generated += 1
+                if uploader is not None:
+                    uploader.maybe_flush(generated)
+                continue
+
             else:
-                # Templates 8 (comparative) and 9 (ranking) — skip for now
+                # No remaining unimplemented L1-style template ids.
                 continue
 
             _imp = template.get("important_features")
@@ -1046,6 +1248,8 @@ def generate_level2_questions(
                 json.dump(item, f, indent=2)
             logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template {_tid}, {_ds})")
             generated += 1
+            if uploader is not None:
+                uploader.maybe_flush(generated)
             continue
 
         if ds == "simulations":
@@ -1114,6 +1318,11 @@ def generate_level2_questions(
             f"(template {template['id']}, {ds})"
         )
         generated += 1
+        if uploader is not None:
+            uploader.maybe_flush(generated)
+
+    if uploader is not None:
+        uploader.flush_remaining()
 
     if generated < n:
         logger.warning(f"Only generated {generated}/{n} questions after {attempts} attempts")
@@ -1144,14 +1353,23 @@ def main() -> None:
         default=repo_root / "output" / "questions" / "level2",
         help="Output directory (default: <repo>/output/questions/level2)",
     )
-    parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
+    parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
+    parser.add_argument(
+        "--enumerate",
+        dest="enumerate_mode",
+        action="store_true",
+        help="Walk every (template x episode) combination deterministically instead "
+             "of random sampling. -n becomes an upper cap. Combinations whose "
+             "episode does not satisfy the template's preconditions are skipped.",
+    )
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
         help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
     )
+    add_streaming_args(parser)
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -1177,6 +1395,9 @@ def main() -> None:
         if _relevance_enabled() else {}
     )
 
+    args.output.mkdir(parents=True, exist_ok=True)
+    uploader = make_uploader_from_args(args, level=2, output_dir=args.output)
+
     generate_level2_questions(
         datasets_dir=args.datasets_dir,
         output_dir=args.output,
@@ -1188,6 +1409,8 @@ def main() -> None:
         seed=args.seed,
         datasets=args.datasets,
         relevance_specs=relevance_specs,
+        enumerate_mode=args.enumerate_mode,
+        uploader=uploader,
     )
 
 

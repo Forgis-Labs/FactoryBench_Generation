@@ -19,7 +19,7 @@ import math
 import random
 import re
 import uuid
-from collections import Counter
+from collections import Counter, OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -27,6 +27,11 @@ import numpy as np
 import pandas as pd
 
 from src.data._decimation import decimate_dataframe
+from src.question_generation.utils.hf_streaming import (
+    HfStreamUploader,
+    add_streaming_args,
+    make_uploader_from_args,
+)
 from src.question_generation.utils.io import load_json, load_root_causes, load_templates
 from src.question_generation.utils.template import (
     build_context,
@@ -62,8 +67,8 @@ DATASET_MACHINE_ID: Dict[str, int] = {
 
 _NO_ANOMALY_DESC = "No anomaly is present; the machine is operating nominally."
 
-CONTEXT_MIN = 16
-CONTEXT_MAX = 90
+CONTEXT_MIN = 32
+CONTEXT_MAX = 64
 
 # Phase index → human-readable name per task
 PHASE_NAMES: Dict[str, Dict[str, str]] = {
@@ -348,38 +353,50 @@ def build_anomaly_single_select(
     anomaly_lookup: Dict[str, str],
 ) -> Tuple[Dict[str, str], str]:
     """
-    Build 4 single-select options + single letter answer for template 2.
-    One option is the correct anomaly (or 'no anomaly' for normal episodes),
-    the rest are distractors.
-    """
-    root_cause = root_causes.get(fault_label, root_causes.get(0, {}))
-    true_anomalies: List[str] = root_cause.get("possible_anomalies", [])
-    is_normal = fault_label == 0 or not true_anomalies
+    Build 4 single-select options + single letter answer for an
+    anomaly-identification question.
 
-    distractor_pool = [a for a in anomaly_lookup if a not in true_anomalies]
-    random.shuffle(distractor_pool)
+    The 4 options are drawn from the canonical root_causes.json pool, plus
+    a synthetic "No anomaly" entry added to that pool. The correct option
+    (the root cause matching this episode's fault_label, or "No anomaly"
+    for nominal episodes) is always one of the 4. ``anomaly_lookup`` is
+    accepted for backward-compatible signature but no longer used.
+    """
+    NO_ANOMALY_FID = 0
+    is_normal = fault_label == 0 or fault_label not in root_causes
+
+    def _desc_for(rc: Dict[str, Any]) -> str:
+        return rc.get("description") or rc.get("root_cause", "").replace("_", " ")
+
+    # Pool: every root cause from root_causes.json + a "no anomaly" entry.
+    pool: List[Tuple[int, str]] = []
+    for fid, rc in root_causes.items():
+        if not isinstance(fid, int) or fid <= 0:
+            continue
+        d = _desc_for(rc)
+        if d:
+            pool.append((fid, d))
+    pool.append((NO_ANOMALY_FID, _NO_ANOMALY_DESC))
 
     if is_normal:
+        correct_fid = NO_ANOMALY_FID
         correct_desc = _NO_ANOMALY_DESC
     else:
-        true_pool = list(true_anomalies)
-        random.shuffle(true_pool)
-        correct_desc = anomaly_lookup.get(true_pool[0], true_pool[0])
+        correct_fid = fault_label
+        correct_desc = _desc_for(root_causes[fault_label])
 
-    entries: List[Tuple[str, bool]] = [(correct_desc, True)]
-    if not is_normal:
-        entries.append((_NO_ANOMALY_DESC, False))
-    while len(entries) < 4 and distractor_pool:
-        name = distractor_pool.pop()
-        entries.append((anomaly_lookup.get(name, name), False))
-
-    random.shuffle(entries)
-    entries = entries[:4]
+    distractors = [(fid, d) for (fid, d) in pool if fid != correct_fid]
+    random.shuffle(distractors)
+    chosen: List[Tuple[str, bool]] = [(correct_desc, True)] + [
+        (d, False) for (_, d) in distractors[:3]
+    ]
+    random.shuffle(chosen)
+    chosen = chosen[:4]
 
     labels = ["A", "B", "C", "D"]
     options: Dict[str, str] = {}
     answer = "A"
-    for i, (desc, is_correct) in enumerate(entries):
+    for i, (desc, is_correct) in enumerate(chosen):
         options[labels[i]] = desc
         if is_correct:
             answer = labels[i]
@@ -578,11 +595,19 @@ def fill_template(
 
         phase_name, phase_start_idx, phase_length = random.choice(inner_phases)
         window_length = phase_length + 5
-        answer = phase_start_idx
+        # Answer is the t= value the model sees, not the row index. Acceptance
+        # is any t inside the t-window of the GT row's ±3 neighbors (asymmetric
+        # bounds at the subseries edges).
+        gt_t = int(round(float(rows[phase_start_idx]["timestamp_ms"])))
+        low_idx = max(0, phase_start_idx - 3)
+        high_idx = min(len(rows) - 1, phase_start_idx + 3)
+        t_low = int(round(float(rows[low_idx]["timestamp_ms"])))
+        t_high = int(round(float(rows[high_idx]["timestamp_ms"])))
+        answer = gt_t
         _TASK_DISPLAY = {"pick_and_place": "pick-and-place", "screwing": "screwing", "peg_in_hole": "peg-in-hole"}
         task_display = _TASK_DISPLAY.get(task_id, task_id.replace("_", " ") if task_id else "manipulation")
         question = fill(tmpl_text, task=task_display, phase=_phase_display_name(phase_name, task_id), window_length=window_length)
-        acceptance_bounds = {"tolerance": 3}
+        acceptance_bounds = {"min": t_low, "max": t_high}
 
     elif tid == 2:
         if not anomaly_lookup:
@@ -689,6 +714,8 @@ def generate_level1_questions(
     n: int = 100,
     seed: Optional[int] = None,
     datasets: Optional[List[str]] = None,
+    enumerate_mode: bool = False,
+    uploader: Optional[HfStreamUploader] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -712,16 +739,22 @@ def generate_level1_questions(
         (ds, ep) for ds, eps in episodes_by_dataset.items() for ep in eps
     ]
 
-    episode_cache: Dict[str, List[Dict[str, Any]]] = {}
+    # LRU-bounded so enumerate-mode runs (which touch every episode) don't OOM.
+    episode_cache: "OrderedDict[str, List[Dict[str, Any]]]" = OrderedDict()
+    _EPISODE_CACHE_MAX = 50
     _normal_cache: Dict[str, bool] = {}
 
     def load_episode(path: Path) -> List[Dict[str, Any]]:
         key = str(path)
-        if key not in episode_cache:
-            raw = load_json(path)
-            if isinstance(raw, dict):
-                raw = raw.get("baseline", raw.get("flat", []))
-            episode_cache[key] = raw
+        if key in episode_cache:
+            episode_cache.move_to_end(key)
+            return episode_cache[key]
+        raw = load_json(path)
+        if isinstance(raw, dict):
+            raw = raw.get("baseline", raw.get("flat", []))
+        episode_cache[key] = raw
+        while len(episode_cache) > _EPISODE_CACHE_MAX:
+            episode_cache.popitem(last=False)
         return episode_cache[key]
 
     def is_normal_episode(rows: List[Dict[str, Any]], path: Path) -> bool:
@@ -830,11 +863,37 @@ def generate_level1_questions(
 
     generated = 0
     attempts = 0
-    max_total_attempts = n * 20
+
+    # Build a deterministic (template, ds, ep_path) iterator if --enumerate.
+    # The outer loop walks every combo once; secondary episodes for paired
+    # templates (tid 3) and group templates (tid 5) are still sampled at
+    # random as before, since exhaustive enumeration there is combinatorial.
+    enum_iter = None
+    if enumerate_mode:
+        enum_combos = [
+            (t, ds, ep)
+            for t in usable_templates
+            for ds in available_datasets
+            for ep in episodes_by_dataset[ds]
+        ]
+        enum_iter = iter(enum_combos)
+        max_total_attempts = len(enum_combos)
+        logger.info(f"[enumerate] {len(enum_combos)} (template, episode) combos to attempt; -n={n} caps output")
+    else:
+        max_total_attempts = n * 20
 
     while generated < n and attempts < max_total_attempts:
         attempts += 1
-        template = random.choice(usable_templates)
+        if enum_iter is not None:
+            try:
+                template, _enum_ds, _enum_ep = next(enum_iter)
+            except StopIteration:
+                logger.info(f"[enumerate] all combos exhausted at {generated} questions")
+                break
+        else:
+            template = random.choice(usable_templates)
+            _enum_ds = None
+            _enum_ep = None
         tid = template["id"]
         important_features = template.get("important_features")
 
@@ -845,8 +904,12 @@ def generate_level1_questions(
         # see fill_template's tid==1 branch which returns None on no inner phase.)
         # ------------------------------------------------------------------
         if tid in (1, 2, 6):
-            ds = random.choice(available_datasets)
-            ep_path = random.choice(episodes_by_dataset[ds])
+            if _enum_ep is not None:
+                ds = _enum_ds
+                ep_path = _enum_ep
+            else:
+                ds = random.choice(available_datasets)
+                ep_path = random.choice(episodes_by_dataset[ds])
             rows = load_episode(ep_path)
             if not isinstance(rows, list) or len(rows) < CONTEXT_MIN:
                 continue
@@ -901,8 +964,12 @@ def generate_level1_questions(
         # Template 7: prediction — sample subseries + future steps for answer
         # ------------------------------------------------------------------
         elif tid == 7:
-            ds = random.choice(available_datasets)
-            ep_path = random.choice(episodes_by_dataset[ds])
+            if _enum_ep is not None:
+                ds = _enum_ds
+                ep_path = _enum_ep
+            else:
+                ds = random.choice(available_datasets)
+                ep_path = random.choice(episodes_by_dataset[ds])
             rows = load_episode(ep_path)
             if not isinstance(rows, list) or len(rows) < CONTEXT_MIN + 10:
                 continue
@@ -978,13 +1045,24 @@ def generate_level1_questions(
         # Template 3: two episodes (prefer different datasets)
         # ------------------------------------------------------------------
         elif tid == 3:
-            if len(available_datasets) >= 2:
-                ds_a, ds_b = random.sample(available_datasets, 2)
+            if _enum_ep is not None:
+                # Enumerated combo provides primary episode; secondary stays random
+                ds_a = _enum_ds
+                ep_a = _enum_ep
+                if len(available_datasets) >= 2:
+                    other_ds = [d for d in available_datasets if d != ds_a]
+                    ds_b = random.choice(other_ds)
+                else:
+                    ds_b = ds_a
+                ep_b_pool = [p for p in episodes_by_dataset[ds_b] if p != ep_a] or episodes_by_dataset[ds_b]
+                ep_b = random.choice(ep_b_pool)
             else:
-                ds_a = ds_b = available_datasets[0]
-
-            ep_a = random.choice(episodes_by_dataset[ds_a])
-            ep_b = random.choice(episodes_by_dataset[ds_b])
+                if len(available_datasets) >= 2:
+                    ds_a, ds_b = random.sample(available_datasets, 2)
+                else:
+                    ds_a = ds_b = available_datasets[0]
+                ep_a = random.choice(episodes_by_dataset[ds_a])
+                ep_b = random.choice(episodes_by_dataset[ds_b])
             rows_a = load_episode(ep_a)
             rows_b_raw = load_episode(ep_b)
 
@@ -1132,6 +1210,12 @@ def generate_level1_questions(
         logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template {tid}, {ds_label})")
         generated += 1
 
+        if uploader is not None:
+            uploader.maybe_flush(generated)
+
+    if uploader is not None:
+        uploader.flush_remaining()
+
     if generated < n:
         logger.warning(f"Only generated {generated}/{n} questions after {attempts} attempts.")
     else:
@@ -1161,7 +1245,7 @@ def main() -> None:
         default=repo_root / "output" / "questions" / "level1",
         help="Output directory (default: <repo>/output/questions/level1)",
     )
-    parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
+    parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
         "--datasets",
@@ -1169,6 +1253,15 @@ def main() -> None:
         default=None,
         help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
     )
+    parser.add_argument(
+        "--enumerate",
+        dest="enumerate_mode",
+        action="store_true",
+        help="Walk every (template x episode) combination deterministically instead "
+             "of random sampling. -n becomes an upper cap. Combinations whose "
+             "episode does not satisfy the template's preconditions are skipped.",
+    )
+    add_streaming_args(parser)
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -1204,6 +1297,9 @@ def main() -> None:
     else:
         logger.info("Relevance-aware sampling disabled (FB_RELEVANCE=0)")
 
+    args.output.mkdir(parents=True, exist_ok=True)
+    uploader = make_uploader_from_args(args, level=1, output_dir=args.output)
+
     generate_level1_questions(
         datasets_dir=args.datasets_dir,
         output_dir=args.output,
@@ -1216,6 +1312,8 @@ def main() -> None:
         n=args.n,
         seed=args.seed,
         datasets=args.datasets,
+        enumerate_mode=args.enumerate_mode,
+        uploader=uploader,
     )
 
 
