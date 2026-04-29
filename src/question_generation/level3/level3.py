@@ -18,11 +18,17 @@ import logging
 import random
 import re
 import uuid
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
 
+from src.question_generation.utils.hf_streaming import (
+    HfStreamUploader,
+    add_streaming_args,
+    make_uploader_from_args,
+)
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
 from src.question_generation.utils.template import (
     build_context,
@@ -45,8 +51,8 @@ logger = logging.getLogger(__name__)
 
 VALID_DATASETS = ["factorywave"]
 STEPS_AHEAD_RANGE = (1, 10)
-CONTEXT_MIN = 16
-CONTEXT_MAX = 90
+CONTEXT_MIN = 32
+CONTEXT_MAX = 64
 
 
 
@@ -920,6 +926,8 @@ def generate_level3_questions(
     seed: Optional[int] = None,
     mc_option_lookup: Optional[Dict[str, str]] = None,
     datasets: Optional[List[str]] = None,
+    enumerate_mode: bool = False,
+    uploader: Optional[HfStreamUploader] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -951,29 +959,54 @@ def generate_level3_questions(
             f"No usable cf dataset pairs found under {datasets_dir / 'normalized_episodes'}"
         )
 
-    episode_cache: Dict[str, List[Dict[str, Any]]] = {}
+    # LRU-bounded so enumerate-mode runs (which touch every episode) don't OOM.
+    episode_cache: "OrderedDict[str, List[Dict[str, Any]]]" = OrderedDict()
+    _EPISODE_CACHE_MAX = 50
 
     def load_episode(path: Path, split: str = "flat") -> List[Dict[str, Any]]:
         cache_key = f"{path}::{split}"
-        if cache_key not in episode_cache:
-            raw = load_json(path)
-            if isinstance(raw, dict):
-                episode_cache[cache_key] = raw.get(split, [])
-            else:
-                episode_cache[cache_key] = raw
+        if cache_key in episode_cache:
+            episode_cache.move_to_end(cache_key)
+            return episode_cache[cache_key]
+        raw = load_json(path)
+        if isinstance(raw, dict):
+            episode_cache[cache_key] = raw.get(split, [])
+        else:
+            episode_cache[cache_key] = raw
+        while len(episode_cache) > _EPISODE_CACHE_MAX:
+            episode_cache.popitem(last=False)
         return episode_cache[cache_key]
+
+    enum_iter = None
+    if enumerate_mode:
+        enum_combos = [
+            (t, ds, pair)
+            for t in templates
+            for ds in available_cf_datasets
+            for pair in pairs_by_dataset[ds]
+        ]
+        enum_iter = iter(enum_combos)
+        max_total_attempts = len(enum_combos)
+        logger.info(f"[enumerate] {len(enum_combos)} (template, cf_pair) combos to attempt; -n={n} caps output")
+    else:
+        max_total_attempts = n * 20
 
     generated = 0
     attempts = 0
-    max_total_attempts = n * 20
 
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
-        template = random.choice(templates)
-
-        sampled_dataset = random.choice(available_cf_datasets)
-        pair = random.choice(pairs_by_dataset[sampled_dataset])
+        if enum_iter is not None:
+            try:
+                template, sampled_dataset, pair = next(enum_iter)
+            except StopIteration:
+                logger.info(f"[enumerate] all combos exhausted at {generated} questions")
+                break
+        else:
+            template = random.choice(templates)
+            sampled_dataset = random.choice(available_cf_datasets)
+            pair = random.choice(pairs_by_dataset[sampled_dataset])
         non_alt_path = cast(Path, pair["non_alt_path"])
         alt_path = cast(Path, pair["alt_path"])
 
@@ -1136,6 +1169,11 @@ def generate_level3_questions(
             f"(template {template['id']}, {pair['cf_dataset']}/{pair.get('non_alt_subfolder', non_alt_path.stem)})"
         )
         generated += 1
+        if uploader is not None:
+            uploader.maybe_flush(generated)
+
+    if uploader is not None:
+        uploader.flush_remaining()
 
     if generated < n:
         logger.warning(f"Only generated {generated}/{n} questions after {attempts} attempts")
@@ -1166,7 +1204,7 @@ def main() -> None:
         default=repo_root / "output" / "questions" / "level3",
         help="Output directory (default: <repo>/output/questions/level3)",
     )
-    parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
+    parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
         "--datasets",
@@ -1174,6 +1212,15 @@ def main() -> None:
         default=None,
         help=f"Datasets to sample from (default: all). Choices: {CF_DATASET_FOLDERS}",
     )
+    parser.add_argument(
+        "--enumerate",
+        dest="enumerate_mode",
+        action="store_true",
+        help="Walk every (template x cf_pair) combination deterministically instead "
+             "of random sampling. -n becomes an upper cap. Combinations whose "
+             "pair does not satisfy the template's preconditions are skipped.",
+    )
+    add_streaming_args(parser)
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -1190,6 +1237,9 @@ def main() -> None:
         level=3,
     )
 
+    args.output.mkdir(parents=True, exist_ok=True)
+    uploader = make_uploader_from_args(args, level=3, output_dir=args.output)
+
     generate_level3_questions(
         datasets_dir=args.datasets_dir,
         output_dir=args.output,
@@ -1197,6 +1247,8 @@ def main() -> None:
         root_causes=root_causes,
         events=events,
         mc_option_lookup=mc_option_lookup,
+        enumerate_mode=args.enumerate_mode,
+        uploader=uploader,
         n=args.n,
         seed=args.seed,
         datasets=args.datasets,

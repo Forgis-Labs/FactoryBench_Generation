@@ -24,11 +24,17 @@ import json
 import logging
 import random
 import uuid
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from src.question_generation.utils.hf_streaming import (
+    HfStreamUploader,
+    add_streaming_args,
+    make_uploader_from_args,
+)
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates, load_ur3_mapping
 from src.question_generation.utils.template import (
     build_context,
@@ -50,8 +56,8 @@ RANKING_LABELS = ["A", "B", "C", "D"]
 RANKING_TEMPLATE_IDS = {3, 4}
 RANKING_METRIC = {3: "duration", 4: "energy"}
 
-CONTEXT_MIN = 16
-CONTEXT_MAX = 90
+CONTEXT_MIN = 32
+CONTEXT_MAX = 64
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +281,8 @@ def generate_level4_questions(
     datasets: Optional[List[str]] = None,
     ur3_mapping: Optional[Dict[str, Dict[str, Any]]] = None,
     relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
+    enumerate_mode: bool = False,
+    uploader: Optional[HfStreamUploader] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -297,21 +305,27 @@ def generate_level4_questions(
     if not available_datasets:
         raise FileNotFoundError("No usable datasets found.")
 
-    episode_cache: Dict[str, List[Dict[str, Any]]] = {}
-    raw_cache: Dict[str, Any] = {}
+    # LRU-bounded so enumerate-mode runs (which touch every episode) don't OOM.
+    episode_cache: "OrderedDict[str, List[Dict[str, Any]]]" = OrderedDict()
+    _EPISODE_CACHE_MAX = 50
+    raw_cache: Dict[str, Any] = {}  # only used by ranking templates (currently disabled)
     meta_cache: Dict[str, Tuple[Optional[int], Dict[str, Any]]] = {}
 
     _OPTIMIZATION_FAULTS = {22, 23, 28}
 
     def load_episode(path: Path) -> List[Dict[str, Any]]:
         key = str(path)
-        if key not in episode_cache:
-            raw = load_json(path)
-            if isinstance(raw, dict):
-                rows = raw.get("baseline", raw.get("flat", []))
-            else:
-                rows = raw
-            episode_cache[key] = rows if isinstance(rows, list) else []
+        if key in episode_cache:
+            episode_cache.move_to_end(key)
+            return episode_cache[key]
+        raw = load_json(path)
+        if isinstance(raw, dict):
+            rows = raw.get("baseline", raw.get("flat", []))
+        else:
+            rows = raw
+        episode_cache[key] = rows if isinstance(rows, list) else []
+        while len(episode_cache) > _EPISODE_CACHE_MAX:
+            episode_cache.popitem(last=False)
         return episode_cache[key]
 
     def load_meta(ep_path: Path) -> Tuple[Optional[int], Dict[str, Any]]:
@@ -342,23 +356,55 @@ def generate_level4_questions(
         (ds, p) for ds, p in all_episodes if load_meta(p)[0] not in _OPTIMIZATION_FAULTS
     ]
 
+    # Hoisted out of the main loop so we can build the deterministic combo
+    # list for --enumerate; previously these were recomputed per iteration.
+    _DISABLED_TEMPLATE_IDS = {3, 4}
+    usable = [t for t in templates if t["id"] not in _DISABLED_TEMPLATE_IDS]
+    if not optimization_episodes:
+        usable = [t for t in usable if t["id"] != 2]
+    if not troubleshooting_episodes:
+        usable = [t for t in usable if t["id"] != 1]
+    if not usable:
+        return
+
+    enum_iter = None
+    if enumerate_mode:
+        enum_combos = []
+        for t in usable:
+            tid = t["id"]
+            if tid == 2:
+                pool = optimization_episodes
+            elif tid == 1:
+                pool = troubleshooting_episodes
+            elif tid in RANKING_TEMPLATE_IDS:
+                # Primary episode walks; partners stay random later.
+                pool = all_episodes
+            else:
+                pool = []
+            for ds, ep in pool:
+                enum_combos.append((t, ds, ep))
+        enum_iter = iter(enum_combos)
+        max_total_attempts = len(enum_combos)
+        logger.info(f"[enumerate] {len(enum_combos)} (template, episode) combos to attempt; -n={n} caps output")
+    else:
+        max_total_attempts = n * 20
+
     generated = 0
     attempts = 0
-    max_total_attempts = n * 20
 
     while generated < n and attempts < max_total_attempts:
         attempts += 1
 
-        # Exclude trajectory optimization templates for now (IDs 3, 4)
-        _DISABLED_TEMPLATE_IDS = {3, 4}
-        usable = [t for t in templates if t["id"] not in _DISABLED_TEMPLATE_IDS]
-        if not optimization_episodes:
-            usable = [t for t in usable if t["id"] != 2]
-        if not troubleshooting_episodes:
-            usable = [t for t in usable if t["id"] != 1]
-        if not usable:
-            break
-        template = random.choice(usable)
+        if enum_iter is not None:
+            try:
+                template, sampled_dataset, ep_path = next(enum_iter)
+            except StopIteration:
+                logger.info(f"[enumerate] all combos exhausted at {generated} questions")
+                break
+        else:
+            template = random.choice(usable)
+            sampled_dataset = None
+            ep_path = None
 
         # --- Templates 3 & 4: multi-episode ranking ---
         if template["id"] in RANKING_TEMPLATE_IDS:
@@ -370,10 +416,11 @@ def generate_level4_questions(
 
         # --- Templates 1 & 2: single-episode subseries ---
         else:
-            if template["id"] == 2:
-                sampled_dataset, ep_path = random.choice(optimization_episodes)
-            else:
-                sampled_dataset, ep_path = random.choice(troubleshooting_episodes)
+            if ep_path is None:
+                if template["id"] == 2:
+                    sampled_dataset, ep_path = random.choice(optimization_episodes)
+                else:
+                    sampled_dataset, ep_path = random.choice(troubleshooting_episodes)
             rows = load_episode(ep_path)
 
             if not rows:
@@ -492,6 +539,11 @@ def generate_level4_questions(
             f"(template {template['id']} '{template['type']}', {item.get('provenance', {}).get('dataset', '?')})"
         )
         generated += 1
+        if uploader is not None:
+            uploader.maybe_flush(generated)
+
+    if uploader is not None:
+        uploader.flush_remaining()
 
     if generated < n:
         logger.warning(f"Only generated {generated}/{n} questions after {attempts} attempts.")
@@ -522,8 +574,19 @@ def main() -> None:
         default=repo_root / "output" / "questions" / "level4",
         help="Output directory (default: <repo>/output/questions/level4)",
     )
-    parser.add_argument("-n", type=int, default=100, help="Number of questions to generate")
+    parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
+    parser.add_argument(
+        "--enumerate",
+        dest="enumerate_mode",
+        action="store_true",
+        help="Walk every (template x episode) combination deterministically instead "
+             "of random sampling. -n becomes an upper cap. Combinations whose "
+             "episode does not satisfy the template's preconditions are skipped. "
+             "For ranking templates (t3/t4) the primary episode walks; the other "
+             "3 episodes per question are still sampled at random.",
+    )
+    add_streaming_args(parser)
     parser.add_argument(
         "--datasets",
         nargs="+",
@@ -549,6 +612,9 @@ def main() -> None:
         if relevance_enabled() else {}
     )
 
+    args.output.mkdir(parents=True, exist_ok=True)
+    uploader = make_uploader_from_args(args, level=4, output_dir=args.output)
+
     generate_level4_questions(
         datasets_dir=args.datasets_dir,
         output_dir=args.output,
@@ -560,6 +626,8 @@ def main() -> None:
         relevance_specs=relevance_specs,
         datasets=args.datasets,
         ur3_mapping=ur3_mapping,
+        enumerate_mode=args.enumerate_mode,
+        uploader=uploader,
     )
 
 
