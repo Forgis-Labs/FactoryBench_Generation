@@ -88,6 +88,13 @@ CHAT_ENDPOINT="https://student-research-lab-resource.services.ai.azure.com/opena
 REASONING_ENDPOINT="https://student-research-lab-resource.services.ai.azure.com/anthropic/v1"
 PROJECT_ENDPOINT="https://student-research-lab-resource.services.ai.azure.com/api/projects/student-research-lab"
 
+# Optional: separate Azure deployment for GPT-5.1 batch jobs.
+# Azure /v1/batches rejects deployments on the `GlobalStandard` SKU (HTTP 400
+# `invalid_deployment_type`). Create a second deployment of gpt-5.1 with SKU
+# `globalbatch` (or `datazonebatch`) in Foundry, then set its name here. When
+# unset, batch falls back to concurrent sync against the default deployment.
+GPT_5_1_BATCH_DEPLOYMENT="gpt-5.1-batch"
+
 # HuggingFace (datasets + KG)
 HF_API_TOKEN="<your_hf_token>"
 

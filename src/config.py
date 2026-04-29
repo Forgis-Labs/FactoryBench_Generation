@@ -38,6 +38,12 @@ MODELS: Dict[str, Dict[str, Any]] = {
         "endpoint_default": "https://student-research-lab-resource.services.ai.azure.com/openai/v1",
         "api_style": "openai",
         "supports_batch": True,
+        # Azure /v1/batches requires a deployment whose SKU is `globalbatch`
+        # or `datazonebatch`. The default `gpt-5.1-1` deployment is
+        # `GlobalStandard` (sync only) and rejects batch with HTTP 400. Set
+        # GPT_5_1_BATCH_DEPLOYMENT to a separate batch-capable deployment
+        # name; absent the env var, batch falls back to concurrent sync.
+        "batch_deployment_env": "GPT_5_1_BATCH_DEPLOYMENT",
     },
 
     # --- AWS Bedrock (managed; native batch via S3) -----------------------
@@ -100,6 +106,24 @@ def get_provider(model_name: str) -> "str | None":
 
 def get_model_config(model_name: str) -> "Dict[str, Any] | None":
     return MODELS.get(model_name)
+
+
+def get_batch_deployment(model_name: str) -> str:
+    """Deployment name to send to Azure /v1/batches for ``model_name``.
+
+    Returns the value of ``batch_deployment_env`` (when set on a foundry model
+    AND the env var is populated), otherwise the model name itself. Lets a
+    sync-only ``GlobalStandard`` deployment coexist with a separate
+    ``globalbatch`` deployment used only by batch jobs.
+    """
+    import os
+    cfg = MODELS.get(model_name) or {}
+    env_key = cfg.get("batch_deployment_env")
+    if env_key:
+        override = os.getenv(env_key)
+        if override:
+            return override
+    return model_name
 
 
 DEFAULT_JUDGE_MODEL: str = "gpt-5.1-1"
