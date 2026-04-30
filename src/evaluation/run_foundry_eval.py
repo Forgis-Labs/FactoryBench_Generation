@@ -1261,6 +1261,10 @@ def _process_entry(
         _finalize_failure(entry, exc, output_dir, state, lock, total)
 
 
+class StrictBatchUnavailable(RuntimeError):
+    """Raised in --strict-batch mode when the batch path cannot be used."""
+
+
 def run_foundry_eval(
     entries: list[Tuple[Path, str, int, str]],
     model: str,
@@ -1274,6 +1278,7 @@ def run_foundry_eval(
     concurrency: int = 1,
     use_batch: bool = True,
     poll_interval: int = 30,
+    strict_batch: bool = False,
 ) -> Tuple[int, int, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
     state: Dict[str, Any] = {
@@ -1286,6 +1291,16 @@ def run_foundry_eval(
     cfg = FOUNDRY_MODELS.get(model, {})
     supports_batch = bool(cfg.get("supports_batch", False))
     api_style = cfg.get("api_style", "openai")
+
+    if strict_batch:
+        if not use_batch:
+            raise StrictBatchUnavailable(
+                "--strict-batch is set but --no-batch was passed; choose one"
+            )
+        if not supports_batch:
+            raise StrictBatchUnavailable(
+                f"--strict-batch: model {model!r} does not declare supports_batch=True in src/config.py"
+            )
 
     batch_fn = None
     skip_batch_reason: Optional[str] = None
@@ -1302,8 +1317,15 @@ def run_foundry_eval(
         else:
             # openai, deepseek, mistral — all OpenAI-compatible via /v1/batches.
             # Azure Foundry's project endpoint may not actually accept batch for
-            # non-OpenAI models; if submission errors, the fallback kicks in.
+            # non-OpenAI models; if submission errors, the fallback kicks in
+            # (unless strict_batch=True; then the exception propagates).
             batch_fn = run_openai_batch
+
+    if strict_batch and batch_fn is None:
+        raise StrictBatchUnavailable(
+            f"--strict-batch: cannot route {model!r} to a batch endpoint"
+            + (f" — {skip_batch_reason}" if skip_batch_reason else "")
+        )
 
     if use_batch and supports_batch and batch_fn is not None:
         pending: list[Tuple[Path, str, int, str]] = []
@@ -1337,6 +1359,11 @@ def run_foundry_eval(
             )
             return state["completed"], state["failed"], state["skipped"]
         except Exception as exc:
+            if strict_batch:
+                raise StrictBatchUnavailable(
+                    f"--strict-batch: {model} batch submission failed ({exc}); "
+                    f"refusing to fall back to sync"
+                ) from exc
             logger.warning(
                 f"[batch] {model} batch submission failed ({exc}); "
                 f"falling back to concurrent sync."
@@ -1393,6 +1420,12 @@ def main() -> None:
                         help="Use provider batch APIs for models that support them (default)")
     parser.add_argument("--no-batch", dest="use_batch", action="store_false",
                         help="Disable batch APIs; force concurrent sync for all models")
+    parser.add_argument("--strict-batch", action="store_true", default=False,
+                        help="Require batch path: error out if the model can't use batch "
+                             "or if batch submission fails. Never falls back to sync. "
+                             "Use when you specifically want batch pricing/quotas (e.g. "
+                             "GPT-5.1 globalbatch deployments) and would rather fail "
+                             "loudly than silently spend on sync calls.")
     parser.add_argument("--poll-interval", type=int, default=30,
                         help="Batch polling interval in seconds (default: 30)")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -1438,6 +1471,7 @@ def main() -> None:
         concurrency=args.concurrency,
         use_batch=args.use_batch,
         poll_interval=args.poll_interval,
+        strict_batch=args.strict_batch,
     )
     logger.info(
         f"Done. Completed={completed}, Failed={failed}, Skipped={skipped}, OutputDir={args.output_dir}"
