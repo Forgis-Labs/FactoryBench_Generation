@@ -186,6 +186,8 @@ def stage_eval(
         cmd.extend(["--concurrency", str(args.concurrency)])
     if args.no_batch:
         cmd.append("--no-batch")
+    if args.strict_batch:
+        cmd.append("--strict-batch")
     if args.poll_interval is not None:
         cmd.extend(["--poll-interval", str(args.poll_interval)])
     summary_path = r_dir / "_summary.json"
@@ -343,6 +345,11 @@ def main() -> None:
                         help="Number of models to run in parallel per level (default: 4)")
     parser.add_argument("--no-batch", action="store_true",
                         help="Disable provider batch APIs; force concurrent sync for all models")
+    parser.add_argument("--strict-batch", action="store_true",
+                        help="If batch submission fails, error out instead of falling back to "
+                             "concurrent sync. Protects against silent cost doubling when batch "
+                             "is misconfigured (e.g. missing GPT_5_1_BATCH_DEPLOYMENT). Forwarded "
+                             "to both run_foundry_eval and run_aws_eval.")
     parser.add_argument("--poll-interval", type=int, default=30,
                         help="Batch polling interval in seconds (default: 30)")
 
