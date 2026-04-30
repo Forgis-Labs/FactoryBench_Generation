@@ -96,20 +96,22 @@ def rescore_reply(
     # Free-form scoring requires the judge LLM. By default we NEVER call it —
     # only recompute if there's already a saved judge score, or the user
     # explicitly passed --rerun-judge. Otherwise leave score as None.
+    new_provenance: Optional[str] = None
     if new_format == "free_form":
         saved_judge = record.get("llm_judge_score")
         if saved_judge is not None:
             new_score = float(saved_judge)
             new_judge = (float(saved_judge), record.get("llm_judge_reason"))
+            new_provenance = "judge"
         elif rerun_judge:
-            new_score, new_judge = score_prediction(
+            new_score, new_judge, new_provenance = score_prediction(
                 new_format, pred, gt, acceptance_bounds, question_text, judge_model,
             )
         else:
             new_score = None
             new_judge = None
     else:
-        new_score, new_judge = score_prediction(
+        new_score, new_judge, new_provenance = score_prediction(
             new_format, pred, gt, acceptance_bounds, question_text, judge_model,
         )
 
@@ -117,6 +119,8 @@ def rescore_reply(
     record["question_type"] = str(q.get("template_type") or record.get("question_type") or "unknown")
     record["ground_truth"] = gt
     record["score"] = new_score
+    if new_provenance is not None:
+        record["parse_provenance"] = new_provenance
     if new_judge is not None:
         record["llm_judge_score"] = new_judge[0]
         record["llm_judge_reason"] = new_judge[1]

@@ -69,8 +69,9 @@ def retag_one(
     new_score = reply.get("score")
     new_judge_score = reply.get("llm_judge_score")
     new_judge_reason = reply.get("llm_judge_reason")
+    new_provenance = reply.get("parse_provenance")
     if old_af != new_af:
-        score, judge_result = score_prediction(
+        score, judge_result, provenance = score_prediction(
             answer_format=new_af,
             prediction=reply.get("answer"),
             ground_truth=reply.get("ground_truth", qa_payload.get("answer")),
@@ -79,6 +80,7 @@ def retag_one(
             judge_model="",
         )
         new_score = score
+        new_provenance = provenance
         if judge_result is None:
             new_judge_score = None
             new_judge_reason = None
@@ -99,6 +101,7 @@ def retag_one(
         reply["answer_format"] = new_af
         reply["question_type"] = new_qt
         reply["score"] = new_score
+        reply["parse_provenance"] = new_provenance
         reply["llm_judge_score"] = new_judge_score
         reply["llm_judge_reason"] = new_judge_reason
         reply_path.write_text(json.dumps(reply, indent=2), encoding="utf-8")

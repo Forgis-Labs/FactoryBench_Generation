@@ -346,7 +346,7 @@ def _write_reply(
     acceptance_bounds = qa_payload.get("acceptance_bounds")
     gt = qa_payload.get("answer")
 
-    score, judge_result = score_prediction(
+    score, judge_result, parse_provenance = score_prediction(
         answer_format=answer_format,
         prediction=answer,
         ground_truth=gt,
@@ -367,6 +367,7 @@ def _write_reply(
         "answer": answer,
         "ground_truth": gt,
         "score": score,
+        "parse_provenance": parse_provenance,
         "llm_judge_score": judge_result[0] if judge_result else None,
         "llm_judge_reason": judge_result[1] if judge_result else None,
         "answer_format": answer_format,
