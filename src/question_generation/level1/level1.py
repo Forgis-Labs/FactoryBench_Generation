@@ -406,6 +406,71 @@ def build_anomaly_single_select(
 _COMPARATIVE_OPTION_ORDER = ["mc_020", "mc_022", "mc_023", "mc_026"]
 
 
+def _uniform_window(
+    rows: List[Dict[str, Any]],
+    min_len: int,
+    max_len: int,
+) -> Optional[Tuple[List[Dict[str, Any]], int, str]]:
+    """Pick a random subseries of length in ``[min_len, max_len]``.
+
+    Returns (subseries, start_idx, sampler_tag) or None if the episode is
+    too short. Used in L1 instead of ``sample_with_relevance`` because L1
+    operates on nominal episodes only — anomaly relevance specs are not
+    applicable, so we sample uniformly.
+    """
+    n = len(rows)
+    if n < min_len:
+        return None
+    length = random.randint(min_len, min(max_len, n))
+    start = random.randint(0, n - length)
+    return rows[start:start + length], start, "uniform"
+
+
+def pick_phase_isolation_candidates(
+    rows: List[Dict[str, Any]],
+    n: int = 3,
+    min_phase_length: int = 3,
+) -> List[Tuple[str, int, int]]:
+    """Return up to ``n`` distinct phase candidates for a phase-isolation
+    question.
+
+    Sampling rule (per the design):
+
+    * If the episode has ≥3 distinct phases, exclude the **first and last**
+      phases of the task and sample inner ones.
+    * If the episode has <3 phases (so excluding edges would leave nothing
+      to sample), fall back to using ALL phases.
+    * Each candidate must be at least ``min_phase_length`` timesteps so the
+      window-start question is meaningfully discriminative.
+
+    Returns up to ``n`` distinct phases (random choice without replacement);
+    the caller drives one question per returned phase, multiplying yield
+    per (template, episode) combo.
+    """
+    all_phases: List[Tuple[str, int, int]] = []
+    current_phase = None
+    phase_start = 0
+    for i, row in enumerate(rows):
+        p = row.get("task_phase")
+        if p != current_phase:
+            if current_phase is not None and str(current_phase) not in ("None", "none", ""):
+                all_phases.append((str(current_phase), phase_start, i - phase_start))
+            current_phase = p
+            phase_start = i
+    if current_phase is not None and str(current_phase) not in ("None", "none", ""):
+        all_phases.append((str(current_phase), phase_start, len(rows) - phase_start))
+
+    if len(all_phases) >= 3:
+        pool = all_phases[1:-1]
+    else:
+        pool = all_phases
+    pool = [t for t in pool if t[2] >= min_phase_length]
+    if not pool:
+        return []
+    k = min(n, len(pool))
+    return random.sample(pool, k)
+
+
 def _modal_phase(rows: List[Dict[str, Any]]) -> Optional[str]:
     phases = [
         str(r.get("task_phase"))
@@ -547,6 +612,7 @@ def fill_template(
     severity_segments: Optional[List[Tuple[List[Dict[str, Any]], int]]] = None,
     severity_relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     severity_tasks: Optional[List[str]] = None,
+    phase_override: Optional[Tuple[str, int, int]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 1 question template.
@@ -557,6 +623,10 @@ def fill_template(
       3 - comparative change detection (multi-select, TFFT)
       5 - severity ranking
       6 - robot identification (single-select)
+
+    For template 1, callers may pass ``phase_override`` (a ``(phase_name,
+    start_idx, length)`` triple) to drive multiple questions per (template,
+    episode) combo, each anchored on a different inner phase.
     """
     tid = template["id"]
     tmpl_text: str = template["template"]
@@ -568,32 +638,13 @@ def fill_template(
     acceptance_bounds = None
 
     if tid == 1:
-        # Find contiguous phase segments in the subseries
-        all_phases: List[Tuple[str, int, int]] = []  # (phase_name, start_idx, length)
-        current_phase = None
-        phase_start = 0
-        for i, row in enumerate(rows):
-            p = row.get("task_phase")
-            if p != current_phase:
-                if current_phase is not None and str(current_phase) not in ("None", "none", ""):
-                    all_phases.append((str(current_phase), phase_start, i - phase_start))
-                current_phase = p
-                phase_start = i
-        if current_phase is not None and str(current_phase) not in ("None", "none", ""):
-            all_phases.append((str(current_phase), phase_start, len(rows) - phase_start))
-
-        # Exclude first and last phases, filter to at least 3 timesteps
-        if len(all_phases) < 3:
-            return None
-        inner_phases = [
-            (name, start, length)
-            for name, start, length in all_phases[1:-1]
-            if length >= 3
-        ]
-        if not inner_phases:
-            return None
-
-        phase_name, phase_start_idx, phase_length = random.choice(inner_phases)
+        if phase_override is not None:
+            phase_name, phase_start_idx, phase_length = phase_override
+        else:
+            candidates = pick_phase_isolation_candidates(rows, n=1)
+            if not candidates:
+                return None
+            phase_name, phase_start_idx, phase_length = candidates[0]
         window_length = phase_length + 5
         # Answer is the t= value the model sees, not the row index. Acceptance
         # is any t inside the t-window of the GT row's ±3 neighbors (asymmetric
@@ -916,22 +967,11 @@ def generate_level1_questions(
 
             ep_fault_id = pick_fault_label(rows)
             ep_task = _episode_task(ep_path, ds, dataset_index)
-            spec = relevance_specs.get(ep_fault_id)
-            sampled = sample_with_relevance(rows, ep_fault_id, spec, ep_task, CONTEXT_MIN, CONTEXT_MAX)
+            sampled = _uniform_window(rows, CONTEXT_MIN, CONTEXT_MAX)
             if sampled is None:
                 continue
             subseries, start_idx, sampler_tag = sampled
             subseries = normalize_timestamps(subseries, _first_timestamp_ms(subseries))
-
-            if not validate_relevance(subseries, spec, ep_task):
-                continue
-
-            filled = fill_template(
-                template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
-                machine_id=DATASET_MACHINE_ID.get(ds, -1),
-            )
-            if filled is None:
-                continue
 
             if important_features:
                 keep = set(important_features) | {"timestamp_ms"}
@@ -939,6 +979,66 @@ def generate_level1_questions(
             else:
                 context_rows = subseries
             context = build_context(context_rows)
+
+            # Template 1: sample up to 3 distinct phases per (template, episode)
+            # combo so each anomalous subseries yields multiple phase-isolation
+            # questions. Each call to fill_template anchors on a different phase;
+            # the rest of the sampling (subseries window, relevance) is shared.
+            if tid == 1:
+                phase_candidates = pick_phase_isolation_candidates(subseries, n=3)
+                if not phase_candidates:
+                    continue
+                wrote_any = False
+                for _phase in phase_candidates:
+                    if generated >= n:
+                        break
+                    filled = fill_template(
+                        template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
+                        machine_id=DATASET_MACHINE_ID.get(ds, -1),
+                        phase_override=_phase,
+                    )
+                    if filled is None:
+                        continue
+                    item = {
+                        "id": str(uuid.uuid4()),
+                        "level": 1,
+                        "template_id": tid,
+                        "template_type": template["type"],
+                        "hides": template.get("hides", []),
+                        "question": filled["question"],
+                        "options": filled["options"],
+                        "answer": filled["answer"],
+                        "acceptance_bounds": filled.get("acceptance_bounds"),
+                        "provenance": {
+                            "dataset": ds,
+                            "episode": ep_path.stem,
+                            "subseries_start_index": start_idx,
+                            "subseries_length": len(subseries),
+                            "phase_name": _phase[0],
+                            "phase_start_in_subseries": _phase[1],
+                            "phase_length": _phase[2],
+                            "sampler": sampler_tag,
+                        },
+                        "context": context,
+                    }
+                    out_path = output_dir / f"level1_{generated:04d}.json"
+                    with out_path.open("w", encoding="utf-8") as f:
+                        json.dump(item, f, indent=2)
+                    logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template 1, {ds}, phase={_phase[0]})")
+                    generated += 1
+                    if uploader is not None:
+                        uploader.maybe_flush(generated)
+                    wrote_any = True
+                if not wrote_any:
+                    continue
+                continue  # tid==1 has its own write path
+
+            filled = fill_template(
+                template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
+                machine_id=DATASET_MACHINE_ID.get(ds, -1),
+            )
+            if filled is None:
+                continue
 
             item = {
                 "id": str(uuid.uuid4()),
@@ -955,7 +1055,7 @@ def generate_level1_questions(
                     "episode": ep_path.stem,
                     "subseries_start_index": start_idx,
                     "subseries_length": len(subseries),
-                    "relevance": relevance_report(subseries, ep_fault_id, spec, ep_task, sampler_tag),
+                    "sampler": sampler_tag,
                 },
                 "context": context,
             }
@@ -980,18 +1080,12 @@ def generate_level1_questions(
             prefix_rows = rows[:len(rows) - 10]
             ep_fault_id = pick_fault_label(rows)
             ep_task = _episode_task(ep_path, ds, dataset_index)
-            spec = relevance_specs.get(ep_fault_id)
-            sampled = sample_with_relevance(
-                prefix_rows, ep_fault_id, spec, ep_task, CONTEXT_MIN, CONTEXT_MAX,
-            )
+            sampled = _uniform_window(prefix_rows, CONTEXT_MIN, CONTEXT_MAX)
             if sampled is None:
                 continue
             raw_sub, start_idx, sampler_tag = sampled
             context_len = len(raw_sub)
             subseries = normalize_timestamps(raw_sub, _first_timestamp_ms(raw_sub))
-
-            if not validate_relevance(subseries, spec, ep_task):
-                continue
 
             filled = fill_template(
                 template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
@@ -1036,7 +1130,7 @@ def generate_level1_questions(
                     "subseries_start_index": start_idx,
                     "subseries_length": context_len,
                     "prediction_index": future_idx,
-                    "relevance": relevance_report(subseries, ep_fault_id, spec, ep_task, sampler_tag),
+                    "sampler": sampler_tag,
                 },
                 "context": context,
             }
@@ -1075,11 +1169,9 @@ def generate_level1_questions(
             fault_b = pick_fault_label(rows_b_raw)
             task_a = _episode_task(ep_a, ds_a, dataset_index)
             task_b = _episode_task(ep_b, ds_b, dataset_index)
-            spec_a = relevance_specs.get(fault_a)
-            spec_b = relevance_specs.get(fault_b)
 
-            sampled_a = sample_with_relevance(rows_a, fault_a, spec_a, task_a, CONTEXT_MIN, CONTEXT_MAX)
-            sampled_b = sample_with_relevance(rows_b_raw, fault_b, spec_b, task_b, CONTEXT_MIN, CONTEXT_MAX)
+            sampled_a = _uniform_window(rows_a, CONTEXT_MIN, CONTEXT_MAX)
+            sampled_b = _uniform_window(rows_b_raw, CONTEXT_MIN, CONTEXT_MAX)
             if sampled_a is None or sampled_b is None:
                 continue
 
@@ -1087,11 +1179,6 @@ def generate_level1_questions(
             sub_b, start_b, sampler_b = sampled_b
             sub_a = normalize_timestamps(sub_a, _first_timestamp_ms(sub_a))
             sub_b = normalize_timestamps(sub_b, _first_timestamp_ms(sub_b))
-
-            if not validate_relevance(sub_a, spec_a, task_a):
-                continue
-            if not validate_relevance(sub_b, spec_b, task_b):
-                continue
 
             filled = fill_template(
                 template, sub_a, root_causes, anomaly_lookup, mc_option_lookup,
@@ -1135,8 +1222,8 @@ def generate_level1_questions(
                     "machine_id_b": DATASET_MACHINE_ID.get(ds_b, -1),
                     "episode_b": ep_b.stem,
                     "subseries_start_b": start_b,
-                    "relevance_a": relevance_report(sub_a, fault_a, spec_a, task_a, sampler_a),
-                    "relevance_b": relevance_report(sub_b, fault_b, spec_b, task_b, sampler_b),
+                    "sampler_a": sampler_a,
+                    "sampler_b": sampler_b,
                 },
                 "context": context,
             }

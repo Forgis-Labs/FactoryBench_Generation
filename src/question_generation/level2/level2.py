@@ -27,6 +27,7 @@ import numpy as np
 from src.question_generation.utils.hf_streaming import (
     HfStreamUploader,
     add_streaming_args,
+    list_completed_combos,
     make_uploader_from_args,
 )
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
@@ -43,6 +44,7 @@ from src.question_generation.utils.template import (
 from src.question_generation.utils.time_series import (
     parse_event_id,
     pick_fault_label,
+    pick_fault_label_from_meta_or_rows,
     sample_subseries_before_event,
 )
 from src.question_generation.level2.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
@@ -53,6 +55,7 @@ from src.question_generation.level1.level1 import (
     get_severity_rank as l1_get_severity_rank,
     load_anomaly_lookup as l1_load_anomaly_lookup,
     load_anomaly_ranking as l1_load_anomaly_ranking,
+    pick_phase_isolation_candidates as l1_pick_phase_isolation_candidates,
     _phase_display_name,
     _signal_display_name,
     PHASE_NAMES,
@@ -808,6 +811,7 @@ def generate_level2_questions(
     relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     enumerate_mode: bool = False,
     uploader: Optional[HfStreamUploader] = None,
+    completed_combos: Optional[set] = None,
 ) -> None:
     if seed is not None:
         random.seed(seed)
@@ -821,6 +825,14 @@ def generate_level2_questions(
     # Load anomaly lookup for L1-style templates (7 = anomaly detection)
     anomaly_lookup = l1_load_anomaly_lookup(
         datasets_dir / "labelling" / "rca" / "anomalies.json"
+    )
+
+    # Comparative-template (t8) statements live as L1-only in mc_options.json
+    # (usable_levels=[1]). Load them with level=1 explicitly, otherwise the
+    # default L2 lookup misses mc_022/023/026 and the comparative builder
+    # silently rejects every attempt.
+    _l1_comparative_mc_lookup = load_mc_option_lookup(
+        datasets_dir / "mc_options" / "mc_options.json", level=1
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -871,18 +883,46 @@ def generate_level2_questions(
             meta_cache[key] = meta
         return meta_cache[key]
 
-    # Pre-filter: only episodes that have a fault_id (all L2 templates need anomalous data)
+    # Pre-filter: only episodes containing anomalies. Metadata-driven only —
+    # no per-row scan, which used to spike memory at scale.
+    #   * If metadata carries ``fault_id`` (factorywave-style), keep iff
+    #     ``fault_id != 0``.
+    #   * If metadata lacks ``fault_id`` (aursad/vorausad-style), include the
+    #     episode optimistically. Truly nominal episodes from these datasets
+    #     get rejected at iteration time by the metadata-first
+    #     ``pick_fault_label_from_meta_or_rows`` ``_fl == 0`` check, which is
+    #     cheap because episode rows are loaded lazily through the LRU cache.
+    def _ep_has_anomaly(p: Path) -> bool:
+        meta = load_meta(p)
+        fid = meta.get("fault_id")
+        if fid is None:
+            # No fault_id in metadata: trust the dataset's intent (these are
+            # anomaly-detection corpora) and let iteration filter nominals.
+            return True
+        try:
+            return int(float(fid)) != 0
+        except (TypeError, ValueError):
+            return True
+
     anomalous_episodes: List[Tuple[str, Path]] = []
+    per_ds_counts: Dict[str, int] = {}
     for ds, paths in episodes_by_dataset.items():
+        kept = 0
         for p in paths:
-            if load_meta(p).get("fault_id"):
+            if _ep_has_anomaly(p):
                 anomalous_episodes.append((ds, p))
+                kept += 1
+        per_ds_counts[ds] = kept
 
     if not anomalous_episodes:
-        logger.warning("No episodes with fault_id found; cannot generate L2 questions.")
+        logger.warning("No anomalous episodes found; cannot generate L2 questions.")
         return
 
-    logger.info(f"L2 eligible episodes: {len(anomalous_episodes)}")
+    logger.info(
+        "L2 eligible (anomalous-by-meta) episodes: "
+        + ", ".join(f"{ds}={per_ds_counts.get(ds, 0)}" for ds in sorted(per_ds_counts))
+        + f" — total {len(anomalous_episodes)}"
+    )
 
     enum_iter = None
     if enumerate_mode:
@@ -891,6 +931,14 @@ def generate_level2_questions(
             for t in templates
             for (ds, ep) in anomalous_episodes
         ]
+        if completed_combos:
+            before = len(enum_combos)
+            enum_combos = [
+                (t, ds, ep)
+                for (t, ds, ep) in enum_combos
+                if (int(t["id"]), ep.stem) not in completed_combos
+            ]
+            logger.info(f"[resume] skipping {before - len(enum_combos)} already-uploaded combos; {len(enum_combos)} remain")
         enum_iter = iter(enum_combos)
         max_total_attempts = len(enum_combos)
         logger.info(f"[enumerate] {len(enum_combos)} (template, episode) combos to attempt; -n={n} caps output")
@@ -970,11 +1018,12 @@ def generate_level2_questions(
                 _raw = _raw.get("baseline", _raw.get("flat", []))
             if not isinstance(_raw, list) or len(_raw) < CONTEXT_MIN:
                 continue
-            _fl = pick_fault_label(_raw)
+            # Fault: prefer metadata's fault_id; fall back to most-common
+            # non-zero fault_label. This recovers sparse-anomaly episodes
+            # (most rows nominal but the episode has a short anomaly burst)
+            # that pick_fault_label wrongly picks as 0.
+            _fl = pick_fault_label_from_meta_or_rows(_raw, load_meta(_ep_path))
             if _fl == 0:
-                # Defensive: anomalous_episodes is filtered by metadata fault_id,
-                # but pick_fault_label reads the per-row fault label which can
-                # differ for episodes whose anomaly is non-injectable.
                 continue
             _rc = root_causes.get(_fl, {})
             _anomaly = _anomaly_inline_name(_fl, _rc)
@@ -1011,39 +1060,71 @@ def generate_level2_questions(
             _bounds = None
 
             if _tid == 6:
-                # Detect phases in the SAMPLED SUBSERIES (which is what the model sees as t=0..),
-                # so the answer index lines up with the rendered context.
-                # First and last phase segments may be partial (the sampler can cut mid-phase),
-                # so they are excluded; everything between is by construction entirely contained.
-                # If no inner phase is fully contained, reject and let the loop try another episode.
-                _phases: List[Tuple[str, int, int]] = []
-                _cur = None
-                _ps = 0
-                for _i, _r in enumerate(_sub):
-                    _p = _r.get("task_phase")
-                    if _p != _cur:
-                        if _cur is not None and str(_cur) not in ("None", "none", ""):
-                            _phases.append((str(_cur), _ps, _i - _ps))
-                        _cur = _p
-                        _ps = _i
-                if _cur is not None and str(_cur) not in ("None", "none", ""):
-                    _phases.append((str(_cur), _ps, len(_sub) - _ps))
-                if len(_phases) < 3:
+                # Sample up to 3 distinct phases (excluding first/last when ≥3
+                # phases exist; otherwise use all phases) so each (template,
+                # episode, subseries) combo yields multiple phase-isolation
+                # questions. Each is written and uploaded independently; the
+                # common write path is skipped via the `continue` at the end.
+                _phase_pool = l1_pick_phase_isolation_candidates(_sub, n=3)
+                if not _phase_pool:
                     continue
-                _inner = [(n_, s_, l_) for n_, s_, l_ in _phases[1:-1] if l_ >= 3]
-                if not _inner:
+                _imp_local = template.get("important_features")
+                if _imp_local:
+                    _keep_local = set(_imp_local) | {"timestamp_ms"}
+                    _ctx_rows_local = [{k: v for k, v in r.items() if k in _keep_local} for r in _sub]
+                else:
+                    _ctx_rows_local = _sub
+                _context_local = build_context(_ctx_rows_local)
+                _wrote_any = False
+                for _ph in _phase_pool:
+                    if generated >= n:
+                        break
+                    _pn, _pi, _pl = _ph
+                    _gt_t = int(round(float(_sub[_pi]["timestamp_ms"])))
+                    _low_idx = max(0, _pi - 3)
+                    _high_idx = min(len(_sub) - 1, _pi + 3)
+                    _t_low = int(round(float(_sub[_low_idx]["timestamp_ms"])))
+                    _t_high = int(round(float(_sub[_high_idx]["timestamp_ms"])))
+                    _ans_local = _gt_t
+                    _bounds_local = {"min": _t_low, "max": _t_high}
+                    _tmpl_filled_local = fill(
+                        _tmpl, anomaly=_anomaly,
+                        phase=_phase_display_name(_pn, _ep_task),
+                        window_length=_pl + 5,
+                    )
+                    item = {
+                        "id": str(uuid.uuid4()),
+                        "level": 2,
+                        "template_id": _tid,
+                        "template_type": template["type"],
+                        "hides": template.get("hides", []),
+                        "question": _tmpl_filled_local,
+                        "options": {},
+                        "answer": _ans_local,
+                        "acceptance_bounds": _bounds_local,
+                        "provenance": {
+                            "dataset": _ds, "episode": _ep_path.stem,
+                            "fault_label": _fl,
+                            "subseries_start_index": _start,
+                            "subseries_length": len(_sub),
+                            "phase_name": _pn,
+                            "phase_start_in_subseries": _pi,
+                            "phase_length": _pl,
+                            "relevance": _relevance_report(_sub, _fl, _spec, _ep_task, _sampler_tag),
+                        },
+                        "context": _context_local,
+                    }
+                    out_path = output_dir / f"level2_{generated:04d}.json"
+                    with out_path.open("w", encoding="utf-8") as f:
+                        json.dump(item, f, indent=2)
+                    logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template 6, {_ds}, phase={_pn})")
+                    generated += 1
+                    if uploader is not None:
+                        uploader.maybe_flush(generated)
+                    _wrote_any = True
+                if not _wrote_any:
                     continue
-                _pn, _pi, _pl = random.choice(_inner)
-                # Answer is the t= value the model sees, not the row index. Acceptance
-                # is any t inside the t-window of the GT row's ±3 neighbors.
-                _gt_t = int(round(float(_sub[_pi]["timestamp_ms"])))
-                _low_idx = max(0, _pi - 3)
-                _high_idx = min(len(_sub) - 1, _pi + 3)
-                _t_low = int(round(float(_sub[_low_idx]["timestamp_ms"])))
-                _t_high = int(round(float(_sub[_high_idx]["timestamp_ms"])))
-                _ans = _gt_t
-                _tmpl_filled = fill(_tmpl, anomaly=_anomaly, phase=_phase_display_name(_pn, _ep_task), window_length=_pl + 5)
-                _bounds = {"min": _t_low, "max": _t_high}
+                continue  # skip the common write path; t6 wrote its own items
 
             elif _tid == 7:
                 _opts, _ans = l1_build_anomaly_single_select(_fl, root_causes, anomaly_lookup)
@@ -1081,7 +1162,7 @@ def generate_level2_questions(
                     _raw_b = _raw_b.get("baseline", _raw_b.get("flat", []))
                 if not isinstance(_raw_b, list) or len(_raw_b) < CONTEXT_MIN:
                     continue
-                _fl_b = pick_fault_label(_raw_b)
+                _fl_b = pick_fault_label_from_meta_or_rows(_raw_b, load_meta(_ep_path_b))
                 _meta_b_path = _ep_path_b.with_name(_ep_path_b.stem + "_metadata.json")
                 _ep_task_b = ""
                 if _meta_b_path.exists():
@@ -1105,7 +1186,7 @@ def generate_level2_questions(
                     machine_id_a=_machine_id, machine_id_b=_machine_id_b,
                     task_id_a=_ep_task, task_id_b=_ep_task_b,
                     rows_a=_sub, rows_b=_sub_b,
-                    mc_lookup=mc_option_lookup,
+                    mc_lookup=_l1_comparative_mc_lookup,
                 )
                 if _result is None:
                     continue
@@ -1169,15 +1250,17 @@ def generate_level2_questions(
                     if not isinstance(_srows, list) or len(_srows) < 5:
                         _bad = True
                         break
-                    _sfl = pick_fault_label(_srows)
-                    _segments.append((_srows, _sfl))
+                    _smeta_dict: Dict[str, Any] = {}
                     _smeta = _sp.with_name(_sp.stem + "_metadata.json")
                     _stask = ""
                     if _smeta.exists():
                         try:
-                            _stask = load_json(_smeta).get("task", "")
+                            _smeta_dict = load_json(_smeta) or {}
+                            _stask = _smeta_dict.get("task", "")
                         except Exception:
                             pass
+                    _sfl = pick_fault_label_from_meta_or_rows(_srows, _smeta_dict)
+                    _segments.append((_srows, _sfl))
                     _seg_tasks.append(_stask)
                 if _bad or len(_segments) < 4:
                     continue
@@ -1397,6 +1480,16 @@ def main() -> None:
 
     args.output.mkdir(parents=True, exist_ok=True)
     uploader = make_uploader_from_args(args, level=2, output_dir=args.output)
+    completed_combos = None
+    if getattr(args, "resume_from_hf", False) and args.hf_dataset_folder:
+        completed_combos, max_shard_idx = list_completed_combos(
+            repo_id=args.hf_repo,
+            dataset_folder=args.hf_dataset_folder,
+            level=2,
+        )
+        # Resume from the next shard index so we don't overwrite existing files.
+        if uploader is not None and max_shard_idx > 0:
+            uploader.batch_index = max_shard_idx
 
     generate_level2_questions(
         datasets_dir=args.datasets_dir,
@@ -1411,6 +1504,7 @@ def main() -> None:
         relevance_specs=relevance_specs,
         enumerate_mode=args.enumerate_mode,
         uploader=uploader,
+        completed_combos=completed_combos,
     )
 
 
