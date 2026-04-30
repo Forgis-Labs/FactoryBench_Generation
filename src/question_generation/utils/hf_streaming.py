@@ -25,7 +25,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, hf_hub_download
 
 from src.pipeline.upload_qa_pairs import (
     DEFAULT_REPO_ID,
@@ -106,6 +106,7 @@ class HfStreamUploader:
         repo_id: str = DEFAULT_REPO_ID,
         private: bool = False,
         output_format: str = "jsonl",
+        start_batch_index: Optional[int] = None,
     ) -> None:
         if output_format not in _VALID_FORMATS:
             raise ValueError(
@@ -118,7 +119,10 @@ class HfStreamUploader:
         self.repo_id = repo_id
         self.private = private
         self.output_format = output_format
-        self.batch_index = 0
+        # When resuming, start_batch_index allows the caller to pass the
+        # highest existing shard index on HF; new shards will be numbered
+        # starting at start_batch_index+1, never overwriting earlier files.
+        self.batch_index = int(start_batch_index) if start_batch_index else 0
 
     def maybe_flush(self, generated: int) -> None:
         """Call after each item write; flushes when ``generated`` hits a
@@ -207,6 +211,88 @@ class HfStreamUploader:
             )
 
 
+def list_completed_combos(
+    repo_id: str,
+    dataset_folder: str,
+    level: int,
+) -> Tuple[set, int]:
+    """Return ``(completed_combos, max_shard_index)``.
+
+    ``completed_combos`` is the set of ``(template_id, episode_stem)`` pairs
+    already uploaded for this (level, folder) on HF. ``max_shard_index`` is
+    the highest existing shard index in the folder (so the caller can resume
+    new uploads without overwriting earlier shards).
+    """
+    completed: set = set()
+    max_shard_idx = 0
+    api = HfApi(token=resolve_hf_token())
+    prefix = f"{dataset_folder}/level_{level}/"
+    try:
+        files = api.list_repo_files(repo_id, repo_type="dataset")
+    except Exception as exc:
+        logger.warning(f"[resume] could not list HF repo files: {exc}")
+        return completed, max_shard_idx
+    shards = [f for f in files if f.startswith(prefix) and f.endswith(".jsonl")]
+    if not shards:
+        logger.info(f"[resume] no existing shards under {prefix}")
+        return completed, max_shard_idx
+
+    # Track highest shard index from the filename ``level{N}_shard_NNNN.jsonl``.
+    import re as _re
+    shard_re = _re.compile(rf"level{level}_shard_(\d+)\.jsonl$")
+    for shard_path in shards:
+        m = shard_re.search(shard_path)
+        if m:
+            try:
+                max_shard_idx = max(max_shard_idx, int(m.group(1)))
+            except (TypeError, ValueError):
+                pass
+
+    logger.info(f"[resume] found {len(shards)} existing shards (max idx={max_shard_idx}); downloading to scan combos")
+    for shard_path in shards:
+        try:
+            local = hf_hub_download(
+                repo_id=repo_id, filename=shard_path, repo_type="dataset"
+            )
+        except Exception as exc:
+            logger.warning(f"[resume] download failed for {shard_path}: {exc}")
+            continue
+        try:
+            with open(local, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        item = json.loads(line)
+                    except Exception:
+                        continue
+                    tid = item.get("template_id")
+                    prov = item.get("provenance") or {}
+                    # Single-episode templates use prov.episode; paired/ranking
+                    # templates use prov.episode_a / prov.episodes (list).
+                    eps: List[str] = []
+                    if "episode" in prov:
+                        eps.append(str(prov["episode"]))
+                    elif "episode_a" in prov:
+                        eps.append(str(prov["episode_a"]))
+                    elif "episodes" in prov and isinstance(prov["episodes"], list):
+                        for e in prov["episodes"]:
+                            if isinstance(e, dict) and e.get("episode"):
+                                eps.append(str(e["episode"]))
+                                break  # primary episode only
+                    if tid is not None and eps:
+                        try:
+                            completed.add((int(tid), eps[0]))
+                        except (TypeError, ValueError):
+                            pass
+        except Exception as exc:
+            logger.warning(f"[resume] parse failed for {shard_path}: {exc}")
+
+    logger.info(f"[resume] {len(completed)} (template, episode) combos already on HF — will be skipped")
+    return completed, max_shard_idx
+
+
 def add_streaming_args(parser, default_repo: str = DEFAULT_REPO_ID) -> None:
     """Attach the stream-upload CLI flags to a generator's arg parser."""
     parser.add_argument(
@@ -245,6 +331,14 @@ def add_streaming_args(parser, default_repo: str = DEFAULT_REPO_ID) -> None:
         "--hf-private",
         action="store_true",
         help="Create the HF dataset repo as private if it doesn't exist yet.",
+    )
+    parser.add_argument(
+        "--resume-from-hf",
+        action="store_true",
+        help="Before generating, query the HF dataset folder for already-"
+             "uploaded shards and skip every (template, episode) combo "
+             "already represented in them. Lets you resume an interrupted "
+             "run without redoing work.",
     )
 
 

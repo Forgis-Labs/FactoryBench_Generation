@@ -124,6 +124,16 @@ def _uniform(rows: List[Row], min_len: int, max_len: int) -> Optional[Window]:
 
 
 def _sample_event(rows: List[Row], spec: Spec, min_len: int, max_len: int) -> Optional[Window]:
+    """Sample a window that ACTUALLY contains an event onset.
+
+    Anchors on a randomly chosen row whose ``event`` token resolves to a
+    non-zero, non-1 id (a real event, not the implicit "no event" / "task
+    started" placeholder). Window length and exact start are still
+    randomized — the constraint is only that the event row is inside the
+    window.
+    """
+    from src.question_generation.utils.time_series import parse_event_id
+
     min_required = max(int(spec.get("min_window_length", min_len)), min_len)
     # When the caller requests a shorter window than the spec prefers (e.g. 5-7 row
     # severity-ranking chunks), honor the caller's upper bound rather than refusing.
@@ -131,9 +141,29 @@ def _sample_event(rows: List[Row], spec: Spec, min_len: int, max_len: int) -> Op
     n = len(rows)
     if n < min_required:
         return None
-    length = random.randint(min_required, min(max_len, n))
-    start = random.randint(0, n - length)
-    return rows[start:start + length], start
+
+    # Find rows that carry a real event token (not 0 = no event, not 1 = task start).
+    event_indices: List[int] = []
+    for i, r in enumerate(rows):
+        eid = parse_event_id(r.get("event", 0))
+        if eid not in (0, 1):
+            event_indices.append(i)
+    if not event_indices:
+        return None
+
+    anchor = random.choice(event_indices)
+    length_hi = min(max_len, n)
+
+    # Try a random length first; if no valid (start, length) exists for it,
+    # fall back to the minimum length (which has the widest start range).
+    for attempt_length in (random.randint(min_required, length_hi), min_required):
+        # Window must contain the anchor: start <= anchor < start + length.
+        min_start = max(0, anchor - attempt_length + 1)
+        max_start = min(n - attempt_length, anchor)
+        if min_start <= max_start:
+            start = random.randint(min_start, max_start)
+            return rows[start:start + attempt_length], start
+    return None
 
 
 def _sample_cumulative(
@@ -173,7 +203,7 @@ def _sample_phase_gated(
     matches = _matching_indices(rows, phase_ids)
     if not matches:
         return None
-    min_overlap = int(spec.get("min_overlap", 2))
+    min_overlap = int(spec.get("min_overlap", 5))
     runs = _contiguous_runs(matches)
     random.shuffle(runs)
 
@@ -214,13 +244,19 @@ def sample_with_relevance(
     task: Optional[str],
     min_len: int,
     max_len: int,
+    fallback_to_uniform: bool = False,
 ) -> Optional[SampleResult]:
     """Sample a window honoring the fault's relevance spec.
 
     Returns (subseries, start_index, sampler_tag) or None if no valid window fits.
     When the relevance system is disabled or spec is missing/global, samples uniformly.
-    When a phase_gated or cumulative spec cannot be honored, returns None so the
-    caller can skip this episode rather than silently producing an irrelevant sample.
+
+    When ``fallback_to_uniform`` is True and a strict locality (event /
+    phase_gated / cumulative) cannot be honored, the sampler returns a
+    uniform window tagged ``"uniform_fallback"`` instead of None. This is
+    useful for templates where displaying the anomaly's signature is
+    nice-to-have (e.g. phase isolation doesn't need anomaly evidence) but
+    not required.
     """
     if not is_enabled() or not spec:
         win = _uniform(rows, min_len, max_len)
@@ -234,14 +270,23 @@ def sample_with_relevance(
 
     if locality == "event":
         win = _sample_event(rows, spec, min_len, max_len)
+        if win is None and fallback_to_uniform:
+            win = _uniform(rows, min_len, max_len)
+            return (win[0], win[1], "uniform_fallback") if win else None
         return (win[0], win[1], "event") if win else None
 
     if locality == "cumulative":
         win = _sample_cumulative(rows, spec, task, min_len, max_len)
+        if win is None and fallback_to_uniform:
+            win = _uniform(rows, min_len, max_len)
+            return (win[0], win[1], "uniform_fallback") if win else None
         return (win[0], win[1], "cumulative") if win else None
 
     if locality == "phase_gated":
         win = _sample_phase_gated(rows, spec, task, min_len, max_len)
+        if win is None and fallback_to_uniform:
+            win = _uniform(rows, min_len, max_len)
+            return (win[0], win[1], "uniform_fallback") if win else None
         return (win[0], win[1], "phase_gated") if win else None
 
     logger.warning(f"Unknown locality '{locality}' for fault {fault_id}; using uniform")
@@ -267,7 +312,7 @@ def validate_relevance(
         phase_ids = _phase_ids_for_task(spec, task, "phases_by_task")
         if not phase_ids:
             return False
-        min_overlap = int(spec.get("min_overlap", 2))
+        min_overlap = int(spec.get("min_overlap", 5))
         target = {str(int(p)) for p in phase_ids}
         overlap = sum(1 for r in sub_rows if _phase_of(r) in target)
         return overlap >= min_overlap
