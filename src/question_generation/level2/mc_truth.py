@@ -204,25 +204,21 @@ def evaluate_mc_statement(
     subseries: List[Dict[str, Any]],
     post_event_rows: List[Dict[str, Any]],
     thresholds: Optional[Dict[str, float]] = None,
+    episode_metadata: Optional[Dict[str, Any]] = None,
 ) -> Optional[bool]:
     sid = _canonical_statement_id(statement_id)
+
+    if sid == "l2_mc_020":
+        if episode_metadata is None:
+            return None
+        success = episode_metadata.get("task_success")
+        if success is None:
+            return None
+        return bool(success)
+
     baseline = _baseline_row(subseries)
     if baseline is None or not post_event_rows:
         return None
-
-    if sid == "l2_mc_001":
-        for row in post_event_rows:
-            value = _to_float(row.get("safety_mode"))
-            if value is not None and int(value) != 1:
-                return True
-        return False
-
-    if sid == "l2_mc_002":
-        for row in post_event_rows:
-            value = _to_float(row.get("safety_mode"))
-            if value is None or int(value) != 1:
-                return False
-        return True
 
     if sid in {"l2_mc_003", "l2_mc_004", "l2_mc_005", "l2_mc_012"}:
         speed_keys = _indexed_keys("feedback_speed", [baseline])
@@ -302,42 +298,6 @@ def evaluate_mc_statement(
         if sid == "l2_mc_008":
             return post_err >= (1.0 + tracking_increase) * pre_err
         return post_err <= (1.0 + tracking_stable_increase) * pre_err
-
-    if sid in {"l2_mc_010", "l2_mc_011"}:
-        vibration_spike = _get_threshold(thresholds, "vibration_spike")
-        vibration_band = _get_threshold(thresholds, "vibration_nominal_band")
-        vibration_coverage = _get_threshold(thresholds, "vibration_nominal_coverage")
-        keys = [k for k in ["vibration_0", "vibration_1", "vibration_2"] if k in baseline]
-        if not keys:
-            return None
-        comparisons: List[bool] = []
-        total = 0
-        for row in post_event_rows:
-            if not isinstance(row, dict):
-                continue
-            row_has = False
-            row_ok = True
-            row_spike = False
-            for key in keys:
-                pre = _to_float(baseline.get(key))
-                post = _to_float(row.get(key))
-                if pre is None or post is None:
-                    continue
-                row_has = True
-                if abs(post) >= (1.0 + vibration_spike) * max(EPS, abs(pre)):
-                    row_spike = True
-                if abs(post) > (1.0 + vibration_band) * max(EPS, abs(pre)):
-                    row_ok = False
-            if row_has:
-                total += 1
-                comparisons.append(row_ok)
-                if sid == "l2_mc_010" and row_spike:
-                    return True
-        if sid == "l2_mc_010":
-            return False
-        if total == 0:
-            return None
-        return (sum(1 for x in comparisons if x) / total) >= vibration_coverage
 
     if sid == "l2_mc_012":
         peak_increase = _get_threshold(thresholds, "current_peak_increase")

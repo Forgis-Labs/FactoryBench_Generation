@@ -2,11 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
-
-logger = logging.getLogger(__name__)
 
 
 def load_json(path: Path) -> Any:
@@ -69,6 +66,92 @@ def resolve_machine_object_for_dataset(dataset: str, machines: List[Dict[str, An
     if machines:
         return machines[0]
     return None
+
+
+def load_dataset_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
+    if path is None or not path.exists() or not path.is_file():
+        return {}
+    try:
+        raw = load_json(path)
+    except Exception:
+        return {}
+    if not isinstance(raw, list):
+        return {}
+    return {
+        item["dataset_id"]: item
+        for item in raw
+        if isinstance(item, dict) and "dataset_id" in item
+    }
+
+
+def resolve_gripper_for_dataset(
+    dataset: str,
+    grippers: List[Dict[str, Any]],
+    dataset_index: Dict[str, Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    if not grippers:
+        return None
+
+    entry = dataset_index.get(str(dataset).strip()) or {}
+    gripper_id = entry.get("gripper_id")
+    if gripper_id is not None:
+        for gripper in grippers:
+            if gripper.get("gripper_id") == gripper_id:
+                return gripper
+
+    token = normalize_dataset_name(dataset)
+    if token == "aursad":
+        for gripper in grippers:
+            if str(gripper.get("gripper_model", "")).lower() == "screwdriver":
+                return gripper
+    return None
+
+
+def gripper_details_block(gripper: Optional[Dict[str, Any]]) -> str:
+    if not isinstance(gripper, dict):
+        return ""
+
+    manufacturer = str(gripper.get("manufacturer") or "").strip()
+    model = str(gripper.get("gripper_model") or "").strip()
+    gripper_type = str(gripper.get("gripper_type") or "end-of-arm tool").strip()
+    actuation = str(gripper.get("actuation") or "").strip()
+
+    equipment_note = str(gripper.get("equipment_note") or "").strip()
+
+    if model:
+        intro = f"{manufacturer} {model}".strip()
+        details: List[str] = []
+        type_lower = gripper_type.lower()
+        if type_lower and type_lower not in intro.lower():
+            details.append(type_lower)
+    else:
+        intro = gripper_type or manufacturer or "gripper"
+        details = []
+        if equipment_note:
+            details.append(equipment_note)
+        elif manufacturer and manufacturer.lower() not in intro.lower():
+            details.append(manufacturer)
+
+    torque = gripper.get("torque_range_Nm")
+    if isinstance(torque, list) and len(torque) == 2:
+        details.append(f"{torque[0]}\u2013{torque[1]} Nm torque range")
+
+    grip_force = gripper.get("grip_force_range_N")
+    if isinstance(grip_force, list) and len(grip_force) == 2:
+        details.append(f"{grip_force[0]}\u2013{grip_force[1]} N grip force")
+
+    screw_range = gripper.get("screw_size_range")
+    if isinstance(screw_range, list) and len(screw_range) == 2:
+        details.append(f"supporting {screw_range[0]}\u2013{screw_range[1]} screws")
+
+    if details:
+        return f"{intro} ({', '.join(details)})"
+    return intro
+
+
+def _indefinite_article(word: str) -> str:
+    first = word.strip()[:1].lower()
+    return "an" if first in {"a", "e", "i", "o", "u"} else "a"
 
 
 def machine_details_block(machine: Optional[Dict[str, Any]]) -> str:
@@ -152,11 +235,30 @@ def format_options(options: Any) -> str:
     return ""
 
 
-def build_prompt(question_item: Dict[str, Any], machines: List[Dict[str, Any]]) -> str:
+def build_prompt(
+    question_item: Dict[str, Any],
+    machines: List[Dict[str, Any]],
+    grippers: Optional[List[Dict[str, Any]]] = None,
+    dataset_index: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> str:
     provenance = question_item.get("provenance") if isinstance(question_item.get("provenance"), dict) else {}
     dataset = str(provenance.get("dataset", ""))
-    machine_obj = resolve_machine_object_for_dataset(dataset, machines)
-    machine_info = machine_details_block(machine_obj)
+    hides = set(question_item.get("hides", []))
+
+    machine_sentence = ""
+    if "robot" not in hides:
+        machine_obj = resolve_machine_object_for_dataset(dataset, machines)
+        machine_info = machine_details_block(machine_obj)
+        machine_sentence = f"The following sensor data comes from {machine_info}."
+    if "gripper" not in hides:
+        gripper_obj = resolve_gripper_for_dataset(dataset, grippers or [], dataset_index or {})
+        gripper_info = gripper_details_block(gripper_obj)
+        if gripper_info:
+            article = _indefinite_article(gripper_info)
+            if machine_sentence:
+                machine_sentence += f" It is equipped with {article} {gripper_info}."
+            else:
+                machine_sentence = f"The robot is equipped with {article} {gripper_info}."
 
     context = question_item.get("context") if isinstance(question_item.get("context"), dict) else {}
     ts_text = format_context_time_series(context)
@@ -164,9 +266,9 @@ def build_prompt(question_item: Dict[str, Any], machines: List[Dict[str, Any]]) 
     question_text = str(question_item.get("question", "")).strip()
     options_text = format_options(question_item.get("options"))
 
-    prompt = f"The following sensor data comes from {machine_info}.\n{ts_text}\nQuestion: {question_text}"
-    if mapping_text:
-        prompt = f"The following sensor data comes from {machine_info}.\n{mapping_text}\n{ts_text}\nQuestion: {question_text}"
+    header_parts = [p for p in [machine_sentence, mapping_text] if p]
+    header = "\n".join(header_parts)
+    prompt = f"{header}\n{ts_text}\nQuestion: {question_text}" if header else f"{ts_text}\nQuestion: {question_text}"
     if options_text:
         prompt += f"\nHere are the options:\n{options_text}"
     return prompt
@@ -207,12 +309,26 @@ def main() -> None:
         default=repo_root / "data" / "labelling" / "machines.json",
         help="Path to machines.json",
     )
+    parser.add_argument(
+        "--grippers",
+        type=Path,
+        default=repo_root / "data" / "labelling" / "grippers.json",
+        help="Path to grippers.json (optional; skipped if missing)",
+    )
+    parser.add_argument(
+        "--dataset-index",
+        type=Path,
+        default=repo_root / "data" / "labelling" / "dataset.json",
+        help="Path to dataset.json (maps dataset_id -> gripper_id/machine_id)",
+    )
 
     args = parser.parse_args()
 
     input_dir = args.input.resolve()
     output_dir = args.output.resolve()
     machines_path = args.machines.resolve()
+    grippers_path = args.grippers.resolve() if args.grippers else None
+    dataset_index_path = args.dataset_index.resolve() if args.dataset_index else None
 
     if not input_dir.exists() or not input_dir.is_dir():
         raise FileNotFoundError(f"Input folder not found: {input_dir}")
@@ -221,6 +337,14 @@ def main() -> None:
 
     machines_raw = load_json(machines_path)
     machines = machines_raw if isinstance(machines_raw, list) else []
+
+    grippers: List[Dict[str, Any]] = []
+    if grippers_path and grippers_path.exists() and grippers_path.is_file():
+        grippers_raw = load_json(grippers_path)
+        if isinstance(grippers_raw, list):
+            grippers = grippers_raw
+
+    dataset_index = load_dataset_index(dataset_index_path)
 
     converted = 0
     scanned = 0
@@ -235,36 +359,13 @@ def main() -> None:
         if not is_question_payload(payload):
             continue
 
-        prompt = build_prompt(payload, machines)
-
-        # Token budget guard
-        estimated_tokens = len(prompt) // 4
-        if estimated_tokens > 900_000:
-            logger.warning(
-                f"Skipping {in_path.name}: estimated {estimated_tokens} tokens exceeds budget"
-            )
-            continue
-
+        prompt = build_prompt(payload, machines, grippers, dataset_index)
         rel = in_path.relative_to(input_dir)
         out_path = output_dir / rel
-
-        output_payload = {
+        write_json(out_path, {
             "prompt": prompt,
-            "metadata": {
-                "qa_pair_id": payload.get("template_id"),
-                "dataset": payload.get("provenance", {}).get("dataset"),
-                "episode": payload.get("provenance", {}).get("episode"),
-                "time_window": payload.get("provenance", {}).get("time_window"),
-                "level": payload.get("level"),
-                "type": payload.get("template_type"),
-            },
-            "type": payload.get("template_type"),
-            "question": payload.get("question"),
-            "correct_answer": payload.get("answer"),
-            "answer_format": payload.get("answer_format", {}).get("type", "unknown") if isinstance(payload.get("answer_format"), dict) else str(payload.get("answer_format", "unknown")),
-        }
-
-        write_json(out_path, output_payload)
+            "metadata": {"qa_pair_id": payload.get("id")},
+        })
         converted += 1
 
     print(f"Scanned {scanned} JSON files; converted {converted} question files to prompts in {output_dir}")

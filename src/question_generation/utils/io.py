@@ -30,3 +30,14 @@ def load_root_causes(path: Path) -> Dict[int, Dict[str, Any]]:
         if isinstance(fid, int):
             by_id[fid] = item
     return by_id
+
+
+def load_ur3_mapping(path: Path) -> Dict[str, Dict[str, Any]]:
+    """Return {root_cause: mapping_dict} from root_cause_ur3_error_mapping.json."""
+    mapping = load_json(path)
+    by_root_cause: Dict[str, Dict[str, Any]] = {}
+    for item in mapping:
+        rc = item.get("root_cause")
+        if isinstance(rc, str):
+            by_root_cause[rc] = item
+    return by_root_cause
