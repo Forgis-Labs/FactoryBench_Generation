@@ -1,0 +1,411 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usepackage{amsmath,amssymb,amsfonts,bm}
+\usepackage{xcolor}
+\usepackage{fontawesome5}
+\usepackage{graphicx}
+\usepackage{grffile} % Allow spaces in image filenames
+
+% Image locations (relative to this .tex file)
+\graphicspath{%
+  {../../robot_images/}%
+  {../../robot_images/Kuka FactoryWave/}%
+  {../../robot_images/UR3 FactoryWave/}%
+  {../../docs/neurips_tex/figures/}%
+}
+
+% BRAND colors
+\definecolor{tiger}{HTML}{FF5A00}
+\definecolor{fire}{HTML}{FF4D00}
+\definecolor{flicker}{HTML}{DC4B07}
+\definecolor{steel}{HTML}{878F92}
+\definecolor{gunmetal}{HTML}{122128}
+\definecolor{panel}{HTML}{202E35}
+
+% FIGURE colors
+\definecolor{forgis_orange}{HTML}{FF5A00}
+\definecolor{forgis_fire}{HTML}{FF4D00}
+\definecolor{forgis_flicker}{HTML}{DC4B07}
+\definecolor{blue}{HTML}{3A7BD5}
+\definecolor{green}{HTML}{2ECC71}
+\definecolor{panelbg}{HTML}{F0F4F8}
+\definecolor{warm_amber}{HTML}{FFF3CD}
+
+% Anomaly palette (soft pastel, like reference)
+\definecolor{anomRed}{HTML}{F8D7DA}
+\definecolor{anomRedB}{HTML}{C0392B}
+\definecolor{anomPink}{HTML}{FCEAEA}
+\definecolor{anomPinkB}{HTML}{D98880}
+\definecolor{anomYellow}{HTML}{FCF3CF}
+\definecolor{anomYellowB}{HTML}{B7950B}
+\definecolor{anomBlue}{HTML}{D6EAF8}
+\definecolor{anomBlueB}{HTML}{2874A6}
+\definecolor{anomGray}{HTML}{EAEDED}
+\definecolor{anomGrayB}{HTML}{566573}
+
+% Task palette
+\definecolor{taskbg}{HTML}{D5F5E3}
+\definecolor{taskborder}{HTML}{27AE60}
+
+% Citation style
+\newcommand{\citeFS}{}
+
+\usetikzlibrary{arrows.meta, positioning, calc, fit, shapes.geometric,
+  decorations.pathreplacing, decorations.markings,
+  backgrounds, shadows.blur, patterns}
+
+% ---- Photo helper: places a real image centred at (x, y) ----
+%  #1 = x,y center coord; #2 = display width; #3 = filename (with extension)
+\newcommand{\photoNode}[3]{%
+  \node[inner sep=0pt, anchor=center] at (#1)
+    {\includegraphics[width=#2]{#3}};
+}
+
+\begin{document}
+\begin{tikzpicture}[
+  every node/.style={font=\sffamily},
+  >=Stealth,
+]
+
+% ============================================================
+%  TOP TITLES + TOP-LEVEL ARROWS
+% ============================================================
+\node[font=\sffamily\bfseries\large, text=gunmetal] (t1) at (0, 9.6)   {Input Data};
+\node[font=\sffamily\bfseries\large, text=gunmetal] (t2) at (8.5, 9.6) {Reasoning Ladder};
+\node[font=\sffamily\bfseries\large, text=gunmetal] (t3) at (17, 9.6)  {The Benchmark Gap};
+
+\draw[gunmetal, line width=2pt, -{Stealth[length=8pt, width=8pt]}]
+  (t1.east) -- (t2.west);
+\draw[gunmetal, line width=2pt, -{Stealth[length=8pt, width=8pt]}]
+  (t2.east) -- (t3.west);
+
+% ============================================================
+%  NODE 1 — INPUT DATA  (wider panel: width 9, smaller TS chart)
+% ============================================================
+\begin{scope}
+  \fill[panelbg, rounded corners=8pt] (-4.5, -7.6) rectangle (4.5, 9.0);
+
+  % --- 3 TASKS badge ---
+  \fill[taskbg, rounded corners=4pt] (-4.2, 8.20) rectangle (-2.4, 8.90);
+  \draw[taskborder, line width=1pt, rounded corners=4pt]
+    (-4.2, 8.20) rectangle (-2.4, 8.90);
+  \node[font=\sffamily\bfseries\scriptsize, text=taskborder] at (-3.30, 8.55) {3 TASKS};
+
+  % --- Robot photos (wider) ---
+  \node[inner sep=0pt, anchor=center] at (-2.25, 6.85)
+    {\includegraphics[width=3.8cm,height=2.2cm,keepaspectratio]{UR3 pick and place.png}};
+  \node[inner sep=0pt, anchor=center] at ( 2.25, 6.85)
+    {\includegraphics[width=3.8cm,height=2.2cm,keepaspectratio]{Kuka.jpeg}};
+
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal, align=center]
+    at (-2.25, 5.40) {Universal Robots UR3};
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal, align=center]
+    at ( 2.25, 5.40) {KUKA KR10};
+
+  % --- Tasks row (3 BIG boxes) ---
+  \foreach \xx/\name/\img in {%
+      -2.80/Pick \& Place/Kuka pick and place.png,
+       0.00/Peg-in-Hole/Peg-in-hole_task.jpeg,
+       2.80/Screwdriving/UR3-screwdriving.png%
+    } {
+    \fill[taskbg, rounded corners=3pt] (\xx-1.30, 2.00) rectangle (\xx+1.30, 4.30);
+    \draw[taskborder, line width=0.8pt, rounded corners=3pt]
+      (\xx-1.30, 2.00) rectangle (\xx+1.30, 4.30);
+    \node[font=\sffamily\bfseries\scriptsize, text=taskborder, align=center]
+      at (\xx, 4.05) {\name};
+    \node[inner sep=0pt, anchor=center] at (\xx, 3.05)
+      {\includegraphics[width=2.40cm,height=1.50cm,keepaspectratio]{\img}};
+    \node[align=center] at (\xx, 2.15) {\citeFS};
+  }
+
+  % --- 27 ANOMALIES banner ---
+  \fill[forgis_orange!25, rounded corners=4pt] (-4.2, 1.10) rectangle (4.2, 1.70);
+  \draw[forgis_orange, line width=1pt, rounded corners=4pt]
+    (-4.2, 1.10) rectangle (4.2, 1.70);
+  \node[font=\sffamily\bfseries\scriptsize, text=forgis_orange] at (0, 1.40)
+    {$\cdots$ 27 ANOMALIES $\cdots$};
+
+  % --- 5 anomaly thumbnails (taller chip, bigger photo) ---
+  \foreach \xx/\bgC/\bdC/\name/\img in {%
+      -3.40/anomRed/anomRedB/Collision rigid object/Collision_with_rigid_object.jpeg,
+      -1.70/anomPink/anomPinkB/Collision soft object/Collision with foam cube.jpeg,
+       0.00/anomYellow/anomYellowB/External arm disturbance/External_arm_disturbance.jpeg,
+       1.70/anomBlue/anomBlueB/Cable collision/Cable_collision.jpeg,
+       3.40/anomGray/anomGrayB/Unstable base/Unstable_mounting_platform.jpeg%
+    } {
+    \fill[\bgC, rounded corners=3pt] (\xx-0.80, -3.20) rectangle (\xx+0.80, 1.00);
+    \draw[\bdC, line width=0.7pt, rounded corners=3pt]
+      (\xx-0.80, -3.20) rectangle (\xx+0.80, 1.00);
+
+    \begin{scope}
+      \clip (\xx-0.72, -1.20) rectangle (\xx+0.72, 0.95);
+      \node[inner sep=0pt, anchor=center] at (\xx, -0.10)
+        {\includegraphics[height=2.30cm]{\img}};
+    \end{scope}
+
+    \node[font=\sffamily\scriptsize, text=gunmetal, align=center, text width=1.6cm]
+      at (\xx, -2.25) {\name};
+  }
+
+  % --- Time series block (compact: height 3.7) ---
+  \fill[white, rounded corners=4pt] (-4.2, -7.40) rectangle (4.2, -3.70);
+  \draw[gunmetal, line width=0.8pt, rounded corners=4pt]
+    (-4.2, -7.40) rectangle (4.2, -3.70);
+
+  \begin{scope}
+    \clip[rounded corners=4pt] (-4.2, -7.40) rectangle (4.2, -3.70);
+    \foreach \y in {-7.2,-6.9,...,-3.8} {
+      \draw[gray!18, line width=0.2pt] (-4.2, \y) -- (4.2, \y);
+    }
+  \end{scope}
+
+  % --- Setpoint ---
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal, anchor=west]
+    at (2.4, -3.95) {Setpoint $(S)$};
+  \draw[gunmetal, line width=1.0pt]
+    (-4.0, -4.40) -- (-2.8, -4.40) -- (-2.8, -4.20)
+    -- (-0.8, -4.20) -- (-0.8, -4.38) -- (1.2, -4.38)
+    -- (1.2, -4.22) -- (4.0, -4.22);
+
+  % --- Context ---
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal, anchor=west]
+    at (2.4, -5.10) {Context $(C)$};
+  \draw[steel, line width=0.9pt]
+    plot[smooth, tension=0.7] coordinates {
+      (-4.0,-5.50) (-3.5,-5.40) (-3.0,-5.55) (-2.5,-5.42) (-2.0,-5.52)
+      (-1.5,-5.40) (-1.0,-5.55) (-0.5,-5.42) (0.0,-5.52) (0.5,-5.40)
+      (1.0,-5.50) (1.5,-5.40) (2.0,-5.50) (2.5,-5.42) (3.0,-5.50)
+      (3.5,-5.42) (4.0,-5.50)
+    };
+
+  % --- Effort ---
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal, anchor=west]
+    at (2.4, -6.30) {Effort $(E)$};
+  \draw[gunmetal, line width=0.9pt]
+    plot[smooth, tension=0.5] coordinates {
+      (-4.0,-6.65) (-3.6,-6.60) (-3.2,-6.70) (-2.8,-6.58) (-2.4,-6.68)
+      (-2.0,-6.62) (-1.6,-6.70) (-1.2,-6.58) (-0.8,-6.30) (-0.4,-7.05)
+      ( 0.0,-6.10) ( 0.4,-7.10) ( 0.8,-6.20) ( 1.2,-7.05) ( 1.6,-6.30)
+      ( 2.0,-7.00) ( 2.4,-6.40) ( 2.8,-6.95) ( 3.2,-6.55) ( 3.6,-6.85)
+      ( 4.0,-6.55)
+    };
+
+  \node[align=center] at (0, -7.30) {\citeFS};
+
+  % Outgoing anchors (right edge now at x=4.5)
+  \coordinate (n1east_top) at (4.5, 5.40);
+  \coordinate (n1east_mid) at (4.5, -1.10);
+  \coordinate (n1east_low) at (4.5, -5.50);
+\end{scope}
+
+% ============================================================
+%  NODE 2 — REASONING LADDER (stretched to fill the panel)
+% ============================================================
+\begin{scope}[xshift=8.5cm]
+  \fill[panelbg, rounded corners=8pt] (-3.0, -7.6) rectangle (3.0, 9.0);
+
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal] at (0, 8.55)
+    {Ladder of Machine Understanding};
+
+  % Ladder side rails (full panel length)
+  \draw[gunmetal!85, line width=4.5pt] (-2.55, -6.5) -- (-2.55, 8.0);
+  \draw[gunmetal!85, line width=4.5pt] ( 2.55, -6.5) -- ( 2.55, 8.0);
+  % rail endcaps (top + bottom)
+  \fill[gunmetal!85] (-2.78, 8.0)   rectangle (-2.32, 8.18);
+  \fill[gunmetal!85] ( 2.32, 8.0)   rectangle ( 2.78, 8.18);
+  \fill[gunmetal!85] (-2.78, -6.65) rectangle (-2.32, -6.50);
+  \fill[gunmetal!85] ( 2.32, -6.65) rectangle ( 2.78, -6.50);
+
+  % --- Rung 4 (Decision) — top ---
+  \node[font=\LARGE, text=forgis_orange] at (-1.6, 6.20) {\faWrench};
+  \node[font=\sffamily\bfseries\scriptsize, text=forgis_orange, anchor=west]
+    at (-0.85, 6.65) {Rung 4 (Decision)};
+  \node[font=\sffamily\scriptsize\itshape, text=gunmetal, anchor=west]
+    at (-0.85, 6.20) {`How do I fix the fault?'};
+  % horizontal beam (separator below Rung 4)
+  \fill[gunmetal!85] (-2.55, 4.40) rectangle (2.55, 4.55);
+
+  % --- Rung 3 (Counterfactual) ---
+  \node[font=\LARGE, text=forgis_orange] at (-1.6, 2.65) {\faCodeBranch};
+  \node[font=\sffamily\bfseries\scriptsize, text=forgis_orange, anchor=west]
+    at (-0.85, 3.10) {Rung 3 (Counterfactual)};
+  \node[font=\sffamily\scriptsize\itshape, text=gunmetal, anchor=west,
+        text width=3.0cm]
+    at (-0.85, 2.65) {`What would have happened if\dots?'};
+  \fill[gunmetal!85] (-2.55, 0.80) rectangle (2.55, 0.95);
+
+  % --- Rung 2 (Intervention) ---
+  \node[font=\LARGE, text=forgis_orange] at (-1.6, -0.95) {\faHandPointer};
+  \node[font=\sffamily\bfseries\scriptsize, text=forgis_orange, anchor=west]
+    at (-0.85, -0.50) {Rung 2 (Intervention)};
+  \node[font=\sffamily\scriptsize\itshape, text=gunmetal, anchor=west,
+        text width=3.0cm]
+    at (-0.85, -0.95) {`What if I change the force now?'};
+  \fill[gunmetal!85] (-2.55, -2.80) rectangle (2.55, -2.65);
+
+  % --- Rung 1 (State) — bottom ---
+  \node[font=\LARGE, text=forgis_orange] at (-1.6, -4.55) {\faEye};
+  \node[font=\sffamily\bfseries\scriptsize, text=forgis_orange, anchor=west]
+    at (-0.85, -4.10) {Rung 1 (State)};
+  \node[font=\sffamily\scriptsize\itshape, text=gunmetal, anchor=west,
+        text width=3.0cm]
+    at (-0.85, -4.55) {`What is the machine doing?'};
+  \fill[gunmetal!85] (-2.55, -6.40) rectangle (2.55, -6.25);
+
+  % Anchors on left/right of each rung (for incoming/outgoing arrows)
+  \coordinate (rung4_L) at (-3.0,  6.20);
+  \coordinate (rung3_L) at (-3.0,  2.65);
+  \coordinate (rung2_L) at (-3.0, -0.95);
+  \coordinate (rung1_L) at (-3.0, -4.55);
+
+  \coordinate (rung4_R) at ( 3.0,  6.20);
+  \coordinate (rung3_R) at ( 3.0,  2.65);
+  \coordinate (rung2_R) at ( 3.0, -0.95);
+  \coordinate (rung1_R) at ( 3.0, -4.55);
+\end{scope}
+
+% ============================================================
+%  NODE 3 — THE BENCHMARK GAP
+% ============================================================
+\begin{scope}[xshift=17cm]
+  \fill[panelbg, rounded corners=8pt] (-3.5, -7.6) rectangle (3.5, 9.0);
+
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal] at (0, 8.55)
+    {Scalable Q\&A Generation};
+
+  % --- Performance Matrix (heatmap) ---
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal] at (-1.85, 8.05)
+    {Performance Matrix};
+  \begin{scope}[shift={(-3.0, 5.5)}]
+    \foreach \i in {0,1,2,3,4,5} {
+      \foreach \j in {0,1,2,3,4,5} {
+        \pgfmathsetmacro{\val}{0.18 + 0.12*(\i+\j) + 0.05*rand}
+        \fill[forgis_orange, opacity=\val]
+          ({0.30*\j}, {0.30*\i}) rectangle
+          ({0.30*\j+0.28}, {0.30*\i+0.28});
+      }
+    }
+    \draw[gunmetal!50, line width=0.4pt] (0,0) rectangle (1.80, 1.80);
+    % axis labels
+    \foreach \i/\lab in {0/R1, 1/R2, 2/R3, 3/R4} {
+      \node[font=\sffamily\scriptsize, text=gunmetal] at (-0.20, 0.30*\i+0.15) {\lab};
+      \node[font=\sffamily\scriptsize, text=gunmetal, rotate=45]
+        at (0.30*\i+0.15, -0.30) {\lab};
+    }
+  \end{scope}
+
+  % --- Literacy vs Machine Understanding (real figure) ---
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal,
+        align=center, text width=3.6cm]
+    at (1.50, 7.85)
+    {Difficulty: Telemetry Literacy vs Machine Understanding};
+  \node[inner sep=0pt, anchor=center] at (1.50, 6.20)
+    {\includegraphics[width=3.4cm,height=2.30cm,keepaspectratio]%
+       {literacy_vs_machine_understanding_summary.png}};
+
+  % --- RESULT GAP callout ---
+  \fill[warm_amber, rounded corners=4pt] (-3.20, 3.20) rectangle (3.20, 4.55);
+  \draw[flicker, line width=1.2pt, rounded corners=4pt]
+    (-3.20, 3.20) rectangle (3.20, 4.55);
+  \node[font=\sffamily\bfseries\scriptsize, text=flicker] at (0, 4.25)
+    {RESULT GAP};
+  \node[font=\sffamily\scriptsize, text=gunmetal, align=center,
+        text width=6.0cm]
+    at (0, 3.70)
+    {Fault Understanding Collapse};
+  \node[align=center] at (0, 3.32) {\citeFS};
+
+  % --- Template-based Q Generation block ---
+  \fill[white, rounded corners=4pt] (-3.20, 1.30) rectangle (3.20, 2.85);
+  \draw[blue, line width=1pt, rounded corners=4pt]
+    (-3.20, 1.30) rectangle (3.20, 2.85);
+  \node[font=\large, text=blue] at (-2.55, 2.30) {\faFile};
+  \node[font=\sffamily\bfseries\scriptsize, text=blue, anchor=west]
+    at (-2.05, 2.50) {Template-based};
+  \node[font=\sffamily\bfseries\scriptsize, text=blue, anchor=west]
+    at (-2.05, 2.10) {Question Generation};
+  \node[font=\sffamily\scriptsize, text=gunmetal, anchor=west, text width=5.2cm]
+    at (-2.05, 1.65)
+    {State $\cdot$ Intervention $\cdot$ Counterfactual};
+
+  % --- Computed Ground Truth (database) ---
+  \begin{scope}[shift={(-1.85, -1.0)}]
+    % Database silhouette
+    \fill[white] (-0.65, -0.55) -- (-0.65, 0.55)
+      to[bend left=18] (0.65, 0.55) -- (0.65, -0.55)
+      to[bend right=18] cycle;
+    \draw[forgis_orange, line width=1pt]
+      (-0.65, -0.55) -- (-0.65, 0.55)
+      to[bend left=18] (0.65, 0.55) -- (0.65, -0.55)
+      to[bend right=18] cycle;
+    \draw[forgis_orange, line width=0.8pt]
+      (-0.65, 0.55) to[bend right=18] (0.65, 0.55);
+    \draw[forgis_orange, line width=0.8pt]
+      (-0.65, 0.20) to[bend right=18] (0.65, 0.20);
+    \draw[forgis_orange, line width=0.8pt]
+      (-0.65, -0.15) to[bend right=18] (0.65, -0.15);
+    % small icons
+    \node[font=\tiny, text=forgis_orange] at (-0.30, 0.05) {\faCog};
+    \node[font=\tiny, text=forgis_orange] at ( 0.00, 0.05) {\faCube};
+    \node[font=\tiny, text=forgis_orange] at ( 0.30, 0.05) {\faWrench};
+  \end{scope}
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal, align=center]
+    at (-1.85, -2.10) {Computed};
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal, align=center]
+    at (-1.85, -2.45) {Ground Truth};
+
+  % --- Counterfactual Qs block ---
+  \fill[white, rounded corners=4pt] (0.40, -1.85) rectangle (3.20, -0.35);
+  \draw[forgis_orange, line width=1pt, rounded corners=4pt]
+    (0.40, -1.85) rectangle (3.20, -0.35);
+  % Title at top-left of the box
+  \node[font=\sffamily\bfseries\scriptsize, text=forgis_orange, anchor=west]
+    at (0.55, -0.65) {Counterfactual Qs};
+  % Icon below the title, on the left
+  \node[font=\Large, text=forgis_orange] at (0.85, -1.30) {\faQuestionCircle};
+  % Subtitle next to the icon
+  \node[font=\sffamily\scriptsize, text=gunmetal, anchor=west, text width=1.8cm]
+    at (1.30, -1.30) {Template-based generation};
+
+  % --- Hugging Face leaderboard ---
+  \fill[white, rounded corners=4pt] (-3.20, -5.30) rectangle (3.20, -3.45);
+  \draw[gunmetal, line width=1pt, rounded corners=4pt]
+    (-3.20, -5.30) rectangle (3.20, -3.45);
+  \node[inner sep=0pt, anchor=center] at (-2.30, -4.40)
+    {\includegraphics[width=1.4cm]{huggingface_logo.png}};
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal, anchor=west]
+    at (-1.50, -4.05) {Hugging Face};
+  \node[font=\sffamily\bfseries\scriptsize, text=gunmetal, anchor=west]
+    at (-1.50, -4.55) {Leaderboard};
+  \node[font=\sffamily\scriptsize\itshape, text=steel, anchor=west]
+    at (-1.50, -4.95) {Public benchmark integration};
+
+  % --- internal arrows ---
+  \draw[gunmetal, line width=0.8pt, ->]
+    (0, 1.30) -- (0, 0.50);
+  \draw[gunmetal, line width=0.8pt, ->]
+    (-1.85, -1.85) -- (-1.85, -3.45);
+  \draw[gunmetal, line width=0.8pt, ->]
+    ( 1.80, -1.85) -- ( 1.80, -3.45);
+  % connector from CF Qs to GT
+  \draw[gunmetal, line width=0.8pt, ->]
+    (0.40, -1.10) -- (-1.20, -1.10);
+
+  % Anchors (4 anchors aligned with the 4 stretched rungs)
+  \coordinate (n3west_top) at (-3.5,  6.00);  % matrix/bars row    <- Rung 4
+  \coordinate (n3west_mid) at (-3.5,  2.65);  % template Q          <- Rung 3
+  \coordinate (n3west_low) at (-3.5, -1.00);  % computed GT (DB)    <- Rung 2
+  \coordinate (n3west_hf)  at (-3.5, -4.30);  % HF leaderboard      <- Rung 1
+\end{scope}
+
+% ============================================================
+%  CROSS-PANEL ARROWS
+% ============================================================
+% Single cross-panel arrows (Input -> Ladder, Ladder -> Benchmark Gap)
+\draw[gunmetal, line width=3pt, -{Stealth[length=10pt, width=10pt]}]
+  (4.5, 0.7) -- (5.5, 0.7);
+\draw[gunmetal, line width=3pt, -{Stealth[length=10pt, width=10pt]}]
+  (11.5, 0.7) -- (13.5, 0.7);
+
+\end{tikzpicture}
+\end{document}
