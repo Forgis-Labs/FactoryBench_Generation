@@ -263,7 +263,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 \draw[L1tint!85!darknavy, line width=1.0pt, rounded corners=4pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
 
                 \filldraw[L1tint] (-\panelw/2+0.34, \panelh/2-0.30) circle (0.20);
-                \node[font=\sffamily\bfseries\scriptsize, white] at (-\panelw/2+0.34, \panelh/2-0.30) {1};
+                \node[font=\sffamily\bfseries\tiny, white] at (-\panelw/2+0.34, \panelh/2-0.30) {L1};
                 \node[anchor=west, font=\sffamily\bfseries\small, L1tint!80!darknavy] at (-\panelw/2+0.62, \panelh/2-0.30) {State};
                 \node[anchor=east, font=\sffamily\scriptsize, text=darknavy!85] at ( \panelw/2-0.30, \panelh/2-0.30) {$P(E \mid S, C)$};
                 \draw[L1tint!25, line width=0.35pt] (-\panelw/2+0.20, \panelh/2-0.62) -- (\panelw/2-0.20, \panelh/2-0.62);
@@ -299,7 +299,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 \draw[L2tint!85!darknavy, line width=1.0pt, rounded corners=4pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
 
                 \filldraw[L2tint] (-\panelw/2+0.34, \panelh/2-0.30) circle (0.20);
-                \node[font=\sffamily\bfseries\scriptsize, white] at (-\panelw/2+0.34, \panelh/2-0.30) {2};
+                \node[font=\sffamily\bfseries\tiny, white] at (-\panelw/2+0.34, \panelh/2-0.30) {L2};
                 \node[anchor=west, font=\sffamily\bfseries\small, L2tint!75!darknavy] at (-\panelw/2+0.62, \panelh/2-0.30) {Intervention};
                 \node[anchor=east, font=\sffamily\scriptsize, text=darknavy!85] at ( \panelw/2-0.30, \panelh/2-0.30) {$P(E_{t>0} \mid \mathrm{do}(C))$};
                 \draw[L2tint!30, line width=0.35pt] (-\panelw/2+0.20, \panelh/2-0.62) -- (\panelw/2-0.20, \panelh/2-0.62);
@@ -324,9 +324,9 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                       -{Stealth[length=6pt, width=5pt]}]
                     (-3, 1.00) .. controls (-3, 0.45) and (-2.55, 0.35) .. (-2.55, -0.15);
 
-                \draw[forgisorange, line width=1.4pt] (-1.85, 0.35) -- (-1.45, 0.35);
+                \draw[figcontext, line width=1.4pt] (-1.85, 0.35) -- (-1.45, 0.35);
                 \node[anchor=west, font=\sffamily\scriptsize, darknavy] at (-1.40, 0.35) {$C$ \,(forced)};
-                \draw[figgreen, line width=1.4pt] (-1.85, -0.05) -- (-1.45, -0.05);
+                \draw[forgisorange, line width=1.4pt] (-1.85, -0.05) -- (-1.45, -0.05);
                 \node[anchor=west, font=\sffamily\scriptsize, darknavy] at (-1.40, -0.05) {$E$};
 
                 \begin{scope}[shift={(0.9, -0.05)}]
@@ -337,8 +337,8 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                         % Probabilistic confidence band around the predicted E
                         % trajectory: zero width at "Now" and widening with the
                         % prediction horizon. Reflects the P(.) in the panel title
-                        % so the green curve no longer reads as deterministic.
-                        \fill[figgreen!30, draw=none]
+                        % so the orange curve no longer reads as deterministic.
+                        \fill[forgisorange!30, draw=none]
                             (axis cs:160, 3.9) -- (axis cs:200, 4.95) -- (axis cs:250, 6.10) --
                             (axis cs:300, 6.60) -- (axis cs:400, 6.65) -- (axis cs:500, 6.75) --
                             (axis cs:500, 4.65) -- (axis cs:400, 4.95) -- (axis cs:300, 5.40) --
@@ -349,18 +349,20 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                         \draw[darknavy, line width=0.5pt, dashed] (axis cs:160,0) -- (axis cs:160,9.5);
                         \node[anchor=south west, font=\sffamily\tiny, darknavy] at (axis cs:50, 0.5) {Now};
 
-                        % Orange C: short physical rise (160 -> 175 ms) instead of
-                        % an instantaneous step, so the trace looks like raw force
-                        % telemetry rather than a synthetic step function.
-                        \addplot[forgisorange, line width=1pt] coordinates { (0,4) (160,4) (175,4.8) (300,4.8) (400,4.8) (500,4.8) };
-                        % Green E: smoothed mean trajectory (probabilistic prediction
-                        % whose uncertainty is rendered by the band above).
-                        \addplot[figgreen, line width=1pt, smooth] coordinates { (0,3.9) (160,3.9) (250,5.6) (300,6) (400,5.8) (500,5.7) };
+                        % Yellow C (figcontext): short physical rise (160 -> 175 ms)
+                        % instead of an instantaneous step, so the trace looks like
+                        % raw context-perturbation telemetry rather than a synthetic
+                        % step function. Color matches the SCE schema fixed in L1.
+                        \addplot[figcontext, line width=1pt] coordinates { (0,4) (160,4) (175,4.8) (300,4.8) (400,4.8) (500,4.8) };
+                        % Orange E (forgisorange): smoothed mean trajectory
+                        % (probabilistic prediction whose uncertainty is rendered by
+                        % the band above). Color matches the SCE schema fixed in L1.
+                        \addplot[forgisorange, line width=1pt, smooth] coordinates { (0,3.9) (160,3.9) (250,5.6) (300,6) (400,5.8) (500,5.7) };
                     \end{axis}
                 \end{scope}
 
                 \node[anchor=south, font=\sffamily\scriptsize\itshape, darknavy, text width=7.8cm, align=center]
-                at (0, -\panelh/2+0.45) {``If force increases at this timestep, what happens next?''};
+                at (0, -\panelh/2+0.45) {``The robot is exhibiting unexpected\_payload. What would most likely happen to the joint torques next?''};
                 \node[anchor=south, font=\sffamily\tiny, figsteel, text width=7.8cm, align=center]
                 at (0, -\panelh/2+0.12) {Predicting the future consequences of a physical perturbation happening now.};
             \end{scope}
@@ -373,13 +375,12 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 \draw[L3tint!85!darknavy, line width=1.0pt, rounded corners=4pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
 
                 \filldraw[L3tint] (-\panelw/2+0.34, \panelh/2-0.30) circle (0.20);
-                \node[font=\sffamily\bfseries\scriptsize, white] at (-\panelw/2+0.34, \panelh/2-0.30) {3};
+                \node[font=\sffamily\bfseries\tiny, white] at (-\panelw/2+0.34, \panelh/2-0.30) {L3};
                 \node[anchor=west, font=\sffamily\bfseries\small, L3tint!80!darknavy] at (-\panelw/2+0.62, \panelh/2-0.30) {Counterfactual};
                 \node[anchor=east, font=\sffamily\scriptsize, text=darknavy!85] at ( \panelw/2-0.30, \panelh/2-0.30) {$P(E_{C=x} \mid S{=}s, E{=}e)$};
                 \draw[L3tint!25, line width=0.35pt] (-\panelw/2+0.20, \panelh/2-0.62) -- (\panelw/2-0.20, \panelh/2-0.62);
 
                 \drawminirobot{-3.1}{-0.30}{0}{L3tint}
-                \node[font=\sffamily\scriptsize\bfseries, L3tint!80!darknavy, anchor=north] at (-2.65, -0.98) {actual run};
 
                 \fill[L3tint!80!darknavy, opacity=0.6] (-2.35, 0.25) circle (0.045);
                 \fill[L3tint!80!darknavy, opacity=0.7] (-2.20, 0.50) circle (0.060);
@@ -388,28 +389,67 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 \fill[white] (-1.55, 1.05) ellipse (1.10 and 0.50);
                 \draw[L3tint!80!darknavy, line width=0.55pt, dashed] (-1.55, 1.05) ellipse (1.10 and 0.50);
 
-                % Tiny ghost robot in the bubble
-                \begin{scope}[shift={(-2.15, 1.08)}, scale=0.20]
-                    \fill[L3tint!12] (-0.45,-1.35) rectangle (0.45,-0.95);
-                    \draw[L3tint!80!darknavy, line width=1.2pt] (-0.45,-1.35) rectangle (0.45,-0.95);
-                    \draw[L3tint!80!darknavy, line width=1.6pt, dashed] (0,-0.95) -- (0.7,0.05);
-                    \draw[L3tint!80!darknavy, line width=1.4pt, dashed] (0.7,0.05) -- (1.6,0.6);
-                    \draw[L3tint!80!darknavy, line width=1.0pt, dashed] (1.6,0.6) -- (2.0,-0.30);
-                    \fill[L3tint!30] (1.85,-0.45) rectangle (2.15,-0.70);
+                % Counterfactual robot inside the thought bubble: SAME PNG as the
+                % actual run, rendered semi-transparent so it reads as "imagined
+                % alternative history" instead of a separate object.
+                % transparency group makes the opacity apply to the bitmap rather
+                % than only the node's outline.
+                \begin{scope}[transparency group, opacity=0.45]
+                    \node[anchor=center, inner sep=0pt] at (-2.1, 1.05)
+                        {\includegraphics[width=0.75cm]{figures/ur_robot_figure.png}};
                 \end{scope}
                 \node[font=\sffamily\scriptsize\bfseries, red!60!darknavy, anchor=west] at (-1.80, 1.15) {STALL!};
                 \node[font=\sffamily\scriptsize\itshape, L3tint!80!darknavy, anchor=west] at (-1.80, 0.90) {(if forced)};
 
-                \draw[figgreen, line width=1.4pt] (-1.85, 0.35) -- (-1.45, 0.35);
-                \node[anchor=west, font=\sffamily\scriptsize, darknavy] at (-1.40, 0.35) {$E$ \,(factual)};
-                \draw[figgreen, line width=1.4pt, dashed] (-1.85, -0.05) -- (-1.45, -0.05);
-                \node[anchor=west, font=\sffamily\scriptsize, darknavy] at (-1.40, -0.05) {$E$ \,(CF)};
+                % Legend: S (setpoint) added on top so the panel matches the math
+                % notation P(E_{C=x} | S=s, E=e), which conditions on S. Stack is
+                % shifted further down (top swatch at y=0.30) so it separates
+                % visually from the thought-bubble's bottom tangent at y=0.55
+                % and from the trail dot at (-2.20, 0.50). Internal dy=0.35
+                % preserved.
+                \draw[figgreen, line width=1.4pt] (-1.85, 0.30) -- (-1.45, 0.30);
+                \node[anchor=west, font=\sffamily\scriptsize, darknavy] at (-1.40, 0.30) {$S$};
+                \draw[forgisorange, line width=1.4pt] (-1.85, -0.05) -- (-1.45, -0.05);
+                \node[anchor=west, font=\sffamily\scriptsize, darknavy] at (-1.40, -0.05) {$E$ \,(factual)};
+                \draw[forgisorange, line width=1.4pt, dashed] (-1.85, -0.40) -- (-1.45, -0.40);
+                \node[anchor=west, font=\sffamily\scriptsize, darknavy] at (-1.40, -0.40) {$E$ \,(CF)};
 
                 \begin{scope}[shift={(0.9, -0.05)}]
                     \begin{axis}[pearlplot]
+                        % Confidence band around the counterfactual E trajectory.
+                        % Anchored at zero width on the bifurcation t=20 ms and
+                        % widening as the alternative history drifts further from
+                        % the observed evidence -- mirrors the L2 band and gives
+                        % visual weight to the P(.) of probabilistic CF reasoning.
+                        \fill[forgisorange!30, draw=none]
+                            (axis cs:20, 3.9) -- (axis cs:50, 4.7) -- (axis cs:100, 6.2) --
+                            (axis cs:200, 9.0) -- (axis cs:300, 9.7) -- (axis cs:400, 9.7) --
+                            (axis cs:500, 9.7) --
+                            (axis cs:500, 9.1) -- (axis cs:400, 9.1) -- (axis cs:300, 8.9) --
+                            (axis cs:200, 8.0) -- (axis cs:100, 5.4) -- (axis cs:50, 4.3) -- cycle;
+
+                        % Bifurcation event line + label anchored next to the
+                        % dashed vertical so the question's "that event" ties
+                        % directly to do(C=x) from the equation. Position lowered
+                        % to y=6.0 (was 8.7) so the eye reads dashed-line + label
+                        % + bifurcation dot as one event group, and a thin leader
+                        % connects the label down to the dot for explicit
+                        % anchoring.
                         \draw[darknavy, line width=0.5pt, dashed] (axis cs:20,0) -- (axis cs:20,9.5);
-                        \addplot[figgreen, line width=1pt, smooth] coordinates { (0,3.9) (100,4.1) (200,4.1) (300,4.1) (400,4) (500,4) };
-                        \addplot[figgreen, line width=1pt, dashed, smooth] coordinates { (0,3.9) (50,4.5) (100,5.8) (200,8.5) (300,9.3) (400,9.4) (500,9.4) };
+                        \node[anchor=south west, font=\sffamily\tiny\bfseries,
+                              text=figcontext!60!darknavy] at (axis cs:23, 0.0) {Event\,$\mathrm{do}(C{=}x)$};
+                        \draw[figcontext!60!darknavy, line width=0.35pt, dotted, line cap=round]
+                            (axis cs:23, 5.85) -- (axis cs:21, 4.2);
+
+                        % S setpoint (figgreen): the controller's commanded value,
+                        % the reference both factual and counterfactual E are read
+                        % against. Without it, deviations have no anchor.
+                        \addplot[figgreen, line width=1pt] coordinates { (0,4) (500,4) };
+                        % E factual and E counterfactual share the same SCE colour
+                        % (forgisorange = E across the whole figure); the dashed
+                        % style is what distinguishes the counterfactual trace.
+                        \addplot[forgisorange, line width=1pt, smooth] coordinates { (0,3.9) (100,4.1) (200,4.1) (300,4.1) (400,4) (500,4) };
+                        \addplot[forgisorange, line width=1pt, dashed, smooth] coordinates { (0,3.9) (50,4.5) (100,5.8) (200,8.5) (300,9.3) (400,9.4) (500,9.4) };
                         \filldraw[darknavy] (axis cs:20,3.9) circle (1.5pt);
                     \end{axis}
                 \end{scope}
@@ -428,26 +468,41 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 \draw[L4tint!85!darknavy, line width=1.0pt, rounded corners=4pt] (-\panelw/2, -\panelh/2) rectangle (\panelw/2, \panelh/2);
 
                 \filldraw[L4tint] (-\panelw/2+0.34, \panelh/2-0.30) circle (0.20);
-                \node[font=\sffamily\bfseries\scriptsize, white] at (-\panelw/2+0.34, \panelh/2-0.30) {4};
+                \node[font=\sffamily\bfseries\tiny, white] at (-\panelw/2+0.34, \panelh/2-0.30) {L4};
                 \node[anchor=west, font=\sffamily\bfseries\small, L4tint!85!darknavy] at (-\panelw/2+0.62, \panelh/2-0.30) {Decision};
                 \node[anchor=east, font=\sffamily\scriptsize, text=darknavy!85] at ( \panelw/2-0.30, \panelh/2-0.30) {$\pi^{*}=\arg\max_{\pi} U(\pi\mid E,S,C,K)$};
                 \draw[L4tint!30, line width=0.35pt] (-\panelw/2+0.20, \panelh/2-0.62) -- (\panelw/2-0.20, \panelh/2-0.62);
 
                 \drawminirobot{-3.0}{-0.4}{0}{L4tint}
-                \filldraw[L4tint!80!darknavy] (-2.15, 0.55) circle (1.4pt);
-                \draw[L4tint, line width=1pt] (-2.15, 0.55) -- (-1.55, 1.00);
-                \draw[L4tint!50, line width=0.6pt] (-2.15, 0.55) -- (-1.55, 0.55);
-                \draw[L4tint!50, line width=0.6pt] (-2.15, 0.55) -- (-1.55, 0.10);
-                
+
+                % Sequential recovery flow (a -> b -> c). Was a tree-of-branches
+                % from a single origin, which read as "pick one of three options"
+                % -- semantically wrong: the right-hand Plan box lists these as
+                % an ordered procedure, so the left visual must agree.
+                % All three boxes share the same active styling (no current-step
+                % highlight) since the model emits the whole procedure at once.
+                % minimum width pins the boxes to the same width so the arrows
+                % between consecutive .south / .north anchors are perfectly
+                % vertical.
                 \node[draw=L4tint, fill=L4tint!15, rounded corners=1.5pt, line width=0.6pt,
                     font=\sffamily\scriptsize\bfseries, text=L4tint!80!darknavy,
-                    inner xsep=3pt, inner ysep=1pt, anchor=west] at (-1.55, 1.00) {a) stop};
-                \node[draw=L4tint!40, fill=white, rounded corners=1.5pt, line width=0.4pt,
-                    font=\sffamily\scriptsize, text=darknavy!70,
-                    inner xsep=3pt, inner ysep=1pt, anchor=west] at (-1.55, 0.55) {b) inspect};
-                \node[draw=L4tint!40, fill=white, rounded corners=1.5pt, line width=0.4pt,
-                    font=\sffamily\scriptsize, text=darknavy!70,
-                    inner xsep=3pt, inner ysep=1pt, anchor=west] at (-1.55, 0.10) {c) resume};
+                    minimum width=1.45cm, inner xsep=3pt, inner ysep=1pt,
+                    anchor=west, name=stepA] at (-1.85, 0.50) {a) stop};
+                \node[draw=L4tint, fill=L4tint!15, rounded corners=1.5pt, line width=0.6pt,
+                    font=\sffamily\scriptsize\bfseries, text=L4tint!80!darknavy,
+                    minimum width=1.45cm, inner xsep=3pt, inner ysep=1pt,
+                    anchor=west, name=stepB] at (-1.85, 0.0) {b) inspect};
+                \node[draw=L4tint, fill=L4tint!15, rounded corners=1.5pt, line width=0.6pt,
+                    font=\sffamily\scriptsize\bfseries, text=L4tint!80!darknavy,
+                    minimum width=1.45cm, inner xsep=3pt, inner ysep=1pt,
+                    anchor=west, name=stepC] at (-1.85, -0.50) {c) resume};
+
+                \draw[L4tint!80!darknavy, line width=0.7pt,
+                      -{Stealth[length=3.5pt, width=3.5pt]}]
+                    (stepA.south) -- (stepB.north);
+                \draw[L4tint!80!darknavy, line width=0.7pt,
+                      -{Stealth[length=3.5pt, width=3.5pt]}]
+                    (stepB.south) -- (stepC.north);
 
                 \node[draw=darknavy!40, fill=white, rounded corners=2pt, line width=0.5pt,
                     font=\sffamily\scriptsize, text=darknavy, align=left,
