@@ -1255,6 +1255,34 @@ Table~\ref{tab:qa_examples} presents seventeen representative Q\&A pairs spannin
 \todo[inline]{After Karim finishes the simulations, we fill this section up. Describe the simulation pipeline used for sim2real analysis: physics engine and version, robot URDFs, controller stack, supported tasks and fault applicators, randomization strategy, logging frequency and signal coverage, and how simulated episodes are aligned with the FactoryWave schema.}
 
 
+\section{Telemetry literacy vs.\ machine understanding}
+\label{app:literacy_vs_understanding}
+
+A model can reach a correct answer in two qualitatively different ways: (i)~by \emph{reading the telemetry} locating the right segment of the time series, identifying the active phase, recovering a numerical value within tolerance or (ii)~by \emph{reasoning about the machine} combining the read-off signal with knowledge of the controller, the task structure, the fault catalogue, and the manufacturer manual to predict an intervention, attribute a root cause, or produce a remediation protocol. The two capabilities can dissociate, as a model may parse the signal cleanly but fail to compose that information with machine-level knowledge, or hold strong priors over machine behaviour that compensate for shallow signal reading.
+
+To probe this dissociation, we divide 83 Q\&A pairs from the FactoryBench evaluation set into two diagnostic groups that target the two capabilities separately. The \textbf{telemetry literacy} group contains questions that can be answered from the attached time series alone, with no required knowledge of the robot. The \textbf{machine understanding} group contains questions that additionally require composing the telemetry with machine-level knowledge, such as predicting the effect of an intervention, attributing a fault to a root cause, or anticipating downstream consequences. Both groups are scored under the same per-format rubrics of Appendix~\ref{app:answer-formats}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/literacy_vs_machine_understanding.png}
+    \caption{Per-model accuracy on the telemetry-literacy and machine-understanding diagnostic groups ($n=83$ Q\&A pairs per group). The gap between the two capabilities varies widely across models, with most models demonstrating strong performance in telemetry but limited comprehension of machine-level concepts.}
+    \label{fig:literacy_vs_machine_understanding}
+\end{figure}
+
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/accuracy_by_reasoning_level.png}
+    \caption{Per-model accuracy decomposed by reasoning level on the same balanced subset (83 Q\&A pairs per model per category, with the 83 machine-understanding questions split between Level~2 and Level~3). Level~1 corresponds to telemetry-literacy questions; Levels~2 and~3 correspond to machine-understanding questions. The sharp L1$\to$L2 drop seen in most models locates the bottleneck at the point where the telemetry must be combined with machine-level knowledge, rather than at the counterfactual rung (L3).}
+    \label{fig:accuracy_by_reasoning_level}
+\end{figure}
+
+Figure~\ref{fig:literacy_vs_machine_understanding} shows the difficulty of LLMs between these two groups. The y-axis gives the per-question accuracy averaged across all questions, and the x-axis gives the seven models evaluated. We observe that six of the seven models score higher on telemetry literacy than on machine understanding, with the gap exceeding 20 percentage points for \texttt{claude-haiku-4-5} (55.0\,\% vs.\ 23.5\,\%) and \texttt{mistral-large-3} (43.0\,\% vs.\ 19.9\,\%); these models can read the signal but stop short of using it to reason about the machine. In the other hand, \texttt{claude-sonnet-4-6} is the only model that inverts the pattern (38.3\,\% literacy vs.\ 53.3\,\% understanding), suggesting it leans more on prior knowledge of robotic systems than on close reading of the attached telemetry, while \texttt{gpt-5.1} reaches parity at 34.3\,\% on both.
+
+
+The two diagnostic groups are populated from different reasoning levels of the benchmark. The 83 telemetry-literacy questions are drawn entirely from \textbf{Level~1}, with questions that can be answered from the attached time series alone (phase identification, value read-off, segment ranking, anomaly spotting). The 83 machine-understanding questions are drawn from \textbf{Level~2} and \textbf{Level~3}, both of which target capabilities that go beyond literal signal reading: Level~2 requires composing the telemetry with knowledge of the robot's rated limits, safety modes, and controller behaviour, and Level~3 additionally requires counterfactual reasoning over alternative histories of the same episode. Decomposing the machine-understanding bar of Figure~\ref{fig:literacy_vs_machine_understanding} into its L2 and L3 components (Figure~\ref{fig:accuracy_by_reasoning_level}) shows that the L1$\to$L2 transition is where most models lose ground (e.g.\ \texttt{mistral-large-3} drops from 43.0\,\% to 17.1\,\%, \texttt{claude-haiku-4-5} from 55.0\,\% to 22.8\,\%), while L2$\to$L3 is flat or slightly improving for several models. \texttt{claude-sonnet-4-6} is again the exception: accuracy rises monotonically with reasoning level (38.3\,\%~$\to$~43.3\,\%~$\to$~63.1\,\%), consistent with its inverted pattern in the headline figure.
+
+
 \section{Random-context control: do the questions need the time series?}
 \label{app:random_context}
 
