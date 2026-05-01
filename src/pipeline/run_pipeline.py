@@ -165,10 +165,7 @@ def stage_eval(
         "--questions", str(q_dir),
         "--model", model,
     ]
-    # --eval-level is foundry-only (used for Opik tagging); the AWS path
-    # doesn't accept it.
-    if eval_module.endswith("run_foundry_eval"):
-        cmd.extend(["--eval-level", eval_level_tag])
+    cmd.extend(["--eval-level", eval_level_tag])
     if args.overwrite:
         cmd.append("--overwrite")
     if args.judge_model:

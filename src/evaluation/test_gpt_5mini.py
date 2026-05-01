@@ -398,11 +398,8 @@ def _estimate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) 
         ("mistral-large",     2.00,   6.00),
         ("mistral-medium",    0.40,   2.00),
         ("mistral-small",     0.20,   0.60),
-        # Qwen (open-weight; representative hosted-inference rate)
-        ("qwen-3.5",          0.50,   1.50),
-        ("qwen-3",            0.50,   1.50),
-        ("qwen2.5-72b",       0.90,   0.90),
-        ("qwen",              0.50,   1.50),
+        # self-hosted
+        ("qwen",              0.00,   0.00),
         # Time-series foundation models served from local checkpoints
         ("chronos",           0.00,   0.00),
         ("moirai",            0.00,   0.00),

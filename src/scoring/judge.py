@@ -23,7 +23,7 @@ from .types import ParseResult
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_JUDGE_MODEL = "gpt-5.1-1"
+DEFAULT_JUDGE_MODEL = "gpt-5-mini"
 DEFAULT_MAX_TOKENS = 256
 # Cap the prediction sent to the judge to avoid blowing the input budget on
 # multi-thousand-token chatty responses.

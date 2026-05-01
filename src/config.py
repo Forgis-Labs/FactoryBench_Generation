@@ -32,18 +32,26 @@ from typing import Any, Dict, List
 
 MODELS: Dict[str, Dict[str, Any]] = {
     # --- Azure Foundry (kept for OpenAI proxy; AWS does not host GPT-5.x) ---
-    "gpt-5.1-1": {
+    # Two foundry entries because Azure deployments are decoupled from the
+    # catalog name. `gpt-5.1` is the headline benchmark model (batch via
+    # GPT_5_1_BATCH_DEPLOYMENT → `gpt-5.1-1`, the globalbatch SKU). `gpt-5-mini`
+    # is the cheaper sibling kept as the LLM-as-judge to avoid bias and cost,
+    # and uses AZURE_OPENAI_CHAT_DEPLOYMENT (the GlobalStandard sync SKU).
+    "gpt-5.1": {
         "provider": "foundry",
         "endpoint_env": "CHAT_ENDPOINT",
         "endpoint_default": "https://student-research-lab-resource.services.ai.azure.com/openai/v1",
         "api_style": "openai",
         "supports_batch": True,
-        # Azure /v1/batches requires a deployment whose SKU is `globalbatch`
-        # or `datazonebatch`. The default `gpt-5.1-1` deployment is
-        # `GlobalStandard` (sync only) and rejects batch with HTTP 400. Set
-        # GPT_5_1_BATCH_DEPLOYMENT to a separate batch-capable deployment
-        # name; absent the env var, batch falls back to concurrent sync.
         "batch_deployment_env": "GPT_5_1_BATCH_DEPLOYMENT",
+    },
+    "gpt-5-mini": {
+        "provider": "foundry",
+        "endpoint_env": "CHAT_ENDPOINT",
+        "endpoint_default": "https://student-research-lab-resource.services.ai.azure.com/openai/v1",
+        "api_style": "openai",
+        "supports_batch": False,
+        "sync_deployment_env": "AZURE_OPENAI_CHAT_DEPLOYMENT",
     },
 
     # --- AWS Bedrock (managed; native batch via S3) -----------------------
@@ -80,6 +88,16 @@ MODELS: Dict[str, Dict[str, Any]] = {
         "api_style": "tgi",
         "supports_async": True,
     },
+    "qwen3-4b": {
+        # Qwen/Qwen3-4B-Instruct-2507 deployed via HuggingFace TGI on SageMaker
+        # async inference (see scripts/deploy_qwen3_4b.py). Text-only, distinct
+        # from the qwen-3.5-4b vision-language entry above.
+        "provider": "sagemaker",
+        "endpoint_env": "QWEN3_4B_SAGEMAKER_ENDPOINT",
+        "region_env": "QWEN3_4B_SAGEMAKER_REGION",
+        "api_style": "tgi",
+        "supports_async": True,
+    },
 }
 
 # Per-provider views derived from the unified MODELS table.
@@ -108,6 +126,24 @@ def get_model_config(model_name: str) -> "Dict[str, Any] | None":
     return MODELS.get(model_name)
 
 
+def _resolve_deployment(model_name: str, env_key: str) -> str:
+    """Resolve a deployment name from ``env_key`` on the model config, falling
+    back to the catalog model name when the env var is not populated."""
+    import os
+    cfg = MODELS.get(model_name) or {}
+    key = cfg.get(env_key)
+    if key:
+        override = os.getenv(key)
+        if override:
+            return override
+    return model_name
+
+
+def get_sync_deployment(model_name: str) -> str:
+    """Deployment name to send to Azure /chat/completions (sync) for ``model_name``."""
+    return _resolve_deployment(model_name, "sync_deployment_env")
+
+
 def get_batch_deployment(model_name: str) -> str:
     """Deployment name to send to Azure /v1/batches for ``model_name``.
 
@@ -116,17 +152,10 @@ def get_batch_deployment(model_name: str) -> str:
     sync-only ``GlobalStandard`` deployment coexist with a separate
     ``globalbatch`` deployment used only by batch jobs.
     """
-    import os
-    cfg = MODELS.get(model_name) or {}
-    env_key = cfg.get("batch_deployment_env")
-    if env_key:
-        override = os.getenv(env_key)
-        if override:
-            return override
-    return model_name
+    return _resolve_deployment(model_name, "batch_deployment_env")
 
 
-DEFAULT_JUDGE_MODEL: str = "gpt-5.1-1"
+DEFAULT_JUDGE_MODEL: str = "gpt-5-mini"
 
 # AWS defaults (can be overridden per-call or via env)
 AWS_REGION_DEFAULT: str = "eu-central-1"  # Frankfurt

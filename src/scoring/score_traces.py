@@ -9,6 +9,14 @@ Usage:
     python -m src.scoring.score_traces --since 2026-04-17T03:58:00Z --no-write-back
     python -m src.scoring.score_traces --since 2026-04-17T03:58:00Z --limit 20 --dry-run
 
+When the trace metadata's ``answer_format`` is wrong (e.g. it was logged
+before a generator/inference fix), pass ``--questions-dir output/questions/levelN``
+to reload the declared ``answer_format.type`` from the local QA files and
+re-score each trace under the correct format:
+
+    python -m src.scoring.score_traces --since 2026-04-30T00:00:00Z \\
+        --questions-dir output/questions/level1 --overwrite
+
 The script is idempotent: traces that already have a `parse_provenance`
 feedback score are skipped unless `--overwrite` is passed.
 """
@@ -50,7 +58,11 @@ PROVENANCE_TO_NUMERIC = {
     "unparseable": 3.0,
 }
 
-MODEL_ALIASES = {"gpt-5-mini-2025-08-07": "gpt-5-mini"}
+MODEL_ALIASES = {
+    "gpt-5-mini-2025-08-07":     "gpt-5.1",
+    "gpt-5.1-2025-11-13":        "gpt-5.1",
+    "claude-haiku-4-5-20251001": "claude-haiku-4-5",
+}
 
 # Flush feedback-score writes to Opik in batches of this many.
 WRITE_BATCH_SIZE = 50
@@ -91,6 +103,37 @@ def _question_text(trace) -> str | None:
     return None
 
 
+def _load_qa_format_index(questions_dir: Path) -> dict[str, str]:
+    """Map ``question`` text -> declared ``answer_format.type`` from local QA files.
+
+    Used to override the ``answer_format`` recorded in Opik metadata when it
+    was inferred wrong at log-time (e.g. tensor answers serialised as
+    ``"a_b_c"`` were misclassified as free_form before the
+    ``infer_answer_format`` fix). Indexed by question text because trace
+    metadata doesn't always carry a usable ``qa_pair_id``.
+    """
+    import json
+    index: dict[str, str] = {}
+    if not questions_dir.is_dir():
+        raise FileNotFoundError(f"--questions-dir not found: {questions_dir}")
+    for path in questions_dir.rglob("*.json"):
+        try:
+            qa = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(qa, dict):
+            continue
+        af = qa.get("answer_format")
+        question = qa.get("question")
+        if isinstance(af, dict) and isinstance(question, str):
+            af_type = str(af.get("type") or "").strip().lower()
+            if af_type:
+                index[question] = af_type
+    logger.info("Loaded %d (question -> answer_format) entries from %s",
+                len(index), questions_dir)
+    return index
+
+
 def _flush_batch(client, batch: list[dict[str, Any]]) -> None:
     if not batch:
         return
@@ -119,6 +162,16 @@ def main() -> None:
                         help="Only score traces with this answer_format "
                              "(e.g. 'ranking'). Useful for targeted re-scores after "
                              "a parser change.")
+    parser.add_argument("--questions-dir", type=Path, default=None,
+                        help="Directory of QA JSON files (e.g. output/questions/level1). "
+                             "When set, the trace's answer_format is overridden by the "
+                             "declared answer_format.type in the matching QA file. Use "
+                             "this after fixing a misclassified answer_format to "
+                             "re-score affected traces under the correct parser.")
+    parser.add_argument("--only-overrides", action="store_true",
+                        help="With --questions-dir, only score traces whose answer_format "
+                             "was actually overridden (skip the rest). Useful for surgical "
+                             "re-scores that don't touch correctly-scored traces.")
     parser.add_argument("--overwrite", action="store_true",
                         help="Re-score traces that already have parse_provenance.")
     parser.add_argument("--dry-run", action="store_true",
@@ -155,6 +208,10 @@ def main() -> None:
         traces = traces[: args.limit]
         logger.info("Limiting to first %d traces", args.limit)
 
+    qa_format_index: dict[str, str] = {}
+    if args.questions_dir is not None:
+        qa_format_index = _load_qa_format_index(args.questions_dir)
+
     rows: list[dict[str, Any]] = []
     pending_writes: list[dict[str, Any]] = []
     provenance_counts: Counter[str] = Counter()
@@ -162,7 +219,9 @@ def main() -> None:
     n_judge_free_form = 0
     n_judge_escalation = 0
     n_skipped_already_scored = 0
+    n_skipped_no_override = 0
     n_missing_data = 0
+    n_format_overridden = 0
 
     for i, tr in enumerate(traces):
         meta = tr.metadata or {}
@@ -174,6 +233,21 @@ def main() -> None:
 
         if prediction is None or ground_truth is None:
             n_missing_data += 1
+            continue
+
+        # Override answer_format from local QA index (when set) — fixes traces
+        # logged before infer_answer_format learned to honour answer_format.type.
+        was_overridden = False
+        if qa_format_index:
+            q_text = _question_text(tr)
+            declared = qa_format_index.get(q_text or "")
+            if declared and declared != answer_format:
+                answer_format = declared
+                n_format_overridden += 1
+                was_overridden = True
+
+        if args.only_overrides and not was_overridden:
+            n_skipped_no_override += 1
             continue
 
         if args.answer_format and answer_format != args.answer_format:
@@ -275,6 +349,10 @@ def main() -> None:
     print(f"Scored         : {len(rows)}")
     print(f"Skipped (already scored, --overwrite to redo): {n_skipped_already_scored}")
     print(f"Skipped (missing prediction/ground_truth)    : {n_missing_data}")
+    if args.only_overrides:
+        print(f"Skipped (no answer_format override)          : {n_skipped_no_override}")
+    if qa_format_index:
+        print(f"answer_format overridden from --questions-dir: {n_format_overridden}")
     print(f"Judge calls    : {n_judge_free_form} (free-form) + {n_judge_escalation} (escalation)")
 
     if not args.no_judge and (n_judge_free_form + n_judge_escalation) > 0:

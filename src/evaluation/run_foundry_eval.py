@@ -258,10 +258,15 @@ def call_model(model: str, prompt: str, max_tokens: int) -> Tuple[str, Dict[str,
     api_key = resolve_api_key()
     endpoint, api_style, api_version = resolve_endpoint(model)
 
+    # Resolve the actual deployment name for sync — this is decoupled from the
+    # catalog name (e.g. catalog "gpt-5.1" → Azure deployment "gpt-5-mini").
+    from src.config import get_sync_deployment
+    sync_model = get_sync_deployment(model)
+
     if api_style == "anthropic":
-        return call_anthropic_style(endpoint, api_key, model, prompt, max_tokens)
+        return call_anthropic_style(endpoint, api_key, sync_model, prompt, max_tokens)
     return call_openai_style(
-        endpoint, api_key, model, prompt, max_tokens,
+        endpoint, api_key, sync_model, prompt, max_tokens,
         api_style=api_style, api_version=api_version,
     )
 
@@ -325,13 +330,33 @@ def build_question_index(questions_dir: Optional[Path]) -> Dict[str, Dict[str, A
     return index
 
 
+_VALID_ANSWER_FORMATS = {
+    "multiple_choice_single_select",
+    "multiple_choice_multi_select",
+    "ranking",
+    "numerical",
+    "tensor",
+    "free_form",
+}
+
+
 def infer_answer_format(q: Dict[str, Any]) -> str:
     """Infer an answer_format string from question payload fields.
 
-    Question generators don't emit an explicit `answer_format`; we derive one
-    from template_type / options / answer shape / level so score_prediction
-    can dispatch correctly.
+    The ``factorynet_qa_*`` datasets declare ``answer_format.type`` directly
+    on each QA — when present and recognised, we use it. Older generators
+    don't emit the field, so we keep the heuristic fallback that derives the
+    format from template_type / options / answer shape / level. The shape
+    fallback misclassifies tensor answers serialised as ``"a_b_c"`` strings
+    (no ``[`` prefix, no float-parseable form) as free_form, which is why the
+    declarative field takes precedence.
     """
+    af = q.get("answer_format")
+    if isinstance(af, dict):
+        declared = str(af.get("type") or "").strip().lower()
+        if declared in _VALID_ANSWER_FORMATS:
+            return declared
+
     level = q.get("level")
     tid = q.get("template_id")
     template_type = str(q.get("template_type") or "").lower()
