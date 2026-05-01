@@ -94,7 +94,6 @@
     "joint_temp_3": "joint_temperatures_3",
     "joint_temp_4": "joint_temperatures_4",
     "joint_temp_5": "joint_temperatures_5",
-    "execution_time": "actual_execution_time",
     "robot_mode": "robot_mode",
     "joint_mode_0": "joint_mode_0",
     "joint_mode_1": "joint_mode_1",
@@ -118,16 +117,20 @@
     "digital_input_bits": "actual_digital_input_bits",
     "digital_output_bits": "actual_digital_output_bits",
     "runtime_state": "runtime_state",
-    "fault_label": "label"
+    "fault_label": "label",
+    "task_phase": "task_phase"
   },
   "machine_id": 0,
   "faults": {
     "0": 0,
-    "1": 16,
-    "2": 17,
-    "3": 18,
-    "4": 19,
-    "5": 20
+    "1": 1,
+    "2": 2,
+    "3": 3,
+    "4": 4,
+    "5": 5
+  },
+  "notes": {
+    "task_phase_derivation": "task_phase is derived at install time from the four pin-bit registers (output_bit_register_64/65/66/67) encoded in the UR3e URCap screwdriving program. See install_aursad.py for the derivation. Mapping: 64=move_to_pin→0 (approach), 65=move_to_home→4 (retract), 66=loosen→6, 67=tighten→2 (screw). These phases follow the UR3e screwing schema in docs/data_recording_instructions.md."
   },
   "absent": [
     "gripper_command",

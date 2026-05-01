@@ -65,6 +65,8 @@ yarn-error.log*
 datasets/open_datasets/*
 data/open_datasets/*
 data/normalized_episodes/*
+data/simulations/*
+data/factorywave/*
 
 #output
 output/*
@@ -90,3 +92,33 @@ figures/paperbanana_runs
 *.nav
 *.snm
 *.vrb
+
+# Generator caches and ad-hoc scratch outputs
+data/.*_cache.json
+phase_files.json
+t7_files.json
+
+# Sim artifacts (keep python source / configs, ignore captures + binary assets)
+sims/**/*.csv
+sims/**/*.parquet
+sims/**/*.h5
+sims/**/*.npy
+sims/**/*.pkl
+sims/**/*.jsonl
+sims/**/cache/
+sims/**/*.stl
+sims/**/*.dae
+sims/**/*.urdf
+sims/**/*.usd
+sims/**/*.usda
+sims/**/*.xacro
+sims/**/*.obj
+sims/**/*.IGS
+sims/**/*.SLDASM
+sims/**/*.SLDPRT
+sims/assets/**/Renderings/
+
+*.out
+*.log
+
+scripts/outputs/

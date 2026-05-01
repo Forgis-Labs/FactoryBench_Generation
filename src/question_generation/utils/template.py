@@ -12,12 +12,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from src.question_generation.utils.feature_categories import filter_features_for_template
 from src.question_generation.utils.time_series import (
-    downsample_peak_preserving,
     encode_time_series,
-    format_note_value,
-    remove_constant_features,
     remove_feature,
     sort_feature_keys,
     strip_null_features,
@@ -33,10 +29,16 @@ def fill(template_str: str, **kwargs: Any) -> str:
     """
     Safe template substitution via str.replace().
     Avoids str.format() pitfalls with literal braces (e.g. {T}, {T+n}).
+    Automatically provides {Event} (sentence-start capitalised version) whenever
+    the 'event' kwarg is supplied, so templates can use {Event} when the
+    event description opens the sentence.
     """
     result = template_str
     for key, value in kwargs.items():
         result = result.replace(f"{{{key}}}", str(value))
+    if "event" in kwargs:
+        s = str(kwargs["event"])
+        result = result.replace("{Event}", s[:1].upper() + s[1:] if s else "")
     return result
 
 
@@ -73,6 +75,25 @@ def pick_scalar_signal(rows: List[Dict[str, Any]]) -> Optional[str]:
     """Pick a random numeric signal name from the first row."""
     names = get_numeric_signal_names(rows)
     return random.choice(names) if names else None
+
+
+def pick_constrained_signal(
+    rows: List[Dict[str, Any]],
+    candidates: List[str],
+) -> Optional[str]:
+    """
+    Pick a signal from candidates that is actually present and numeric in rows.
+    Returns None if no candidate is available.
+    """
+    if not rows:
+        return None
+    available = {
+        key
+        for key in rows[0].keys()
+        if isinstance(rows[0].get(key), (int, float, np.floating))
+    }
+    valid = [c for c in candidates if c in available]
+    return random.choice(valid) if valid else None
 
 
 def pick_joint_velocity_and_torque(
@@ -151,47 +172,17 @@ def sample_chunks(
 # ---------------------------------------------------------------------------
 
 
-def build_context(
-    subseries: List[Dict[str, Any]],
-    template_type: Optional[str] = None,
-    important_features: Optional[List[str]] = None,
-    anchor_timestamps: Optional[set[float]] = None,
-) -> Dict[str, Any]:
+def build_context(subseries: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Build the context dict attached to every generated question.
-    Contains the encoded time series and any constant-feature notes.
-
-    When *template_type* is provided, per-template feature filtering and
-    peak-preserving downsampling are applied to reduce token count.
+    Contains the encoded time series with all features inlined per row.
     """
     ts = strip_null_features(subseries)
-
-    # Layer 1: per-template feature filtering
-    if template_type is not None:
-        ts = filter_features_for_template(ts, template_type)
-
-    # Layer 2: peak-preserving downsampling (cap to 32-64 rows)
-    ts = downsample_peak_preserving(
-        ts,
-        important_features=important_features,
-        anchor_timestamps=anchor_timestamps
-    )
-
     ts = sort_feature_keys(ts)
     ts = remove_feature(ts, "fault_label")
-    ts, constant_features = remove_constant_features(ts)
-    ts = sort_feature_keys(ts)
     encoded, acronym_mapping = encode_time_series(ts)
 
     ctx: Dict[str, Any] = {}
-    if constant_features:
-        ctx["notes"] = {
-            "disclaimer": "these features stayed constant at the following values",
-            "constant_features": {
-                k: format_note_value(constant_features[k])
-                for k in sorted(constant_features.keys())
-            },
-        }
     ctx["time_series_format"] = {
         "description": (
             "Each row in time_series is one timestep encoded as "
@@ -259,14 +250,37 @@ def fill_event_description(
             return None
 
         text = str(raw_event)
-        parts = text.split("_")
-        if len(parts) < 2:
+        underscore_idx = text.find("_")
+        if underscore_idx < 0:
+            return None
+
+        params_str = text[underscore_idx + 1:]
+        if not params_str:
             return None
 
         var_items = list(variables.items())
         if not var_items:
             return {}
 
+        # Key=value format: "motor=motor_2;phase_offset_deg=9.87"
+        if "=" in params_str:
+            parsed_kv: Dict[str, Any] = {}
+            for pair in params_str.split(";"):
+                pair = pair.strip()
+                if "=" not in pair:
+                    continue
+                k, v = pair.split("=", 1)
+                parsed_kv[k.strip()] = _to_float_if_possible(v.strip())
+
+            result: Dict[str, Any] = {}
+            for var_name, var_type in var_items:
+                if var_name in parsed_kv:
+                    val = parsed_kv[var_name]
+                    result[var_name] = _to_int_if_possible(str(val)) if var_type == "integer" else val
+            return result if result else None
+
+        # Positional format (legacy): underscore-separated values after event_id
+        parts = text.split("_")
         tokens = parts[1:]
         parsed: Dict[str, Any] = {}
 
@@ -324,19 +338,27 @@ def fill_event_description(
             kwargs["L"] = L
         return fill(desc, **kwargs)
 
-    signal = pick_scalar_signal(subseries) or "joint_velocity_0"
+    feature_candidates: Optional[List[str]] = event.get("variable_constraints", {}).get("feature_i")
+    if feature_candidates:
+        signal = (
+            pick_constrained_signal(subseries, feature_candidates)
+            or pick_scalar_signal(subseries)
+            or "joint_velocity_0"
+        )
+    else:
+        signal = pick_scalar_signal(subseries) or "joint_velocity_0"
 
     start_val: Optional[float] = None
     end_val: Optional[float] = None
     for row in subseries:
         v = row.get(signal)
         if isinstance(v, (int, float, np.floating)):
-            start_val = round(float(v), 3)
+            start_val = round(float(v), 2)
             break
     for row in reversed(subseries):
         v = row.get(signal)
         if isinstance(v, (int, float, np.floating)):
-            end_val = round(float(v), 3)
+            end_val = round(float(v), 2)
             break
 
     kwargs: Dict[str, Any] = {}
@@ -351,12 +373,12 @@ def fill_event_description(
     if "Y" in variables:
         kwargs["Y"] = end_val if end_val is not None else 0.0
     if "delta" in variables:
-        kwargs["delta"] = round(abs((end_val or 0.0) - (start_val or 0.0)), 3)
+        kwargs["delta"] = round(abs((end_val or 0.0) - (start_val or 0.0)), 2)
     if "duration" in variables:
         kwargs["duration"] = random.randint(2, 10)
     if "rate" in variables:
         n = max(1, len(subseries))
-        kwargs["rate"] = round(((end_val or 0.0) - (start_val or 0.0)) / n, 4)
+        kwargs["rate"] = round(((end_val or 0.0) - (start_val or 0.0)) / n, 2)
     if "x" in variables:
         kwargs["x"] = random.choice([0.5, 1.0, 1.5, 2.0, 2.5])
     if "L" in variables or "{L}" in desc:

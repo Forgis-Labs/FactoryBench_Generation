@@ -482,3 +482,43 @@ def pick_fault_label(rows: List[Dict[str, Any]]) -> int:
     if not labels:
         return 0
     return max(set(labels), key=labels.count)
+
+
+def pick_fault_label_from_meta_or_rows(
+    rows: List[Dict[str, Any]],
+    meta: Optional[Dict[str, Any]] = None,
+) -> int:
+    """Determine the dominant fault for an episode.
+
+    Priority order (per benchmark spec — "fault should be determined by
+    metadata, unless it isn't specified"):
+
+    1. ``meta['fault_id']`` if present and non-None.
+    2. Most common **non-zero** ``fault_label`` across rows. This recovers
+       sparse-anomaly episodes (e.g. factorywave's ~12% with mostly nominal
+       rows + a short anomaly burst) which the plain ``pick_fault_label``
+       wrongly picks as 0 because zeros outnumber the actual anomaly.
+    3. ``0`` (genuinely nominal — no fault_id in metadata, no non-zero
+       fault_label anywhere).
+    """
+    if meta is not None:
+        fid = meta.get("fault_id")
+        if fid is not None:
+            try:
+                return int(float(fid))
+            except (TypeError, ValueError):
+                pass
+    nz: List[int] = []
+    for row in rows or []:
+        val = row.get("fault_label")
+        if val is None:
+            continue
+        try:
+            n = int(float(val))
+        except (TypeError, ValueError):
+            continue
+        if n != 0:
+            nz.append(n)
+    if nz:
+        return max(set(nz), key=nz.count)
+    return 0
