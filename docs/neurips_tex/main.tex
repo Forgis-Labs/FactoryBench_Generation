@@ -670,6 +670,8 @@ Every L1--L3 score is reducible to the deterministic parser, the judge is invoke
 \subsection{Results}
 \label{sec:results}
 
+\todo[inline]{Coral: we should update this section after the final run, incluiding the final model list}
+
 Table~\ref{tab:results} reports measured mean rubric scores for our cross-vendor LLM panel and the simple non-LLM baseline. The baseline dispatches per template type (linear regression on the target signal for tensor-prediction templates, and seeded uniform random over the option set for MC, multi-select and ranking templates) and is therefore deliberately weak: it cannot read the question or use the rest of the context. Level~4 is free-form and excluded from the baseline column because no traditional method maps cleanly to ``produce a remediation protocol''.
 
 \begin{table}[htbp]
