@@ -120,3 +120,5 @@ sims/assets/**/Renderings/
 
 *.out
 *.log
+
+scripts/outputs/
