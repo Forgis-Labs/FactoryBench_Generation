@@ -590,7 +590,7 @@ The complete mapping (error-derived and expert-authored protocols alike) is inge
 \subsection{Zero-shot evaluation}
 \label{sec:zero-shot}
 
-We evaluate a cross-vendor panel of frontier LLMs available at submission time (April 2026): GPT-5.1 \cite{openai2025gpt5mini} and Claude Sonnet 4.6 \cite{anthropic2025claudehaiku45} on the closed-weight side, DeepSeek 3.2 \cite{deepseek2025v31} and Mistral-Large-3 \cite{mistral2025large3} on the open-weight side. Qwen3-4B \cite{qwen2026qwen35} is reserved for the inter-robot generalisation experiment in Section~\ref{sec:industrial-generalization} and is therefore not included in the zero-shot table. For calibration we also report a non-LLM baseline that dispatches per item by answer format: linear regression on the target signal for the scalar and tensor forecasting templates, and uniform random over the option set for single and multi-select MCQ and ranking templates. Free-form Level~4 templates are out of scope for this baseline (no traditional method maps cleanly to ``produce a remediation protocol'').
+We evaluate a cross-vendor panel of frontier LLMs available at submission time (April 2026): GPT-5.1 \cite{openai2025gpt51} and Claude Sonnet 4.6 \cite{anthropic2025sonnet46} on the closed-weight side, DeepSeek 3.2 \cite{deepseek2025v32} and Mistral-Large-3 \cite{mistral2025large3} on the open-weight side. Qwen3-4B \cite{qwen2025qwen3} is reserved for the inter-robot generalisation experiment in Section~\ref{sec:industrial-generalization} and is therefore not included in the zero-shot table. For calibration we also report a non-LLM baseline that dispatches per item by answer format: linear regression on the target signal for the scalar and tensor forecasting templates, and uniform random over the option set for single and multi-select MCQ and ranking templates. Free-form Level~4 templates are out of scope for this baseline (no traditional method maps cleanly to ``produce a remediation protocol'').
 
 Table~\ref{tab:results} reports measured mean rubric scores for the panel and the baseline.
 
@@ -660,29 +660,11 @@ Our physical validation protocol closes the loop from benchmark to reality, addr
 
 \subsection{License}
 
-\todo[inline]{Some practical questions: How can people employ the benchmark? Where can it be found. Will it be maintained and expanded? Will incorrect labels be corrected? Is there a private dataset too? Are parts of the dataset designated for training and parts for testing?}
+FactoryBench and FactoryWave are released under the MIT License and are freely available for academic and commercial use. Both the episode data and the benchmark artefacts (question templates, paraphrase banks, LLM-as-judge prompts, generator source code, and the full Q\&A dataset) are distributed via the public Hugging Face repositories \texttt{Forgis/FactoryWave} and \texttt{Forgis/FactoryBench\_QA\_pairs}. The data are fully public; there is no private holdout. The train/validation/test split (80/10/10 at the episode level, shared across all four levels) is described in Section~\ref{sec:industrial-generalization} and the mapping is included in the release so that evaluees can reproduce the exact partition used in this paper.
 
-FactoryBench and FactoryWave are released under a \todo{check license} license and distributed via a public Hugging Face repository. The release includes the episode data, the generator source code, the full set of 20 question templates with their paraphrase banks, all LLM-as-judge prompts, and the full benchmark. We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file.
-
-
+We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file. Bug reports and label-correction requests are tracked on the public GitHub repository.
 
 \bibliography{references}
-
-\todo[inline]{Do all the references actually exist? If they do not, this is typically seen as a proof that we had this paper AI generated. It will then likely be desk-rejected.
-
-Before submission, double-check every reference in \texttt{references.bib}:
-
-A) Verify authors, title, venue, and year against the original source.
-B) Check for fabricated or near-duplicate entries.
-C) When citing arXiv papers, include the identifier in the citation, e.g.\ arXiv:2201.12740.
-D) Capitalization: the references currently write everything in lowercase, but some abbreviations are chosen by their authors to capitalize specific words. Follow the authors' preferred formatting.
-
-Specific entries flagged so far:
-
-- Could not find: Abhimanyu Das et al.\ ``Time series foundation models and forecasting''.
-- Slightly different name: Ya Su et al.\ ``Robust anomaly detection for multivariate time series through stochastic recurrent neural network (OmniAnomaly)''.
-- Wrong author: Gerald Woo et al.\ ``Chronos: Learning the language of time series'', arXiv preprint, 2024a.
-}
 
 \bibliographystyle{plainnat}
 
