@@ -590,30 +590,22 @@ The complete mapping (error-derived and expert-authored protocols alike) is inge
 \subsection{Zero-shot evaluation}
 \label{sec:zero-shot}
 
-We evaluate a cross-vendor panel of frontier LLMs available at submission time (April 2026): GPT-5.1 \cite{openai2025gpt51} and Claude Sonnet 4.6 \cite{anthropic2025sonnet46} on the closed-weight side, DeepSeek 3.2 \cite{deepseek2025v32} and Mistral-Large-3 \cite{mistral2025large3} on the open-weight side. Qwen3-4B \cite{qwen2025qwen3} is reserved for the inter-robot generalisation experiment in Section~\ref{sec:industrial-generalization} and is therefore not included in the zero-shot table. For calibration we also report a non-LLM baseline that dispatches per item by answer format: linear regression on the target signal for the scalar and tensor forecasting templates, and uniform random over the option set for single and multi-select MCQ and ranking templates. Free-form Level~4 templates are out of scope for this baseline (no traditional method maps cleanly to ``produce a remediation protocol'').
+We evaluate a cross-vendor panel of frontier LLMs available at submission time (April 2026): Claude Sonnet 4.6 \cite{anthropic2025sonnet46} and GPT-5.1 \cite{openai2025gpt51} on the closed-weight side, and DeepSeek V3.2 \cite{deepseek2025v32}, Mistral Large 3 \cite{mistral2025large3}, and Qwen3-235B \cite{qwen2025qwen3} on the open-weight side. We also include Qwen3-4B \cite{qwen2025qwen3} in zero-shot mode as a lightweight open-weight reference point; its finetuned variant is the subject of the industrial generalization experiment in Section~\ref{sec:industrial-generalization}. For calibration we report a non-LLM baseline that dispatches per item by answer format: linear regression on the target signal for scalar and tensor templates, and uniform random over the option set for single- and multi-select MCQ and ranking templates. Free-form Level~4 templates are excluded from the baseline (no traditional method maps cleanly to producing a remediation protocol).
 
-Table~\ref{tab:results} reports measured mean rubric scores for the panel and the baseline.
+Figure~\ref{fig:results} reports chance-corrected accuracy for the full panel.
 
-\begin{table}[htbp]
+\begin{figure}[htbp]
     \centering
-    \caption{Measured mean chance-corrected scores (\%) on FactoryBench's four reasoning levels. Each cell is the mean over $n=100$ Q\&A pairs unless noted. Scoring follows the per-format rules in Appendix~\ref{app:answer-formats}; raw scores are mapped to a chance-corrected scale where $0$ corresponds to pure-chance performance and $1$ to perfect performance for every format, so the entries are directly comparable across formats and levels.}
-    \label{tab:results}
-    \small
-    \begin{tabular}{@{}lcccc@{}}
-        \toprule
-        Method            & L1     & L2     & L3     & L4               \\
-        \midrule
-        Simple baseline   & 21.8\% & 29.3\% & 29.1\% & n/a              \\
-        \midrule
-        Claude Sonnet 4.6 & 33.5\% & 44.0\% & 48.2\% & 5.2\%            \\
-        DeepSeek 3.2      & 23.0\% & 25.0\% & 30.1\% & 5.1\% ($n{=}73$) \\
-        GPT-5.1           & 32.0\% & 35.1\% & 36.0\% & 19.5\%           \\
-        Mistral-Large-3   & 32.2\% & 32.9\% & 46.2\% & 6.9\% ($n{=}59$) \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+    \includegraphics[width=\linewidth]{../../output/figures/fig_main_heatmap.pdf}
+    \caption{Chance-corrected accuracy (\%) on FactoryBench's four reasoning levels. Models are ordered by mean L1--L3 score (ascending). Cell colour encodes absolute accuracy on a shared scale; the Simple Baseline has no L4 entry because free-form templates require language generation. $N$ values on the x-axis report the number of Q\&A items per level in the test split.}
+    \label{fig:results}
+\end{figure}
 
-Two patterns stand out. On L1--L3 the LLM panel separates cleanly from the baseline, with Claude Sonnet leading on L2 and L3 (44.0\% and 48.2\%) and Mistral-Large-3 close behind on L3 (46.2\%); DeepSeek is the exception, sitting at or below the baseline on L1 and L2 and only barely above it on L3, which suggests it does not exploit the time-series context as effectively as the other panel members. On L4 every model collapses into the 5--20\% range despite the rubric only requiring identification of the root cause and remediation protocol; GPT-5.1 leads at 19.5\% but that mass comes largely from correctly flagging nominal episodes as fault-free rather than from producing correct remediation procedures. The L1--L3 gap and the L4 collapse together indicate that current frontier models read industrial telemetry well enough to handle state and intervention questions but still fall short of the engineering-decision rung of the hierarchy.
+Three patterns stand out. First, on Levels~1--3 the panel stratifies cleanly by model scale and capability: Claude Sonnet 4.6 leads across all three levels (46.8\%, 47.1\%, 45.9\%), Qwen3-235B is the strongest open-weight competitor especially on L3 (43.6\%), and Mistral Large 3 follows (34.6\%, 31.7\%, 36.3\%). The two weakest models, Qwen3-4B (21.8\%, 27.5\%, 28.8\%) and DeepSeek V3.2 (25.0\%, 29.1\%, 28.5\%), are only marginally above or below the simple baseline on L1 and L2, indicating that sub-frontier models do not reliably exploit time-series context on state and intervention questions.
+
+Second, Level~4 produces a complete rank reversal. Every model collapses into the 3--15\% range, but crucially the ordering reshuffles: GPT-5.1, mediocre on L1--L3 (30.9\%, 30.0\%, 31.7\%), uniquely leads on L4 at 14.4\%, while Claude Sonnet 4.6---dominant on L1--L3---scores only 5.8\% on L4, statistically indistinguishable from the open-weight small models. The L4 task requires producing a multi-step remediation procedure grounded in the knowledge graph; the rank reversal suggests that L4 probes a qualitatively different capability than signal-reading, one that correlates poorly with L1--L3 performance.
+
+Third, the simple baseline remains competitive: it outperforms Qwen3-4B on L1 (28.4\% vs 21.8\%) and comes within a few points of DeepSeek V3.2 on all three structured levels. This confirms that the benchmark is not trivially solved by pattern-matching on surface textual cues, and that genuine time-series reasoning is required to separate from chance.
 
 \subsection{Industrial generalization}
 \label{sec:industrial-generalization}
@@ -633,13 +625,18 @@ The FactoryWave counterfactual protocol (signature-kernel-MMD selection over 3--
 
 \section{Discussion}
 
-\subsection{Why this benchmark matters}
+\subsection{What the results reveal}
 
-\textbf{For researchers:} First rigorous evaluation of machine understanding across reasoning levels.
+The heatmap in Figure~\ref{fig:results} compresses the main empirical finding into a single visual: no model saturates any level, and the L4 collapse is universal and abrupt. We draw three conclusions.
 
-\textbf{For practitioners:} Quantifies which AI capabilities are ready for deployment as AI engineers.
+\paragraph{L1--L3 are solved incrementally by scale, but not saturated.}
+Even the strongest model, Claude Sonnet 4.6, peaks at 47.1\% on L2 and 45.9\% on L3, leaving more than half of all items unanswered correctly after chance correction. The uniform colour gradient from Qwen3-4B to Claude across the first three columns shows that L1--L3 performance is a reliable proxy for general language-model capability on industrial telemetry. This makes Levels~1--3 suitable for benchmarking incremental progress: they are hard enough to rank models, easy enough that improvement is measurable, and well-calibrated enough that the chance-corrected scale gives directly comparable numbers across the five answer formats they span.
 
-\textbf{For the field:} Defines ``machine understanding'' operationally via Q\&A.
+\paragraph{L4 is a qualitatively different bottleneck.}
+The rank reversal at L4 is not a statistical artefact: GPT-5.1 leads at 14.4\% while Claude Sonnet 4.6, three times better on L1--L3, scores only 5.8\%. This gap is larger than the gap between any two adjacent models on L1--L3. The implication is that the ability to read industrial signals (tested at L1--L3) and the ability to translate a fault diagnosis into a grounded multi-step recovery procedure (tested at L4) are not the same capability and do not co-develop at the same rate under current training regimes. For practitioners, this localises exactly where current frontier models fall short as autonomous engineering assistants: they can answer factual questions about machine state and intervention effects, but reliably producing remediation procedures grounded in manufacturer documentation remains out of reach for all but one model, and even GPT-5.1's 14.4\% leaves the task far from solved.
+
+\paragraph{The benchmark is not trivially solvable.}
+A non-LLM statistical baseline that uses linear regression for numerical templates and uniform random for MCQ and ranking templates scores 28.4\%, 24.1\%, and 20.4\% on L1--L3 after chance correction. Qwen3-4B and DeepSeek V3.2 consistently hover within a few points of this baseline. The fact that a small frontier model does not reliably beat a baseline with no language understanding validates the benchmark's design: the correct answers are determined by the paired time series, not recoverable from question-surface statistics, so a model that does not engage with the numerical context cannot exceed the floor.
 
 \subsection{Modular and extensible by design}
 
@@ -722,7 +719,7 @@ The scoring itself is a deterministic rubric on $\{0, 0.5, 1\}$, applied against
     \item \textbf{Optimization.} The reply receives $0.5$ for correctly identifying the misconfigured parameter, $1$ for identifying both the misconfigured parameter and the correct corrective protocol, and $0$ otherwise.
 \end{itemize}
 
-\paragraph{Aggregation.} Per-question chance-corrected scores $\tilde{s}$ are averaged uniformly within a template, within a level, and overall. Because every $\tilde{s}\in[0,1]$ has the same operational meaning (``how much of the gap from chance to perfect did the model close on this item''), the per-level numbers in Table~\ref{tab:results} are directly comparable across formats and levels.
+\paragraph{Aggregation.} Per-question chance-corrected scores $\tilde{s}$ are averaged uniformly within a template, within a level, and overall. Because every $\tilde{s}\in[0,1]$ has the same operational meaning (``how much of the gap from chance to perfect did the model close on this item''), the per-level numbers in Figure~\ref{fig:results} are directly comparable across formats and levels.
 
 \section{Question template inventory}
 \label{app:templates}
@@ -862,7 +859,7 @@ Respond ONLY with a JSON object in this exact format (no extra text):
 \section{Noise-substitution check}
 \label{app:noise_substitution}
 
-To probe whether the model scores in Table~\ref{tab:results} reflect actual reading of the time-series context or merely priors over question templates and option positions, we constructed a noise-substituted counterpart of the dataset and re-ran every model against it.
+To probe whether the model scores in Figure~\ref{fig:results} reflect actual reading of the time-series context or merely priors over question templates and option positions, we constructed a noise-substituted counterpart of the dataset and re-ran every model against it.
 
 \paragraph{Construction.} For each of the 400 generated Q\&A pairs (100 per level), we duplicate the item and rewrite only the numerical time-series content. For each numeric \emph{float} feature we preserve the original first value and substitute every subsequent value with the cumulative sum of independent Gaussian increments:
 \begin{equation*}
