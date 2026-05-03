@@ -112,7 +112,7 @@ def _anomaly_inline_name(fault_id: int, root_cause: Dict[str, Any], capitalize: 
         return name[0].upper() + name[1:]
     return name
 
-VALID_DATASETS = ["aursad", "vorausad", "factorywave"]
+VALID_DATASETS = ["aursad", "vorausad", "factorywave", "factorywave_kuka"]
 
 STEPS_AHEAD_RANGE = (1, 10)
 CONTEXT_MIN = 32

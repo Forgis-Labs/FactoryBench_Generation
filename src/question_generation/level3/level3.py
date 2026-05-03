@@ -49,7 +49,7 @@ from src.question_generation.level3.mc_truth import DEFAULT_THRESHOLDS, evaluate
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["factorywave"]
+VALID_DATASETS = ["factorywave", "factorywave_kuka"]
 STEPS_AHEAD_RANGE = (1, 10)
 CONTEXT_MIN = 32
 CONTEXT_MAX = 64
