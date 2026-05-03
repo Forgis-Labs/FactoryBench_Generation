@@ -367,8 +367,6 @@ def _write_reply(
         "answer": answer,
         "ground_truth": gt,
         "score": score,
-        "llm_judge_score": judge_result[0] if judge_result else None,
-        "llm_judge_reason": judge_result[1] if judge_result else None,
         "answer_format": answer_format,
         "question_type": question_type,
         "model": model,
@@ -892,6 +890,12 @@ def main() -> None:
                              "Pass 0 to disable.")
     parser.add_argument("--limit", type=int, default=None,
                         help="Process at most N prompts from --input (for smoke tests).")
+    parser.add_argument("--batch-number", type=int, default=0,
+                        help="0-indexed slice of size --batch-size to process. Used by the "
+                             "test-set orchestrator to chunk a level across multiple batches.")
+    parser.add_argument("--batch-size", type=int, default=1000,
+                        help="Slice width for --batch-number (process items "
+                             "[batch_number*batch_size : (batch_number+1)*batch_size]).")
     parser.add_argument("--summary-file", type=Path, default=None)
     parser.add_argument("-v", "--verbose", action="store_true")
 
@@ -907,7 +911,11 @@ def main() -> None:
 
     judge_model = "" if args.no_judge else args.judge_model
 
-    entries = load_prompt_entries(args.input)
+    entries = load_prompt_entries(
+        args.input,
+        batch_number=args.batch_number,
+        batch_size=args.batch_size,
+    )
     if args.limit is not None and args.limit > 0:
         entries = entries[: args.limit]
         logger.info(f"Limited to first {len(entries)} prompts (--limit {args.limit})")

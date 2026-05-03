@@ -19,6 +19,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
+from src.evaluation.chance_correct import chance_correct
+
 # ── Forgis brand palette ──────────────────────────────────────────────
 TIGER = "#ff5a00"
 FIRE = "#FF4D00"
@@ -103,6 +105,21 @@ def build_question_map(questions_dir: Path | None) -> Dict[str, str]:
     return qmap
 
 
+def build_question_payload_map(questions_dir: Path | None) -> Dict[str, Dict[str, Any]]:
+    """Map question-file stem -> full question payload (used by chance correction)."""
+    qmap: Dict[str, Dict[str, Any]] = {}
+    if questions_dir is None or not questions_dir.is_dir():
+        return qmap
+    for q_path in questions_dir.rglob("*.json"):
+        try:
+            q = load_json(q_path)
+            if isinstance(q, dict):
+                qmap[q_path.stem] = q
+        except Exception:
+            pass
+    return qmap
+
+
 def resolve_format_label(reply: Dict[str, Any], question_map: Dict[str, str]) -> str:
     """Derive a human-readable answer-format label from a reply JSON."""
     af = reply.get("answer_format")
@@ -126,8 +143,16 @@ def load_replies(replies_dir: Path) -> List[Dict[str, Any]]:
 def aggregate(
     results: List[Dict[str, Any]],
     question_map: Dict[str, str],
+    payload_map: Dict[str, Dict[str, Any]] | None = None,
+    apply_chance_correct: bool = False,
 ) -> Dict[str, Dict[str, List[float]]]:
-    """Return model -> format_label -> [scores]."""
+    """Return model -> format_label -> [scores].
+
+    When ``apply_chance_correct`` is True, raw scores are mapped through
+    ``chance_correct`` using the matching question payload (so per-item
+    option counts and permutation lengths are honoured). Free-form scores
+    pass through unchanged.
+    """
     agg: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
     for res in results:
         model = res.get("model", "unknown")
@@ -135,7 +160,19 @@ def aggregate(
         if score is None:
             continue
         fmt = resolve_format_label(res, question_map)
-        agg[model][fmt].append(float(score))
+        if apply_chance_correct:
+            stem = Path(res.get("prompt_file", "")).stem
+            q = (payload_map or {}).get(stem) or {}
+            raw_af = res.get("answer_format")
+            if not isinstance(raw_af, str) or raw_af in ("", "unknown"):
+                qaf = q.get("answer_format")
+                raw_af = qaf.get("type") if isinstance(qaf, dict) else (qaf or "unknown")
+            corrected = chance_correct(float(score), raw_af, q)
+            if corrected is None:
+                continue
+            agg[model][fmt].append(float(corrected))
+        else:
+            agg[model][fmt].append(float(score))
     return agg
 
 
@@ -270,19 +307,22 @@ def main() -> None:
     parser.add_argument("--input", type=Path, required=True, help="Directory with LLM reply JSONs")
     parser.add_argument("--questions", type=Path, default=None, help="Question JSONs (fallback for format lookup)")
     parser.add_argument("--figures-dir", type=Path, required=True, help="Output directory for figures")
+    parser.add_argument("--chance-correct", action="store_true",
+                        help="Apply per-format chance correction (max(0, (s-E)/(1-E))) before aggregating.")
     args = parser.parse_args()
 
     set_neurips_style()
     args.figures_dir.mkdir(parents=True, exist_ok=True)
 
     question_map = build_question_map(args.questions)
+    payload_map = build_question_payload_map(args.questions) if args.chance_correct else {}
     results = load_replies(args.input)
 
     if not results:
         print(f"No result files found in {args.input}")
         return
 
-    agg = aggregate(results, question_map)
+    agg = aggregate(results, question_map, payload_map, apply_chance_correct=args.chance_correct)
     print(f"Loaded {len(results)} replies across {len(agg)} model(s).\n")
 
     for model, format_scores in agg.items():
