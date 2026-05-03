@@ -534,13 +534,21 @@ def run_direct_requests(
                         except Exception:
                             score = 0
                         else:
+                            # Three-level piecewise for margin-bounded items (mirrors tensor).
+                            # min/max bounds stay binary (no native "2x margin" zone).
                             if acceptance_bounds and "min" in acceptance_bounds and "max" in acceptance_bounds:
-                                score = int(
+                                score = float(
                                     float(acceptance_bounds["min"]) <= pred_val <= float(acceptance_bounds["max"])
                                 )
                             elif acceptance_bounds:
-                                margin = acceptance_bounds.get("margin", 0)
-                                score = int(abs(pred_val - gt_val) <= margin)
+                                margin = float(acceptance_bounds.get("margin", 0))
+                                d = abs(pred_val - gt_val)
+                                if d <= margin:
+                                    score = 1.0
+                                elif d <= 2 * margin:
+                                    score = 0.5
+                                else:
+                                    score = 0.0
                             else:
                                 score = int(abs(pred_val - gt_val) < 1e-4)
                     elif answer_format == "tensor":
@@ -550,12 +558,23 @@ def run_direct_requests(
                         except Exception:
                             score = 0
                         else:
+                            # Three-level piecewise: 1 within margin, 0.5 within 2x margin,
+                            # 0 otherwise. With margins calibrated to R_j/12, the chance level
+                            # is 1/4 under uniform random in the channel's natural range.
                             if acceptance_bounds and "margin" in acceptance_bounds:
                                 margins = acceptance_bounds["margin"]
                                 if len(gt_vals) == len(pred_vals) == len(margins):
                                     n = len(gt_vals)
-                                    n_correct = sum(abs(p - g) <= m for p, g, m in zip(pred_vals, gt_vals, margins))
-                                    score = n_correct / n
+                                    per_elem = []
+                                    for p, g, m in zip(pred_vals, gt_vals, margins):
+                                        d = abs(p - g)
+                                        if d <= m:
+                                            per_elem.append(1.0)
+                                        elif d <= 2 * m:
+                                            per_elem.append(0.5)
+                                        else:
+                                            per_elem.append(0.0)
+                                    score = sum(per_elem) / n if n > 0 else 0.0
                                 else:
                                     score = 0.0
                             else:

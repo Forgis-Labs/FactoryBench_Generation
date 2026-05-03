@@ -24,7 +24,12 @@ try:
 except ImportError:
     OpenAI = None
 
-from src.config import DEFAULT_JUDGE_MODEL, FOUNDRY_MODELS
+from src.config import (
+    DEFAULT_JUDGE_MODEL,
+    FOUNDRY_MODELS,
+    get_api_key_env,
+    get_upstream_model_id,
+)
 from src.evaluation.test_gpt_5mini import (
     JUDGE_SYSTEM_PROMPT,
     _estimate_cost,
@@ -115,7 +120,19 @@ def _parse_numerical_answer(value: Any) -> float:
     return float(matches[-1])
 
 
-def resolve_api_key() -> str:
+def resolve_api_key(model: Optional[str] = None) -> str:
+    """Resolve the API key for ``model``.
+
+    Per-model ``api_key_env`` (e.g. ``OPENROUTER_API_KEY`` for qwen on
+    OpenRouter) wins; absent that, falls back to the Azure/OpenAI defaults so
+    existing GPT-5.x configs keep working.
+    """
+    if model:
+        env_key = get_api_key_env(model)
+        if env_key:
+            override = os.getenv(env_key)
+            if override:
+                return override
     key = (
         os.getenv("AZURE_API_KEY")
         or os.getenv("AZURE_OPENAI_API_KEY")
@@ -253,13 +270,14 @@ def call_anthropic_style(
 
 
 def call_model(model: str, prompt: str, max_tokens: int) -> Tuple[str, Dict[str, Any]]:
-    api_key = resolve_api_key()
+    api_key = resolve_api_key(model)
     endpoint, api_style, api_version = resolve_endpoint(model)
+    upstream_id = get_upstream_model_id(model)
 
     if api_style == "anthropic":
-        return call_anthropic_style(endpoint, api_key, model, prompt, max_tokens)
+        return call_anthropic_style(endpoint, api_key, upstream_id, prompt, max_tokens)
     return call_openai_style(
-        endpoint, api_key, model, prompt, max_tokens,
+        endpoint, api_key, upstream_id, prompt, max_tokens,
         api_style=api_style, api_version=api_version,
     )
 
@@ -400,21 +418,10 @@ def score_prediction(
 
     try:
         if answer_format == "free_form":
-            # LLM-as-judge can be disabled via --no-judge / FB_DISABLE_JUDGE=1.
-            # Free-form items then get score=None (treated as ungraded downstream).
-            if _is_judge_disabled(judge_model):
-                score = None
-                judge_result = None
-            else:
-                ref_answer = str(gt) if gt is not None else ""
-                judge_score, judge_reason = foundry_llm_judge(
-                    question=question_text,
-                    prediction=str(pred) if pred is not None else "",
-                    reference=ref_answer,
-                    judge_model=judge_model,
-                )
-                score = judge_score
-                judge_result = (judge_score, judge_reason)
+            # Single-judge scoring removed; free-form items are graded post-hoc
+            # by the 3-judge ensemble in scripts/score_replies_batch.py.
+            score = None
+            judge_result = None
 
         elif answer_format == "numerical":
             try:
@@ -423,13 +430,21 @@ def score_prediction(
             except Exception:
                 score = 0.0
             else:
+                # Three-level piecewise for margin-bounded items (matches tensor branch).
+                # min/max bounds remain binary because there is no native "2x margin" zone.
                 if acceptance_bounds and "min" in acceptance_bounds and "max" in acceptance_bounds:
                     score = float(
                         float(acceptance_bounds["min"]) <= pred_val <= float(acceptance_bounds["max"])
                     )
                 elif acceptance_bounds:
-                    margin = acceptance_bounds.get("margin", 0)
-                    score = float(abs(pred_val - gt_val) <= margin)
+                    margin = float(acceptance_bounds.get("margin", 0))
+                    d = abs(pred_val - gt_val)
+                    if d <= margin:
+                        score = 1.0
+                    elif d <= 2 * margin:
+                        score = 0.5
+                    else:
+                        score = 0.0
                 else:
                     score = float(abs(pred_val - gt_val) < 1e-4)
 
@@ -440,12 +455,23 @@ def score_prediction(
             except Exception:
                 score = 0.0
             else:
+                # Three-level piecewise scorer: 1 within margin, 0.5 within 2x margin, 0 otherwise.
+                # Calibration intent: per-channel margin m_j = R_j/12 yields E = 3m/R = 1/4 under
+                # uniform random in the channel's natural range, matching single-select MCQ chance.
                 if acceptance_bounds and "margin" in acceptance_bounds:
                     margins = acceptance_bounds["margin"]
                     if len(gt_vals) == len(pred_vals) == len(margins):
                         n = len(gt_vals)
-                        n_correct = sum(abs(p - g) <= m for p, g, m in zip(pred_vals, gt_vals, margins))
-                        score = n_correct / n
+                        per_elem = []
+                        for p, g, m in zip(pred_vals, gt_vals, margins):
+                            d = abs(p - g)
+                            if d <= m:
+                                per_elem.append(1.0)
+                            elif d <= 2 * m:
+                                per_elem.append(0.5)
+                            else:
+                                per_elem.append(0.0)
+                        score = sum(per_elem) / n if n > 0 else 0.0
                     else:
                         score = 0.0
                 else:
@@ -634,10 +660,11 @@ def run_openai_batch(
     import time
 
     base_url, _api_style, api_version = resolve_endpoint(model)
-    api_key = resolve_api_key()
+    api_key = resolve_api_key(model)
     client = _openai_client(base_url, api_key, api_version=api_version)
 
-    jsonl_text = _build_openai_batch_jsonl(entries, model, max_output_tokens)
+    upstream_id = get_upstream_model_id(model)
+    jsonl_text = _build_openai_batch_jsonl(entries, upstream_id, max_output_tokens)
     tf = tempfile.NamedTemporaryFile(
         mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
     )
@@ -764,7 +791,8 @@ def run_anthropic_batch(
     import time
 
     base_url, _api_style, _ = resolve_endpoint(model)
-    api_key = resolve_api_key()
+    api_key = resolve_api_key(model)
+    upstream_id = get_upstream_model_id(model)
     headers = {
         "Authorization": f"Bearer {api_key}",
         "anthropic-version": "2023-06-01",
@@ -776,7 +804,7 @@ def run_anthropic_batch(
         requests_payload.append({
             "custom_id": custom_id,
             "params": {
-                "model": model,
+                "model": upstream_id,
                 "max_tokens": max_output_tokens,
                 "messages": [{"role": "user", "content": prompt_text}],
             },
@@ -1158,8 +1186,6 @@ def _finalize_success(
         "answer": answer,
         "ground_truth": gt,
         "score": score,
-        "llm_judge_score": judge_result[0] if judge_result else None,
-        "llm_judge_reason": judge_result[1] if judge_result else None,
         "answer_format": answer_format,
         "question_type": question_type,
         "model": body.get("model") or model,
