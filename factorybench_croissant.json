@@ -14,14 +14,8 @@
   "url": "https://huggingface.co/datasets/FactoryBench/FactoryBench",
   "license": "https://opensource.org/licenses/MIT",
   "version": "1.0",
-  "citation": "Merzouki et al., FactoryBench: A Benchmark for Machine-Behavior Reasoning over Industrial Robotic Telemetry, NeurIPS 2026.",
+  "citation": "Merzouki et al., FactoryBench: Benchmarking Machine Understanding via Question-Answering, 2026. Preprint.",
   "datePublished": "2026-05-04",
-  "rai:dataLimitations": "FactoryBench covers a closed catalogue of 27 physically injected fault mechanisms across three robot types (UR3, UR3e, KUKA KR10) and three canonical industrial tasks (pick-and-place, screwing, peg-in-hole). Faults are atomic and instantaneously injected rather than compound or gradual, and all episodes are recorded in controlled laboratory conditions rather than production environments. The benchmark therefore measures in-distribution fault recognition and causal reasoning rather than the open-world fault detection and diagnosis challenges typically encountered in live factories.",
-  "rai:dataBiases": "The dataset is concentrated on specific robot manufacturers (Universal Robots, KUKA) and a small set of structured manipulation tasks. All physical recordings were made in controlled laboratory settings, which may not reflect the sensor noise, mechanical wear, operator variability, and environmental conditions present in production facilities. The fault injection protocol prioritises reproducibility over ecological validity, and the resulting episode distribution may over-represent clean fault signatures relative to what practitioners observe in the field.",
-  "rai:personalSensitiveInformation": "The dataset contains no personal or sensitive information. All data consists entirely of robotic joint telemetry, torque and force measurements, TCP pose, gripper state, and task-phase labels recorded from robot manipulators. No human subjects, personally identifiable information, or sensitive attributes are present.",
-  "rai:dataUseCases": "FactoryBench is intended for benchmarking language models and time-series models on industrial machine-behavior understanding, causal reasoning evaluation over robotic telemetry, and fault diagnosis research. It provides a reproducible evaluation framework for researchers developing models for industrial AI. It is not intended for direct deployment as a production fault-detection or safety-critical system.",
-  "rai:dataSocialImpact": "FactoryBench is designed to advance AI-assisted industrial maintenance and fault diagnosis research, with the potential to improve manufacturing safety, reduce unplanned downtime, and accelerate the development of AI engineering assistants. Downstream applications of models evaluated on this benchmark may affect automation levels in manufacturing; practitioners and deployers should assess labor and occupational safety implications before production deployment.",
-  "rai:hasSyntheticData": false,
   "cr:recordSet": [
     {
       "@type": "cr:RecordSet",
@@ -307,6 +301,7 @@
     "rai:dataBiases": "Potential domain bias toward industrial workflows and UR/KUKA robot terminology; limited diversity of robot platforms and tasks. Size imbalance between levels 2 and 3.",
     "rai:personalSensitiveInformation": "The dataset contains no personal or sensitive information. All data was collected from industrial robots with no human subjects involved.",
     "rai:dataSocialImpact": "Advances machine-behavior reasoning research for industrial robotics, supporting safer and more reliable automated manufacturing systems. Not intended for deployment in safety-critical systems without further expert validation.",
-    "rai:hasSyntheticData": "Yes. Q&A pairs are synthetically generated from real robotic telemetry signals using templated question generation. The underlying sensor data is collected from physical UR3 and KUKA KR10 robots executing pick-and-place, screwing, and peg-in-hole tasks at 83-125 Hz with systematic fault injection, supplemented with AURSAD and voraus-AD datasets."
+    "rai:hasSyntheticData": true,
+    "rai:syntheticDataDescription": "Q&A pairs are algorithmically generated from real robotic telemetry signals using structured question templates. The underlying sensor data is collected from physical UR3 and KUKA KR10 robots executing pick-and-place, screwing, and peg-in-hole tasks at 83-125 Hz with systematic fault injection, supplemented with AURSAD and voraus-AD datasets."
   }
 }
