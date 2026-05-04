@@ -4,7 +4,7 @@
 % \usepackage[preprint]{neurips_2026}
 
 % to compile a camera-ready version, add the [final] option:
-\usepackage[eandd, final]{neurips_2026}
+\usepackage[eandd]{neurips_2026}
 
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc} % use 8-bit T1 fonts
@@ -121,7 +121,7 @@ A promising paradigm is to build LLM agents equipped with specialized tools, inc
 To address this gap, we propose FactoryBench, a benchmark designed to evaluate machine-behavior reasoning in time series models and LLMs. FactoryBench is grounded in FactoryWave, a dense multivariate time-series dataset collected from one-armed robotic systems spanning both collaborative and industrial manufacturing platforms, with synchronized setpoint, context, feedback, and effort signals recorded at 83 and 125 Hz (KUKA KR10 and UR3 respectively). Industrial-robot data of this kind is rare in public benchmarks: these systems are almost exclusively deployed in production environments with safety enclosures that restrict access, proprietary controllers that expose limited telemetry, and recordings that typically fall under plant-level confidentiality agreements. As a result, existing robotic datasets are dominated by cobot platforms, and to our knowledge FactoryWave is the first extensive anomaly dataset to (partly) cover an industrial robot, explicitly aimed at bridging this cobot-to-industrial-machine gap.
 
 
-We also introduce a scalable question-generation framework composed of 20 structured templates spanning a wide range of reasoning types and applicable to general machine data flows. These templates enable systematic construction of question-answering tasks that probe state understanding, intervention reasoning, counterfactual analysis, and decision-making in machine contexts. Using this framework and the FactoryWave dataset, we build FactoryBench, a large-scale Q\&A dataset specifically designed to evaluate time-series understanding and engineering reasoning in LLM agents.
+We also introduce a scalable question-generation framework composed of 20 structured templates spanning a wide range of reasoning types and applicable to general machine data flows. These templates enable systematic construction of question-answering tasks that probe state understanding, intervention reasoning, counterfactual analysis, and decision-making in machine contexts. Using this framework and the FactoryWave dataset, we build FactoryBench, a large-scale Q\&A dataset specifically designed to evaluate time-series understanding and engineering reasoning in LLM agents. \todo{I think this paragraph and the one before have too much overlap. In particular, FactoryBench is introduced twice. First "FactoryBench, a benchmark designed to evaluate machine-behavior reasoning in time series models and LLMs." then " FactoryBench, a large-scale Q\&A dataset specifically designed to evaluate time-series understanding and engineering reasoning in LLM agents." So which one is it?}
 
 By bridging the gap between general language reasoning and specialized time-series modeling, FactoryBench provides a principled foundation for studying machine-behavior reasoning in industrial environments.
 
@@ -155,7 +155,7 @@ Causal frameworks provide formal tools for interventions and counterfactuals \ci
         \textbf{FactoryBench (Ours)} & \checkmark                    & \checkmark                      & \textbf{TBD} & \checkmark                     & \checkmark              & \checkmark                & \checkmark                & \checkmark                     \\
         \bottomrule
     \end{tabular}
-\end{table}
+\end{table}\todo{The questionmark at the size column for MTBench, should maybe be explained somewhere. Does this simply not have a well documented size?}
 
 \section{FactoryBench framework}
 
@@ -686,15 +686,15 @@ These findings send a clear message to the industrial AI community: in their cur
 
 
 
-\subsection{License}
+\subsection{License}\todo{One should never have a section with a single subsection. It also seems as if this has nothing to do with the Conclusion. I think it could be an extra section and it could be in the appendix. }
 
-FactoryBench and FactoryWave are released under the MIT License and are freely available for academic and commercial use. Both the episode data and the benchmark artefacts (question templates, paraphrase banks, LLM-as-judge prompts, generator source code, and the full Q\&A dataset) are distributed via the public Hugging Face repositories \texttt{Forgis/FactoryWave} and \texttt{Forgis/FactoryBench\_QA\_pairs}. The data are fully public; there is no private holdout. The train/validation/test split (80/10/10 at the episode level, shared across all four levels) is described in Section~\ref{sec:industrial-generalization} and the mapping is included in the release so that evaluees can reproduce the exact partition used in this paper.
+FactoryBench and FactoryWave are released under the MIT License and are freely available for academic and commercial use. Both the episode data and the benchmark artefacts (question templates, paraphrase banks, LLM-as-judge prompts, generator source code, and the full Q\&A dataset) are distributed via the public Hugging Face repositories \texttt{Forgis/FactoryWave} and \texttt{Forgis/FactoryBench\_QA\_pairs}\todo{Is this allowed? It seems to break double blindness}. The data are fully public; there is no private holdout. The train/validation/test split (80/10/10 at the episode level, shared across all four levels) is described in Section~\ref{sec:industrial-generalization} and the mapping is included in the release so that evaluees can reproduce the exact partition used in this paper.
 
 We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file. Bug reports and label-correction requests are tracked on the public GitHub repository.
 
-\bibliography{references}
-
-\bibliographystyle{plainnat}
+\bibliography{references}\todo{I changed the ref style, because always giving names takes too much space.}
+\bibliographystyle{plain}
+%\bibliographystyle{plainnat}
 
 \newpage
 \appendix
