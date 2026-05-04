@@ -121,4 +121,5 @@ sims/assets/**/Renderings/
 *.out
 *.log
 
-scripts/outputs/
+scripts/outputs/!output/figures/fig_main_heatmap.pdf
+!output/figures/fig_main_heatmap.pdf
