@@ -52,7 +52,7 @@ from src.question_generation.utils.relevance import (
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["aursad", "vorausad", "factorywave"]
+VALID_DATASETS = ["aursad", "vorausad", "factorywave", "factorywave_kuka"]
 SEVERITY_ORDER: Dict[str, int] = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
 # Precise per-fault ranking loaded from anomaly_ranking.json (fault_id → rank 1..N, higher = more severe)
@@ -63,6 +63,7 @@ DATASET_MACHINE_ID: Dict[str, int] = {
     "aursad": 0,    # UR3e
     "vorausad": 2,  # Yu cobot
     "factorywave": 0,     # UR3e (FactoryWave real-robot recordings)
+    "factorywave_kuka": 3,  # KUKA KR 10 R1100-2 (FactoryWave real-robot recordings)
 }
 
 _NO_ANOMALY_DESC = "No anomaly is present; the machine is operating nominally."

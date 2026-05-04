@@ -24,7 +24,12 @@ try:
 except ImportError:
     OpenAI = None
 
-from src.config import DEFAULT_JUDGE_MODEL, FOUNDRY_MODELS
+from src.config import (
+    DEFAULT_JUDGE_MODEL,
+    FOUNDRY_MODELS,
+    get_api_key_env,
+    get_upstream_model_id,
+)
 from src.evaluation.test_gpt_5mini import (
     JUDGE_SYSTEM_PROMPT,
     _estimate_cost,
@@ -36,8 +41,6 @@ from src.evaluation.test_gpt_5mini import (
     parse_llm_answer,
     save_json,
 )
-from src.scoring.cascade import parse_only
-from src.scoring.types import ParseResult
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +120,19 @@ def _parse_numerical_answer(value: Any) -> float:
     return float(matches[-1])
 
 
-def resolve_api_key() -> str:
+def resolve_api_key(model: Optional[str] = None) -> str:
+    """Resolve the API key for ``model``.
+
+    Per-model ``api_key_env`` (e.g. ``OPENROUTER_API_KEY`` for qwen on
+    OpenRouter) wins; absent that, falls back to the Azure/OpenAI defaults so
+    existing GPT-5.x configs keep working.
+    """
+    if model:
+        env_key = get_api_key_env(model)
+        if env_key:
+            override = os.getenv(env_key)
+            if override:
+                return override
     key = (
         os.getenv("AZURE_API_KEY")
         or os.getenv("AZURE_OPENAI_API_KEY")
@@ -255,18 +270,14 @@ def call_anthropic_style(
 
 
 def call_model(model: str, prompt: str, max_tokens: int) -> Tuple[str, Dict[str, Any]]:
-    api_key = resolve_api_key()
+    api_key = resolve_api_key(model)
     endpoint, api_style, api_version = resolve_endpoint(model)
-
-    # Resolve the actual deployment name for sync — this is decoupled from the
-    # catalog name (e.g. catalog "gpt-5.1" → Azure deployment "gpt-5-mini").
-    from src.config import get_sync_deployment
-    sync_model = get_sync_deployment(model)
+    upstream_id = get_upstream_model_id(model)
 
     if api_style == "anthropic":
-        return call_anthropic_style(endpoint, api_key, sync_model, prompt, max_tokens)
+        return call_anthropic_style(endpoint, api_key, upstream_id, prompt, max_tokens)
     return call_openai_style(
-        endpoint, api_key, sync_model, prompt, max_tokens,
+        endpoint, api_key, upstream_id, prompt, max_tokens,
         api_style=api_style, api_version=api_version,
     )
 
@@ -330,33 +341,13 @@ def build_question_index(questions_dir: Optional[Path]) -> Dict[str, Dict[str, A
     return index
 
 
-_VALID_ANSWER_FORMATS = {
-    "multiple_choice_single_select",
-    "multiple_choice_multi_select",
-    "ranking",
-    "numerical",
-    "tensor",
-    "free_form",
-}
-
-
 def infer_answer_format(q: Dict[str, Any]) -> str:
     """Infer an answer_format string from question payload fields.
 
-    The ``factorynet_qa_*`` datasets declare ``answer_format.type`` directly
-    on each QA — when present and recognised, we use it. Older generators
-    don't emit the field, so we keep the heuristic fallback that derives the
-    format from template_type / options / answer shape / level. The shape
-    fallback misclassifies tensor answers serialised as ``"a_b_c"`` strings
-    (no ``[`` prefix, no float-parseable form) as free_form, which is why the
-    declarative field takes precedence.
+    Question generators don't emit an explicit `answer_format`; we derive one
+    from template_type / options / answer shape / level so score_prediction
+    can dispatch correctly.
     """
-    af = q.get("answer_format")
-    if isinstance(af, dict):
-        declared = str(af.get("type") or "").strip().lower()
-        if declared in _VALID_ANSWER_FORMATS:
-            return declared
-
     level = q.get("level")
     tid = q.get("template_id")
     template_type = str(q.get("template_type") or "").lower()
@@ -417,112 +408,125 @@ def score_prediction(
     acceptance_bounds: Optional[Dict[str, Any]],
     question_text: str,
     judge_model: str,
-) -> Tuple[Optional[float], Optional[Tuple[float, str]], str]:
-    """Return (score, judge_result_or_none, provenance).
-
-    Deterministic formats route through the parser cascade in
-    ``src.scoring.parsers`` (strict -> lenient). The cascade extracts the
-    canonical answer; for multiple_choice_multi_select / ranking we keep the
-    legacy positional-fraction scoring formula (the cascade's own _score
-    methods are stricter — tiered MCMS, Kendall's tau ranking — but we
-    preserve the existing FactoryBench semantics here).
-
-    free_form continues to use ``foundry_llm_judge`` (gpt-5.1 default,
-    0-10 scale normalized to 0-1). The judge result is reported with
-    provenance="judge".
-    """
+) -> Tuple[Optional[float], Optional[Tuple[float, str]]]:
+    """Return (score, judge_result_or_none). Mirrors test_gpt_5mini scoring branches."""
     acceptance_bounds = _normalized_acceptance_bounds(acceptance_bounds)
     gt = ground_truth
     pred = prediction
     judge_result: Optional[Tuple[float, str]] = None
     score: Optional[float] = None
-    provenance: str = "unparseable"
 
     try:
         if answer_format == "free_form":
-            # LLM-as-judge can be disabled via --no-judge / FB_DISABLE_JUDGE=1.
-            # Free-form items then get score=None (treated as ungraded downstream).
-            if _is_judge_disabled(judge_model):
-                score = None
-                judge_result = None
-                provenance = "unparseable"
+            # Single-judge scoring removed; free-form items are graded post-hoc
+            # by the 3-judge ensemble in scripts/score_replies_batch.py.
+            score = None
+            judge_result = None
+
+        elif answer_format == "numerical":
+            try:
+                gt_val = round(float(gt), 4)
+                pred_val = round(_parse_numerical_answer(pred), 4)
+            except Exception:
+                score = 0.0
             else:
-                ref_answer = str(gt) if gt is not None else ""
-                judge_score, judge_reason = foundry_llm_judge(
-                    question=question_text,
-                    prediction=str(pred) if pred is not None else "",
-                    reference=ref_answer,
-                    judge_model=judge_model,
-                )
-                score = judge_score
-                judge_result = (judge_score, judge_reason)
-                provenance = "judge"
-            return score, judge_result, provenance
-
-        if answer_format in {
-            "multiple_choice_single_select",
-            "multiple_choice_multi_select",
-            "ranking",
-            "numerical",
-            "tensor",
-        }:
-            result: ParseResult = parse_only(
-                answer_format=answer_format,
-                prediction=str(pred) if pred is not None else "",
-                ground_truth=gt,
-                acceptance_bounds=acceptance_bounds,
-            )
-            provenance = result.provenance
-
-            if result.provenance == "unparseable":
-                # No deterministic extraction succeeded — record as wrong.
-                return 0.0, None, provenance
-
-            # MCMS and ranking: rescore the parsed answer with the legacy
-            # FactoryBench positional-fraction formula (instead of the
-            # cascade parser's own tiered / Kendall's tau scoring).
-            if answer_format == "multiple_choice_multi_select":
-                gt_str = str(gt).strip().upper()
-                pred_str = str(result.parsed)
-                if pred_str and set(gt_str) <= {"T", "F"} and len(pred_str) == len(gt_str):
-                    n = len(gt_str)
-                    n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
-                    score = n_correct / n
+                # Three-level piecewise for margin-bounded items (matches tensor branch).
+                # min/max bounds remain binary because there is no native "2x margin" zone.
+                if acceptance_bounds and "min" in acceptance_bounds and "max" in acceptance_bounds:
+                    score = float(
+                        float(acceptance_bounds["min"]) <= pred_val <= float(acceptance_bounds["max"])
+                    )
+                elif acceptance_bounds:
+                    margin = float(acceptance_bounds.get("margin", 0))
+                    d = abs(pred_val - gt_val)
+                    if d <= margin:
+                        score = 1.0
+                    elif d <= 2 * margin:
+                        score = 0.5
+                    else:
+                        score = 0.0
                 else:
-                    score = 0.0
-                return score, None, provenance
+                    score = float(abs(pred_val - gt_val) < 1e-4)
 
-            if answer_format == "ranking":
-                gt_str = str(gt).strip().upper()
-                pred_str = str(result.parsed)
-                if pred_str and len(pred_str) == len(gt_str):
-                    n = len(gt_str)
-                    n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
-                    score = n_correct / n
+        elif answer_format == "tensor":
+            try:
+                gt_vals = _parse_tensor_answer(gt)
+                pred_vals = _parse_tensor_answer(pred, expected_len=len(gt_vals))
+            except Exception:
+                score = 0.0
+            else:
+                # Three-level piecewise scorer: 1 within margin, 0.5 within 2x margin, 0 otherwise.
+                # Calibration intent: per-channel margin m_j = R_j/12 yields E = 3m/R = 1/4 under
+                # uniform random in the channel's natural range, matching single-select MCQ chance.
+                if acceptance_bounds and "margin" in acceptance_bounds:
+                    margins = acceptance_bounds["margin"]
+                    if len(gt_vals) == len(pred_vals) == len(margins):
+                        n = len(gt_vals)
+                        per_elem = []
+                        for p, g, m in zip(pred_vals, gt_vals, margins):
+                            d = abs(p - g)
+                            if d <= m:
+                                per_elem.append(1.0)
+                            elif d <= 2 * m:
+                                per_elem.append(0.5)
+                            else:
+                                per_elem.append(0.0)
+                        score = sum(per_elem) / n if n > 0 else 0.0
+                    else:
+                        score = 0.0
                 else:
-                    score = 0.0
-                return score, None, provenance
+                    score = float(gt_vals == pred_vals)
 
-            # single_select / numerical / tensor: cascade's own score
-            # already matches the legacy semantics.
-            return result.score, None, provenance
+        elif answer_format == "multiple_choice_multi_select":
+            gt_str = str(gt).strip().upper()
+            pred_str = _parse_mcms_answer(pred, len(gt_str))
+            # Previous scheme (commented): tiered 1.0 / 0.5 / 0.0 (all-correct,
+            # off-by-one, otherwise zero). Now: positional fraction so each
+            # correctly answered T/F position contributes 1/n.
+            # if pred_str is not None and set(gt_str) <= {"T", "F"}:
+            #     n = len(gt_str)
+            #     n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
+            #     if n_correct == n:
+            #         score = 1.0
+            #     elif n_correct >= n - 1:
+            #         score = 0.5
+            #     else:
+            #         score = 0.0
+            # else:
+            #     score = 0.0
+            if pred_str is not None and set(gt_str) <= {"T", "F"}:
+                n = len(gt_str)
+                n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
+                score = n_correct / n
+            else:
+                score = 0.0
 
-        # Fallback: exact string equality for any unrecognised format.
-        score = float(str(gt) == str(pred))
-        provenance = "strict" if score == 1.0 else "lenient"
+        elif answer_format == "multiple_choice_single_select":
+            gt_str = str(gt).strip().upper()
+            pred_letter = parse_llm_answer(str(pred).strip())
+            score = 0.0 if pred_letter is None else float(gt_str == pred_letter)
+
+        elif answer_format == "ranking":
+            gt_str = str(gt).strip().upper()
+            match = re.search(r"\b([A-D]{4})\b", str(pred).strip().upper())
+            pred_str = match.group(1) if match else ""
+            # Previous scheme (commented): exact match only (1.0 or 0.0).
+            # Now: positional fraction so a near-miss like ABCD vs ABDC
+            # gets credit for the 2 correctly-placed items.
+            # score = float(gt_str == pred_str)
+            if pred_str and len(pred_str) == len(gt_str):
+                n = len(gt_str)
+                n_correct = sum(g == p for g, p in zip(gt_str, pred_str))
+                score = n_correct / n
+            else:
+                score = 0.0
+
+        else:
+            score = float(str(gt) == str(pred))
     except Exception:
         score = None
-        provenance = "unparseable"
 
-    return score, judge_result, provenance
-
-
-PROVENANCE_TO_NUMERIC = {
-    "strict": 0.0,
-    "lenient": 1.0,
-    "judge": 2.0,
-    "unparseable": 3.0,
-}
+    return score, judge_result
 
 
 def log_to_opik(
@@ -541,7 +545,6 @@ def log_to_opik(
     usage_raw: Dict[str, Any],
     prompt_tokens: int,
     completion_tokens: int,
-    parse_provenance: Optional[str] = None,
 ) -> None:
     if not os.getenv("OPIK_API_KEY"):
         return
@@ -610,12 +613,6 @@ def log_to_opik(
                 trace.log_feedback_score(
                     name="llm_judge", value=judge_result[0], reason=judge_result[1] or accuracy_reason,
                 )
-        if parse_provenance is not None and parse_provenance in PROVENANCE_TO_NUMERIC:
-            trace.log_feedback_score(
-                name="parse_provenance",
-                value=PROVENANCE_TO_NUMERIC[parse_provenance],
-                reason=parse_provenance,
-            )
     except Exception as e:
         logger.warning(f"Opik logging failed: {e}")
 
@@ -663,10 +660,11 @@ def run_openai_batch(
     import time
 
     base_url, _api_style, api_version = resolve_endpoint(model)
-    api_key = resolve_api_key()
+    api_key = resolve_api_key(model)
     client = _openai_client(base_url, api_key, api_version=api_version)
 
-    jsonl_text = _build_openai_batch_jsonl(entries, model, max_output_tokens)
+    upstream_id = get_upstream_model_id(model)
+    jsonl_text = _build_openai_batch_jsonl(entries, upstream_id, max_output_tokens)
     tf = tempfile.NamedTemporaryFile(
         mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
     )
@@ -793,7 +791,8 @@ def run_anthropic_batch(
     import time
 
     base_url, _api_style, _ = resolve_endpoint(model)
-    api_key = resolve_api_key()
+    api_key = resolve_api_key(model)
+    upstream_id = get_upstream_model_id(model)
     headers = {
         "Authorization": f"Bearer {api_key}",
         "anthropic-version": "2023-06-01",
@@ -805,7 +804,7 @@ def run_anthropic_batch(
         requests_payload.append({
             "custom_id": custom_id,
             "params": {
-                "model": model,
+                "model": upstream_id,
                 "max_tokens": max_output_tokens,
                 "messages": [{"role": "user", "content": prompt_text}],
             },
@@ -1152,7 +1151,7 @@ def _finalize_success(
     est_cost = _estimate_cost(model_name, prompt_tokens, completion_tokens)
 
     gt = qa_payload.get("answer")
-    score, judge_result, parse_provenance = score_prediction(
+    score, judge_result = score_prediction(
         answer_format=answer_format,
         prediction=answer,
         ground_truth=gt,
@@ -1177,7 +1176,6 @@ def _finalize_success(
         usage_raw=usage_raw,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        parse_provenance=parse_provenance,
     )
 
     save_json(out_path, {
@@ -1188,9 +1186,6 @@ def _finalize_success(
         "answer": answer,
         "ground_truth": gt,
         "score": score,
-        "parse_provenance": parse_provenance,
-        "llm_judge_score": judge_result[0] if judge_result else None,
-        "llm_judge_reason": judge_result[1] if judge_result else None,
         "answer_format": answer_format,
         "question_type": question_type,
         "model": body.get("model") or model,

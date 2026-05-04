@@ -51,7 +51,7 @@ from src.question_generation.utils.relevance import (
 
 logger = logging.getLogger(__name__)
 
-VALID_DATASETS = ["aursad", "vorausad", "factorywave"]
+VALID_DATASETS = ["aursad", "vorausad", "factorywave", "factorywave_kuka"]
 RANKING_LABELS = ["A", "B", "C", "D"]
 RANKING_TEMPLATE_IDS = {3, 4}
 RANKING_METRIC = {3: "duration", 4: "energy"}

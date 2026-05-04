@@ -14,8 +14,7 @@ Provider routing is read from ``src.config``. Region is resolved per-model
                      output S3 location, which we poll until the result lands.
 
 Reply JSON shape, ground-truth lookup, scoring, and Opik logging are reused
-from ``run_foundry_eval`` (via ``log_to_opik`` and ``score_prediction``) so
-this module is drop-in compatible with the foundry path.
+verbatim from ``run_foundry_eval`` so this module is drop-in compatible.
 
 Required environment variables (full setup walkthrough in
 ``src/evaluation/aws-setup.md``):
@@ -65,7 +64,6 @@ from src.evaluation.run_foundry_eval import (
     _estimate_cost,
     build_question_index,
     infer_answer_format,
-    log_to_opik,
     score_prediction,
 )
 
@@ -335,7 +333,6 @@ def _write_reply(
     output_dir: Path,
     ground_truth_index: Dict[str, Any],
     judge_model: str,
-    eval_level: str,
 ) -> Tuple[float, Optional[float]]:
     prompt_path, prompt_text, prompt_idx, custom_id = entry
     out_path = output_dir / f"{custom_id}_answer.json"
@@ -347,11 +344,9 @@ def _write_reply(
     answer_format = infer_answer_format(qa_payload)
     question_type = str(qa_payload.get("template_type") or qa_payload.get("type") or "unknown")
     acceptance_bounds = qa_payload.get("acceptance_bounds")
-    level_val = qa_payload.get("level")
-    effective_eval_level = eval_level or (f"level_{level_val}" if level_val is not None else "unknown")
     gt = qa_payload.get("answer")
 
-    score, judge_result, parse_provenance = score_prediction(
+    score, judge_result = score_prediction(
         answer_format=answer_format,
         prediction=answer,
         ground_truth=gt,
@@ -362,27 +357,7 @@ def _write_reply(
 
     prompt_tokens = int(usage.get("prompt_tokens") or 0)
     completion_tokens = int(usage.get("completion_tokens") or 0)
-    model_name = model.lower()
-    est_cost = _estimate_cost(model_name, prompt_tokens, completion_tokens)
-
-    log_to_opik(
-        qa_payload=qa_payload,
-        prompt_text=prompt_text,
-        pred=answer,
-        gt=gt,
-        body=raw_body if isinstance(raw_body, dict) else {"raw": raw_body},
-        model_name=model_name,
-        eval_level=effective_eval_level,
-        answer_format=answer_format,
-        question_type=question_type,
-        score=score,
-        judge_result=judge_result,
-        est_cost=est_cost,
-        usage_raw=usage,
-        prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens,
-        parse_provenance=parse_provenance,
-    )
+    est_cost = _estimate_cost(model.lower(), prompt_tokens, completion_tokens)
 
     save_json(out_path, {
         "custom_id": custom_id,
@@ -392,9 +367,6 @@ def _write_reply(
         "answer": answer,
         "ground_truth": gt,
         "score": score,
-        "parse_provenance": parse_provenance,
-        "llm_judge_score": judge_result[0] if judge_result else None,
-        "llm_judge_reason": judge_result[1] if judge_result else None,
         "answer_format": answer_format,
         "question_type": question_type,
         "model": model,
@@ -462,7 +434,6 @@ def run_bedrock_batch(
     max_output_tokens: int,
     ground_truth_index: Dict[str, Any],
     judge_model: str,
-    eval_level: str,
     poll_interval: int = 30,
     cost_limit: Optional[float] = None,
 ) -> Tuple[int, int, int]:
@@ -586,7 +557,6 @@ def run_bedrock_batch(
             _write_reply(
                 entry, answer, model_out, usage,
                 model, output_dir, ground_truth_index, judge_model,
-                eval_level,
             )
             completed += 1
         except Exception as exc:
@@ -606,7 +576,6 @@ def run_bedrock_sync(
     max_output_tokens: int,
     ground_truth_index: Dict[str, Any],
     judge_model: str,
-    eval_level: str,
     cost_limit: Optional[float] = None,
 ) -> Tuple[int, int, int]:
     cfg = BEDROCK_MODELS[model]
@@ -644,7 +613,7 @@ def run_bedrock_sync(
             )
             raw = json.loads(resp["body"].read())
             answer, usage = _extract_output(api_style, raw)
-            est = _write_reply(entry, answer, raw, usage, model, output_dir, ground_truth_index, judge_model, eval_level)[0]
+            est = _write_reply(entry, answer, raw, usage, model, output_dir, ground_truth_index, judge_model)[0]
             cumulative_cost += est
             completed += 1
             logger.info(
@@ -715,7 +684,6 @@ def run_sagemaker_async(
     max_output_tokens: int,
     ground_truth_index: Dict[str, Any],
     judge_model: str,
-    eval_level: str,
     poll_interval: int = 30,
     cost_limit: Optional[float] = None,
     per_request_timeout_s: int = 1800,
@@ -789,7 +757,7 @@ def run_sagemaker_async(
             raw_text = _download_s3_text(s3, out_bucket, out_key)
             raw = json.loads(raw_text)
             answer, usage = _extract_output(api_style, raw)
-            _write_reply(entry, answer, raw, usage, model, output_dir, ground_truth_index, judge_model, eval_level)
+            _write_reply(entry, answer, raw, usage, model, output_dir, ground_truth_index, judge_model)
             completed += 1
         except Exception as exc:
             _write_failure(entry, f"async reply parse error: {exc}", output_dir)
@@ -816,7 +784,6 @@ def run_aws_eval(
     overwrite: bool,
     ground_truth_index: Dict[str, Any],
     judge_model: str,
-    eval_level: str = "",
     use_batch: bool = True,
     poll_interval: int = 30,
     cost_limit: Optional[float] = None,
@@ -854,7 +821,7 @@ def run_aws_eval(
             try:
                 done, fail, _ = run_bedrock_batch(
                     pending, model, output_dir, max_output_tokens,
-                    ground_truth_index, judge_model, eval_level,
+                    ground_truth_index, judge_model,
                     poll_interval=poll_interval, cost_limit=cost_limit,
                 )
                 return done, fail, skipped
@@ -867,7 +834,7 @@ def run_aws_eval(
                 )
         done, fail, _ = run_bedrock_sync(
             pending, model, output_dir, max_output_tokens,
-            ground_truth_index, judge_model, eval_level, cost_limit=cost_limit,
+            ground_truth_index, judge_model, cost_limit=cost_limit,
         )
         return done, fail, skipped
 
@@ -876,7 +843,7 @@ def run_aws_eval(
         # endpoint (typically scale-to-zero JumpStart deploy).
         done, fail, _ = run_sagemaker_async(
             pending, model, output_dir, max_output_tokens,
-            ground_truth_index, judge_model, eval_level,
+            ground_truth_index, judge_model,
             poll_interval=poll_interval, cost_limit=cost_limit,
         )
         return done, fail, skipped
@@ -905,9 +872,6 @@ def main() -> None:
     parser.add_argument("--judge-model", type=str, default=DEFAULT_JUDGE_MODEL)
     parser.add_argument("--no-judge", action="store_true",
                         help="Disable LLM-as-judge entirely. Free-form items get score=None.")
-    parser.add_argument("--eval-level", type=str, default="",
-                        help="Evaluation level tag for Opik tracing "
-                             "(falls back to qa_payload['level'] then 'unknown').")
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
     parser.add_argument("--max-output-tokens", type=int, default=2000)
     parser.add_argument("--overwrite", action="store_true")
@@ -926,6 +890,12 @@ def main() -> None:
                              "Pass 0 to disable.")
     parser.add_argument("--limit", type=int, default=None,
                         help="Process at most N prompts from --input (for smoke tests).")
+    parser.add_argument("--batch-number", type=int, default=0,
+                        help="0-indexed slice of size --batch-size to process. Used by the "
+                             "test-set orchestrator to chunk a level across multiple batches.")
+    parser.add_argument("--batch-size", type=int, default=1000,
+                        help="Slice width for --batch-number (process items "
+                             "[batch_number*batch_size : (batch_number+1)*batch_size]).")
     parser.add_argument("--summary-file", type=Path, default=None)
     parser.add_argument("-v", "--verbose", action="store_true")
 
@@ -941,7 +911,11 @@ def main() -> None:
 
     judge_model = "" if args.no_judge else args.judge_model
 
-    entries = load_prompt_entries(args.input)
+    entries = load_prompt_entries(
+        args.input,
+        batch_number=args.batch_number,
+        batch_size=args.batch_size,
+    )
     if args.limit is not None and args.limit > 0:
         entries = entries[: args.limit]
         logger.info(f"Limited to first {len(entries)} prompts (--limit {args.limit})")
@@ -956,7 +930,6 @@ def main() -> None:
         overwrite=args.overwrite,
         ground_truth_index=ground_truth_index,
         judge_model=judge_model,
-        eval_level=args.eval_level,
         use_batch=args.use_batch,
         poll_interval=args.poll_interval,
         cost_limit=cost_limit,
