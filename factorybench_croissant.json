@@ -12,7 +12,7 @@
   "name": "FactoryBench",
   "description": "FactoryBench is a benchmark for evaluating machine-behavior reasoning over industrial robotic telemetry, structured around Pearl's causal hierarchy. Q&A pairs span four reasoning levels: state identification, intervention reasoning, counterfactual analysis, and engineering decision-making (troubleshooting and optimisation).",
   "url": "https://huggingface.co/datasets/FactoryBench/FactoryBench",
-  "license": "https://opensource.org/licenses/MIT",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
   "version": "1.0",
   "citation": "Merzouki et al., FactoryBench: Benchmarking Machine Understanding via Question-Answering, 2026. Preprint.",
   "datePublished": "2026-05-04",

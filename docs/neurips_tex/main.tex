@@ -4,7 +4,7 @@
 % \usepackage[preprint]{neurips_2026}
 
 % to compile a camera-ready version, add the [final] option:
-\usepackage[eandd]{neurips_2026}
+\usepackage[final,eandd]{neurips_2026}
 
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc} % use 8-bit T1 fonts
@@ -77,22 +77,23 @@
 \usetikzlibrary{arrows.meta, positioning, calc, fit, shapes.geometric, 
   decorations.pathreplacing, backgrounds, patterns, shadows}
 
-\title{FactoryBench: Benchmarking Machine Understanding via Question-Answering}
+\title{\raisebox{-0.5ex}{\includegraphics[height=1.2em]{figures/factorybench_logo.png}}FactoryBench: Evaluating Industrial\\Machine Understanding}
 
-\author{\parbox{\dimexpr\textwidth-2\tabcolsep}{\centering
-  Yanis Merzouki$^{1,*}$ \quad
-  Coral Izquierdo$^{7}$ \quad
-  Matei Ignuta-Ciuncanu$^{3,4}$ \quad
-  Marcos G\'{o}mez-Bracamonte$^{1,5}$ \\
+\author{\parbox{\dimexpr\textwidth-2\tabcolsep}{\centering\footnotesize
+  Yanis Merzouki$^{1,2,*}$ \quad
+  Coral Izquierdo$^{2,3}$ \quad
+  Matei Ignuta-Ciuncanu$^{4,5}$ \quad
+  Marcos G\'{o}mez-Bracamonte$^{1,6}$ \\
+  Riccardo Maggioni$^{2}$ \quad
   Alessandro Lombardi$^{2}$ \quad
   Camilla Mazzoleni$^{2}$ \quad
   Federico Martelli$^{2,1}$ \quad
-  Riccardo Maggioni$^{2}$ \quad
   Bal\'{a}zs G\"{u}nther$^{1}$ \\
   Jonas Petersen$^{1,2,\dagger}$ \quad
-  Philipp Petersen$^{6,\dagger}$ \\[0.6em]
+  Philipp Petersen$^{7,\dagger}$ \\[0.6em]
   \normalfont\footnotesize
-  $^{1}$ETH Zurich \enspace $^{2}$Forgis \enspace $^{3}$Imperial College London \enspace $^{4}$University of Berkeley \enspace $^{5}$KTH Royal Institute of Technology \enspace $^{6}$University of Vienna \enspace $^{7}$UC3M \\[0.2em]
+  $^{1}$ETH Zurich \enspace $^{2}$Forgis \enspace $^{3}$UC3M \enspace $^{4}$Imperial College London \enspace $^{5}$University of Berkeley \\
+  $^{6}$KTH Royal Institute of Technology \enspace $^{7}$University of Vienna \\[0.2em]
   $^{*}$Correspondence: \texttt{ymerzouki@ethz.ch} \qquad $^{\dagger}$Equal senior contribution \\[0.5em]
   \small
   {\faGithub}\ Code: \href{https://github.com/Forgis-Research/FactoryBench}{\nolinkurl{github.com/Forgis-Research/FactoryBench}} \\[0.15em]
@@ -224,11 +225,11 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                     % `opacity` applies to the bitmap rather than just the node frame.
                     \begin{scope}[transparency group, opacity=0.32]
                         \node[anchor=center, inner sep=0pt] at (#1, #2)
-                            {\includegraphics[width=2.0cm]{figures/ur_robot_figure.png}};
+                        {\includegraphics[width=2.0cm]{figures/ur_robot_figure.png}};
                     \end{scope}
                 \else
                     \node[anchor=center, inner sep=0pt] at (#1, #2)
-                        {\includegraphics[width=2.0cm]{figures/ur_robot_figure.png}};
+                    {\includegraphics[width=2.0cm]{figures/ur_robot_figure.png}};
                 \fi
             }
 
@@ -310,11 +311,11 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 % Controller box (do(C)) above the robot, wide enough to host the
                 % "Force Perturbation" subtitle in \tiny without overflowing.
                 \draw[L2tint, line width=0.6pt, fill=white, rounded corners=1pt]
-                    (-4.10, 1.00) rectangle (-2.0, 1.55);
+                (-4.10, 1.00) rectangle (-2.0, 1.55);
                 \node[font=\sffamily\scriptsize\bfseries, L2tint!80!darknavy, anchor=center]
-                    at (-3, 1.38) {do(C)};
+                at (-3, 1.38) {do(C)};
                 \node[font=\sffamily\tiny\itshape, L2tint!80!darknavy, anchor=center]
-                    at (-3, 1.13) {Force Perturbation};
+                at (-3, 1.13) {Force Perturbation};
 
                 % Arrow swooping from the box's bottom centre down onto the cargo.
                 % Vertical tangents at both ends (P0->P1 vertical, P2->P3 vertical)
@@ -322,8 +323,8 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 % straight down and lands on the cargo also pointing straight down,
                 % which reads as "force injected from above onto the cargo".
                 \draw[L2tint, line width=1.2pt, line cap=round,
-                      -{Stealth[length=6pt, width=5pt]}]
-                    (-3, 1.00) .. controls (-3, 0.45) and (-2.55, 0.35) .. (-2.55, -0.15);
+                        -{Stealth[length=6pt, width=5pt]}]
+                (-3, 1.00) .. controls (-3, 0.45) and (-2.55, 0.35) .. (-2.55, -0.15);
 
                 \draw[figcontext, line width=1.4pt] (-1.85, 0.35) -- (-1.45, 0.35);
                 \node[anchor=west, font=\sffamily\scriptsize, darknavy] at (-1.40, 0.35) {$C$ \,(forced)};
@@ -340,10 +341,10 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                         % prediction horizon. Reflects the P(.) in the panel title
                         % so the orange curve no longer reads as deterministic.
                         \fill[forgisorange!30, draw=none]
-                            (axis cs:160, 3.9) -- (axis cs:200, 4.95) -- (axis cs:250, 6.10) --
-                            (axis cs:300, 6.60) -- (axis cs:400, 6.65) -- (axis cs:500, 6.75) --
-                            (axis cs:500, 4.65) -- (axis cs:400, 4.95) -- (axis cs:300, 5.40) --
-                            (axis cs:250, 5.10) -- (axis cs:200, 4.40) -- cycle;
+                        (axis cs:160, 3.9) -- (axis cs:200, 4.95) -- (axis cs:250, 6.10) --
+                        (axis cs:300, 6.60) -- (axis cs:400, 6.65) -- (axis cs:500, 6.75) --
+                        (axis cs:500, 4.65) -- (axis cs:400, 4.95) -- (axis cs:300, 5.40) --
+                        (axis cs:250, 5.10) -- (axis cs:200, 4.40) -- cycle;
 
                         \node[anchor=center, font=\sffamily\tiny\bfseries, L2tint] at (axis cs:330, 8.5) {Future Prediction};
 
@@ -397,7 +398,7 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                 % than only the node's outline.
                 \begin{scope}[transparency group, opacity=0.45]
                     \node[anchor=center, inner sep=0pt] at (-2.1, 1.05)
-                        {\includegraphics[width=0.75cm]{figures/ur_robot_figure.png}};
+                    {\includegraphics[width=0.75cm]{figures/ur_robot_figure.png}};
                 \end{scope}
                 \node[font=\sffamily\scriptsize\bfseries, red!60!darknavy, anchor=west] at (-1.80, 1.15) {STALL!};
                 \node[font=\sffamily\scriptsize\itshape, L3tint!80!darknavy, anchor=west] at (-1.80, 0.90) {(if forced)};
@@ -423,11 +424,11 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                         % the observed evidence -- mirrors the L2 band and gives
                         % visual weight to the P(.) of probabilistic CF reasoning.
                         \fill[forgisorange!30, draw=none]
-                            (axis cs:20, 3.9) -- (axis cs:50, 4.7) -- (axis cs:100, 6.2) --
-                            (axis cs:200, 9.0) -- (axis cs:300, 9.7) -- (axis cs:400, 9.7) --
-                            (axis cs:500, 9.7) --
-                            (axis cs:500, 9.1) -- (axis cs:400, 9.1) -- (axis cs:300, 8.9) --
-                            (axis cs:200, 8.0) -- (axis cs:100, 5.4) -- (axis cs:50, 4.3) -- cycle;
+                        (axis cs:20, 3.9) -- (axis cs:50, 4.7) -- (axis cs:100, 6.2) --
+                        (axis cs:200, 9.0) -- (axis cs:300, 9.7) -- (axis cs:400, 9.7) --
+                        (axis cs:500, 9.7) --
+                        (axis cs:500, 9.1) -- (axis cs:400, 9.1) -- (axis cs:300, 8.9) --
+                        (axis cs:200, 8.0) -- (axis cs:100, 5.4) -- (axis cs:50, 4.3) -- cycle;
 
                         % Bifurcation event line + label anchored next to the
                         % dashed vertical so the question's "that event" ties
@@ -438,9 +439,9 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                         % anchoring.
                         \draw[darknavy, line width=0.5pt, dashed] (axis cs:20,0) -- (axis cs:20,9.5);
                         \node[anchor=south west, font=\sffamily\tiny\bfseries,
-                              text=figcontext!60!darknavy] at (axis cs:23, 0.0) {Event\,$\mathrm{do}(C{=}x)$};
+                            text=figcontext!60!darknavy] at (axis cs:23, 0.0) {Event\,$\mathrm{do}(C{=}x)$};
                         \draw[figcontext!60!darknavy, line width=0.35pt, dotted, line cap=round]
-                            (axis cs:23, 5.85) -- (axis cs:21, 4.2);
+                        (axis cs:23, 5.85) -- (axis cs:21, 4.2);
 
                         % S setpoint (figgreen): the controller's commanded value,
                         % the reference both factual and counterfactual E are read
@@ -499,11 +500,11 @@ By structuring Q\&A tasks along these four levels, FactoryBench enables rigorous
                     anchor=west, name=stepC] at (-1.85, -0.50) {c) resume};
 
                 \draw[L4tint!80!darknavy, line width=0.7pt,
-                      -{Stealth[length=3.5pt, width=3.5pt]}]
-                    (stepA.south) -- (stepB.north);
+                        -{Stealth[length=3.5pt, width=3.5pt]}]
+                (stepA.south) -- (stepB.north);
                 \draw[L4tint!80!darknavy, line width=0.7pt,
-                      -{Stealth[length=3.5pt, width=3.5pt]}]
-                    (stepB.south) -- (stepC.north);
+                        -{Stealth[length=3.5pt, width=3.5pt]}]
+                (stepB.south) -- (stepC.north);
 
                 \node[draw=darknavy!40, fill=white, rounded corners=2pt, line width=0.5pt,
                     font=\sffamily\scriptsize, text=darknavy, align=left,
@@ -591,12 +592,12 @@ Table~\ref{tab:factorywave_distribution} summarises the resulting distribution o
     \small
     \begin{tabular}{@{}llrrrr@{}}
         \toprule
-        Robot          & Task           & Normal        & Fault         & CF groups   & Total         \\
+        Robot          & Task           & Normal        & Fault         & CF groups    & Total         \\
         \midrule
-        UR3            & Pick-and-Place & 1053          & 3238          & 109         & 4400          \\
-        UR3            & Screwing       & 230           & 850           & 40          & 1120          \\
-        UR3            & Peg-in-Hole    & 322           & 1200          & 100         & 1622          \\
-        KUKA KR10      & Pick-and-Place & 578           & 1221          & 42          & 1841          \\
+        UR3            & Pick-and-Place & 1053          & 3238          & 109          & 4400          \\
+        UR3            & Screwing       & 230           & 850           & 40           & 1120          \\
+        UR3            & Peg-in-Hole    & 322           & 1200          & 100          & 1622          \\
+        KUKA KR10      & Pick-and-Place & 578           & 1221          & 42           & 1841          \\
         \midrule
         \textbf{Total} &                & \textbf{2183} & \textbf{6509} & \textbf{291} & \textbf{8983} \\
         \bottomrule
@@ -660,7 +661,7 @@ The heatmap in Figure~\ref{fig:results} surfaces multiple findings that collecti
 On L1, three of six LLMs fail to separate meaningfully from the simple baseline (28.4\%), including GPT-5.1 which is estimated (by parameter-count extrapolation from public benchmarks and inference-cost proxies) to be by far the largest model in the panel. Only Mistral Large~3, Qwen3-235B, and Claude Sonnet 4.6 establish a clear margin. Raw scale does not reliably confer the ability to extract precise state information from dense industrial signals; L1 is measuring something general-purpose pretraining does not directly optimise for.
 
 \paragraph{Models that struggle on Level~1 still outperform the baseline on Levels~2 and~3.}
-The weakest L1 performers, Qwen3-4B and DeepSeek V3.2, both score below the simple baseline on state identification, yet both exceed it on L2 and L3. GPT-5.1 follows the same pattern. The disconnect is structural across the full panel, not an artefact of one model. L2 and L3 templates are primarily relational and directional (did a signal change after the intervention; do two trajectories diverge?), and LLMs appear to possess this comparative reasoning as a latent competence that is partially decoupled from the precise numerical reading required at L1. That said, the rank ordering of models is nearly identical across all three levels: the same models that lead on L1 lead on L2 and L3, with no meaningful reordering. This consistency indicates that stronger state comprehension does translate into better intervention and counterfactual reasoning in a machine understanding context, and that L2 and L3 are not independent of L1 ability but build on it. 
+The weakest L1 performers, Qwen3-4B and DeepSeek V3.2, both score below the simple baseline on state identification, yet both exceed it on L2 and L3. GPT-5.1 follows the same pattern. The disconnect is structural across the full panel, not an artefact of one model. L2 and L3 templates are primarily relational and directional (did a signal change after the intervention; do two trajectories diverge?), and LLMs appear to possess this comparative reasoning as a latent competence that is partially decoupled from the precise numerical reading required at L1. That said, the rank ordering of models is nearly identical across all three levels: the same models that lead on L1 lead on L2 and L3, with no meaningful reordering. This consistency indicates that stronger state comprehension does translate into better intervention and counterfactual reasoning in a machine understanding context, and that L2 and L3 are not independent of L1 ability but build on it.
 
 \paragraph{GPT-5.1 leads on the most practically relevant level despite underperforming on the others.}
 GPT-5.1 ranks fourth out of six LLMs on Levels~1--3, yet leads Level~4 at 14.4\%, more than twice the next-best model. L4 requires identifying the root cause and producing a multi-step remediation procedure grounded in the manufacturer documentation. We theorize that GPT-5.1's reversal might be due to a disproportionate exposure to structured industrial documentation in its training data, letting it match the correct protocol to a fault description even when its signal comprehension is comparatively weak. More broadly, the pattern reveals a dissociation between \emph{signal comprehension} and \emph{protocol retrieval}: a model can produce the correct high-level engineering answer while its lower-level understanding of the underlying time series remains incomplete. The two capabilities appear to require different training signal, and optimising for one does not deliver the other.
@@ -713,17 +714,17 @@ FactoryBench emits questions in five answer formats. The four structured formats
     \setlength{\tabcolsep}{4pt}
     \begin{tabular}{@{}l p{4.6cm} p{6.2cm}@{}}
         \toprule
-        \textbf{Format} & \textbf{Description} & \textbf{Raw scoring (before chance correction)} \\
+        \textbf{Format}   & \textbf{Description}                                                                                                                 & \textbf{Raw scoring (before chance correction)}                                                                                                                                                                                                                                                                          \\
         \midrule
-        Single-select MCQ & Three or four mutually exclusive options (A--C or A--D); the model selects one. & Exact match: $1$ if the parsed letter equals the gold letter, $0$ otherwise. Per-item chance level $E=1/k$ where $k\in\{3,4\}$ is the option count for that question. \\
+        Single-select MCQ & Three or four mutually exclusive options (A--C or A--D); the model selects one.                                                      & Exact match: $1$ if the parsed letter equals the gold letter, $0$ otherwise. Per-item chance level $E=1/k$ where $k\in\{3,4\}$ is the option count for that question.                                                                                                                                                    \\
         \addlinespace
-        Multi-select MCQ  & Four independent statements (A--D) about the outcome of an event or intervention; the model emits a T/F string of length four. & Positional fraction: $1/4$ per slot whose T/F matches the gold; raw score in $\{0, 0.25, 0.5, 0.75, 1\}$. Chance level $E=1/2$. \\
+        Multi-select MCQ  & Four independent statements (A--D) about the outcome of an event or intervention; the model emits a T/F string of length four.       & Positional fraction: $1/4$ per slot whose T/F matches the gold; raw score in $\{0, 0.25, 0.5, 0.75, 1\}$. Chance level $E=1/2$.                                                                                                                                                                                          \\
         \addlinespace
-        Ranking           & Four time-series segments or outcomes (A--D) ordered by a specified criterion. Answer is a permutation string (e.g.\ \texttt{DABC}). & Positional fraction: $1/4$ per slot whose letter matches the gold permutation; raw score in $\{0, 0.25, 0.5, 0.75, 1\}$. Chance level $E=1/4$. \\
+        Ranking           & Four time-series segments or outcomes (A--D) ordered by a specified criterion. Answer is a permutation string (e.g.\ \texttt{DABC}). & Positional fraction: $1/4$ per slot whose letter matches the gold permutation; raw score in $\{0, 0.25, 0.5, 0.75, 1\}$. Chance level $E=1/4$.                                                                                                                                                                           \\
         \addlinespace
-        Tensor            & One or more scalar values (e.g.\ expected sensor reading after an intervention). Answer is a list of floats. & Per-scalar three-level piecewise score: $1$ if $|\hat{v}-v^{\star}|\!\leq\! m$, $0.5$ if $m\!<\!|\hat{v}-v^{\star}|\!\leq\!2m$, else $0$. Per-channel margin calibrated to $m_j = R_j/12$ so the chance level matches MCQ ($E = 1/4$). \\
+        Tensor            & One or more scalar values (e.g.\ expected sensor reading after an intervention). Answer is a list of floats.                         & Per-scalar three-level piecewise score: $1$ if $|\hat{v}-v^{\star}|\!\leq\! m$, $0.5$ if $m\!<\!|\hat{v}-v^{\star}|\!\leq\!2m$, else $0$. Per-channel margin calibrated to $m_j = R_j/12$ so the chance level matches MCQ ($E = 1/4$).                                                                                   \\
         \addlinespace
-        Free-form         & Open-ended natural-language response, used only for the two Level~4 question types: troubleshooting and optimization. & Score $\in\{0, 0.5, 1\}$. Troubleshooting: $0.5$ if the reply names the correct root cause, $1$ if it also gives the correct corrective protocol, $0$ otherwise. Optimization: $0.5$ if the reply correctly identifies the misconfigured parameter, $1$ if it also gives the correct corrective protocol, $0$ otherwise. \\
+        Free-form         & Open-ended natural-language response, used only for the two Level~4 question types: troubleshooting and optimization.                & Score $\in\{0, 0.5, 1\}$. Troubleshooting: $0.5$ if the reply names the correct root cause, $1$ if it also gives the correct corrective protocol, $0$ otherwise. Optimization: $0.5$ if the reply correctly identifies the misconfigured parameter, $1$ if it also gives the correct corrective protocol, $0$ otherwise. \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -785,64 +786,64 @@ Table~\ref{tab:template_inventory} lists the number of question templates curren
 Table~\ref{tab:template_list} lists every template defined in the generator. Placeholders in braces (\{task\}, \{anomaly\}, \{phase\}, \{signal\}, \{n\}, \{event\}, \{window\_length\}, \{joint\_signal\}) are filled at generation time from the episode metadata or the relevance specification. The trailing answer-format reminders (\emph{``Answer only with $\ldots$''}) are truncated for readability, matching the convention used in Table~\ref{tab:qa_examples}. Note that the \emph{active} subset reported in Table~\ref{tab:template_inventory} is smaller because some defined templates currently emit no released Q\&A items under the active relevance specification.
 
 \begin{small}
-\renewcommand{\arraystretch}{1.4}
-\begin{longtable}{@{}>{\centering\arraybackslash}p{0.05\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.66\textwidth}@{}}
-\caption{Full list of FactoryBench question templates by causal level. \emph{Single-choice MCQ} requires one letter; \emph{multi-select MCQ} requires a binary string over a fixed option set; \emph{ranking} requires a permutation over $k$ items; \emph{tensor (scalar)} is a single real number accepted within a tolerance band; \emph{tensor (6-vector)} is a JSON array of six real numbers, one per joint axis; \emph{free-form} responses are evaluated by an LLM-as-judge against a reference answer.}\label{tab:template_list} \\
-\toprule
-\textbf{ID} & \textbf{Answer format} & \textbf{Template (boilerplate truncated)} \\
-\midrule
-\endfirsthead
-\multicolumn{3}{@{}l}{\footnotesize\emph{Table~\ref{tab:template_list} continued from previous page}} \\
-\toprule
-\textbf{ID} & \textbf{Answer format} & \textbf{Template (boilerplate truncated)} \\
-\midrule
-\endhead
-\midrule
-\multicolumn{3}{r@{}}{\footnotesize\emph{continued on next page}} \\
-\endfoot
-\bottomrule
-\endlastfoot
+    \renewcommand{\arraystretch}{1.4}
+    \begin{longtable}{@{}>{\centering\arraybackslash}p{0.05\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.66\textwidth}@{}}
+        \caption{Full list of FactoryBench question templates by causal level. \emph{Single-choice MCQ} requires one letter; \emph{multi-select MCQ} requires a binary string over a fixed option set; \emph{ranking} requires a permutation over $k$ items; \emph{tensor (scalar)} is a single real number accepted within a tolerance band; \emph{tensor (6-vector)} is a JSON array of six real numbers, one per joint axis; \emph{free-form} responses are evaluated by an LLM-as-judge against a reference answer.}\label{tab:template_list} \\
+        \toprule
+        \textbf{ID} & \textbf{Answer format} & \textbf{Template (boilerplate truncated)}                                                                                                                                                                                                                                                                                                                                                                                                                                                          \\
+        \midrule
+        \endfirsthead
+        \multicolumn{3}{@{}l}{\footnotesize\emph{Table~\ref{tab:template_list} continued from previous page}}                                                                                                                                                                                                                                                                                                                                                                                                                                     \\
+        \toprule
+        \textbf{ID} & \textbf{Answer format} & \textbf{Template (boilerplate truncated)}                                                                                                                                                                                                                                                                                                                                                                                                                                                          \\
+        \midrule
+        \endhead
+        \midrule
+        \multicolumn{3}{r@{}}{\footnotesize\emph{continued on next page}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                         \\
+        \endfoot
+        \bottomrule
+        \endlastfoot
 
-\multicolumn{3}{@{}l@{}}{\textbf{Level 1: State understanding}} \\
-\midrule
-L1.1 & Tensor (scalar)              & The robot is performing a \{task\} task. We want to isolate the \{phase\} in the robot's time series. Assuming a fixed window length of \{window\_length\} timesteps, at which timestamp should the window begin? \\
-L1.2 & Single-choice MCQ & What anomaly are present in the following time series? \\
-L1.3 & Multi-select MCQ  & What changed between the two instances of robotic time series data? \\
-L1.5 & Ranking  & Rank the following robot time series segments from most to least severe anomaly. \\
-L1.6 & Single-choice MCQ & What robot does this sensor data originate from? \\
-L1.7 & Tensor (scalar)              & Given the sensor stream below, what is the expected value of \{signal\} at T+\{n\}ms? \\
-\midrule
+        \multicolumn{3}{@{}l@{}}{\textbf{Level 1: State understanding}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \\
+        \midrule
+        L1.1        & Tensor (scalar)        & The robot is performing a \{task\} task. We want to isolate the \{phase\} in the robot's time series. Assuming a fixed window length of \{window\_length\} timesteps, at which timestamp should the window begin?                                                                                                                                                                                                                                                                                  \\
+        L1.2        & Single-choice MCQ      & What anomaly are present in the following time series?                                                                                                                                                                                                                                                                                                                                                                                                                                             \\
+        L1.3        & Multi-select MCQ       & What changed between the two instances of robotic time series data?                                                                                                                                                                                                                                                                                                                                                                                                                                \\
+        L1.5        & Ranking                & Rank the following robot time series segments from most to least severe anomaly.                                                                                                                                                                                                                                                                                                                                                                                                                   \\
+        L1.6        & Single-choice MCQ      & What robot does this sensor data originate from?                                                                                                                                                                                                                                                                                                                                                                                                                                                   \\
+        L1.7        & Tensor (scalar)        & Given the sensor stream below, what is the expected value of \{signal\} at T+\{n\}ms?                                                                                                                                                                                                                                                                                                                                                                                                              \\
+        \midrule
 
-\multicolumn{3}{@{}l@{}}{\textbf{Level 2: Intervention reasoning}} \\
-\midrule
-L2.1  & Ranking   & The sensor stream below is from a robot exhibiting \{anomaly\}. Rank the signal segments listed in the `options' field in the order you would expect them to appear as the anomaly manifests. \\
-L2.2  & Multi-select MCQ   & The sensor stream below is from a robot exhibiting \{anomaly\}. What would most likely happen next? \\
-L2.3  & Multi-select MCQ   & The sensor stream below is from a robot exhibiting \{anomaly\}. Select all statements that apply in the options provided. \\
-L2.4  & Tensor (scalar)                & The sensor stream below is from a robot exhibiting \{anomaly\}. What is the expected value of \{signal\} at T+\{n\}ms? \\
-L2.5  & Tensor (6-vector)              & The sensor stream below is from a robot exhibiting \{anomaly\}. What are the expected values of \{joint\_signal\} at T+\{n\}ms? \\
-L2.6  & Tensor (scalar)                & Knowing that the robot suffers from \{anomaly\} in the given context time series, we want to isolate the \{phase\} phase. Assuming a fixed window length of \{window\_length\} timesteps, at which timestamp should the window begin? \\
-L2.7  & Single-choice MCQ  & Given the sensor data from a robot performing the task, determine what anomaly is present? \\
-L2.8  & Single-choice MCQ  & You are provided with two sensor streams originating from robots accomplishing tasks. What differences between the two given instances of robotic time series data (if any) do you notice? \\
-L2.9  & Ranking   & Rank the following robot time series segments from most to least severe anomaly. \\
-L2.10 & Single-choice MCQ  & Knowing that the robot suffers from \{anomaly\} in the given context time series, what robot does this sensor data originate from? \\
-\midrule
+        \multicolumn{3}{@{}l@{}}{\textbf{Level 2: Intervention reasoning}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                        \\
+        \midrule
+        L2.1        & Ranking                & The sensor stream below is from a robot exhibiting \{anomaly\}. Rank the signal segments listed in the `options' field in the order you would expect them to appear as the anomaly manifests.                                                                                                                                                                                                                                                                                                      \\
+        L2.2        & Multi-select MCQ       & The sensor stream below is from a robot exhibiting \{anomaly\}. What would most likely happen next?                                                                                                                                                                                                                                                                                                                                                                                                \\
+        L2.3        & Multi-select MCQ       & The sensor stream below is from a robot exhibiting \{anomaly\}. Select all statements that apply in the options provided.                                                                                                                                                                                                                                                                                                                                                                          \\
+        L2.4        & Tensor (scalar)        & The sensor stream below is from a robot exhibiting \{anomaly\}. What is the expected value of \{signal\} at T+\{n\}ms?                                                                                                                                                                                                                                                                                                                                                                             \\
+        L2.5        & Tensor (6-vector)      & The sensor stream below is from a robot exhibiting \{anomaly\}. What are the expected values of \{joint\_signal\} at T+\{n\}ms?                                                                                                                                                                                                                                                                                                                                                                    \\
+        L2.6        & Tensor (scalar)        & Knowing that the robot suffers from \{anomaly\} in the given context time series, we want to isolate the \{phase\} phase. Assuming a fixed window length of \{window\_length\} timesteps, at which timestamp should the window begin?                                                                                                                                                                                                                                                              \\
+        L2.7        & Single-choice MCQ      & Given the sensor data from a robot performing the task, determine what anomaly is present?                                                                                                                                                                                                                                                                                                                                                                                                         \\
+        L2.8        & Single-choice MCQ      & You are provided with two sensor streams originating from robots accomplishing tasks. What differences between the two given instances of robotic time series data (if any) do you notice?                                                                                                                                                                                                                                                                                                         \\
+        L2.9        & Ranking                & Rank the following robot time series segments from most to least severe anomaly.                                                                                                                                                                                                                                                                                                                                                                                                                   \\
+        L2.10       & Single-choice MCQ      & Knowing that the robot suffers from \{anomaly\} in the given context time series, what robot does this sensor data originate from?                                                                                                                                                                                                                                                                                                                                                                 \\
+        \midrule
 
-\multicolumn{3}{@{}l@{}}{\textbf{Level 3: Counterfactual reasoning}} \\
-\midrule
-L3.1 & Ranking  & Given the baseline sensor stream below and the counterfactual scenario where \{event\}, rank the signal segments listed in the `options' field in the order you would expect them to appear as the event manifests. \\
-L3.2 & Multi-select MCQ  & Given the counterfactual scenario where \{event\}, what would most likely happen next? \\
-L3.3 & Multi-select MCQ              & Given the counterfactual scenario where \{event\}, select all statements that would apply. \\
-L3.4 & Tensor (scalar)               & In the counterfactual scenario where \{event\}, what would be the expected value of \{signal\} at T+\{n\}ms? \\
-L3.5 & Tensor (6-vector)             & In the counterfactual scenario where \{event\}, what would be the expected values of \{joint\_signal\} at T+\{n\}ms? \\
-\midrule
+        \multicolumn{3}{@{}l@{}}{\textbf{Level 3: Counterfactual reasoning}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \\
+        \midrule
+        L3.1        & Ranking                & Given the baseline sensor stream below and the counterfactual scenario where \{event\}, rank the signal segments listed in the `options' field in the order you would expect them to appear as the event manifests.                                                                                                                                                                                                                                                                                \\
+        L3.2        & Multi-select MCQ       & Given the counterfactual scenario where \{event\}, what would most likely happen next?                                                                                                                                                                                                                                                                                                                                                                                                             \\
+        L3.3        & Multi-select MCQ       & Given the counterfactual scenario where \{event\}, select all statements that would apply.                                                                                                                                                                                                                                                                                                                                                                                                         \\
+        L3.4        & Tensor (scalar)        & In the counterfactual scenario where \{event\}, what would be the expected value of \{signal\} at T+\{n\}ms?                                                                                                                                                                                                                                                                                                                                                                                       \\
+        L3.5        & Tensor (6-vector)      & In the counterfactual scenario where \{event\}, what would be the expected values of \{joint\_signal\} at T+\{n\}ms?                                                                                                                                                                                                                                                                                                                                                                               \\
+        \midrule
 
-\multicolumn{3}{@{}l@{}}{\textbf{Level 4: Decision support}} \\
-\midrule
-L4.1 & Free-form                    & Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to fix it. \\
-L4.2 & Free-form                    & An engineer wants to increase the effectiveness and accuracy of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this? Do not justify your answer, simply indicate steps to take (or specify if nothing can be done). \\
-L4.3 & Ranking & The 4 sensor streams below each correspond to a complete task execution padded to a common length. Consider only the task completion portion of each stream (up to the end of the final task phase) when assessing duration. Rank them from shortest to longest task duration. \\
-L4.4 & Ranking & The 4 sensor streams below each correspond to a complete task execution padded to a common length. Consider only the task completion portion of each stream (up to the end of the final task phase) when assessing energy consumption. Rank them from most to least energy-efficient. \\
-\end{longtable}
+        \multicolumn{3}{@{}l@{}}{\textbf{Level 4: Decision support}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                              \\
+        \midrule
+        L4.1        & Free-form              & Given the sensor stream below, does the machine show signs of anomalous behavior? If yes, identify the most likely root cause and describe the steps you would take to fix it.                                                                                                                                                                                                                                                                                                                     \\
+        L4.2        & Free-form              & An engineer wants to increase the effectiveness and accuracy of this machine. Based on the sensor stream below, what operational changes or parameter adjustments could help achieve this? Do not justify your answer, simply indicate steps to take (or specify if nothing can be done).                                                                                                                                                                                                          \\
+        L4.3        & Ranking                & The 4 sensor streams below each correspond to a complete task execution padded to a common length. Consider only the task completion portion of each stream (up to the end of the final task phase) when assessing duration. Rank them from shortest to longest task duration.                                                                                                                                                                                                                     \\
+        L4.4        & Ranking                & The 4 sensor streams below each correspond to a complete task execution padded to a common length. Consider only the task completion portion of each stream (up to the end of the final task phase) when assessing energy consumption. Rank them from most to least energy-efficient.                                                                                                                                                                                                              \\
+    \end{longtable}
 \end{small}
 
 \paragraph{Prompt structure and knowledge-graph augmentation.}
@@ -860,7 +861,7 @@ Here are the options:
 \noindent The leading \texttt{<machine\_sentence>} is filled at prompt-build time from the FactoryBench knowledge graph, specifically the machine and gripper tables, keyed on the dataset that the question is grounded in. This guarantees that identical question templates are grounded in the correct hardware description regardless of which underlying dataset the episode comes from. For a UR3e-grounded question on FactoryWave, the resulting line expands to:
 
 \begin{quote}\small
-The following sensor data comes from Universal Robots UR3e, a collaborative robot (cobot) from the E-series with 3 kg payload, 6 degrees of freedom, controlled via UR PolyScope (teach pendant), UrScript, typically used for light assembly tasks, automated workbench scenarios. It is equipped with a 2FG14 Finger Gripper OnRobot.
+    The following sensor data comes from Universal Robots UR3e, a collaborative robot (cobot) from the E-series with 3 kg payload, 6 degrees of freedom, controlled via UR PolyScope (teach pendant), UrScript, typically used for light assembly tasks, automated workbench scenarios. It is equipped with a 2FG14 Finger Gripper OnRobot.
 \end{quote}
 
 \noindent The augmentation is conditional: identification templates such as L1.6 (``What robot does this sensor data originate from?'') and L2.10 suppress the machine sentence so the model cannot read the answer off the prompt header, and templates that probe gripping behaviour without revealing tooling can selectively suppress only the gripper clause. The acronym-mapping block decodes the time-series header into long-form channel names and is included whenever the question carries one.

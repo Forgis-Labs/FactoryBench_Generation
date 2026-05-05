@@ -1,128 +1,209 @@
-\documentclass[border=5pt,tikz]{standalone}
+\documentclass[border=2pt,tikz]{standalone}
 \usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 \usepackage{xcolor}
-\usepackage{amsmath,amssymb}
+\usepackage{mathptmx}
+\usepackage{array}
+\usetikzlibrary{
+  arrows.meta,
+  positioning,
+  shapes.geometric,
+  fit,
+  backgrounds,
+  calc,
+  decorations.pathreplacing,
+  patterns,
+  shadows
+}
 
+% Colors from the paper
 \definecolor{darknavy}{HTML}{122128}
 \definecolor{forgisorange}{HTML}{FF5A00}
 \definecolor{panelbg}{HTML}{F0F4F8}
 \definecolor{figsteel}{HTML}{878F92}
 
-\usetikzlibrary{arrows.meta, positioning, calc}
-
 \begin{document}
+% Sketch / layout plan:
+% - Two columns separated by a dashed divider
+% - Left column (x=0): Template (b1) --arrow+annotations--> Instantiated Question (b2)
+%   Box width: 5.4cm text + 2*8pt padding ~ 5.96cm
+% - Divider at x ~ 6.4cm (0.4cm gap from left box edge)
+% - Right column starts at x ~ 6.85cm (0.45cm gap from divider)
+%   Box width: 6.4cm text + 2*8pt padding ~ 6.96cm
+% - Total: ~13.8cm, close to NeurIPS \textwidth (13.97cm / ~397pt)
+% - Left column gap: 2.5cm between b1.south and b2.north (enough for 4 annotation lines)
+% - Right column gap: 2.2cm between b3.south and b4.north (enough for waveform + labels)
+% - Waveform placed to the LEFT of the arrow, with clear separation
+% - "evaluate against data" placed to the RIGHT of the arrow, with clear separation
+
 \begin{tikzpicture}[
-    font=\sffamily\scriptsize\color{darknavy},
-    arr/.style={
-        -{Latex[length=2.5pt, width=2pt]},
-        forgisorange, line width=0.7pt,
-    },
-    stdpanel/.style={
-        rectangle, rounded corners=3pt, fill=panelbg,
-        inner xsep=5pt, inner ysep=4pt, align=left,
-    },
-    outpanel/.style={
-        rectangle, rounded corners=3pt,
-        fill=forgisorange!6, draw=forgisorange!25, line width=0.4pt,
-        inner xsep=5pt, inner ysep=4pt, align=left,
-    },
-    badge/.style={
-        fill=forgisorange, rounded corners=2pt,
-        inner xsep=3pt, inner ysep=1.2pt,
-        font=\sffamily\bfseries\tiny, text=white,
-        anchor=west,
-    },
-    boxtitle/.style={
-        font=\sffamily\bfseries\scriptsize, text=darknavy,
-        anchor=base west,
-    },
-]
+        font=\sffamily\scriptsize\color{darknavy},
+        arr/.style={
+                -{Latex[length=2.5pt, width=2pt]},
+                forgisorange, line width=0.7pt,
+            },
+        stdpanel/.style={
+                rectangle, rounded corners=3pt, fill=panelbg,
+                inner xsep=8pt, inner ysep=8pt, align=left,
+            },
+        outpanel/.style={
+                rectangle, rounded corners=3pt,
+                fill=forgisorange!6, draw=forgisorange!25, line width=0.4pt,
+                inner xsep=8pt, inner ysep=8pt, align=left,
+            },
+    ]
 
-% -- Box 1: Template --
-\node[stdpanel, text width=2.5cm, anchor=north west] (b1) at (0,0) {%
-    {\rule{0pt}{8pt}}\\[-6pt]
-    {\fontsize{6}{7.8}\selectfont\itshape
-        Had {\bfseries\color{forgisorange}\{event\}} occurred at time
-        {\bfseries\color{forgisorange}\{t\}}\,ms, what would be the
-        expected values of {\bfseries\color{forgisorange}\{joint\_signal\}}
-        at T+{\bfseries\color{forgisorange}\{n\}}\,ms in this counterfactual case?}%
-};
-\node[badge] (bg1) at ([xshift=4pt, yshift=-4pt]b1.north west) {\textsc{1}};
-\node[boxtitle] at ([xshift=2pt]bg1.base east) {Template};
+    % ============================================================
+    % LAYOUT CONSTANTS
+    % ============================================================
+    \newcommand{\lcolx}{0}           % left column x origin
+    \newcommand{\lboxw}{5.4cm}       % left column text width
+    \newcommand{\divx}{6.4}          % dashed divider x
+    \newcommand{\rcolx}{6.85}        % right column x origin
+    \newcommand{\rboxw}{6.4cm}       % right column text width
+    \newcommand{\interboxgapL}{2.6cm}% vertical gap left column
+    \newcommand{\interboxgapR}{2.3cm}% vertical gap right column
 
-% -- Box 2: Slot Binding --
-\node[stdpanel, text width=2.7cm, right=0.3cm of b1] (b2) {%
-    {\rule{0pt}{8pt}}\\[-6pt]
-    {\fontsize{6}{8.5}\selectfont
-        {\bfseries\color{forgisorange}event}
-            {\color{figsteel}\,$\leftarrow$\,}+0.5\,kg payload\\[0.5pt]
-        {\bfseries\color{forgisorange}t}
-            {\color{figsteel}\,$\leftarrow$\,}4\,329\\[0.5pt]
-        {\bfseries\color{forgisorange}joint\_signal}
-            {\color{figsteel}\,$\leftarrow$\,}joint accel.\\[0.5pt]
-        {\bfseries\color{forgisorange}n}
-            {\color{figsteel}\,$\leftarrow$\,}500}%
-};
-\node[badge] (bg2) at ([xshift=4pt, yshift=-4pt]b2.north west) {\textsc{2}};
-\node[boxtitle] at ([xshift=2pt]bg2.base east) {Slot Binding};
+    % ============================================================
+    % COLUMN TITLES
+    % ============================================================
+    \node[font=\sffamily\bfseries\scriptsize, text=darknavy, anchor=south west]
+    (titleL) at (\lcolx, 0.15) {Question Generation};
+    \node[font=\sffamily\bfseries\scriptsize, text=darknavy, anchor=south west]
+    (titleR) at (\rcolx, 0.15) {Ground Truth: Answer Generation};
 
-% -- Box 3: Instantiated Question --
-\node[outpanel, text width=3.0cm, right=0.3cm of b2] (b3) {%
-    {\rule{0pt}{8pt}}\\[-6pt]
-    {\fontsize{6}{7.8}\selectfont\itshape
-        Had {\bfseries\color{forgisorange}an increase of 0.5\,kg to the payload}
-        occurred at time {\bfseries\color{forgisorange}4\,329}\,ms, what would be
-        the expected values of {\bfseries\color{forgisorange}joint accelerations}
-        at T+{\bfseries\color{forgisorange}500}\,ms in this counterfactual case?}%
-};
-\node[badge] (bg3) at ([xshift=4pt, yshift=-4pt]b3.north west) {\textsc{3}};
-\node[boxtitle] at ([xshift=2pt]bg3.base east) {Question};
+    % ============================================================
+    % LEFT COLUMN
+    % ============================================================
 
-% -- Arrows left half --
-\draw[arr] (b1.east) -- (b2.west);
-\draw[arr] (b2.east) -- (b3.west);
+    % -- Box 1: Template --
+    \node[stdpanel, text width=\lboxw, anchor=north west] (b1) at (\lcolx,0) {%
+        {\sffamily\bfseries\scriptsize\color{darknavy} Template}\\[3pt]
+        {\scriptsize\itshape\color{darknavy}%
+            Had {\bfseries\color{forgisorange}\{event\}} occurred at time
+                {\bfseries\color{forgisorange}\{t\}}\,ms, what would be the
+            expected values of {\bfseries\color{forgisorange}\{joint\_signal\}}
+            at T+{\bfseries\color{forgisorange}\{n\}}\,ms in this counterfactual case?}%
+    };
 
-% ============ DIVIDER ============
-\coordinate (divtop) at ($(b3.north east) + (0.22, 0.25)$);
-\coordinate (divbot) at ($(b3.south east) + (0.22, 0)$);
-\draw[figsteel!60, densely dashed, line width=0.5pt] (divtop) -- (divbot);
+    % -- Box 2: Instantiated Question --
+    \node[outpanel, text width=\lboxw, anchor=north west]
+    (b2) at ([yshift=-\interboxgapL]b1.south west) {%
+        {\sffamily\bfseries\scriptsize\color{darknavy} Instantiated Question}\\[3pt]
+        {\scriptsize\itshape\color{darknavy}%
+            ``Had {\bfseries\color{forgisorange}an increase of 0.5\,kg to the payload}
+            occurred at time {\bfseries\color{forgisorange}4\,329}\,ms, what would be
+            the expected values of {\bfseries\color{forgisorange}joint accelerations}
+            at T+{\bfseries\color{forgisorange}500}\,ms in this counterfactual case?''}%
+    };
 
-% -- Box 4: Answer Rule Pool --
-\node[stdpanel, text width=3.6cm, right=0.44cm of b3] (b4) {%
-    {\rule{0pt}{8pt}}\\[-6pt]
-    {\fontsize{6}{8}\selectfont
-        \textbf{A:} \textit{``Accel.\ spike above threshold''}\\[-1pt]
-        \hspace*{4pt}{\fontsize{5}{7}\selectfont\color{figsteel}
-            rule:\,$\max(\text{accel}_{[t:t\!+\!n]}) > \mu\!+\!2\sigma$}\,{\color{forgisorange}\checkmark}\\[2.5pt]
-        \textbf{B:} \textit{``Torque within nominal range''}\\[-1pt]
-        \hspace*{4pt}{\fontsize{5}{7}\selectfont\color{figsteel}
-            rule:\,$\max(\text{torque}_{[t:t\!+\!n]}) < \text{limit}$}\,{\color{figsteel}$\times$}}%
-};
-\node[badge] (bg4) at ([xshift=4pt, yshift=-4pt]b4.north west) {\textsc{4}};
-\node[boxtitle] at ([xshift=2pt]bg4.base east) {Answer Rules};
+    % -- Vertical arrow (shifted left to make room for annotations) --
+    \coordinate (arrmid) at ([xshift=-0.6cm]b1.south);
+    \draw[arr] ([yshift=-4pt]arrmid) -- ([yshift=4pt]arrmid |- b2.north);
 
-% -- Box 5: Ground-Truth Answer --
-\node[outpanel, text width=2.1cm, right=0.3cm of b4] (b5) {%
-    {\rule{0pt}{8pt}}\\[-6pt]
-    {\fontsize{6}{8.5}\selectfont
-        \textbf{Answer:} \{A\}\,{\color{forgisorange}\checkmark}\\[3pt]
-        {\fontsize{5.5}{7.5}\selectfont\color{figsteel}
-            Score: deterministic\\(from labels + rules)}}%
-};
-\node[badge] (bg5) at ([xshift=4pt, yshift=-4pt]b5.north west) {\textsc{5}};
-\node[boxtitle] at ([xshift=2pt]bg5.base east) {Ground Truth};
+    % -- Slot binding annotations (to the right of the arrow, vertically centered) --
+    \coordinate (mid1) at ($(arrmid)!0.5!(arrmid |- b2.north)$);
+    \node[anchor=west, align=left, inner sep=0pt] at ([xshift=8pt]mid1) {%
+        {\fontsize{5.5}{7.5}\selectfont
+            {\bfseries\color{forgisorange}\{event\}}%
+            \hspace{8pt}{\color{figsteel}$\leftarrow$}%
+            \;+0.5\,kg payload}\\[1.5pt]
+        {\fontsize{5.5}{7.5}\selectfont
+            {\bfseries\color{forgisorange}\{t\}}%
+            \hspace{26pt}{\color{figsteel}$\leftarrow$}%
+            \;4\,329}\\[1.5pt]
+        {\fontsize{5.5}{7.5}\selectfont
+            {\bfseries\color{forgisorange}\{joint\_signal\}}%
+            \;{\color{figsteel}$\leftarrow$}%
+            \;joint accel.}\\[1.5pt]
+        {\fontsize{5.5}{7.5}\selectfont
+            {\bfseries\color{forgisorange}\{n\}}%
+            \hspace{25pt}{\color{figsteel}$\leftarrow$}%
+            \;500}%
+    };
 
-% -- Arrow right half --
-\draw[arr] (b4.east) -- (b5.west);
+    % ============================================================
+    % DASHED DIVIDER
+    % ============================================================
+    \draw[figsteel!40, densely dashed, line width=0.4pt]
+    ([yshift=3pt]\divx, 0.15 |- titleL.north) -- ([yshift=-3pt]\divx, 0 |- b2.south);
 
-% ============ SECTION TITLES ============
-\node[font=\sffamily\bfseries\footnotesize, text=darknavy, anchor=south]
-    at ($(b1.north west)!0.5!(b3.north east) + (0, 0.15)$)
-    {Question Generation};
+    % ============================================================
+    % RIGHT COLUMN
+    % ============================================================
 
-\node[font=\sffamily\bfseries\footnotesize, text=darknavy, anchor=south]
-    at ($(b4.north west)!0.5!(b5.north east) + (0, 0.15)$)
-    {Answer Generation};
+    % -- Box 3: Deterministic Answer Rules (top-aligned with b1) --
+    \node[stdpanel, text width=\rboxw, anchor=north west]
+    (b3) at (\rcolx, 0) {%
+        {\sffamily\bfseries\scriptsize\color{darknavy} Deterministic Answer Rules}\\[3pt]
+        {\scriptsize\color{darknavy}%
+            {\bfseries Algorithm} (Template L3-5, Tensor):}\\[2pt]
+        {\fontsize{5.5}{7.5}\selectfont\color{darknavy}%
+            {\bfseries\color{forgisorange}1.}\;Load counterfactual episode (fault-injected)}\\[1.5pt]
+        {\fontsize{5.5}{7.5}\selectfont\color{darknavy}%
+            {\bfseries\color{forgisorange}2.}\;Find row at timestamp $t + n$\,ms}\\[1.5pt]
+        {\fontsize{5.5}{7.5}\selectfont\color{darknavy}%
+            {\bfseries\color{forgisorange}3.}\;Extract joint\_accel\_0\,\ldots\,joint\_accel\_5}\\[1.5pt]
+        {\fontsize{5.5}{7.5}\selectfont\color{darknavy}%
+            {\bfseries\color{forgisorange}4.}\;Ground truth $= [v_0,\, v_1,\, v_2,\, v_3,\, v_4,\, v_5]$}\\[4pt]
+        {\fontsize{5.5}{7.5}\selectfont\color{figsteel}%
+            Other L3 formats: Multi-Select, Ranking}%
+    };
+
+    % -- Box 4: Ground-Truth Answer (bottom-aligned with b2) --
+    \node[outpanel, text width=\rboxw, anchor=south west]
+    (b4) at (b3.south west |- b2.south) {%
+        {\sffamily\bfseries\scriptsize\color{darknavy} Ground-Truth Answer}\\[3pt]
+        {\scriptsize\color{darknavy}%
+            \textbf{Format:}\;Tensor\;[6]}\\[2pt]
+        {\scriptsize\color{darknavy}%
+            \textbf{Answer:}\;{\bfseries\color{forgisorange}%
+                1.23\_0.87\_$-$0.42\_0.15\_2.01\_$-$0.03}}\\[4pt]
+        {\fontsize{5.5}{7.5}\selectfont\color{figsteel}%
+            Also generated for Level\,3:}\\[1.5pt]
+        {\fontsize{5.5}{7.5}\selectfont\color{figsteel}%
+            \hspace*{6pt}Multi-Select (T/F string)\;\textemdash\;2 templates}\\[1.5pt]
+        {\fontsize{5.5}{7.5}\selectfont\color{figsteel}%
+            \hspace*{6pt}Ranking (permutation ABCD)\;\textemdash\;1 template}%
+    };
+
+    % -- Vertical arrow between b3 and b4 --
+    \coordinate (r3bot) at ([yshift=-4pt]b3.south);
+    \coordinate (r4top) at ([yshift=4pt]b4.north);
+    \draw[arr] (r3bot) -- (r4top);
+
+    % -- Midpoint of right arrow --
+    \coordinate (rmid) at ($(r3bot)!0.5!(r4top)$);
+
+    % -- "evaluate against data" annotation (right of arrow) --
+    \node[anchor=west, inner sep=0pt] (evalabel) at ([xshift=12pt]rmid)
+    {{\fontsize{5.5}{7.5}\selectfont\itshape\color{figsteel}evaluate against data}};
+
+    % -- Time-series waveform schematic (left of arrow, above midpoint) --
+    % Offset upward so it does not crowd the arrow midpoint
+    \coordinate (wavecenter) at ([xshift=-1.1cm, yshift=2pt]rmid);
+    \begin{scope}[shift={(wavecenter)}]
+        % Mini waveform (~0.9cm wide, centered at scope origin)
+        \draw[forgisorange, line width=0.4pt]
+            (-0.45,0) .. controls (-0.3,0.08) and (-0.15,-0.06) ..
+            (0,0.02) .. controls (0.15,0.1) and (0.3,-0.05) ..
+            (0.45,0.03);
+        \draw[figsteel, line width=0.35pt]
+            (-0.45,-0.06) .. controls (-0.3,-0.12) and (-0.15,0.0) ..
+            (0,-0.08) .. controls (0.15,-0.02) and (0.3,-0.1) ..
+            (0.45,-0.05);
+        \draw[darknavy!35, line width=0.35pt]
+            (-0.45,0.06) .. controls (-0.3,0.14) and (-0.15,0.0) ..
+            (0,0.1) .. controls (0.15,0.02) and (0.3,0.1) ..
+            (0.45,0.06);
+        % Label above the waveform
+        \node[anchor=south, inner sep=0pt] at (0, 0.18)
+            {{\fontsize{5.5}{7.5}\selectfont\itshape\color{figsteel}episode data}};
+    \end{scope}
+    % Feed arrow from waveform right edge to the vertical arrow
+    \draw[figsteel!60, line width=0.4pt, -{Latex[length=1.5pt, width=1.5pt]}]
+        ([xshift=0.5cm]wavecenter) -- ([xshift=-3pt, yshift=2pt]rmid);
 
 \end{tikzpicture}
 \end{document}
