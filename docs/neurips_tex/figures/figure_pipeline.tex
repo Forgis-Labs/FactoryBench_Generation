@@ -1,0 +1,521 @@
+% Figure: FactoryBench end-to-end pipeline.
+% U-shape flow:
+%   Top row, left -> right : Q&A construction (datasets -> ... -> level cards)
+%   Right edge        down : level outputs collected into evaluation
+%   Bottom row right -> left: evaluation (icon-only model, det/majority, score)
+% All arrows are Manhattan-style (axis-aligned segments only).
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.85\linewidth}{!}{%
+    \begin{tikzpicture}[
+            font=\sffamily\fontsize{6.5}{8}\selectfont\color{gunmetal},
+            >={Latex[length=4pt, width=3.4pt]},
+            arr/.style={->, tiger, line width=1.3pt},
+            arrline/.style={tiger, line width=1.3pt},
+            faint/.style={->, figsteel!75, line width=0.9pt},
+            faintline/.style={figsteel!75, line width=0.9pt},
+            dsbox/.style={
+                    rectangle, rounded corners=2pt, draw=gunmetal!50, line width=0.45pt,
+                    fill=white, align=center,
+                    inner xsep=4pt, inner ysep=3pt,
+                    text width=1.7cm,
+                    font=\sffamily\fontsize{6}{7.2}\selectfont\color{gunmetal},
+                },
+            dsplain/.style={
+                    align=center, inner sep=2pt,
+                    text width=1.9cm,
+                    font=\sffamily\fontsize{6}{7.2}\selectfont\color{gunmetal},
+                },
+            iconplain/.style={
+                    align=center, inner sep=3pt,
+                    font=\sffamily\fontsize{6.2}{7.5}\selectfont\color{gunmetal},
+                },
+            stage/.style={
+                    rectangle, rounded corners=3pt, fill=panelbg,
+                    align=center,
+                    inner xsep=5pt, inner ysep=4pt,
+                    text width=1.85cm, minimum height=1.0cm,
+                },
+            generator/.style={
+                    rectangle, rounded corners=3pt,
+                    fill=tiger!12, draw=tiger!55, line width=0.9pt,
+                    align=center,
+                    inner xsep=5pt, inner ysep=6pt,
+                    text width=2.4cm, minimum height=2.6cm,
+                },
+            kgbox/.style={
+                    rectangle, rounded corners=2pt, draw=gunmetal!50, line width=0.45pt,
+                    fill=white, align=center,
+                    inner xsep=4pt, inner ysep=3pt,
+                    text width=2.1cm, minimum height=1.05cm,
+                    font=\sffamily\fontsize{6}{7.2}\selectfont\color{gunmetal},
+                },
+            scorebr/.style={
+                    rectangle, rounded corners=2pt, fill=panelbg,
+                    align=center, inner xsep=4pt, inner ysep=3pt,
+                    text width=2.45cm, minimum height=0.7cm,
+                    font=\sffamily\fontsize{6}{7.5}\selectfont\color{gunmetal},
+                },
+            score/.style={
+                    rectangle, rounded corners=3pt,
+                    fill=tiger!12, draw=tiger!60, line width=0.9pt,
+                    align=center, inner xsep=4pt, inner ysep=4pt,
+                    text width=1.55cm, minimum height=0.95cm,
+                    font=\sffamily\bfseries\fontsize{6.5}{8}\selectfont\color{gunmetal},
+                },
+            sectiontitle/.style={
+                    font=\sffamily\bfseries\fontsize{7.8}{9.5}\selectfont\color{gunmetal},
+                    anchor=south west,
+                },
+            iconnode/.style={
+                    align=center, inner sep=2pt,
+                    font=\sffamily\fontsize{6.5}{7.5}\selectfont\color{gunmetal},
+                },
+            judgeicon/.style={
+                    inner sep=2pt,
+                    font=\sffamily\fontsize{7}{8}\selectfont\color{gunmetal},
+                },
+            levelimg/.style={
+                    inner sep=0pt, outer sep=0pt,
+                },
+            edgelabel/.style={
+                    font=\sffamily\fontsize{6.0}{7}\selectfont\itshape\color{flicker},
+                    fill=white, inner xsep=2pt, inner ysep=1pt,
+                },
+        ]
+
+        % ============================================================
+        %  LAYOUT CONSTANTS (column x-coordinates, kept consistent)
+        % ============================================================
+        \def\colDS{0.95}    % datasets column
+        \def\colPool{4.5175}% pool/normalization column, centred between datasets bus (1.97) and poolSplit (7.065)
+        \def\colGen{7.00}   % was generator column; now occupied by the level icons
+        \def\colLvl{9.5075} % levels column, centred between poolSplit (7.800) and qaJoinX (11.215)
+
+        % ============================================================
+        %  ROW 1: Q&A CONSTRUCTION
+        % ============================================================
+        \node[sectiontitle] at (0, 2.45) {1.\, Q\&A CONSTRUCTION};
+
+        % --- Three datasets (no individual boxes; thin dividers between them)
+        \node[dsplain] (ds1) at (\colDS,  1.50) {%
+            {\color{gunmetal}\faDatabase}\; \bfseries\color{tiger} FactoryWave\\[-1pt]
+            {\fontsize{4.8}{5.8}\selectfont\itshape\color{tiger!85}\bfseries (ours)}\\[1pt]
+            \includegraphics[height=0.42cm]{figures/FactoryWave.png}\\[-1pt]
+            \fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}UR3\,+\,KUKA (8\,983)};
+        \node[dsplain] (ds2) at (\colDS,  0.20) {%
+            {\color{gunmetal}\faDatabase}\; \bfseries AURSAD\\[1pt]
+            \includegraphics[height=0.42cm]{figures/AURSAD.png}\\[-1pt]
+            \fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}UR3e (4\,094)};
+        \node[dsplain] (ds3) at (\colDS, -1.00) {%
+            {\color{gunmetal}\faDatabase}\; \bfseries voraus-AD\\[1pt]
+            \includegraphics[height=0.42cm]{figures/VORAUSAD.png}\\[-1pt]
+            \fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}Yu-Cobot (2\,122)};
+        % Thin divider lines between adjacent datasets
+        \draw[gunmetal!30, line width=0.4pt] (\colDS-0.95, 0.80) -- (\colDS+0.95, 0.80);
+        \draw[gunmetal!30, line width=0.4pt] (\colDS-0.95, -0.40) -- (\colDS+0.95, -0.40);
+
+        % --- Episode pool (icon-only, no box; normalisation noted as subtitle)
+        \node[iconplain] (pool) at (\colPool, 0.20) {%
+            {\fontsize{14}{16}\selectfont\color{gunmetal}\faLayerGroup}\;\bfseries Episode pool\\[1pt]
+            \fontsize{5.2}{6.4}\selectfont\itshape\color{figsteel}15k normalized episodes\\
+            \fontsize{5.2}{6.4}\selectfont\itshape\color{figsteel}under common format};
+
+        % --- Bus and pool-horizontal midpoint (defined early so templates
+        % can be positioned exactly above poolMid).
+        \coordinate (poolSplit) at (7.800, 0);
+        \coordinate (poolMid)   at ($(pool.east)!0.5!(poolSplit |- pool)$);
+
+        % --- 4 Level icons, vertically stacked (the generator box has been
+        % removed — these levels themselves represent the four kinds of Q&A
+        % the generator emits).  Inputs (templates, pool, KG) feed the column;
+        % outputs go to the model under test.
+        \node[align=center, inner sep=3pt, text width=2.0cm] (qa1) at (\colLvl,  1.70) {%
+            {\fontsize{16}{18}\selectfont\color{L1border}\faEye}\\[-1pt]
+            {\bfseries\color{L1border} L1 State}};
+        \node[align=center, inner sep=3pt, text width=2.0cm] (qa2) at (\colLvl,  0.80) {%
+            {\fontsize{16}{18}\selectfont\color{L2border}\faBolt}\\[-1pt]
+            {\bfseries\color{L2border} L2 Intervention}};
+        \node[align=center, inner sep=3pt, text width=2.0cm] (qa3) at (\colLvl, -0.30) {%
+            {\fontsize{16}{18}\selectfont\color{L3border}\faRandom}\\[-1pt]
+            {\bfseries\color{L3border} L3 Counterfactual}};
+        \node[align=center, inner sep=3pt, text width=2.0cm] (qa4) at (\colLvl, -1.30) {%
+            {\fontsize{16}{18}\selectfont\color{L4border}\faClipboardCheck}\\[2pt]
+            {\bfseries\color{L4border} L4 Decision}};
+
+        % --- Caption ABOVE the level column describing how the four levels
+        % are produced (same style as "Voting system of LLM judges").
+        \node[font=\sffamily\fontsize{5.2}{6.4}\selectfont\itshape\color{figsteel},
+              anchor=south, align=center]
+            at (\colLvl, 2.10) {Q\&A pair generation via\\sampling and variable filling};
+
+        % --- Caption BELOW the kg -> qa4 arrow, labelling its role as the
+        % protocol ground-truth source for L4.  Aligned vertically with
+        % the "error -> protocol" subtitle inside the KG node so the two
+        % captions share a horizontal baseline.
+        \node[font=\sffamily\fontsize{5.2}{6.4}\selectfont\itshape\color{figsteel},
+              anchor=center, align=center]
+            at (\colLvl, -2.60) {Protocol ground truth for L4};
+
+        % ============================================================
+        %  FACTORYWAVE DETAIL COLUMN (left-side mirror of the L3 example)
+        % ============================================================
+        \def\fwX{-2.85}
+
+        \node[font=\sffamily\bfseries\fontsize{6.5}{8}\selectfont\color{flicker},
+              anchor=south, align=center, text width=2.6cm]
+            at (\fwX, 2.50) {Inside\\FactoryWave};
+
+        % Detail items: icon + bold count + italic descriptor stacked
+        % vertically, no surrounding rectangle.  Each item is a clean
+        % iconplain-style block on top of the tiger frame fill.
+        \node[align=center, inner sep=3pt, text width=2.5cm,
+              font=\sffamily\fontsize{6.0}{7.2}\selectfont\color{gunmetal}]
+            (fwFaults) at (\fwX, 1.70) {%
+            {\fontsize{14}{16}\selectfont\color{tiger}\faExclamationTriangle}\\[4pt]
+            \bfseries 27 Faults\\[1pt]
+            {\fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}gripper, peg, collision, payload}};
+
+        \node[align=center, inner sep=3pt, text width=2.5cm,
+              font=\sffamily\fontsize{6.0}{7.2}\selectfont\color{gunmetal}]
+            (fwRobots) at (\fwX, 0.30) {%
+            {\fontsize{14}{16}\selectfont\color{tiger}\faRobot}\\[4pt]
+            \bfseries 2 Robots\\[1pt]
+            {\fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}UR3 cobot + KUKA KR10}};
+
+        \node[align=center, inner sep=3pt, text width=2.5cm,
+              font=\sffamily\fontsize{6.0}{7.2}\selectfont\color{gunmetal}]
+            (fwTasks) at (\fwX, -1.10) {%
+            {\fontsize{14}{16}\selectfont\color{tiger}\faClipboardList}\\[4pt]
+            \bfseries 3 Tasks\\[1pt]
+            {\fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}pick-place, peg-in-hole, screwing}};
+
+        \node[align=center, inner sep=3pt, text width=2.5cm,
+              font=\sffamily\fontsize{6.0}{7.2}\selectfont\color{gunmetal}]
+            (fwExperiments) at (\fwX, -2.50) {%
+            {\fontsize{14}{16}\selectfont\color{tiger}\faFlask}\\[4pt]
+            \bfseries 3 Experiments\\[1pt]
+            {\fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}normal, fault, counterfactual}};
+
+        % --- 3D zoom callout (mirrors the L3 example callout) ---
+        \coordinate (fwNW) at ($(fwFaults.north west)      + (-0.04, 0.04)$);
+        \coordinate (fwSE) at ($(fwExperiments.south east) + ( 0.04,-0.04)$);
+        \coordinate (fwNE) at (fwSE |- fwNW);
+        \coordinate (fwSW) at (fwNW |- fwSE);
+
+        % (a) Drop-shadow stack BEHIND the column (offset away from ds1).
+        \begin{scope}[on background layer]
+            \fill[gunmetal!10, rounded corners=3pt]
+                ($(fwNW) + (-0.30, -0.30)$) rectangle ($(fwSE) + (-0.30, -0.30)$);
+            \fill[gunmetal!18, rounded corners=3pt]
+                ($(fwNW) + (-0.20, -0.20)$) rectangle ($(fwSE) + (-0.20, -0.20)$);
+            \fill[gunmetal!28, rounded corners=2.5pt]
+                ($(fwNW) + (-0.10, -0.10)$) rectangle ($(fwSE) + (-0.10, -0.10)$);
+            \fill[tiger!12, rounded corners=2pt] (fwNW) rectangle (fwSE);
+            \draw[tiger!35, line width=2.0pt, rounded corners=2pt]
+                (fwNW) rectangle (fwSE);
+            \draw[tiger!75, line width=0.6pt, rounded corners=2pt]
+                (fwNW) rectangle (fwSE);
+        \end{scope}
+
+        % (c) Perspective wedge fill (drawn FIRST on the background layer
+        % so the pulse-ring outline below renders on top of it).  Edges
+        % are anchored on ds1's left corners (no gray-divider overlap).
+        \begin{scope}[on background layer]
+            \fill[tiger!8]
+                ($(ds1.north west) + (-0.04, 0.04)$) -- (fwNE) --
+                (fwSE) -- ($(ds1.south west) + (-0.04,-0.04)$) -- cycle;
+        \end{scope}
+
+        % (b) Pulse-ring on the FactoryWave dataset (ds1).  Drawn AFTER
+        % the wedge fill so all four sides of the ring stay visible.
+        \begin{scope}[on background layer]
+            \draw[tiger!25, line width=2.5pt, rounded corners=2pt]
+                ($(ds1.south west) + (-0.04,-0.04)$) rectangle
+                ($(ds1.north east) + ( 0.04, 0.04)$);
+            \draw[tiger!85, line width=0.5pt, dashed, rounded corners=2pt]
+                ($(ds1.south west) + (-0.04,-0.04)$) rectangle
+                ($(ds1.north east) + ( 0.04, 0.04)$);
+        \end{scope}
+        % Wedge edges: thick solid tiger orange, emerging FROM ds1's left
+        % corners toward the detail column corners.  They sit OUTSIDE the
+        % pulse-ring around FactoryWave, so they read as projection
+        % beams from the source rather than as a continuation of the box.
+        \draw[tiger, line width=0.9pt, line cap=round]
+            ($(ds1.north west) + (-0.04, 0.04)$) -- (fwNE);
+        \draw[tiger, line width=0.9pt, line cap=round]
+            ($(ds1.south west) + (-0.04,-0.04)$) -- (fwSE);
+
+        % --- Templates: icon-only (no box), inline icon+title (as before).
+        % Centred (default anchor) at (\colPool, 2.20) so the templates
+        % bbox is bisected vertically by y = 2.20 — the arrow exits the
+        % east face at y = tmpl.center.y, putting its horizontal segment
+        % through the middle of templates rather than under it.
+        \node[iconplain] (tmpl) at (\colPool, 1.70) {%
+            {\fontsize{14}{16}\selectfont\color{gunmetal}\faList}\;\bfseries 21 Templates\\
+            \fontsize{5.2}{6.4}\selectfont\itshape\color{figsteel}free variables};
+
+        % --- Knowledge graph (lives in the manuals/parsing row).  Sits to
+        % the left of the level column so kg -> qa4 routes horizontally
+        % then vertically up into the level column.
+        \node[iconplain] (kg) at (6.565, -2.30) {%
+            {\fontsize{14}{16}\selectfont\color{gunmetal}\faProjectDiagram}\;\bfseries Knowledge graph\\
+            \fontsize{5.2}{6.4}\selectfont\itshape\color{figsteel}error\,$\to$\,protocol};
+
+        % --- Manufacturer's manuals (BELOW datasets, same row as KG)
+        \node[iconplain] (manuals) at (\colDS, -2.30) {%
+            {\fontsize{14}{16}\selectfont\color{gunmetal}\faBook}\;\bfseries Manuals\\[1pt]
+            \fontsize{5.2}{6.4}\selectfont\itshape\color{figsteel}manufacturer\\
+            \fontsize{5.2}{6.4}\selectfont\itshape\color{figsteel}technical documents};
+
+        % --- Parsing step between manuals and the knowledge graph: takes
+        % free-form manual text and emits the structured triples that
+        % populate the KG.
+        \node[iconplain] (mparse) at (3.50, -2.30) {%
+            {\color{gunmetal}\faTools}\;\bfseries Parsing};
+
+        % ----------- Row 1 arrows (all Manhattan)
+        % Datasets -> Pool: same joint-arrow pattern as the judges -> majority
+        % flow.  Each ds.east goes vertically to a shared bus at ds.east.x,
+        % then one horizontal segment carries them into pool.west.
+        % Datasets -> pool.  Each path goes horizontally from ds.east to a
+        % shared vertical bus at x=2.7, then merges and runs into pool.west.
+        \draw[arr] (ds1.east) -| (2.3, 0.20) -- (pool.west);
+        \draw[arr] (ds2.east) -| (2.3, 0.20) -- (pool.west);
+        \draw[arr] (ds3.east) -| (2.3, 0.20) -- (pool.west);
+
+        % Pool/Norm -> Levels: single trunk out of pool feeds a vertical
+        % bus, which then branches into each of the 4 levels.  Mirrors the
+        % predJ -> judges pattern in the evaluation row.  poolSplit/poolMid
+        % are defined earlier so templates can sit directly above poolMid.
+        \draw[arrline] (pool.east) -- (poolSplit |- pool);
+        \draw[arrline] (poolSplit |- qa1) -- (poolSplit |- qa4);
+        \draw[arr] (poolSplit |- qa1) -- (qa1.west);
+        \draw[arr] (poolSplit |- qa2) -- (qa2.west);
+        \draw[arr] (poolSplit |- qa3) -- (qa3.west);
+        \draw[arr] (poolSplit |- qa4) -- (qa4.west);
+
+        % Templates -> poolMid: arrow exits the east face of templates so
+        % its horizontal segment runs at y = tmpl.center.y, cutting
+        % templates at its vertical midpoint, then drops to poolMid.
+        \draw[arrline] (tmpl.east) -| (poolMid);
+
+        % Manuals -> Parsing -> Knowledge graph (chain of straight horizontals at y=-2.30)
+        \draw[arr] (manuals.east) -- (mparse.west);
+        \draw[arr] (mparse.east)  -- (kg.west);
+
+        % Knowledge graph -> bottom of level column (Manhattan: right then up;
+        % KG is L4-specific)
+        \draw[arr] (kg.east) -| (qa4.south);
+
+        % ============================================================
+        %  EXAMPLE COLUMN (Level 3 counterfactual): vertical stack on
+        %  the right side of the figure, presented as a zoom-in of qa3.
+        % ============================================================
+        \def\exX{13.865}
+
+        \node[font=\sffamily\bfseries\fontsize{6.5}{8}\selectfont\color{flicker},
+              anchor=south, align=center, text width=2.8cm]
+            at (\exX, 2.25) {Example of template filling:\\L3 counterfactual};
+
+        % Template content (top) — no rectangle box, no "Template" label.
+        \node[align=left, inner sep=4pt, text width=2.3cm,
+              font=\sffamily\fontsize{5.4}{6.6}\selectfont\color{gunmetal}]
+            (extmpl) at (\exX, 1.55) {%
+            \itshape Had {\color{tiger}\{event\}} at
+            {\color{tiger}\{t\}}\,ms, what would
+            {\color{tiger}\{signal\}} be at T+{\color{tiger}\{n\}}\,ms?};
+
+        % Instantiated content (middle) — no rectangle box, no "Instantiated question" label.
+        \node[align=left, inner sep=4pt, text width=2.3cm,
+              font=\sffamily\fontsize{5.4}{6.6}\selectfont\color{gunmetal}]
+            (exq) at (\exX, -0.80) {%
+            \itshape Had {\color{tiger}\bfseries a +0.5\,kg payload spike} at
+            {\color{tiger}\bfseries 4\,329}\,ms, what would
+            {\color{tiger}\bfseries joint accelerations} be at
+            T+{\color{tiger}\bfseries 500}\,ms?};
+
+        % Ground-truth answer (bottom) — no rectangle box.
+        \node[align=left, inner sep=4pt, text width=2.3cm,
+              font=\sffamily\fontsize{5.4}{6.6}\selectfont\color{gunmetal}]
+            (exa) at (\exX, -3.15) {%
+            \bfseries Ground truth collected from dense episode data\\[1pt]
+            {\color{tiger}\bfseries\fontsize{5.2}{6.4}\selectfont
+                $[1.23,\, 0.87,\, {-}0.42,$\\
+                $\phantom{[}0.15,\, 2.01,\, {-}0.03]$}};
+
+        % Internal vertical arrows: template -> question -> answer.
+        % Labels sit beside the arrow (no white-fill background), with
+        % the same italic flicker font used by the rest of the edge
+        % labels in the figure.
+        \draw[arr] (extmpl.south) -- (exq.north)
+            node[midway, right=1pt, align=center,
+                 font=\sffamily\fontsize{6.0}{7}\selectfont\itshape\color{flicker}]
+                {bind\\variables};
+        \draw[arr] (exq.south) -- (exa.north)
+            node[midway, right=1pt,
+                 font=\sffamily\fontsize{6.0}{7}\selectfont\itshape\color{flicker}]
+                {compute};
+
+        % --- Fancy 3D zoom-callout ---
+        % Coordinates of the column's bounding rectangle.
+        \coordinate (exNW) at ($(extmpl.north west) + (-0.04, 0.04)$);
+        \coordinate (exSE) at ($(exa.south east)    + ( 0.04,-0.04)$);
+        \coordinate (exNE) at (exSE |- exNW);
+        \coordinate (exSW) at (exNW |- exSE);
+
+        % (a) Tilted drop-shadow stack behind the column (3 layers, deepest first).
+        \begin{scope}[on background layer]
+            \fill[gunmetal!10, rounded corners=3pt]
+                ($(exNW) + (0.30, -0.30)$) rectangle ($(exSE) + (0.30, -0.30)$);
+            \fill[gunmetal!18, rounded corners=3pt]
+                ($(exNW) + (0.20, -0.20)$) rectangle ($(exSE) + (0.20, -0.20)$);
+            \fill[gunmetal!28, rounded corners=2.5pt]
+                ($(exNW) + (0.10, -0.10)$) rectangle ($(exSE) + (0.10, -0.10)$);
+            % Frame fill behind the column: same light-orange tint
+            % (tiger!12) used by the final score box in the eval row.
+            \fill[tiger!12, rounded corners=2pt] (exNW) rectangle (exSE);
+            % Soft outer L3 glow ring + sharp outline
+            \draw[L3border!35, line width=2.0pt, rounded corners=2pt]
+                (exNW) rectangle (exSE);
+            \draw[L3border!75, line width=0.6pt, rounded corners=2pt]
+                (exNW) rectangle (exSE);
+        \end{scope}
+
+        % (b) Pulse-ring glow on qa3 (the L3 source).
+        \begin{scope}[on background layer]
+            \draw[L3border!25, line width=2.5pt, rounded corners=2pt]
+                ($(qa3.south west) + (-0.04,-0.04)$) rectangle
+                ($(qa3.north east) + ( 0.04, 0.04)$);
+            \draw[L3border!85, line width=0.5pt, dashed, rounded corners=2pt]
+                ($(qa3.south west) + (-0.04,-0.04)$) rectangle
+                ($(qa3.north east) + ( 0.04, 0.04)$);
+        \end{scope}
+
+        % (c) Perspective wedge fill + thick edges.
+        \begin{scope}[on background layer]
+            \fill[L3border!8]
+                ($(qa3.north east) + (0.04, 0.04)$) -- (exNW) --
+                (exSW) -- ($(qa3.south east) + (0.04,-0.04)$) -- cycle;
+        \end{scope}
+        \draw[L3border, line width=0.9pt, line cap=round]
+            ($(qa3.north east) + (0.04, 0.04)$) -- (exNW);
+        \draw[L3border, line width=0.9pt, line cap=round]
+            ($(qa3.south east) + (0.04,-0.04)$) -- (exSW);
+
+
+        % ============================================================
+        %  ROW 2: EVALUATION  (mirrored: right -> left)
+        % ============================================================
+        % Divider line separating Q&A construction from Evaluation
+        % (stops before the example column on the right).
+        \draw[gunmetal!35, line width=0.4pt] (-0.5, -3.30) -- (11.8, -3.30);
+
+        \node[sectiontitle] at (0, -4.05) {2.\, EVALUATION};
+
+        % --- Model under test as a large icon (no box).  Placed at the trunk
+        % column (below the qaJoinX) so the down-arrow is straight vertical.
+        \def\mutX{11.215}
+        \node[iconnode] (mut) at (\mutX, -5.25) {%
+            {\fontsize{18}{20}\selectfont\color{gunmetal}\faBrain}\\[1pt]
+            Model under test};
+
+        % --- Branch junction: positioned partway between mut and the branches
+        % so the L1-3 / L4 divergence is visible but doesn't take up the whole
+        % horizontal span.
+        \coordinate (predJ) at (9.565, -5.25);
+
+        % --- TOP BRANCH: Parsing (icon-only, no box) — receives the L1-3
+        % answer trunk and feeds the score box.
+        \node[iconplain, anchor=east] (parsing) at (5.865, -4.55) {%
+            {\color{gunmetal}\faTools}\;\bfseries Parsing};
+
+        % --- BOTTOM BRANCH: 3 judge ICONS (each in a brand-palette colour)
+        \node[judgeicon] (j1) at (6.965, -5.45) {%
+            {\fontsize{11}{13}\selectfont\color{tiger}\faGavel}\,\;J\textsubscript{1}};
+        \node[judgeicon] (j2) at (6.965, -6.00) {%
+            {\fontsize{11}{13}\selectfont\color{flicker}\faGavel}\,\;J\textsubscript{2}};
+        \node[judgeicon] (j3) at (6.965, -6.55) {%
+            {\fontsize{11}{13}\selectfont\color{L4border}\faGavel}\,\;J\textsubscript{3}};
+
+        % --- Bottom-branch Parsing (icon-only, no box): extracts a score
+        % from each judge's free-form output.  The "Median of scores"
+        % aggregation is drawn as a label on the parsing2 -> score line
+        % rather than its own box.
+        \node[iconplain, anchor=east] (parsing2) at (5.865, -6.00) {%
+            {\color{gunmetal}\faTools}\;\bfseries Parsing};
+
+        % --- Voting-system caption beneath the three judges (same style
+        % as the "error -> protocol" subtitle on the knowledge graph).
+        \node[font=\sffamily\fontsize{5.2}{6.4}\selectfont\itshape\color{figsteel},
+              anchor=north, align=center]
+            at (6.965, -6.85) {Voting system of LLM judges};
+
+        % --- Final score (far left, between the two branches vertically)
+        \node[score, anchor=east, fill=none, draw=none] (final) at (1.865, -5.25) {%
+            {\color{tiger!85}\faStar}\; \bfseries Scores\\
+            \fontsize{5}{6}\selectfont\mdseries\itshape\color{figsteel}per level};
+
+        % ----------- Row 2 arrows (Manhattan)
+
+        % Q&A pairs: levels east -> single trunk down to mut.  qaJoinX is
+        % aligned with mut.x, so the final segment into mut.north is straight
+        % vertical with no horizontal correction.
+        \coordinate (qaJoinX) at (\mutX, 0);
+        \draw[arrline] (qa1.east) -- (qaJoinX |- qa1);
+        \draw[arrline] (qa2.east) -- (qaJoinX |- qa2);
+        \draw[arrline] (qa3.east) -- (qaJoinX |- qa3);
+        \draw[arrline] (qa4.east) -- (qaJoinX |- qa4);
+        \draw[arrline] (qaJoinX |- qa1) -- (qaJoinX |- qa4);
+        \draw[arr]     (qaJoinX |- qa4) -- (mut.north);
+
+        \node[edgelabel, anchor=east]
+        at ([xshift=-4pt]qaJoinX |- 0,-3.70) {Q\&A pairs};
+
+        % mut -> predJ -> branches.  The mut->predJ segment has no arrowhead
+        % so it merges visually with the branching arrows.
+        \draw[arrline] (mut.west) -- (predJ);
+
+        % predJ -> parsing.east (carries L1-3 answers)
+        \draw[arr] (predJ) |- (parsing.east);
+        \node[edgelabel, align=center] at ($(predJ |- parsing.east)!0.5!(parsing.east)$) {L1-3 answers\\+ ground truth};
+
+        % predJ -> judges: ONE line down to j2's y level, horizontal to a
+        % split point east of the judges, then 3 short branches up/level/down.
+        \coordinate (judgeSplit) at (7.765, -6.00);
+        \draw[arrline] (predJ) |- (judgeSplit);
+        \draw[arrline] (judgeSplit |- j1) -- (judgeSplit |- j3);
+        \draw[arr] (judgeSplit |- j1) -- (j1.east);
+        \draw[arr] (judgeSplit) -- (j2.east);
+        \draw[arr] (judgeSplit |- j3) -- (j3.east);
+        % Label on the horizontal segment of the L4 trunk (at y = j2.y)
+        \node[edgelabel, align=center] at ($(predJ |- judgeSplit)!0.5!(judgeSplit)$) {L4 answers\\+ ground truth};
+
+        % Judges -> Parsing (per-judge): each j.west drops to parsing2 row, then horizontal
+        \draw[arr] (j1.west) |- (parsing2.east);
+        \draw[arr] (j2.west) |- (parsing2.east);
+        \draw[arr] (j3.west) |- (parsing2.east);
+
+        % Each branch is drawn as TWO arrows that terminate at the named
+        % label node.  Labels use the same bold gunmetal sans-serif font
+        % as the "Parsing" iconplain icons (no italic, no flicker), with
+        % a white fill so they cover the line behind the text.
+        \node[font=\sffamily\fontsize{6.2}{7.5}\selectfont\bfseries\color{gunmetal},
+              fill=white, inner xsep=2pt, inner ysep=1pt]
+            (ccLabel) at ($(parsing.west)!0.5!(parsing.west -| final.north)$)
+            {{\fontsize{8}{10}\selectfont\faBalanceScale}\; Chance correction};
+        \node[font=\sffamily\fontsize{6.2}{7.5}\selectfont\bfseries\color{gunmetal},
+              fill=white, inner xsep=2pt, inner ysep=1pt]
+            (mLabel)  at ($(parsing2.west)!0.5!(parsing2.west -| final.south)$)
+            {{\fontsize{8}{10}\selectfont\faSortAmountDown}\; Median of scores};
+
+        \draw[arr] (parsing.west)  -- (ccLabel.east);
+        \draw[arr] (ccLabel.west)  -| (final.north);
+        \draw[arr] (parsing2.west) -- (mLabel.east);
+        \draw[arr] (mLabel.west)   -| (final.south);
+
+    \end{tikzpicture}}
+    \caption{End-to-end FactoryBench pipeline. \textbf{(1)~Q\&A construction:} normalised episodes from FactoryWave, AURSAD, and voraus-AD are paired with typed-variable templates (plus the knowledge graph for L4) to generate Q\&A items at four reasoning levels. \textbf{(2)~Evaluation:} the model's answers are scored deterministically for L1--3 and by the median of three LLM judges for L4 free-form, then chance-corrected per level.}
+    \label{fig:pipeline}
+\end{figure}
