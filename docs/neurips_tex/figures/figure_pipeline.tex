@@ -7,7 +7,7 @@
 
 \begin{figure}[H]
     \centering
-    \resizebox{0.85\linewidth}{!}{%
+    \makebox[\linewidth][c]{\resizebox{1.2\linewidth}{!}{%
     \begin{tikzpicture}[
             font=\sffamily\fontsize{6.5}{8}\selectfont\color{gunmetal},
             >={Latex[length=4pt, width=3.4pt]},
@@ -165,34 +165,34 @@
 
         \node[font=\sffamily\bfseries\fontsize{6.5}{8}\selectfont\color{flicker},
               anchor=south, align=center, text width=2.6cm]
-            at (\fwX, 2.50) {Inside\\FactoryWave};
+            at (\fwX, 2.50) {FactoryWave\\at a glance};
 
         % Detail items: icon + bold count + italic descriptor stacked
         % vertically, no surrounding rectangle.  Each item is a clean
         % iconplain-style block on top of the tiger frame fill.
         \node[align=center, inner sep=3pt, text width=2.5cm,
-              font=\sffamily\fontsize{6.0}{7.2}\selectfont\color{gunmetal}]
+              font=\sffamily\fontsize{6}{7.2}\selectfont\color{gunmetal}]
             (fwFaults) at (\fwX, 1.70) {%
             {\fontsize{14}{16}\selectfont\color{tiger}\faExclamationTriangle}\\[4pt]
             \bfseries 27 Faults\\[1pt]
             {\fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}gripper, peg, collision, payload}};
 
         \node[align=center, inner sep=3pt, text width=2.5cm,
-              font=\sffamily\fontsize{6.0}{7.2}\selectfont\color{gunmetal}]
+              font=\sffamily\fontsize{6}{7.2}\selectfont\color{gunmetal}]
             (fwRobots) at (\fwX, 0.30) {%
             {\fontsize{14}{16}\selectfont\color{tiger}\faRobot}\\[4pt]
             \bfseries 2 Robots\\[1pt]
             {\fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}UR3 cobot + KUKA KR10}};
 
         \node[align=center, inner sep=3pt, text width=2.5cm,
-              font=\sffamily\fontsize{6.0}{7.2}\selectfont\color{gunmetal}]
+              font=\sffamily\fontsize{6}{7.2}\selectfont\color{gunmetal}]
             (fwTasks) at (\fwX, -1.10) {%
             {\fontsize{14}{16}\selectfont\color{tiger}\faClipboardList}\\[4pt]
             \bfseries 3 Tasks\\[1pt]
             {\fontsize{4.8}{5.8}\selectfont\itshape\color{figsteel}pick-place, peg-in-hole, screwing}};
 
         \node[align=center, inner sep=3pt, text width=2.5cm,
-              font=\sffamily\fontsize{6.0}{7.2}\selectfont\color{gunmetal}]
+              font=\sffamily\fontsize{6}{7.2}\selectfont\color{gunmetal}]
             (fwExperiments) at (\fwX, -2.50) {%
             {\fontsize{14}{16}\selectfont\color{tiger}\faFlask}\\[4pt]
             \bfseries 3 Experiments\\[1pt]
@@ -317,7 +317,7 @@
 
         \node[font=\sffamily\bfseries\fontsize{6.5}{8}\selectfont\color{flicker},
               anchor=south, align=center, text width=2.8cm]
-            at (\exX, 2.25) {Example of template filling:\\L3 counterfactual};
+            at (\exX, 2.25) {Example of template:\\L3 counterfactual};
 
         % Template content (top) — no rectangle box, no "Template" label.
         \node[align=left, inner sep=4pt, text width=2.3cm,
@@ -515,7 +515,7 @@
         \draw[arr] (parsing2.west) -- (mLabel.east);
         \draw[arr] (mLabel.west)   -| (final.south);
 
-    \end{tikzpicture}}
-    \caption{End-to-end FactoryBench pipeline. \textbf{(1)~Q\&A construction:} normalised episodes from FactoryWave, AURSAD, and voraus-AD are paired with typed-variable templates (plus the knowledge graph for L4) to generate Q\&A items at four reasoning levels. \textbf{(2)~Evaluation:} the model's answers are scored deterministically for L1--3 and by the median of three LLM judges for L4 free-form, then chance-corrected per level.}
+    \end{tikzpicture}}}
+    \caption{End-to-end FactoryBench pipeline. \textbf{(1)~Q\&A construction:} normalised episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2024vorausad} are paired with typed-variable templates (plus the knowledge graph for L4) to generate Q\&A items at four reasoning levels. \textbf{(2)~Evaluation:} the model's answers are scored deterministically for L1--3 and by the median of three LLM judges for L4 free-form, then chance-corrected per level.}
     \label{fig:pipeline}
 \end{figure}
