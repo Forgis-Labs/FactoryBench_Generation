@@ -5,7 +5,7 @@
 \item {\bf Claims}
     \item[] Question: Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?
     \item[] Answer: \answerYes{}
-    \item[] Justification: The abstract and the Introduction section together introduce FactoryBench as a four-level benchmark grounded in FactoryWave (our new dataset) plus AURSAD~\cite{leporowski2022aursad} and voraus-AD~\cite{brockmann2024vorausad}, with an LLM-as-judge protocol for Level~4 free-form items; every claim is backed by the results in the Evaluation section and the dataset, scoring and template details in the appendices.
+    \item[] Justification: The abstract and the Introduction section together introduce FactoryBench as a four-level benchmark grounded in FactoryWave (our new dataset) plus AURSAD~\cite{leporowski2022aursad} and voraus-AD~\cite{brockmann2023vorausad}, with an LLM-as-judge protocol for Level~4 free-form items; every claim is backed by the results in the Evaluation section and the dataset, scoring and template details in the appendices.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the abstract and introduction do not include the claims made in the paper.
@@ -111,8 +111,8 @@
 
 \item {\bf Experiments compute resources}
     \item[] Question: For each experiment, does the paper provide sufficient information on the computer resources (type of compute workers, memory, time of execution) needed to reproduce the experiments?
-    \item[] Answer: \answerNA{}
-    \item[] Justification: Q\&A generation can be performed on any reasonably modern computer or laptop and is not compute-heavy, so a compute-resource analysis is not warranted. Closed-weight models are evaluated via their providers' APIs and open-weight models through hosted inference.
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Q\&A generation runs on a single modern laptop and is not compute-heavy. Closed-weight models (GPT-5.1, Claude Sonnet~4.6, Mistral Large~3) are evaluated via their providers' APIs; open-weight models (DeepSeek~V3.2, Qwen3-235B, Qwen3-4B) through hosted inference. Total API cost for the full evaluation across all six models was approximately \$350.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -162,7 +162,7 @@
 \item {\bf Licenses for existing assets}
     \item[] Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected?
     \item[] Answer: \answerYes{}
-    \item[] Justification: AURSAD~\cite{leporowski2022aursad} and voraus-AD~\cite{brockmann2024vorausad} are cited at point of use (Section~\ref{sec:sce} and Table~\ref{tab:datasets}) and used under their original licenses. Each LLM evaluated in Section~\ref{sec:zero-shot} is cited and accessed through its provider's official API at the agreed terms of service.
+    \item[] Justification: AURSAD~\cite{leporowski2022aursad} and voraus-AD~\cite{brockmann2023vorausad} are cited at point of use (Section~\ref{sec:sce} and Table~\ref{tab:datasets}) and used under their original licenses. Each LLM evaluated in Section~\ref{sec:zero-shot} is cited and accessed through its provider's official API at the agreed terms of service.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not use existing assets.
