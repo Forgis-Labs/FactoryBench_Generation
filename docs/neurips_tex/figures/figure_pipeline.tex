@@ -6,8 +6,8 @@
 % All arrows are Manhattan-style (axis-aligned segments only).
 
 \begin{figure}[H]
-    \centering
-    \makebox[\linewidth][c]{\resizebox{1.2\linewidth}{!}{%
+    \centering\vspace{-0.8em}
+    \makebox[\linewidth][c]{\resizebox{1.08\linewidth}{!}{%
     \begin{tikzpicture}[
             font=\sffamily\fontsize{6.5}{8}\selectfont\color{gunmetal},
             >={Latex[length=4pt, width=3.4pt]},
@@ -516,6 +516,7 @@
         \draw[arr] (mLabel.west)   -| (final.south);
 
     \end{tikzpicture}}}
-    \caption{End-to-end FactoryBench pipeline. \textbf{(1)~Q\&A construction:} normalised episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2024vorausad} are paired with typed-variable templates (plus the knowledge graph for L4) to generate Q\&A items at four reasoning levels. \textbf{(2)~Evaluation:} the model's answers are scored deterministically for L1--3 and by the median of three LLM judges for L4 free-form, then chance-corrected per level.}
+    \vspace{-0.8em}
+    \caption{End-to-end FactoryBench pipeline. \textbf{(1)~Q\&A construction:} normalized episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2024vorausad} are paired with typed-variable templates (plus the knowledge graph for L4) to generate Q\&A items at four reasoning levels. \textbf{(2)~Evaluation:} the model's answers are scored deterministically for L1--3 and by the median of three LLM judges for L4 free-form, then chance-corrected per level.}
     \label{fig:pipeline}
 \end{figure}
