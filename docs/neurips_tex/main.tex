@@ -180,7 +180,7 @@ Causal frameworks provide formal tools for interventions and counterfactuals \ci
     \footnotesize
     \setlength{\tabcolsep}{4pt}
     \renewcommand{\arraystretch}{1.15}
-    \begin{tabular}{@{}c l | >{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}p{1.7cm}@{}}
+    \begin{tabular}{@{}c l >{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}p{1.7cm}@{}}
         \toprule
         Level      & Type           & Example question                                                                                                                                                 & What it tests                                                                   & Answer format \\
         \midrule
@@ -743,7 +743,7 @@ Figure~\ref{fig:pearl_ladder} instantiates Pearl's three causal levels (Associat
     \caption{Number of active question templates per level, by answer format. Counts reflect templates that produce released Q\&A items in the current dataset.}
     \label{tab:template_inventory}
     \small
-    \begin{tabular}{@{}lccccc|c@{}}
+    \begin{tabular}{@{}lcccccc@{}}
         \toprule
         Level                       & MC single-select & MC multi-select & Ranking & Tensor / Numerical & Free-form & Total       \\
         \midrule
@@ -1490,7 +1490,7 @@ where $f$ represents the nominal plant dynamics (inverse-dynamics-plus-controlle
 \section{License and availability}
 \label{app:license}
 
-FactoryBench and FactoryWave are released under the MIT License and are freely available for academic and commercial use. Both the episode data and the benchmark artefacts (question templates, paraphrase banks, LLM-as-judge prompts, generator source code, and the full Q\&A dataset) are distributed via the public Hugging Face repository \texttt{FactoryBench/FactoryBench}\todo{Is this allowed? It seems to break double blindness}. To guard against test-set contamination in future model releases, we hold back a private $15\%$ subset of the Q\&A pairs at the \emph{episode} level (so all questions grounded in any held-out episode stay private across all four levels) and keep its raw episode data, gold answers, and rubric annotations off the public release; this private slice is used internally for contamination checks and may also be used to score future evaluees on request. The remaining $85\%$ is fully public, with a train/validation/test split included in the release so that evaluees can reproduce the exact partition used in this paper.
+FactoryBench and FactoryWave are released under the MIT License and are freely available for academic and commercial use. Both the episode data and the benchmark artefacts (question templates, paraphrase banks, LLM-as-judge prompts, generator source code, and the full Q\&A dataset) are distributed via the public Hugging Face repository \texttt{FactoryBench/FactoryBench}. To guard against test-set contamination in future model releases, we hold back a private $15\%$ subset of the Q\&A pairs at the \emph{episode} level (so all questions grounded in any held-out episode stay private across all four levels) and keep its raw episode data, gold answers, and rubric annotations off the public release; this private slice is used internally for contamination checks and may also be used to score future evaluees on request. The remaining $85\%$ is fully public, with a train/validation/test split included in the release so that evaluees can reproduce the exact partition used in this paper.
 
 We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file. Bug reports and label-correction requests are tracked on the public GitHub repository.
 
