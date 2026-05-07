@@ -231,9 +231,9 @@ The datasets integrated into FactoryBench are summarized in Table~\ref{tab:datas
         \toprule
         Dataset                                & Robot          & Episodes & Frequency   & Tasks         & Anomalies \\
         \midrule
-        AURSAD~\cite{leporowski2022aursad}             & UR3e           & 4094     & 100\,Hz     & Scr           & 4         \\
-        voraus-AD~\cite{brockmann2023vorausad}          & Yu-Cobot       & 2122     & 100/500\,Hz & PnP           & 12        \\
-        FactoryWave (ours) & UR3, KUKA KR10 & 8983     & 125/83\,Hz  & PnP, Scr, PiH & 27        \\
+        AURSAD~\cite{leporowski2022aursad}     & UR3e           & 4094     & 100\,Hz     & Scr           & 4         \\
+        voraus-AD~\cite{brockmann2023vorausad} & Yu-Cobot       & 2122     & 100/500\,Hz & PnP           & 12        \\
+        FactoryWave (ours)                     & UR3, KUKA KR10 & 8983     & 125/83\,Hz  & PnP, Scr, PiH & 27        \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -243,7 +243,7 @@ The datasets integrated into FactoryBench are summarized in Table~\ref{tab:datas
 
 \subsection{Scalable generation via extensive labeling}
 
-Scalable ground-truth generation is the central challenge of any Q\&A benchmark grounded in raw data. FactoryBench addresses this by coupling a structured labelling ontology with a context-free grammar (CFG)-style template system, designed by robotics experts and PhD researchers. Each template contains variable slots filled at generation time from one of two sources: label information read directly from the episode data (signal names, timestamps, anomaly labels, root causes), or a predefined sampling distribution attached to that slot (prediction horizons, numerical thresholds, curated vocabularies for discrete options). The discrete vocabularies are seeded from the label sets of AURSAD~\cite{leporowski2022aursad} and voraus-AD~\cite{brockmann2023vorausad}, extended to cover FactoryWave-specific cases, and released in full so every instantiation is inspectable and reproducible. The context time series used to fill the variables is sampled uniformly by data source (open source vs FactoryWave), then dataset, experiment, length within controlled bounds, and finally placement, yielding a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
+Scalable ground-truth generation is the central challenge of any Q\&A benchmark grounded in raw data. FactoryBench addresses this by coupling a structured labeling ontology with a context-free grammar (CFG)-style template system, designed by robotics experts and PhD researchers. Each template contains variable slots filled at generation time from one of two sources: label information read directly from the episode data (signal names, timestamps, anomaly labels, root causes), or a predefined sampling distribution attached to that slot (prediction horizons, numerical thresholds, curated vocabularies for discrete options). The discrete vocabularies are seeded from the label sets of AURSAD~\cite{leporowski2022aursad} and voraus-AD~\cite{brockmann2023vorausad}, extended to cover FactoryWave-specific cases, and released in full so every instantiation is inspectable and reproducible. The context time series used to fill the variables is sampled uniformly by data source (open source vs FactoryWave), then dataset, experiment, length within controlled bounds, and finally placement, yielding a combinatorial expansion from a small set of carefully designed templates into a large, diverse question pool.
 
 % \input{figures/figure_03_question_gen}
 
