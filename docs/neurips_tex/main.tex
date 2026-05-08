@@ -128,7 +128,7 @@ Traditional time-series models excel at narrow tasks such as prediction, classif
 
 Evaluating whether language-based systems truly reason about machine behavior, rather than pattern-matching on textual cues, remains challenging. By \emph{machine-behavior understanding} we mean the ability to (i)~interpret the current operational state from raw multivariate signals, (ii)~predict the effect of an intervention, (iii)~reason counterfactually about alternative histories, and (iv)~recommend remedial actions grounded in physical and engineering constraints. How current LLMs perform across these four competences on dense industrial telemetry has not yet been systematically measured. General benchmarks such as MMLU, BIG-bench, and MMMU \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} target textual or multimodal understanding and cannot probe machine behavior; closer-in-spirit time-series Q\&A benchmarks (TimeSeriesExam~\cite{cai2024timeseriesexamtimeseriesunderstanding}, ChatTS~\cite{Xie_2025}, EngineMT-QA~\cite{wang2025itformerbridgingtimeseries}, TSAQA~\cite{jing2026tsaqatimeseriesanalysis}, Time-MQA~\cite{kong2025timemqatimeseriesmultitask}, MTBench~\cite{chen2026mtbenchmultimodaltimeseries}, QuAnTS~\cite{wenkel2024quants}; Table~\ref{tab:benchmark_comparison}) restrict themselves to synthetic or univariate data, omit counterfactual reasoning, or do not involve a robotic system under closed-loop control.
 
-To address this gap we propose FactoryBench, a benchmark for machine-behavior reasoning in time-series models and LLMs. FactoryBench is grounded in \textbf{FactoryWave}, a dense multivariate dataset collected from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. Industrial-robot data of this kind is rare in public benchmarks: such systems live in restricted production environments behind proprietary controllers with limited telemetry and plant-level confidentiality. To our knowledge FactoryWave is the first extensive anomaly dataset to (partly) cover an industrial robot, explicitly bridging the cobot-to-industrial-machine gap. To populate the benchmark, we introduce a scalable question-generation framework of 21 structured templates spanning state, intervention, counterfactual, and decision-making reasoning, applicable to general machine data flows; instantiated over FactoryWave (and AURSAD / voraus-AD), they yield the full FactoryBench Q\&A corpus.
+To address this gap we propose FactoryBench, a benchmark for machine-behavior reasoning in time-series models and LLMs. FactoryBench is grounded in \textbf{FactoryWave}, a dense multivariate dataset collected from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. Industrial-robot data of this kind is rare in public benchmarks: such systems live in restricted production environments behind proprietary controllers with limited telemetry and plant-level confidentiality. To our knowledge FactoryWave is the first extensive anomaly dataset to (partly) cover an industrial robot, explicitly bridging the cobot-to-industrial-machine gap. To populate the benchmark, we introduce a scalable question-generation framework of 21 structured templates spanning state, intervention, counterfactual, and decision-making reasoning, applicable to general machine data flows; instantiated over FactoryWave (and AURSAD / voraus-AD), they yield the full FactoryBench Q\&A corpus, whose level, answer-format, and context-length distribution we summarise in Appendix~\ref{app:qa_distribution}.
 
 \section{Related work}
 
@@ -402,7 +402,25 @@ The scoring itself is a rubric on $\{0, 0.5, 1\}$, applied against the gold answ
 
 \paragraph{Aggregation.} Per-question chance-corrected scores $\tilde{s}$ are averaged uniformly within a template and level.
 
-\section{Question template inventory}
+\section{Released Q\&A distribution}
+\label{app:qa_distribution}
+
+Figure~\ref{fig:qa_overview} summarises how the released 70{,}915 Q\&A items are distributed across levels, answer formats, and time-series context lengths. Three patterns are worth flagging.
+
+\paragraph{Level sizes are uneven by design.} L2 (33{,}425 items) is by far the largest level and L3 (2{,}939 items) is the smallest. The asymmetry follows directly from the underlying episode pool. Most FactoryWave episodes are anomalous (we deliberately oversample fault scenarios so that diagnostic templates have enough material), and L2 templates can be instantiated against any anomalous episode, which inflates L2's count. Counterfactual templates (L3) by contrast require paired (baseline, fault) runs collected with the signature-kernel-MMD protocol of Section~\ref{sec:density}, which is far more expensive to produce per episode; the released L3 corpus is therefore the slice of items for which a high-quality CF pair exists, and is intrinsically small.
+
+\paragraph{Answer-format mix tracks the reasoning level.} L1 leans on numerical (69\,\%) and single-select MCQ (28\,\%) formats; L2 spreads across numerical, MCQ, and multi-select; L3 is dominated by multi-select (62\,\%) and tensor (17\,\%) reflecting the counterfactual ranking and trajectory-prediction templates; L4 is entirely free-form because every L4 template asks for natural-language remediation or optimisation answers.
+
+\paragraph{Sub-series lengths are tightly bounded.} The displayed time-series window is between 32 and 77 timesteps (>64 is possible for ranking since multiple time series) for almost every released item (median $\approx$50 across all four levels), keeping the prompt within the context budget of every evaluated model.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{figures/fig_qa_overview_3panel.pdf}
+    \caption{Distribution of the 70{,}915 released Q\&A items. \textbf{(a)} Level sizes with train/validation/test breakdown. \textbf{(b)} Answer-format mix on the test split, per level. \textbf{(c)} Sub-series length (number of time-series rows) per item.}
+    \label{fig:qa_overview}
+\end{figure}
+
+\subsection{Question-template inventory}
 \label{app:templates}
 Table~\ref{tab:template_inventory} lists the number of question templates currently producing released Q\&A items, broken down by answer format. Templates that are defined in the generator but do not yet emit any questions in the released set are excluded.
 
