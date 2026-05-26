@@ -3,9 +3,6 @@
 \documentclass{article}
 
 % to compile a preprint version, add the [preprint] option:
-% \usepackage[preprint]{neurips_2026}
-
-% to compile a camera-ready version, add the [final] option:
 \usepackage[preprint]{neurips_2026}
 
 \usepackage[utf8]{inputenc} % allow utf-8 input
@@ -23,7 +20,7 @@
 \usepackage{xcolor} % colors
 \usepackage{graphicx}
 \usepackage{subcaption}
-\graphicspath{{./}{./figures/}}
+\graphicspath{{../../}{./}}
 \usepackage{multirow}
 \usepackage{enumerate}
 \usepackage{fontawesome5}
@@ -97,10 +94,10 @@
   \normalfont\footnotesize
   $^{1}$ETH Zurich \enspace $^{2}$Forgis \enspace $^{3}$UC3M \enspace $^{4}$Imperial College London \enspace $^{5}$University of Berkeley \\
   $^{6}$KTH Royal Institute of Technology \enspace $^{7}$University of Vienna \\[0.2em]
-  $^{*}$Correspondence: \texttt{ymerzouki@ethz.ch} \qquad $^{\dagger}$Equal senior contribution \\[0.3em]
+  $^{*}$Correspondence: \texttt{ymerzouki@ethz.ch} \qquad $^{\dagger}$Equal senior contribution \\[0.5em]
   \small
-  {\faGithub}\ Code: \href{https://anonymous.4open.science/r/FactoryBench/README.md}{\nolinkurl{anonymous.4open.science/r/FactoryBench}} \\[0.15em]
-  \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ Dataset: \href{https://huggingface.co/datasets/FactoryBench/FactoryBench}{\nolinkurl{huggingface.co/datasets/FactoryBench/FactoryBench}}
+  {\faGithub}\ Code: \href{https://github.com/Forgis-Labs/Factorybench}{\nolinkurl{github.com/Forgis-Labs/Factorybench}} \\[0.15em]
+  \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ Dataset: \href{https://huggingface.co/datasets/Forgis/FactoryBench}{\nolinkurl{huggingface.co/datasets/Forgis/FactoryBench}}
 }}
 
 \begin{document}
@@ -108,7 +105,11 @@
 
 \maketitle
 
-\vspace{-1.5em}
+\begin{center}\vspace{-2.4em}\small
+    {\faGithub}\ Code: \href{https://github.com/Forgis-Labs/Factorybench}{\nolinkurl{github.com/Forgis-Labs/Factorybench}} \\[0.15em]
+    \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ Dataset: \href{https://huggingface.co/datasets/Forgis/FactoryBench}{\nolinkurl{huggingface.co/datasets/Forgis/FactoryBench}}
+\end{center}
+\vspace{-0.4em}
 \input{figures/figure_pipeline}
 \vspace{-1.5em}
 \begin{abstract}
@@ -120,19 +121,19 @@
 
 Modern robotic manufacturing systems emit dense multivariate telemetry, encoding joint states, torques, forces, velocities, contact events, task phases, and fault indicators. Extracting actionable knowledge from these signals is central to monitoring, diagnostics, anomaly detection, and decision support.
 
-Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection \cite{zhou2021informer,su2019omni,audibert2020usad}, but they are typically specialized, hard to interpret, output labels without explicit reasoning, and generalize poorly outside their training task \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}, limiting their utility for automated engineering decisions in a factory setting. Large language models, in contrast, possess strong general reasoning and can produce structured technical explanations \cite{wei2022chain,yao2023tree}, but underperform when applied directly to dense numerical time series \cite{gruver2023llmtime,jin2024timellm}; specialized transformer-based architectures meanwhile continue to advance time-series forecasting and representation learning \cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2022time,ansari2024chronos,das2024decoder}.
+Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection \cite{zhou2021informer,su2019omni,audibert2020usad}, but they are typically specialized, hard to interpret, output labels without explicit reasoning, and generalize poorly outside their training task \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}, limiting their utility for automated engineering decisions in a factory setting. Large language models, in contrast, possess strong general reasoning and can produce structured technical explanations \cite{wei2022chain,yao2023tree}, but underperform when applied directly to dense numerical time series \cite{gruver2023llmtime,jin2024timellm}; specialized transformer-based architectures meanwhile continue to advance time-series forecasting and representation learning \cite{vaswani2017attention,zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2022time,ansari2024chronos,das2024decoder,petersen2026hepaselfsupervisedhorizonconditionedevent}.
 
 Evaluating whether language-based systems truly reason about machine behavior, rather than pattern-matching on textual cues, remains challenging. By \emph{machine-behavior understanding} we mean the ability to (i)~interpret the current operational state from raw multivariate signals, (ii)~predict the effect of an intervention, (iii)~reason counterfactually about alternative histories, and (iv)~recommend remedial actions grounded in physical and engineering constraints. How current LLMs perform across these four competences on dense industrial telemetry has not yet been systematically measured. General benchmarks such as MMLU, BIG-bench, and MMMU \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} target textual or multimodal understanding and cannot probe machine behavior; closer-in-spirit time-series Q\&A benchmarks (TimeSeriesExam~\cite{cai2024timeseriesexamtimeseriesunderstanding}, ChatTS~\cite{Xie_2025}, EngineMT-QA~\cite{wang2025itformerbridgingtimeseries}, TSAQA~\cite{jing2026tsaqatimeseriesanalysis}, Time-MQA~\cite{kong2025timemqatimeseriesmultitask}, MTBench~\cite{chen2026mtbenchmultimodaltimeseries}, QuAnTS~\cite{wenkel2024quants}; Table~\ref{tab:benchmark_comparison}) restrict themselves to synthetic or univariate data, omit counterfactual reasoning, or do not involve a robotic system under closed-loop control.
 
-To address this gap we propose FactoryBench, a benchmark for machine-behavior reasoning in time-series models and LLMs. FactoryBench is grounded in \textbf{FactoryWave}, a dense multivariate dataset collected from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. Industrial-robot data of this kind is rare in public benchmarks: such systems live in restricted production environments behind proprietary controllers with limited telemetry and plant-level confidentiality. To our knowledge FactoryWave is the first extensive anomaly dataset to (partly) cover an industrial robot, explicitly bridging the cobot-to-industrial-machine gap. To populate the benchmark, we introduce a scalable question-generation framework of 21 structured templates spanning state, intervention, counterfactual, and decision-making reasoning, applicable to general machine data flows; instantiated over FactoryWave (and AURSAD / voraus-AD), they yield the full FactoryBench Q\&A corpus.
+To address this gap we propose FactoryBench, a benchmark for machine-behavior reasoning in time-series models and LLMs. FactoryBench is grounded in \textbf{FactoryWave}, a dense multivariate dataset collected from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. Industrial-robot data of this kind is rare in public benchmarks: such systems live in restricted production environments behind proprietary controllers with limited telemetry and plant-level confidentiality. To our knowledge FactoryWave is the first extensive anomaly dataset to (partly) cover an industrial robot, explicitly bridging the cobot-to-industrial-machine gap. To populate the benchmark, we introduce a scalable question-generation framework of 21 structured templates spanning state, intervention, counterfactual, and decision-making reasoning, applicable to general machine data flows; instantiated over FactoryWave (and AURSAD / voraus-AD), they yield the full FactoryBench Q\&A corpus, whose level, answer-format, and context-length distribution we summarise in Appendix~\ref{app:qa_distribution}.
 
 \section{Related work}
 
 Recent advances in LLM reasoning include prompting and deliberative strategies (e.g., Chain-of-Thought and Tree-of-Thought) that improve multi-step performance \cite{wei2022chain,yao2023tree}, alongside tool-augmented paradigms such as Toolformer and ReAct that enable grounded computation through external modules \cite{schick2023toolformer,yao2023react,qin2023tool}. These ideas motivate industrial agent design where symbolic reasoning must be combined with numerical workflows.
 
-Time-series modeling has advanced through transformer-based architectures (Informer, Autoformer, FEDformer, PatchTST) \cite{zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2022time}, strong alternative baselines such as TFT and N-BEATS \cite{lim2021tft,oreshkin2020nbeats}, and critical comparisons against simpler linear models \cite{zeng2023transformers}. Foundation-model directions (e.g., Chronos) further explore transfer and zero/few-shot adaptation \cite{ansari2024chronos,das2024decoder}. In parallel, anomaly and reliability monitoring literature includes OmniAnomaly, USAD, and Deep SVDD \cite{su2019omni,audibert2020usad,ruff2018deep}, with surveys and benchmarks highlighting persistent gaps in interpretability and root-cause actionability \cite{chalapathy2019survey,lavin2015numenta}.
+Time-series modeling has advanced through transformer-based architectures (Informer, Autoformer, FEDformer, PatchTST) \cite{zhou2021informer,wu2021autoformer,zhou2022fedformer,nie2022time}, strong alternative baselines such as TFT and N-BEATS \cite{lim2021tft,oreshkin2020nbeats}, and critical comparisons against simpler linear models \cite{zeng2023transformers}. Foundation-model directions (e.g., Chronos) further explore transfer and zero/few-shot adaptation \cite{ansari2024chronos,das2024decoder}, with large-scale industrial time-series corpora such as FactoryNet \cite{othman2026factorynetlargescaledatasetindustrial}, on which FactoryBench builds. In parallel, anomaly and reliability monitoring literature includes OmniAnomaly, USAD, and Deep SVDD \cite{su2019omni,audibert2020usad,ruff2018deep}, with surveys and benchmarks highlighting persistent gaps in interpretability and root-cause actionability \cite{chalapathy2019survey,lavin2015numenta}.
 
-Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969causal,runge2019causal}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support. Table~\ref{tab:benchmark_comparison} positions FactoryBench against closely related Q\&A and time-series benchmarks along eight axes. The column labels refer to concepts introduced later in the paper: Counterfactual denotes questions that reason about alternative histories (Level~3, Section~\ref{sec:levels}); Free-Form denotes open-ended natural-language answers, scored by an LLM-as-judge voting protocol (Appendix~\ref{app:answer-formats}); and Novel Dense TS indicates whether the benchmark contributes a new, high-frequency multivariate dataset rather than relying exclusively on public sources.
+Causal frameworks provide formal tools for interventions and counterfactuals \cite{pearl2009causality,peters2017elements,rubin1974causal}, while temporal methods such as Granger causality and modern nonlinear causal discovery support directional reasoning in time series \cite{granger1969causal,runge2019causal}. Knowledge-graph representations further structure domain knowledge for transformer-based reasoning \cite{petersen2026structuralinductivebiashelps}. Existing broad benchmarks (MMLU, BIG-bench, MMMU) \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} and classical time-series resources \cite{laptev2015generic,dau2019ucr,wen2022transformers} do not directly evaluate machine-centered reasoning over industrial telemetry. FactoryBench targets this gap by jointly testing temporal interpretation, causal reasoning, and engineering decision support. Table~\ref{tab:benchmark_comparison} positions FactoryBench against closely related Q\&A and time-series benchmarks along eight axes. The column labels refer to concepts introduced later in the paper: Counterfactual denotes questions that reason about alternative histories (Level~3, Section~\ref{sec:levels}); Free-Form denotes open-ended natural-language answers, scored by an LLM-as-judge voting protocol (Appendix~\ref{app:answer-formats}); and Novel Dense TS indicates whether the benchmark contributes a new, high-frequency multivariate dataset rather than relying exclusively on public sources.
 
 \begin{table}[htbp]
     \centering
@@ -398,7 +399,25 @@ The scoring itself is a rubric on $\{0, 0.5, 1\}$, applied against the gold answ
 
 \paragraph{Aggregation.} Per-question chance-corrected scores $\tilde{s}$ are averaged uniformly within a template and level.
 
-\section{Question template inventory}
+\section{Released Q\&A distribution}
+\label{app:qa_distribution}
+
+Figure~\ref{fig:qa_overview} summarises how the released 70{,}915 Q\&A items are distributed across levels, answer formats, and time-series context lengths. Three patterns are worth flagging.
+
+\paragraph{Level sizes are uneven by design.} L2 (33{,}425 items) is by far the largest level and L3 (2{,}939 items) is the smallest. The asymmetry follows directly from the underlying episode pool. Most FactoryWave episodes are anomalous (we deliberately oversample fault scenarios so that diagnostic templates have enough material), and L2 templates can be instantiated against any anomalous episode, which inflates L2's count. Counterfactual templates (L3) by contrast require paired (baseline, fault) runs collected with the signature-kernel-MMD protocol of Section~\ref{sec:density}, which is far more expensive to produce per episode; the released L3 corpus is therefore the slice of items for which a high-quality CF pair exists, and is intrinsically small.
+
+\paragraph{Answer-format mix tracks the reasoning level.} L1 leans on numerical (69\,\%) and single-select MCQ (28\,\%) formats; L2 spreads across numerical, MCQ, and multi-select; L3 is dominated by multi-select (62\,\%) and tensor (17\,\%) reflecting the counterfactual ranking and trajectory-prediction templates; L4 is entirely free-form because every L4 template asks for natural-language remediation or optimisation answers.
+
+\paragraph{Sub-series lengths are tightly bounded.} The displayed time-series window is between 32 and 77 timesteps (>64 is possible for ranking since multiple time series) for almost every released item (median $\approx$50 across all four levels), keeping the prompt within the context budget of every evaluated model.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{figures/fig_qa_overview_3panel.pdf}
+    \caption{Distribution of the 70{,}915 released Q\&A items. \textbf{(a)} Level sizes with train/validation/test breakdown. \textbf{(b)} Answer-format mix on the test split, per level. \textbf{(c)} Sub-series length (number of time-series rows) per item.}
+    \label{fig:qa_overview}
+\end{figure}
+
+\subsection{Question-template inventory}
 \label{app:templates}
 Table~\ref{tab:template_inventory} lists the number of question templates currently producing released Q\&A items, broken down by answer format. Templates that are defined in the generator but do not yet emit any questions in the released set are excluded.
 
@@ -1486,9 +1505,9 @@ where $f$ represents the nominal plant dynamics (inverse-dynamics-plus-controlle
 \section{License and availability}
 \label{app:license}
 
-FactoryBench and FactoryWave are released under the MIT License and are freely available for academic and commercial use. Both the episode data and the benchmark artefacts (question templates, paraphrase banks, LLM-as-judge prompts, generator source code, and the full Q\&A dataset) are distributed via the public Hugging Face repository \texttt{FactoryBench/FactoryBench}. To guard against test-set contamination in future model releases, we hold back a private $15\%$ subset of the Q\&A pairs at the \emph{episode} level (so all questions grounded in any held-out episode stay private across all four levels) and keep its raw episode data, gold answers, and rubric annotations off the public release; this private slice is used internally for contamination checks and may also be used to score future evaluees on request. The remaining $85\%$ is fully public, with a train/validation/test split included in the release so that evaluees can reproduce the exact partition used in this paper.
+FactoryBench and FactoryWave are released under the MIT License and are freely available for academic and commercial use. Both the episode data and the benchmark artefacts (question templates, paraphrase banks, LLM-as-judge prompts, generator source code, and the full Q\&A dataset) are distributed via the public Hugging Face repository \texttt{Forgis/FactoryBench}. To guard against test-set contamination in future model releases, we hold back a private $15\%$ subset of the Q\&A pairs at the \emph{episode} level (so all questions grounded in any held-out episode stay private across all four levels) and keep its raw episode data, gold answers, and rubric annotations off the public release; this private slice is used internally for contamination checks and may also be used to score future evaluees on request. The remaining $85\%$ is fully public, with a train/validation/test split included in the release so that evaluees can reproduce the exact partition used in this paper.
 
-We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file. Bug reports and label-correction requests are tracked on a public repository (link provided upon acceptance).
+We provide a versioned release track (e.g., \texttt{v1.0}, \texttt{v1.1}) so that reported numbers always refer to a fixed benchmark state; corrections to labels or templates are published as minor-version updates with a public changelog, and the exact version used in any evaluation is stamped into every result file. Bug reports and label-correction requests are tracked on the public repository at \url{https://github.com/Forgis-Labs/Factorybench}.
 
 \end{document}
 
