@@ -1,0 +1,5 @@
+peft
+accelerate
+transformers>=4.45
+huggingface-hub
+flash-attn
