@@ -2,7 +2,7 @@
 
 [![Website](https://img.shields.io/badge/Website-forgis.com-orange)](https://www.forgis.com)
 [![arXiv](https://img.shields.io/badge/arXiv-2605.07675-b31b1b)](https://arxiv.org/abs/2605.07675)
-[![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow)](https://huggingface.co/datasets/Forgis/FactoryBench)
+[![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow)](https://huggingface.co/datasets/FactoryBench/FactoryBench)
 
 **Team:** Yanis Merzouki, Coral Izquierdo, Matei Ignuta-Ciuncanu, Marcos Gomez-Bracamonte, Riccardo Maggioni, Alessandro Lombardi, Camilla Mazzoleni, Federico Martelli, Balazs Gunther, Jonas Petersen, Philipp Petersen
 
@@ -47,7 +47,7 @@ pip install datasets
 ```python
 from datasets import load_dataset
 
-ds = load_dataset("Forgis/FactoryBench")
+ds = load_dataset("FactoryBench/FactoryBench")
 ```
 
 ## Citation
