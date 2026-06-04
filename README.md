@@ -18,10 +18,6 @@ Submitted to **NeurIPS 2026 Datasets and Benchmarks Track**.
   <img src="assets/factorybench_pipeline.png" width="100%">
 </p>
 
-<p align="center">
-  <img src="assets/factorybench_collage.png" width="100%">
-</p>
-
 ## 4-Level Q&A Framework
 
 | Level | Task | Example | Pearl Rung |
@@ -33,7 +29,11 @@ Submitted to **NeurIPS 2026 Datasets and Benchmarks Track**.
 
 Each level builds on the previous. Failure at Level N implies failure at Level N+1.
 
-## Key Numbers
+## FactoryWave Dataset
+
+<p align="center">
+  <img src="assets/factorybench_collage.png" width="100%">
+</p>
 
 | | |
 |---|---|
