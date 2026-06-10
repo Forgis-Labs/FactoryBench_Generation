@@ -11,6 +11,10 @@ This repository contains the Q&A generation framework, evaluation drivers, and s
 
 We introduce FactoryBench, a benchmark for evaluating time-series models and LLMs on machine understanding over industrial robotic telemetry. Q&A pairs are organized along four causal levels (state, intervention, counterfactual, decision) instantiating Pearl's ladder of causation, and span five answer formats: four structured formats are scored deterministically and free-form answers are scored by an LLM-as-judge voting protocol. We propose a scalable Q&A generation framework built around structured question templates, present FactoryWave (a dense, multitask, multivariate sensor dataset collected from a UR3 cobot and a KUKA KR10 industrial arm), and construct FactoryBench as a large-scale benchmark of over 70k Q&A items grounded in roughly 15k normalized episodes from FactoryWave, AURSAD, and voraus-AD. Zero-shot evaluation of six frontier LLMs shows that no model exceeds 50% on structured levels or 18% on decision-making, revealing a wide gap between current models and operational machine understanding.
 
+<p align="center">
+  <img src="figures/FactoryBench_pipeline.png" alt="FactoryBench overview: episodes from FactoryWave + AURSAD + voraus-AD flow through the structured Q&A generation framework, producing the four-level benchmark and the deterministic + LLM-as-judge scoring cascade." width="92%">
+</p>
+
 ## 4-Level Q&A Framework
 
 | Level | Task | Example |
@@ -21,6 +25,14 @@ We introduce FactoryBench, a benchmark for evaluating time-series models and LLM
 | **L4 Decision** | Generate a remediation plan from the trace | "Robot stopped with error C203A. What to do?" |
 
 Each level builds on the previous; failure at level N implies failure at level N+1.
+
+## FactoryWave
+
+FactoryBench is grounded in **FactoryWave**, a dense multitask multivariate sensor dataset we collected from a UR3 cobot (125 Hz) and a KUKA KR10 industrial arm (83 Hz) executing pick-and-place, peg-in-hole, and screwdriving cycles. Each robot was run through a catalogue of **27 systematically injected fault conditions** spanning mechanical, gripper, payload-configuration, collision, and external-disturbance failure modes.
+
+<p align="center">
+  <img src="figures/factorybench-collage.png" alt="FactoryWave tasks and fault catalogue. Photographs of UR3 and KUKA KR10 executing the three tasks (pick-and-place, peg-in-hole, screwdriving) in the centre, surrounded by a representative subset of the 27 systematically injected fault conditions (additional axis weight, cable collision, hole obstruction, unstable base, collisions with soft and rigid objects, external arm disturbance)." width="92%">
+</p>
 
 ## Quick Start
 
