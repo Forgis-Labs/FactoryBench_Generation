@@ -12,9 +12,9 @@ In this document an expert answers 21 FactoryBench items, one per active questio
 
 ## Level 1 — State (4 items)
 
-### 01 · L1 t1 · Numerical
+### 01 · L1 · Numerical
 
-`8021cbef-b0cb-4cf1-95f2-d3e7645c872e` · `predictive` · test split · scored as `numerical` · series: 40 rows
+Question ID: `8021cbef-b0cb-4cf1-95f2-d3e7645c872e`
 
 > The robot is performing a manipulation task. We want to isolate the descent to the bin in the robot's time series. Assuming a fixed window length of 13 timesteps, at which timestamp should the window begin? Answer only with an integer or decimal number, nothing else.
 
@@ -69,7 +69,9 @@ Question: The robot is performing a manipulation task. We want to isolate the de
 
 </details>
 
-**Answer:** The window should begin in t=1067, as all jount velocities drop near zero (fs0=-1.11, fs1=0.14, fs2=0.81, fs3=-0.9, fs4=0.03, fs5=-0.8). This data indicates the robot has completed its horizontal approach and is momentarily at rest over the bin. After this timestamp, the base fp0 seems to be static, but the shoulder fs1, elbow fs2 and wrist fs3 had an increase in velocity, corresponding to a pure downward vertical translation (t=1166: fp0=107.22, fp1=-73.32, fp2=86.76, fp3=-102.08, fp4=-89.51, fp5=405.17, fs0=-1.51, fs1=3.5, fs2=13.95, fs3=-17.52, fs4=-0.02, fs5=-1.15, sp0=107.23, sp1=-73.32, sp2=86.8, sp3=-102.12, sp4=-89.51, sp5=405.17).
+**Answer:** 1067
+
+*Why:* The window should begin in t=1067, as all jount velocities drop near zero (fs0=-1.11, fs1=0.14, fs2=0.81, fs3=-0.9, fs4=0.03, fs5=-0.8). This data indicates the robot has completed its horizontal approach and is momentarily at rest over the bin. After this timestamp, the base fp0 seems to be static, but the shoulder fs1, elbow fs2 and wrist fs3 had an increase in velocity, corresponding to a pure downward vertical translation (t=1166: fp0=107.22, fp1=-73.32, fp2=86.76, fp3=-102.08, fp4=-89.51, fp5=405.17, fs0=-1.51, fs1=3.5, fs2=13.95, fs3=-17.52, fs4=-0.02, fs5=-1.15, sp0=107.23, sp1=-73.32, sp2=86.8, sp3=-102.12, sp4=-89.51, sp5=405.17).
 
 <details>
 <summary>Expected answer</summary>
@@ -80,18 +82,11 @@ Acceptance bounds: `{"min": 767, "max": 1358}`
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
-
 ---
 
-### 02 · L1 t3 · MC multi-select
+### 02 · L1 · MC multi-select
 
-`4e8de9c8-80b6-4a0d-98d0-7b6006eefbd1` · `comparative` · test split · scored as `multiple_choice_multi_select` · series: 106 rows in `series_a` + `series_b` — **absent from the released prompt** · `hides=['robot', 'gripper']`
-
-**The released prompt for this template carries no time series** — a prompt-builder bug,
-see [Dataset findings](#dataset-findings). Answered from the series the dataset does
-contain, attached below the prompt, i.e. what a fixed builder would show; the item is
-separately recorded as unanswerable as released.
+Question ID: `4e8de9c8-80b6-4a0d-98d0-7b6006eefbd1`
 
 > What changed between the two instances of robotic time series data?  Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.
 
@@ -104,21 +99,7 @@ separately recorded as unanswerable as released.
 <summary>Full prompt</summary>
 
 ```text
-
-Question: What changed between the two instances of robotic time series data?  Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.
-Here are the options:
-A. Those come from different robots.
-B. The two robots have different anomalous states. Note: this means either exactly one of them is anomalous, or they both are, but have different anomalies.
-C. The two robots are performing different tasks.
-D. The two robots are performing the same task, but at different phases.
-```
-
-</details>
-
-<details>
-<summary><code>context.series_a</code> — 57 rows, absent from the released prompt</summary>
-
-```text
+Series A:
 Acronym mapping: fp0=feedback_pos_0, fp1=feedback_pos_1, fp2=feedback_pos_2, fp3=feedback_pos_3, fp4=feedback_pos_4, fp5=feedback_pos_5, fs0=feedback_speed_0, fs1=feedback_speed_1, fs2=feedback_speed_2, fs3=feedback_speed_3, fs4=feedback_speed_4, fs5=feedback_speed_5, sp0=setpoint_pos_0, sp1=setpoint_pos_1, sp2=setpoint_pos_2, sp3=setpoint_pos_3, sp4=setpoint_pos_4, sp5=setpoint_pos_5, tm=timestamp_ms
 t=0: fp0=48.25, fp1=-87.34, fp2=127.43, fp3=-130.12, fp4=-90.59, fp5=357.21, fs0=0.01, fs1=0, fs2=0.02, fs3=0.03, fs4=0, fs5=0.02, sp0=48.25, sp1=-87.32, sp2=127.43, sp3=-130.12, sp4=-90.58, sp5=357.2
 t=101: fp0=48.25, fp1=-87.33, fp2=127.43, fp3=-130.11, fp4=-90.58, fp5=357.2, fs0=0, fs1=0.02, fs2=0.01, fs3=0.05, fs4=0, fs5=0.02, sp0=48.25, sp1=-87.32, sp2=127.43, sp3=-130.12, sp4=-90.58, sp5=357.2
@@ -177,14 +158,8 @@ t=5340: fp0=41.45, fp1=-99.5, fp2=73.07, fp3=-65.35, fp4=-87.74, fp5=320.18, fs0
 t=5440: fp0=41.02, fp1=-99.57, fp2=70.76, fp3=-63.09, fp4=-87.55, fp5=317.77, fs0=-2.77, fs1=-0.89, fs2=-14.75, fs3=14.58, fs4=1.19, fs5=-15.59, sp0=41.02, sp1=-99.58, sp2=70.78, sp3=-63.09, sp4=-87.55, sp5=317.77
 t=5541: fp0=41.02, fp1=-99.57, fp2=70.76, fp3=-63.09, fp4=-87.55, fp5=317.77, fs0=-2.77, fs1=-0.89, fs2=-14.75, fs3=14.58, fs4=1.19, fs5=-15.59, sp0=41.02, sp1=-99.58, sp2=70.78, sp3=-63.09, sp4=-87.55, sp5=317.77
 t=5642: fp0=40.73, fp1=-99.62, fp2=69.25, fp3=-61.59, fp4=-87.43, fp5=316.15, fs0=-1.81, fs1=-0.15, fs2=-9.12, fs3=8.58, fs4=0.82, fs5=-9.43, sp0=40.73, sp1=-99.62, sp2=69.26, sp3=-61.6, sp4=-87.43, sp5=316.16
-```
 
-</details>
-
-<details>
-<summary><code>context.series_b</code> — 49 rows, absent from the released prompt</summary>
-
-```text
+Series B:
 Acronym mapping: ecf0=est_contact_force_0, ecf1=est_contact_force_1, ecf2=est_contact_force_2, ecf3=est_contact_force_3, ecf4=est_contact_force_4, ecf5=est_contact_force_5, ett0=effort_target_torque_0, ett1=effort_target_torque_1, ett2=effort_target_torque_2, ett3=effort_target_torque_3, ett4=effort_target_torque_4, ett5=effort_target_torque_5, fp0=feedback_pos_0, fp1=feedback_pos_1, fp2=feedback_pos_2, fp3=feedback_pos_3, fp4=feedback_pos_4, fp5=feedback_pos_5, fs0=feedback_speed_0, fs1=feedback_speed_1, fs2=feedback_speed_2, fs3=feedback_speed_3, fs4=feedback_speed_4, fs5=feedback_speed_5, sp0=setpoint_pos_0, sp1=setpoint_pos_1, sp2=setpoint_pos_2, sp3=setpoint_pos_3, sp4=setpoint_pos_4, sp5=setpoint_pos_5, tm=timestamp_ms
 t=0: ett0=0, ett1=-12.48, ett2=-6.13, ett3=-0.19, ett4=0, ett5=0, ecf0=8.81, ecf1=-3.48, ecf2=22.97, ecf3=1.05, ecf4=0.25, ecf5=-0.29, fp0=0.2, fp1=-1, fp2=1.41, fp3=-0.41, fp4=2.55, fp5=-1.55, fs0=0, fs1=0, fs2=0, fs3=0, fs4=0, fs5=0, sp0=0.2, sp1=-1, sp2=1.41, sp3=-0.41, sp4=2.55, sp5=-1.55
 t=99: ett0=0, ett1=-12.48, ett2=-6.13, ett3=-0.19, ett4=0, ett5=0, ecf0=8.98, ecf1=-3.53, ecf2=23.21, ecf3=1.04, ecf4=0.25, ecf5=-0.3, fp0=0.2, fp1=-1, fp2=1.41, fp3=-0.41, fp4=2.55, fp5=-1.55, fs0=0, fs1=0, fs2=0, fs3=0, fs4=0, fs5=0, sp0=0.2, sp1=-1, sp2=1.41, sp3=-0.41, sp4=2.55, sp5=-1.55
@@ -235,13 +210,23 @@ t=4448: ett0=-0.02, ett1=-12.56, ett2=-6.47, ett3=-0.32, ett4=-0.08, ett5=0, ecf
 t=4547: ett0=-0.02, ett1=-12.53, ett2=-6.48, ett3=-0.31, ett4=-0.07, ett5=0, ecf0=-2, ecf1=0.13, ecf2=-0.84, ecf3=-0.14, ecf4=0, ecf5=0, fp0=0.15, fp1=-1.03, fp2=1.36, fp3=-0.3, fp4=1.36, fp5=-1.57, fs0=-0.07, fs1=-0.04, fs2=-0.07, fs3=0.14, fs4=-1.54, fs5=-0.02, sp0=0.15, sp1=-1.03, sp2=1.36, sp3=-0.3, sp4=1.36, sp5=-1.57
 t=4646: ett0=0.02, ett1=-12.43, ett2=-6.46, ett3=-0.3, ett4=0.04, ett5=0, ecf0=-1.87, ecf1=-0.65, ecf2=-0.76, ecf3=-0.14, ecf4=-0.02, ecf5=0.03, fp0=0.14, fp1=-1.04, fp2=1.35, fp3=-0.29, fp4=1.21, fp5=-1.57, fs0=-0.07, fs1=-0.04, fs2=-0.07, fs3=0.15, fs4=-1.57, fs5=-0.02, sp0=0.14, sp1=-1.04, sp2=1.35, sp3=-0.29, sp4=1.2, sp5=-1.57
 t=4745: ett0=0.03, ett1=-12.37, ett2=-6.45, ett3=-0.28, ett4=0.08, ett5=0, ecf0=-1.31, ecf1=-1.08, ecf2=-0.63, ecf3=-0.13, ecf4=-0.04, ecf5=0.06, fp0=0.13, fp1=-1.04, fp2=1.34, fp3=-0.27, fp4=1.05, fp5=-1.57, fs0=-0.07, fs1=-0.04, fs2=-0.07, fs3=0.14, fs4=-1.47, fs5=-0.02, sp0=0.13, sp1=-1.04, sp2=1.34, sp3=-0.27, sp4=1.05, sp5=-1.57
+Question: What changed between the two instances of robotic time series data?  Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.
+Here are the options:
+A. Those come from different robots.
+B. The two robots have different anomalous states. Note: this means either exactly one of them is anomalous, or they both are, but have different anomalies.
+C. The two robots are performing different tasks.
+D. The two robots are performing the same task, but at different phases.
 ```
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `FFTF`
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:**
+- **A** is false as both sides are 6-DOF revolute arms in degrees at ~100 ms with identical field naming, series_b's pose (fp=0.2, -1, 1.41, -0.41, 2.55, -1.55) is simply the all-zeros pose, where the constant ett1=-12.48 Nm is the gravity hold expected of a 3 kg-class cobot with the arm horizontal and series_a satisfies fp1+fp2+fp3 = -87.32+127.43-130.11 = -90.0 with fp4=-90.58, the wrist-down configuration of the same class of arm.
+- **B** is false as neither stream is faulted. Series_a tracks its setpoint to within 0.05° end to end (t=4432: fp2=102.06 vs sp2=102.04), and series_b never leaves fs=0 while its contact-force estimate simply relaxes from ecf2=22.97 N to ≈0 N by t=1878.
+- **C** is the only statement I mark true as series_a seems like it runs a pick-and-place cycle with 2.9 s of idle, then the base held at fp0=48.25 while shoulder, elbow and wrist 1 drive a pure vertical descent (t=3324: fs1=-20.96, fs2=-28.48, fs3=49.46), then a coordinated retract in which every joint moves (t=4736: fp0=45.56, fp5=342.87, fs5=-37.77), whereas series_b holds a single pose for 3 s and then creeps one wrist joint 1.5° over 1.7 s (fp4 2.55 → 1.05, peak fs4=-1.57), a fine in-place alignment rather than another phase of the same transport, which is what makes **D** false.
+
 
 <details>
 <summary>Expected answer</summary>
@@ -250,13 +235,11 @@ t=4745: ett0=0.03, ett1=-12.37, ett2=-6.45, ett3=-0.28, ett4=0.08, ett5=0, ecf0=
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
-
 ---
 
-### 03 · L1 t6 · MC single-select
+### 03 · L1 · MC single-select
 
-`d3a8d682-a97f-4385-85c2-b3bed548168c` · `identification` · test split · scored as `multiple_choice_single_select` · series: 50 rows · `hides=['robot', 'gripper']`
+Question ID: `d3a8d682-a97f-4385-85c2-b3bed548168c`
 
 > What robot does this sensor data originate from? Answer only with the letter of the correct option (ie. A), nothing else.
 
@@ -328,9 +311,12 @@ C. Agile Robots Yu 5 Industrial
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `B`
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:**
+
+During the 1.5 seconds in which the arm is at static rest (fp = 82.66, -35.2, 74.86, -5.69, 44.43, 122.1 from t=0 to t=1617), the shoulder joint ett_1 must exert a force of between -95 and -102 Nm. Once the arm begins a slow dragging motion, this value stabilises between –134 and –148 Nm (t=2322: ett_1=-148.44). These values are physically incompatible with a Universal Robots UR3e (https://www.universal-robots.com/products/ur3e/), it has a nominal limit of 56 Nm on its main joints (base, shoulder, elbow). The recorded 148 Nm exceeds the physical limit of that machine. The Agile Robots Yu 5 is a 5 kg payload cobot whose proximal motors operate in the ~150 Nm range; recording 148 Nm would mean that the robot is operating at over 90% of its rated capacity simply to perform a slow movement in the middle of its workspace. As detailed in the KUKA KR 10 R1100-2 Technical Manual (https://es.scribd.com/document/754657260/kr10-r1100-2pdf#:~:text=Workspace%20graphic), this model is a has 10 kg payload and 1101 mm reach in an arm mass of approximately 54 kg. Sustaining ~100 Nm of static gravity load just to hold its own weight and plateauing at ~140 Nm during slow spatial movements, are completely routine and nominal values given the structural inertia of this specific KUKA hardware. In the industrial brochure of Yu 5 (https://www.agile-robots.com/media/files/products/Yu/Agile-Robots_Yu_5_Industrial_Brochure.pdf), this is a 5 kg payload collaborative robot. While its proximal motors do operate in the ~150 Nm maximum peak range, recording a sustained 148 Nm would mean that the robot is operating at over 90% of its rated peak capacity simply to perform a slow movement in the middle of its workspace.
+
 
 <details>
 <summary>Expected answer</summary>
@@ -339,13 +325,11 @@ C. Agile Robots Yu 5 Industrial
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
-
 ---
 
 ### 04 · L1 t7 · Numerical
 
-`cf6cf68b-bc88-4bba-9783-c6b3580359cc` · `predictive` · test split · scored as `numerical` · series: 37 rows
+Question ID: `cf6cf68b-bc88-4bba-9783-c6b3580359cc`
 
 > Given the sensor stream below, what is the expected value of the position of joint 4 at T+7ms? Answer only with an integer or decimal number, nothing else.
 
@@ -397,9 +381,9 @@ Question: Given the sensor stream below, what is the expected value of the posit
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** -90.91
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** Joint 4 is completely stationary (fs4 = 0, sp4 = -90.90 throughout). The measured position fp4 simply dithers between -90.90 and -90.91 due to 0.01° sensor quantization noise. Because the 7 ms prediction horizon is just a fraction of the ~100 ms sample period, mechanical dynamics cannot develop in that timeframe. Therefore, the current value will persist. -90.91 is the best estimate as it is the most frequent reading.
 
 <details>
 <summary>Expected answer</summary>
@@ -410,7 +394,6 @@ Acceptance bounds: `{"signal": "feedback_pos_4", "steps_ahead": 7, "actual_value
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
 
 ---
 
@@ -545,9 +528,9 @@ D. co0=-0.02, co1=-2.1, co2=-1.68, co3=-0.77, co4=-0.22, co5=-0.11, dib=0, dob=0
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `BDAC` — each option is a six-row window lifted straight out of the context series, so ranking them is a matter of finding where each window sits. Matching on the `fs`/`fp` fingerprints: **B** starts at t=11391 (fs1=-0.03, fs2=-0.09, fs3=0.04 with fp1=-48.43, fp2=69.70 — a row that occurs once), **D** at t=11998 (fs1=-0.01, fs2=-0.01, fs3=-0.01 with fp1=-48.46), **A** at t=12601 (two identical rows, then fp1=-48.46/fp3=-111.48, then fp1=-48.45/fp3=-111.47, then two more identical rows — exactly the pattern of t=12601…13106), and **C** at t=13207 (fp5=323.21 on five consecutive rows, dropping to 323.20 on the sixth — t=13207…13712).
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** the fault here is a TCP frame misconfiguration, a static parametric error, so there is no force or current transient in the option rows to order them by: every window shows the same parked pose (fp = 26.37, -48.45, 69.67, -111.47, -90.77, 323.2), the same joint temperatures (jt = 32.9 … 40.62) and tm=0. What does separate them is that the four windows are consecutive slices of the settling tail of the context, where the residual joint speeds decay monotonically (fs1: -0.07 at t=11190 → -0.21 → -0.03 → -0.01 → 0 by t=12299). Once B and D are pinned onto that decay, the two all-zero-speed windows A and C are fixed as the next two slices by their duplication and fp5 patterns. The consistency check is that B → D → A → C is contiguous at 6 samples × ~101 ms per window with no gap, which is what tells me the match is right rather than coincidental.
 
 <details>
 <summary>Expected answer</summary>
@@ -556,7 +539,7 @@ D. co0=-0.02, co1=-2.1, co2=-1.68, co3=-0.77, co4=-0.22, co5=-0.11, dib=0, dob=0
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** high
 
 ---
 
@@ -623,9 +606,9 @@ D. Following the event, temperatures rise across multiple joints (>=2 joints wit
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `(TO-CHECK) FFFF` — three of the four options cannot be evaluated from what the prompt contains. The stream carries only `feedback_pos`, `feedback_speed` and `setpoint_pos`: there is no contact-force channel (option A), no robot-current channel (B) and no joint-temperature channel (D), so none of those three claims can be asserted and I mark them false. Only **C** is computable, and it is false: the position error |fp − sp| peaks at 0.08° in the fastest part of the window (t=412: fp2=77.06 vs sp2=77.14, fp3=-62.38 vs sp3=-62.46) and *falls* to 0.02° by the end (t=3819: fp0=51.22 vs sp0=51.20) as the joint speeds decay from fs2=57.58 to fs2=-5.82. That is velocity-proportional following error shrinking, not a 19 % rise.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** worth recording that a purely physical answer would have marked A true — a soft foam object is compliant, so contact force in a foam collision does stay low — and that reading would have been wrong here. The item therefore turns entirely on whether the released channel set lets the thresholds be checked, which is exactly the failure mode a reviewer should see. Two data-quality notes on the same stream: the timestamp column is monotone but the values are not consistently ordered with it (t=530 carries fp0=64.08, which belongs between the values at t=310 and t=412; t=943 likewise sits between t=825 and t=927), and t=3562 carries fp4=-90.11 where both neighbours read -89.07 — interleaved or duplicated frames inside the window.
 
 <details>
 <summary>Expected answer</summary>
@@ -634,7 +617,7 @@ D. Following the event, temperatures rise across multiple joints (>=2 joints wit
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** medium — the string follows from three options being uncheckable, not from measuring them
 
 ---
 
@@ -817,9 +800,9 @@ D. Following the event, at least one joint speed drops sharply (>=25% below pre-
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `FFTT` — **A** is false and **D** true from the speed channels alone: joint speeds are nowhere near a ±9 % band, they sweep from 0 (idle up to t=3529) to fs1=-72.54 and fs5=-111.38 (t=706 of the second move) and back to 0 twice over, and at least one joint drops far more than 25 % below its pre-event level — fs0 goes from -54.26 at t=5445 to -3.19 at t=9979 and then to 0. **C** is true: command and measurement stay locked together, |fp − sp| never exceeds 0.07° anywhere in the 152 rows (t=5142: fp0=66.45 vs sp0=66.38; t=18051: fp0=37.87 vs sp0=37.94), and that residual is pure velocity lag. **B** is false.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** B is the one claim the prompt gives no channel for — there is no robot-current signal in the stream — so I answer it on the mechanism of the fault. A TCP frame misconfiguration is a purely kinematic, parametric error: the controller solves the inverse kinematics against a wrong tool frame, so the arm follows a slightly wrong Cartesian path, but each joint still tracks its own command under the same loads, and nothing in that chain raises motor current by 21 %. The record is consistent with it — the joints track cleanly, the settle-and-hold phases are quiet (fs = 0 to two decimals from t=11393 to t=14921), and there is no sign anywhere of a controller working against a load. Note also that C is stated about *TCP* tracking error while the prompt exposes no measured TCP pose, so I evaluate it through the joint-space proxy, which is tight enough that any TCP error would have to come from the frame constant itself rather than from tracking.
 
 <details>
 <summary>Expected answer</summary>
@@ -828,7 +811,7 @@ D. Following the event, at least one joint speed drops sharply (>=25% below pre-
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** medium — A, C and D are read straight off the data; B is inferred from the fault mechanism because the current channel is absent
 
 ---
 
@@ -916,9 +899,9 @@ Question: The sensor stream below is from a robot exhibiting a collision with a 
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `134.2` — the arm is fully parked at the end of the record. From t=8062 onward fp2 reads 134.18-134.20, fs2 sits between 0.00 and 0.06, and sp2 is pinned at 134.20 for every sample through t=9778; 605 ms later the best estimate is that same held value.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** the interesting part of this stream is over well before the horizon opens. The collision appears between t=4237 and t=7761 as a violent excursion — fs0 reaches -181.87 and fs1 -138.30 at t=7761, with fp1 swinging out to -145.95 — and then everything collapses within two samples: at t=7962 the speeds are already down to fs0=40.74, and by t=8062 all six read ≈0 with fp2=134.23 against sp2=134.20. The last 1.7 s (17 samples) is a dead hold with a constant setpoint, and 605 ms is comfortably inside a hold the controller has already been maintaining for longer than that, so persistence is the right model rather than any extrapolation of the pre-stop dynamics.
 
 <details>
 <summary>Expected answer</summary>
@@ -929,7 +912,7 @@ Acceptance bounds: `{"signal": "feedback_pos_2", "std": 5.342317, "margin": 4.00
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** high
 
 ---
 
@@ -995,9 +978,9 @@ Question: The sensor stream below is from a robot exhibiting a collision with a 
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `[20.67,-66.29,62.49,2.54,21.18,90.66]` — I report the held setpoint rather than the last feedback sample. The commanded pose sp = (20.67, -66.29, 62.49, 2.54, 21.18, 90.66) is identical in every row from t=4981 to t=5793, all six speeds stay within ±0.4 deg/s of zero over the same span, and fp jitters ±0.02° around that setpoint, so 981 ms ahead the arm is still sitting on it.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** the trajectory in this record finishes at t=2748, where fp2 tops out at 62.50 with fs2 dropping to 0.36; every sample from t=2849 onward is a hold. The only thing that happens afterwards is one outlier frame at t=4912 (fp = 20.91, -67.06, 63.24, 2.58, 21.42, 91.72 — 0.24 to 1.06° off the hold on all six joints at once, with sp shifted by the same amount and fs still ≈0), which is a spliced or mis-joined frame rather than motion, so I exclude it from the estimate. Choosing sp over the final fp row matters on joint 5: the last feedback value is 90.65 while the setpoint is 90.66, and on a joint this quiet the setpoint is the better predictor of where the arm actually is a second later.
 
 <details>
 <summary>Expected answer</summary>
@@ -1008,7 +991,7 @@ Acceptance bounds: `{"signal": "feedback_pos", "std": [0.013178, 0.85298, 5.7110
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** high
 
 ---
 
@@ -1072,9 +1055,9 @@ Question: Knowing that the robot suffers from a collision with a rigid object in
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `1311` — the same reading as item 01. Up to t=1311 the arm is running a large reorienting sweep (fp0 39.39 → 3.05 and fp5 313.55 → 253.08, with fs0 down to -50.09 and fs5 to -83.90), and at t=1311 all six velocities collapse together (fs0=-0.56, fs1=1.56, fs2=-0.46, fs3=-0.71, fs4=-0.08, fs5=-1.44): the approach is finished and the tool is momentarily at rest above the object.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** from the very next sample the signature is a vertical descent rather than a continuation of the sweep. Base and wrist 3 stop dead and stay there — fp0 sits at 3.07-3.10 and fp5 at 253.05-253.09 for the rest of the record, with fs0 and fs5 never exceeding 0.23 in magnitude — while shoulder, elbow and wrist 1 take over with the coupled sign pattern of a straight-line drop (t=1716: fs1=17.42, fs2=30.06, fs3=-48.32; fp1 -80.64 → -72.81, fp2 98.13 → 109.56, fp3 -107.94 → -127.18). That phase ends at t=2119, so a 12-sample window opened at t=1311 spans t=1311…2423 and covers the descent, the contact and the first samples of the hold that follows — which is what you want if you are isolating the approach to the object.
 
 <details>
 <summary>Expected answer</summary>
@@ -1085,7 +1068,7 @@ Acceptance bounds: `{"min": 1009, "max": 1614}`
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** high
 
 ---
 
@@ -1178,9 +1161,9 @@ D. An external force continuously pulls or pushes the robot arm during motion, s
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `D` — the record is a sustained torque offset on the gravity-loaded joints with no matching motion and no tracking error. Through t=2919 the arm is bit-identically motionless at fp = (17.59, -30.38, 63.47, 3.79, 50.21, 77.62) with ett1 between -93 and -108 Nm; from t=3018 ett1 climbs through -126.87, -142.82, -153.37, -162.86 and on to -178.16 (t=3925), then stays between -168 and -178 Nm for the whole remaining 2.2 s, while ett2 goes from -18 to -61 Nm. Over that same interval the arm moves only 5.4° on joint 1 and 7.3° on joint 4, at a few degrees per second. A persistent torque anomaly through the motion, with the pose still tracked to 0.05°, is an external force pulling on the arm.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** **C** is the option worth taking seriously and the sign of the change contradicts it — losing a payload mid-trajectory *unloads* the arm, so the gravity-hold torque magnitude would step down. Here |ett1| almost doubles and never comes back, so whatever is acting is adding load, not removing it. **A** would put the anomaly at one place and one time: a peg jammed on the hole rim gives a localised force spike together with a growing fp-versus-sp gap while the controller pushes against the obstruction. The tracking error here stays at 0.03-0.05° for the entire record (t=6149: fp1=-35.73 vs sp1=-35.75), the torque is a plateau rather than a spike, and there is no approach-and-stop in the trajectory for an insertion to happen in. **B** carries no semantic content at all ("Semantic description pending curation"), so there is no signature to match it against and it cannot be defended as an answer. The discriminator I use against an ordinary, healthy start-of-motion torque step — compare item 20 — is the shape: here the torque climbs monotonically as the arm extends and stays elevated, instead of peaking at the acceleration and relaxing onto a cruise level.
 
 <details>
 <summary>Expected answer</summary>
@@ -1189,18 +1172,20 @@ D. An external force continuously pulls or pushes the robot arm during motion, s
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** high
 
 ---
 
 ### 12 · L2 t8 · MC multi-select
 
-`180f8bc9-d63e-494b-ae21-4db56980e55d` · `comparative` · test split · scored as `multiple_choice_multi_select` · series: 104 rows in `series_a` + `series_b` — **absent from the released prompt**
+`180f8bc9-d63e-494b-ae21-4db56980e55d` · `comparative` · test split · scored as `multiple_choice_multi_select` · series: 104 rows in `series_a` + `series_b`
 
-**The released prompt for this template carries no time series** — a prompt-builder bug,
-see [Dataset findings](#dataset-findings). Answered from the series the dataset does
-contain, attached below the prompt, i.e. what a fixed builder would show; the item is
-separately recorded as unanswerable as released.
+**The released prompt for this item carried no time series.** This template keeps its two
+streams in `context.series_a` / `context.series_b`, a shape `build_prompt()` did not render, so
+the prompt the scored models received held only the question and the options. Every L1 t3 and
+L2 t8 item in the dataset was affected — 110 of them in the test split alone. The builder now
+renders both sides (`format_paired_time_series`); the prompt below is that repaired output, not
+what the scored models saw.
 
 > You are provided with two sensor streams originating from robots accomplishing tasks. What differences between the two given instances of robotic time series data (if any) do you notice? Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.
 
@@ -1210,25 +1195,11 @@ separately recorded as unanswerable as released.
 - **D.** The two robots are performing the same task, but at different phases.
 
 <details>
-<summary>Full prompt</summary>
+<summary>Full prompt — repaired builder output (26,060 characters), not what the scored models received</summary>
 
 ```text
 The following sensor data comes from Universal Robots UR3e, a collaborative robot (cobot) from the E-series with 3 kg payload, 6 degrees of freedom, controlled via UR PolyScope (teach pendant), UrScript, typically used for light assembly tasks, automated workbench scenarios.
-
-Question: You are provided with two sensor streams originating from robots accomplishing tasks. What differences between the two given instances of robotic time series data (if any) do you notice? Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.
-Here are the options:
-A. Those come from different robots.
-B. The two robots have different anomalous states. Note: this means either exactly one of them is anomalous, or they both are, but have different anomalies.
-C. The two robots are performing different tasks.
-D. The two robots are performing the same task, but at different phases.
-```
-
-</details>
-
-<details>
-<summary><code>context.series_a</code> — 61 rows, absent from the released prompt</summary>
-
-```text
+Series A:
 Acronym mapping: ett0=effort_target_torque_0, ett1=effort_target_torque_1, ett2=effort_target_torque_2, ett3=effort_target_torque_3, ett4=effort_target_torque_4, ett5=effort_target_torque_5, fp0=feedback_pos_0, fp1=feedback_pos_1, fp2=feedback_pos_2, fp3=feedback_pos_3, fp4=feedback_pos_4, fp5=feedback_pos_5, fs0=feedback_speed_0, fs1=feedback_speed_1, fs2=feedback_speed_2, fs3=feedback_speed_3, fs4=feedback_speed_4, fs5=feedback_speed_5, sp0=setpoint_pos_0, sp1=setpoint_pos_1, sp2=setpoint_pos_2, sp3=setpoint_pos_3, sp4=setpoint_pos_4, sp5=setpoint_pos_5, tm=timestamp_ms
 t=0: ett0=-2.73, ett1=-0.23, ett2=0.41, ett3=0.21, ett4=-1.21, ett5=0.32, fp0=1.07, fp1=1.32, fp2=1.84, fp3=-2.55, fp4=-1.81, fp5=0.46, fs0=0, fs1=0, fs2=0, fs3=0, fs4=0, fs5=0, sp0=1.07, sp1=1.32, sp2=1.84, sp3=-2.55, sp4=-1.81, sp5=0.46
 t=100: ett0=-2.2, ett1=-0.48, ett2=0.65, ett3=0.38, ett4=-0.93, ett5=0.25, fp0=1.07, fp1=1.32, fp2=1.84, fp3=-2.55, fp4=-1.81, fp5=0.46, fs0=0, fs1=0, fs2=0, fs3=0, fs4=0, fs5=0, sp0=1.07, sp1=1.32, sp2=1.84, sp3=-2.55, sp4=-1.81, sp5=0.46
@@ -1291,14 +1262,8 @@ t=5676: ett0=0.74, ett1=-1.15, ett2=2, ett3=1.2, ett4=0.98, ett5=0.99, fp0=-0.26
 t=5775: ett0=3.97, ett1=-0.52, ett2=1.53, ett3=0.96, ett4=3.21, ett5=1, fp0=-0.32, fp1=1.56, fp2=2.18, fp3=-2.17, fp4=-1.54, fp5=-0.81, fs0=-0.44, fs1=0.03, fs2=0.07, fs3=-0.03, fs4=0, fs5=-0.43, sp0=-0.32, sp1=1.56, sp2=2.18, sp3=-2.17, sp4=-1.54, sp5=-0.8
 t=5875: ett0=8.77, ett1=0.04, ett2=1.67, ett3=1.1, ett4=5.79, ett5=0.1, fp0=-0.35, fp1=1.56, fp2=2.18, fp3=-2.17, fp4=-1.54, fp5=-0.84, fs0=-0.09, fs1=0.01, fs2=0.01, fs3=-0.01, fs4=0, fs5=-0.07, sp0=-0.34, sp1=1.56, sp2=2.18, sp3=-2.17, sp4=-1.54, sp5=-0.83
 t=5974: ett0=8.97, ett1=-0.04, ett2=1.53, ett3=0.96, ett4=5.05, ett5=-1.15, fp0=-0.35, fp1=1.56, fp2=2.18, fp3=-2.17, fp4=-1.54, fp5=-0.83, fs0=0.04, fs1=0, fs2=-0.01, fs3=0.01, fs4=0, fs5=0.06, sp0=-0.34, sp1=1.56, sp2=2.18, sp3=-2.17, sp4=-1.54, sp5=-0.83
-```
 
-</details>
-
-<details>
-<summary><code>context.series_b</code> — 43 rows, absent from the released prompt</summary>
-
-```text
+Series B:
 Acronym mapping: fp0=feedback_pos_0, fp1=feedback_pos_1, fp2=feedback_pos_2, fp3=feedback_pos_3, fp4=feedback_pos_4, fp5=feedback_pos_5, fs0=feedback_speed_0, fs1=feedback_speed_1, fs2=feedback_speed_2, fs3=feedback_speed_3, fs4=feedback_speed_4, fs5=feedback_speed_5, sp0=setpoint_pos_0, sp1=setpoint_pos_1, sp2=setpoint_pos_2, sp3=setpoint_pos_3, sp4=setpoint_pos_4, sp5=setpoint_pos_5, tm=timestamp_ms
 t=0: fp0=48.58, fp1=-85.31, fp2=99.21, fp3=-103.06, fp4=-89.49, fp5=48.29, fs0=0.07, fs1=-0.02, fs2=0.12, fs3=0.32, fs4=0.02, fs5=0.1, sp0=48.57, sp1=-85.3, sp2=99.21, sp3=-103.05, sp4=-89.49, sp5=48.29
 t=101: fp0=48.56, fp1=-85.31, fp2=99.2, fp3=-103.05, fp4=-89.49, fp5=48.27, fs0=0.01, fs1=0.01, fs2=0.05, fs3=0.04, fs4=-0.03, fs5=0, sp0=48.55, sp1=-85.3, sp2=99.2, sp3=-103.04, sp4=-89.49, sp5=48.27
@@ -1343,13 +1308,21 @@ t=3996: fp0=50.41, fp1=-86.34, fp2=100.32, fp3=-103.1, fp4=-89.49, fp5=50.14, fs
 t=4097: fp0=51.98, fp1=-87.17, fp2=101.17, fp3=-103.11, fp4=-89.49, fp5=51.7, fs0=16.13, fs1=-7.32, fs2=7.5, fs3=-0.18, fs4=0, fs5=16.34, sp0=52.02, sp1=-87.19, sp2=101.18, sp3=-103.11, sp4=-89.49, sp5=51.74
 t=4122: fp0=50.12, fp1=-86.27, fp2=100.23, fp3=-103.09, fp4=-89.49, fp5=49.85, fs0=10.66, fs1=-5.8, fs2=6.09, fs3=-0.22, fs4=0, fs5=10.59, sp0=50.17, sp1=-86.29, sp2=100.25, sp3=-103.09, sp4=-89.49, sp5=49.88
 t=4222: fp0=53.93, fp1=-88.08, fp2=102.13, fp3=-103.14, fp4=-89.49, fp5=53.67, fs0=20.1, fs1=-8.51, fs2=8.65, fs3=-0.06, fs4=0, fs5=20.15, sp0=53.97, sp1=-88.1, sp2=102.13, sp3=-103.14, sp4=-89.49, sp5=53.69
+Question: You are provided with two sensor streams originating from robots accomplishing tasks. What differences between the two given instances of robotic time series data (if any) do you notice? Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.
+Here are the options:
+A. Those come from different robots.
+B. The two robots have different anomalous states. Note: this means either exactly one of them is anomalous, or they both are, but have different anomalies.
+C. The two robots are performing different tasks.
+D. The two robots are performing the same task, but at different phases.
 ```
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `TTTF` — *(TO-CHECK on option A, which the prompt does not determine.)* I mark A, B and C true. **A**: series_b is the UR3e signature that recurs across this set — fp = (48.57, -85.31, 99.21, -103.05, -89.49, 48.29), wrist 2 pinned at -89.49° and wrist 3 tracking the base at a fixed 0.28° offset — while series_a works within ±2.2° of its zero pose and publishes joint torques; different arms. **B**: series_a is anomalous and series_b is not. **C**: series_a spends the record on micro-adjustments inside a 1° envelope, whereas series_b holds one pose for 3.5 s and then launches a fast coordinated base-plus-wrist sweep (t=4222: fp0=53.93, fs0=20.10, fs5=20.15) — different tasks, which is why **D** is false.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** the anomaly call on series_a rests on torque per degree, not on torque magnitude. At t=2291-2490 the six torques swing from ≈0 to ett2=+47.28, ett1=-37.64 and ett3=+26.22 Nm while the joints move 0.05° in total and no speed exceeds 0.9 deg/s; the same thing recurs at t=4780-5278, where ett0 goes -7.16 → -29.62 and ett4 -4.83 → -17.41 for 0.64° of joint-0 travel. Tens of newton-metres delivered into almost no displacement is a blocked or externally loaded joint. Series_b by contrast is a textbook idle-then-accelerate ramp: tracking error ≤0.05° throughout (t=4222: fp0=53.93 vs sp0=53.97), speeds rising smoothly, nothing to flag.
+
+**Caveat on option A — the T is unsupported.** The evidence I would cite for it, different channel sets plus pose ranges two orders of magnitude apart, is exactly the evidence present in item 02, where that same reading produces the wrong answer; the two items are mirror images of each other and carry opposite labels on A. Worse, this item sets no `hides`, so its prompt opens by asserting a single machine — "The following sensor data comes from Universal Robots UR3e…" — while the expected answer is that the two streams come from different robots. The label tracks `provenance.machine_id` (2 for series_a, 0 for series_b), which the prompt never carries. Option A is not decidable here either.
 
 <details>
 <summary>Expected answer</summary>
@@ -1358,7 +1331,7 @@ t=4222: fp0=53.93, fp1=-88.08, fp2=102.13, fp3=-103.14, fp4=-89.49, fp5=53.67, f
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** medium on B, C and D, which are read straight off the two series; none on A, which the released prompt does not determine
 
 ---
 
@@ -1427,9 +1400,9 @@ C. KUKA KR 10 R1100-2
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `B` — the pose fingerprint is unambiguous. Wrist 2 sits at -89.07/-89.08° for all 41 samples, the shoulder-elbow-wrist-1 sum is -81.58 + 107.92 - 115.50 = -89.16 ≈ -90° (the tool held vertical), and wrist 3 tracks the base at a constant offset in every single row (t=0: fp0=60.95, fp5=60.66; t=1454: 54.93, 54.57; t=4065: 48.42, 48.08 — always fp5 ≈ fp0 - 0.33, base and wrist 3 co-rotating to keep tool yaw fixed while the base sweeps). That is the same UR3e cell and program family as the other UR3e traces in this set.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** the other two options are excluded on channel set and on scale. This stream publishes `feedback_pos`, `feedback_speed` and `setpoint_pos` and nothing else; the KUKA trace in this benchmark (item 03) publishes axis torques with **no** joint-speed channel and sits in a completely different pose family (fp3=-5.69, fp4=+44.43), so C is out. The Agile Robots streams here (item 02 `series_b`, item 12 `series_a`, item 14 options B/C/D) always carry `effort_target_torque`, often `est_contact_force`, and operate within ±3° of zero; this record has neither and runs at 48/-81/108/-115°, so A is out. Everything else fits a UR3e: peak speeds of 25 deg/s against a 180 deg/s limit, ~100 ms RTDE-style sampling, tracking error ≤0.08° (t=1557: fp0=53.05 vs sp0=52.97), and the stated external arm disturbance leaves no mark on any of the three published channels — which is itself consistent, since a disturbance shows up in torque and this stream carries no torque.
 
 <details>
 <summary>Expected answer</summary>
@@ -1438,7 +1411,7 @@ C. KUKA KR 10 R1100-2
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** UR3e joint speed limits and RTDE field naming · **Time:** PENDING · **Confidence:** high
 
 ---
 
@@ -1469,9 +1442,9 @@ D. ett0=10.18, ett1=5.39, ett2=-7.65, ett3=-4.77, ett4=6.53, ett5=0.23, fp0=-0.2
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `(TO-CHECK) BDAC` — the question never defines "severe", and the four segments come from three different machines with different channel sets and incompatible units (A carries no torque channel at all; B and D publish `ett*` around a near-zero pose; C publishes `ett*` plus `ecf*` and is completely static), so there is no common severity scale to rank on. Using the one criterion that is physically meaningful across all four — torque or force excursion that the motion does not explain — I get B, D, A, C. **B**: ett2 swings from -2.87 to -16.04 Nm and ett1 from -0.61 to +10.01 Nm while the joints move 0.05° in total and no speed exceeds 0.43 deg/s, i.e. of the order of 260 Nm per degree of travel. **D**: a larger absolute excursion (ett0 10.18 → 38.97, ett4 6.53 → 21.12 Nm) but accompanied by real accelerating motion (fp0 -0.23 → 0.62, fs0 0.86 → 2.19), around 34 Nm per degree. **A**: a nominal descent, tracking error ≤0.04°, speeds ramping to fs3=-47.84 — the only oddities are a duplicated frame (rows 3 and 4 identical) and an fs4=1.28 reading against 0.01° of fp4 motion. **C**: the most benign — fs=0 in every row, ett constant at (0, -9.5, -5.71, -0.14, 0.01, 0), and the only thing moving is a contact-force estimate relaxing from 0.87 N to ≈0.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** flagged because I cannot reconstruct the intended metric and the plausible candidates disagree with each other. Ranking by tracking error gives A > D > B > C (max |fp − sp| of 0.04, 0.02, 0.01, 0.00°). Ranking by raw signal magnitude gives A > D > B > C as well, but only because A's numbers are degrees per second (fs3=-47.84) while the others are newton-metres (38.97, 16.04, 9.5) — a scale-unaware score would order these segments by their units rather than by their behaviour. Ranking by unexplained torque gives the B > D > A > C I report, and it is the only one of the three that is a statement about anomaly at all, so it is the one I use. The prompt gives no way to tell which was meant.
 
 <details>
 <summary>Expected answer</summary>
@@ -1480,7 +1453,7 @@ D. ett0=10.18, ett1=5.39, ett2=-7.65, ett3=-4.77, ett4=6.53, ett5=0.23, fp0=-0.2
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** low — B first and C last are defensible; the middle pair is not determinable from the prompt
 
 ---
 
@@ -1561,9 +1534,9 @@ D. co0=0.06, co1=-1.52, co2=-1.22, co3=-0.51, co4=-0.15, co5=-0.02, dib=0, dob=0
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `ACBD` — **A** is the immediate continuation: its first row reproduces the last context row exactly (fp = 107.21, -79.69, 104.93, -115.60, -90.51, 306.49 with fs = 0.51, 12.34, 20.82, -32.82, 0.06, 0 at t=4732), and across its six rows the descent finishes and the arm settles at fp1=-74.12, with the TCP Z-force climbing to tf2=33.01 and 32.90 on the last two rows — the impact. Every other option sits at that settled pose with fs=0, so their order follows the relaxation of the joint current/torque offsets: A ends at co1=-0.40, co4=-0.09; **C** starts at co1=-0.52, co4=-0.02 and climbs to co1=-1.52, co2=-1.30, co3=-0.60, co4=-0.09; **B** picks up at co1=-1.52, co2=-1.29, co3=-0.55, co4=-0.14 and drifts to co2=-1.22, co3=-0.51, co4=-0.15; **D** is flat at exactly those final values (co = 0.06, -1.52, -1.22, -0.51, -0.15, -0.02 in all seven rows).
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** two independent checks agree with the `co` chain. First, the program-step counter: A runs tp = 6, 6, 6, 6, 7, 7, 7 (it crosses a waypoint), B and C are entirely at tp = 7, and D ends at tp = 8 — so A is first and D is last. Second, the motion-time field decays through A (tm = 0.61, 0.84, 0.55, 0.24, 0.24, 0, 0) and reads 0 in every row of B, C and D, which is what you expect if A is the only window that still contains motion. The TCP Z-force tells the same story physically: it peaks at +33 N in A, is still decaying from +18.91 N in C's first row, and has settled to a steady ≈-13 N in B and D. Note that no positional information can order these segments — fp is identical to 0.01° across all four — so the whole item hinges on the auxiliary control channels.
 
 <details>
 <summary>Expected answer</summary>
@@ -1572,7 +1545,7 @@ D. co0=0.06, co1=-1.52, co2=-1.22, co3=-0.51, co4=-0.15, co5=-0.02, dib=0, dob=0
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** high
 
 ---
 
@@ -1667,9 +1640,9 @@ D. Following the event, tracking error increases noticeably (>=31% above pre-eve
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `(TO-CHECK) TFFF` — **A** is the one statement the record supports. The event is placed at 7766 ms, but the stream ends at 6353 ms and the arm has been at a complete, commanded standstill since t=3835: all six speeds read exactly 0, fpo is frozen at (34.82, -45.81, 64.80, -109.15, -90.84, 337.84) and the TCP setpoint is constant for 2.5 s. A hanging cable brushing a parked arm has no relative velocity and no dynamic path to excite, so there is no mechanism by which it moves the safety state or the aggregate error. **B**, **C** and **D** I mark false because nothing in the released channels supports them: there is no force channel that could show a 41 % spike, no `setpoint_pos` to compute a joint tracking error against, and option C's ±12 % band is taken around a pre-event joint speed of exactly zero.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** flagged because the option set is not evaluable as written. Three of the four thresholds are stated against baselines that are either absent from the stream (contact force, joint tracking error) or identically zero (joint speed), and a percentage band around zero has no meaning — any resumption of the program, collision or not, puts the speeds outside it, while a continued hold puts them exactly on it. A and C are also not independent under the literal reading: if nothing happens, the speeds stay at zero, which is "within ±12 % of pre-event values" on any sensible interpretation. I resolve the set by asserting only what the data positively supports, which gives TFFF, but a reviewer should know the same data supports TFTF under an equally reasonable reading of C.
 
 <details>
 <summary>Expected answer</summary>
@@ -1678,7 +1651,7 @@ D. Following the event, tracking error increases noticeably (>=31% above pre-eve
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** low — A is well supported; B, C and D are false by unevaluability rather than by measurement, and C is degenerate
 
 ---
 
@@ -1742,9 +1715,9 @@ D. Following the event, robot current increases markedly (>=18% above pre-event 
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `(TO-CHECK) FFFF` — none of the four statements can be established. The event is placed at 7764 ms; the record ends at 3233 ms with the arm parked since t=2322 (all six speeds ≈0, pose frozen at -4.81, -88.31, 128.45, -130.11, -89.70, 171.93). **B** needs joint temperatures and **D** needs robot current — neither channel exists in the prompt. **C** needs a tracking error, and the stream publishes `setpoint_tcp` only, with no measured TCP pose and no `setpoint_pos`, so there is nothing to difference. **A** is stated as a ±10 % band around a pre-event joint speed of exactly zero, which is degenerate: the arm either stays at 0 (on the boundary) or the program resumes and blows straight past it — this same cycle reaches 153 deg/s on wrist 3 at t=807 — so "close to baseline" cannot be asserted either.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** the physical reading is unremarkable and the same in every case: a slack cable contacting a stationary arm 4.5 s after it stopped, at a pose it has been holding without any excursion visible in the published channels, is not going to raise motor current, heat three joints, or open a tracking gap. So even where a channel were available I would not expect B, C or D to fire. What makes the item unanswerable rather than merely easy is that three of the four thresholds reference signals the prompt does not carry, so a solver arrives at FFFF by elimination rather than by measurement — the right string for the wrong reason.
 
 <details>
 <summary>Expected answer</summary>
@@ -1753,7 +1726,7 @@ D. Following the event, robot current increases markedly (>=18% above pre-event 
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** low — all four options are false by unevaluability, and A's threshold is degenerate
 
 ---
 
@@ -1816,9 +1789,9 @@ Question: In the counterfactual scenario where a collision cardboard object occu
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `0` — the move is already decelerating and will be over well before the horizon. The segment that started at t=2920 peaked at fs0=54.70 (t=3828) and is now decaying (53.14 at t=3928, 46.60 at t=4130), and the joints that lead it have already collapsed: fs1 from -61.07 to -9.93 and fs2 from 88.60 to 12.59 across those same three samples, with fp1 and fp2 flattening out (-90.42 → -92.26 and 105.56 → 107.75). One second later joint 0 is parked.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** the record gives a precedent for how long a settle takes on this machine. The first segment runs t=1912 → 2820 and is at zero within roughly 900 ms of its deceleration onset, with the ramp-down occupying 400-500 ms once the distal joints start unwinding — which they have already done here. T+1008 ms therefore lands inside the hold, not in the ramp, so 0 deg/s is the estimate rather than a linear extrapolation of the ≈6.5 deg/s per sample that fs0 is currently shedding (that would give about -19 and is meaningless past the stop). The counterfactual collision at 7965 ms is 3.8 s beyond the end of the record and does not enter a 1 s forecast.
 
 <details>
 <summary>Expected answer</summary>
@@ -1829,7 +1802,7 @@ Acceptance bounds: `{"signal": "feedback_speed_0", "std": 17.636406, "margin": 1
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** high
 
 ---
 
@@ -1899,9 +1872,9 @@ Question: In the counterfactual scenario where a collision cardboard object occu
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `[23.4,-136.0,-21.7,-1.9,6.1,0.65]` — the arm is in the middle of a steady sweep and the torques are on a flat plateau, so the estimate one sample ahead is the current plateau level. I take the mean of the last five samples (t=4410…4809), over which ett0 runs 19.52-26.19, ett1 -137.74 to -133.72, ett2 -23.85 to -19.93, ett3 -2.47 to -0.92, ett4 5.25-6.82 and ett5 0.46-0.90.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+**Why:** from t=3707 to t=4809 joint 0 advances by a near-constant 1.8° per 100 ms sample (5.46 → 25.59°, i.e. about 18 deg/s) while joints 1 to 4 change slowly and monotonically, and over that whole span each torque channel varies only within its noise band, with no trend beyond a gentle unloading of the shoulder (ett1 -143.4 → -133.7 Nm, roughly 1 Nm per 100 ms). At an 87 ms horizon — less than one sample period — neither that trend nor the counterfactual matters: the collision is placed at 14017 ms, some 9.2 s past the end of the record, and 87 ms is far shorter than any impact response. Averaging rather than taking the last row is deliberate, because the per-sample scatter on ett0 is ±4 Nm (19.52 at t=4510 against 26.19 at t=4410), larger than the drift over the horizon, so the plateau mean is the lower-variance estimate. I also discount t=4323 as a spliced frame: fp1, fp2, fp4 and fp5 all jump off the smooth ramp by 0.3-1.2° at that one sample and return.
 
 <details>
 <summary>Expected answer</summary>
@@ -1912,7 +1885,7 @@ Acceptance bounds: `{"signal": "effort_target_torque", "std": [16.387348, 19.501
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** high
 
 ---
 
@@ -1983,9 +1956,11 @@ Question: Given the sensor stream below, does the machine show signs of anomalou
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** No fault to act on — the machine is behaving normally and I would not raise a work order on this record. The one large event in it, |ett1| stepping from ≈85 to ≈147 Nm and |ett2| from ≈15 to ≈53 Nm between t=10520 and t=10925, lands exactly on the onset of a commanded motion: sp1 and sp4 begin to change at t=10621 (sp1 -44.51 → -44.53, sp4 34.41 → 34.43) and fp follows them, so this is the feedforward and gravity-load step of a joint that starts moving and extending, not a disturbance. It also has the right shape for that — the torque overshoots to -147.00 Nm at t=10925 and then relaxes onto a quiet -137 to -146 Nm plateau, which is acceleration followed by cruise. Position tracking backs it up: the error is exactly 0.00° through the 3.3 s standstill (t=7193 → 10520, fp equal to sp to two decimals on all six joints) and only reaches 0.09-0.12° once the joints are moving (t=11929: fp1=-48.87 vs sp1=-48.96, fp4=39.36 vs sp4=39.48), which is plain velocity-proportional lag. No protective stop, no discontinuity, no chatter on the plateau.
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+The one thing I would put on a watch list rather than fix: during the standstill, where the pose is bit-identical sample to sample, the hold torque drifts monotonically — ett1 from -76.58 to -88.97 Nm and ett2 from -12.21 to -15.12 Nm, i.e. 16 % and 24 % over 3.3 s. Gravity torque is a function of pose alone, so a drift at a fixed pose is either thermal drift in the current-based torque estimate or a slowly applied external load. It is small in absolute terms, it produces no tracking degradation, and one 4.7 s window is not enough to separate the two, so the action is to trend the hold torque at this pose across cycles rather than to intervene now.
+
+**Why:** the reason this record reads as healthy rather than as the external-load case in item 11 is the shape of the torque profile, not its size. Both records show a hold at ≈-85 to -100 Nm on the shoulder followed by a step into the -140 to -178 Nm range as the arm extends. In item 11 the torque climbs monotonically for the whole move (-126.87 → -178.16 Nm) and never comes back, which is what a persistent pull looks like; here it peaks at -147.00 Nm within 300 ms and then settles several newton-metres lower and stays flat, which is what inertia followed by a gravity cruise looks like. The other things I checked and found clean: the plateau has no oscillation or ratcheting (-141 ± 5 Nm across fifteen samples), the setpoint is never re-commanded or discontinuous, and the tracking error scales with speed instead of accumulating.
 
 <details>
 <summary>Expected answer</summary>
@@ -1996,7 +1971,7 @@ Root cause: `normal`
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** medium — with 4.7 s of context, no velocity, force, current or temperature channel, and no nominal reference cycle at the same pose, the standstill torque drift cannot be resolved from this window alone
 
 ---
 
@@ -2072,9 +2047,15 @@ Question: An engineer wants to increase the effectiveness and accuracy of this m
 
 </details>
 
-**Answer:** `PENDING`
+**Answer:** `(TO-CHECK)` — steps, in order of expected effect:
 
-**Why:** _PENDING — which signal is read, what is computed, why each distractor is ruled out._
+1. Re-run the payload identification for the current tool (mass **and** centre of gravity) and write the corrected values into the tool-load / installation settings. The residual wrist torque bias points to a centre of gravity displaced of the order of 0.1 m laterally from the flange axis; the exact vector has to be read from the installation settings, which this stream does not expose.
+2. After correcting the load data, re-run the gravity and joint-friction model identification so the feedforward matches the actual tool.
+3. Reduce commanded path speed and acceleration on the accuracy-critical part of the cycle, or raise the velocity feedforward gain — the following error here is velocity-proportional, so this is the direct lever on positional accuracy.
+4. Use exact-stop (blend radius 0) at the taught points where accuracy matters, so the 0.4-0.8° in-motion lag is not carried into the point.
+5. Re-zero the force/torque estimate with the corrected payload, and trend the static hold torque at a fixed pose across cycles to confirm the correction took.
+
+**Why:** marked to check because the fix *family* is derivable from the stream but the numeric correction is not — there is no payload, tool-load or installation-settings channel in the prompt, so no specific centre-of-gravity vector can be read off it. What the data does show is three things. First, a systematic, velocity-proportional following error: fp trails sp by 0.38° on joint 0 and 0.78° on joint 5 while they are running (t=14105: fp0=77.58 vs sp0=77.20, fp5=39.04 vs sp5=39.82), falling to 0.01° as soon as the arm stops (t=18947: fp0=17.07 vs sp0=17.06) — so accuracy is limited by tracking lag, not by repeatability. Second, a direction-dependent wrist torque that decomposes into friction plus a pose-independent bias: ett5 holds at +6.5 to +7.0 Nm through the whole first segment while joint 5 winds from 39.04° to 92.59°, then flips to about -3.8 Nm for the second segment while it unwinds, giving a Coulomb term of ≈5.2 Nm and a residual bias of ≈+1.4 Nm that a correct load model should null. With a payload of a few kilograms that bias corresponds to a lateral centre-of-gravity offset of roughly 0.1 m, which is the quantitative hint that the tool load is misconfigured rather than merely unidentified. Third, ett2 drifts 22.8 Nm (-53.99 → -31.22) during the final hold at t=19048-19551, where no joint moves more than 0.15°, i.e. the load model at that pose has not settled. All three are consistent with a payload / centre-of-gravity mismatch, which is why the load identification heads the list.
 
 <details>
 <summary>Expected answer</summary>
@@ -2085,7 +2066,7 @@ Root cause: `payload_cog_misconfiguration`
 
 </details>
 
-**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** PENDING
+**Raw:** PENDING · **Transformed:** PENDING · **Resources:** PENDING · **Time:** PENDING · **Confidence:** medium on the root cause and the remediation family; low on any numeric centre-of-gravity value, which the released channels do not contain
 
 ---
 
