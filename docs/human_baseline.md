@@ -10,7 +10,7 @@ In this document an expert answers 21 FactoryBench items, one per active questio
 
 ---
 
-## Level 1 — State (4 items)
+## Level 1 — State
 
 ### 01 · L1 · Numerical
 
@@ -313,9 +313,7 @@ C. Agile Robots Yu 5 Industrial
 
 **Answer:** `B`
 
-**Why:**
-
-During the 1.5 seconds in which the arm is at static rest (fp = 82.66, -35.2, 74.86, -5.69, 44.43, 122.1 from t=0 to t=1617), the shoulder joint ett_1 must exert a force of between -95 and -102 Nm. Once the arm begins a slow dragging motion, this value stabilises between –134 and –148 Nm (t=2322: ett_1=-148.44). These values are physically incompatible with a Universal Robots UR3e (https://www.universal-robots.com/products/ur3e/), it has a nominal limit of 56 Nm on its main joints (base, shoulder, elbow). The recorded 148 Nm exceeds the physical limit of that machine. The Agile Robots Yu 5 is a 5 kg payload cobot whose proximal motors operate in the ~150 Nm range; recording 148 Nm would mean that the robot is operating at over 90% of its rated capacity simply to perform a slow movement in the middle of its workspace. As detailed in the KUKA KR 10 R1100-2 Technical Manual (https://es.scribd.com/document/754657260/kr10-r1100-2pdf#:~:text=Workspace%20graphic), this model is a has 10 kg payload and 1101 mm reach in an arm mass of approximately 54 kg. Sustaining ~100 Nm of static gravity load just to hold its own weight and plateauing at ~140 Nm during slow spatial movements, are completely routine and nominal values given the structural inertia of this specific KUKA hardware. In the industrial brochure of Yu 5 (https://www.agile-robots.com/media/files/products/Yu/Agile-Robots_Yu_5_Industrial_Brochure.pdf), this is a 5 kg payload collaborative robot. While its proximal motors do operate in the ~150 Nm maximum peak range, recording a sustained 148 Nm would mean that the robot is operating at over 90% of its rated peak capacity simply to perform a slow movement in the middle of its workspace.
+**Why:** During the 1.5 seconds in which the arm is at static rest (fp = 82.66, -35.2, 74.86, -5.69, 44.43, 122.1 from t=0 to t=1617), the shoulder joint ett_1 must exert a force of between -95 and -102 Nm. Once the arm begins a slow dragging motion, this value stabilises between –134 and –148 Nm (t=2322: ett_1=-148.44). These values are physically incompatible with a Universal Robots UR3e (https://www.universal-robots.com/products/ur3e/), it has a nominal limit of 56 Nm on its main joints (base, shoulder, elbow). The recorded 148 Nm exceeds the physical limit of that machine. The Agile Robots Yu 5 is a 5 kg payload cobot whose proximal motors operate in the ~150 Nm range; recording 148 Nm would mean that the robot is operating at over 90% of its rated capacity simply to perform a slow movement in the middle of its workspace. As detailed in the KUKA KR 10 R1100-2 Technical Manual (https://es.scribd.com/document/754657260/kr10-r1100-2pdf#:~:text=Workspace%20graphic), this model is a has 10 kg payload and 1101 mm reach in an arm mass of approximately 54 kg. Sustaining ~100 Nm of static gravity load just to hold its own weight and plateauing at ~140 Nm during slow spatial movements, are completely routine and nominal values given the structural inertia of this specific KUKA hardware. In the industrial brochure of Yu 5 (https://www.agile-robots.com/media/files/products/Yu/Agile-Robots_Yu_5_Industrial_Brochure.pdf), this is a 5 kg payload collaborative robot. While its proximal motors do operate in the ~150 Nm maximum peak range, recording a sustained 148 Nm would mean that the robot is operating at over 90% of its rated peak capacity simply to perform a slow movement in the middle of its workspace.
 
 
 <details>
@@ -327,7 +325,7 @@ During the 1.5 seconds in which the arm is at static rest (fp = 82.66, -35.2, 74
 
 ---
 
-### 04 · L1 t7 · Numerical
+### 04 · L1 · Numerical
 
 Question ID: `cf6cf68b-bc88-4bba-9783-c6b3580359cc`
 
@@ -618,7 +616,7 @@ D. Following the event, temperatures rise across multiple joints (>=2 joints wit
 
 ---
 
-### 07 · L2 t3 · MC multi-select
+### 07 · L2 · MC multi-select
 
 Question ID: `4426a69c-42f3-44b7-a351-d6c7023c589d`
 
@@ -992,7 +990,7 @@ Acceptance bounds: `{"signal": "feedback_pos", "std": [0.013178, 0.85298, 5.7110
 
 ---
 
-### 10 · L2 t6 · Numerical
+### 10 · L2 · Numerical
 
 Question ID: `c2e92ee2-63fa-4374-98ed-30136f6a786a`
 
@@ -1068,7 +1066,7 @@ Acceptance bounds: `{"min": 1009, "max": 1614}`
 
 ---
 
-### 11 · L2 t7 · MC single-select
+### 11 · L2 · MC single-select
 
 Question ID: `45624f64-f16f-4b06-9741-562fbd613de4`
 
@@ -1323,7 +1321,7 @@ D. The two robots are performing the same task, but at different phases.
 
 ---
 
-### 13 · L2 t10 · MC single-select
+### 13 · L2 · MC single-select
 
 Question ID: `427da1e6-77dc-4f46-9bed-5b7894161a4f`
 
@@ -1401,7 +1399,7 @@ C. KUKA KR 10 R1100-2
 
 ---
 
-### 14 · L2 t9 · Ranking
+### 14 · L2 · Ranking
 
 Question ID: `b2f749b6-e1c0-448a-830b-393cd01c769e`
 
@@ -1443,9 +1441,9 @@ D. ett0=10.18, ett1=5.39, ett2=-7.65, ett3=-4.77, ett4=6.53, ett5=0.23, fp0=-0.2
 
 ---
 
-## Level 3 — Counterfactual (5 items)
+## Level 3 — Counterfactual
 
-### 15 · L3 t1 · Ranking
+### 15 · L3 · Ranking
 
 `468c4eef-91b9-471b-b5f1-dee28d4c3b84` · `predictive` · test split · scored as `ranking` · series: 48 rows
 
@@ -1640,7 +1638,7 @@ D. Following the event, tracking error increases noticeably (>=31% above pre-eve
 
 ---
 
-### 17 · L3 t3 · MC multi-select
+### 17 · L3 · MC multi-select
 
 `cb33e946-8cd0-43e3-988c-b0b200e6b7d4` · `trajectory_outcome_multiselect` · test split · scored as `multiple_choice_multi_select` · series: 33 rows
 
@@ -1715,7 +1713,7 @@ The physical reading is unremarkable and the same in every case. A slack cable c
 
 ---
 
-### 18 · L3 t4 · Numerical
+### 18 · L3 · Numerical
 
 Question ID: `dcb1fc6f-bd3c-4d29-97e7-c1e039ca6b93`
 
@@ -1789,7 +1787,7 @@ Acceptance bounds: `{"signal": "feedback_speed_0", "std": 17.636406, "margin": 1
 
 ---
 
-### 19 · L3 t5 · Tensor
+### 19 · L3 · Tensor
 
 Question ID: `14a1b0b7-3b64-434a-9f58-aa88e80f8938`
 
@@ -1870,9 +1868,9 @@ Acceptance bounds: `{"signal": "effort_target_torque", "std": [16.387348, 19.501
 
 ---
 
-## Level 4 — Decision making (2 items)
+## Level 4 — Decision making
 
-### 20 · L4 t1 · Free-form
+### 20 · L4 · Free-form
 
 `638d4173-8b13-4f6d-bd9c-a27c8efb4792` · `troubleshooting` · test split · scored as `free_form` · series: 48 rows
 
@@ -1958,7 +1956,7 @@ Root cause: `normal`
 
 ---
 
-### 21 · L4 t2 · Free-form
+### 21 · L4 · Free-form
 
 `66e3e741-2581-48c1-baef-7efeea027c26` · `optimization` · test split · scored as `free_form` · series: 55 rows
 
