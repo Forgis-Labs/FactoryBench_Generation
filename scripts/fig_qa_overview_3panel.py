@@ -26,6 +26,9 @@ load_dotenv(r"C:\Users\ymerz\OneDrive\Documents\Work\Forgis\FactoryBench\.env",
             override=True)
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
+import sys
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))  # so `src.evaluation` resolves when run from anywhere
 HF_REPO = "FactoryBench/FactoryBench"
 LEVELS = (1, 2, 3, 4)
 SPLITS = ("train", "validation", "test")
@@ -74,23 +77,18 @@ def set_style() -> None:
 
 
 def _classify_answer_style(rec: dict) -> str:
-    """Map a Q&A record to one of: numerical, numerical_tensor, mc_single_K,
-    mc_multi_4, free_form."""
-    options = rec.get("options") or {}
-    answer = rec.get("answer")
-    if isinstance(answer, list):
-        return "numerical_tensor"
-    if not options:
-        if isinstance(answer, (int, float)):
-            return "numerical"
-        return "free_form"
-    n_opts = len(options)
-    # Multi-select answers tend to be a string of T/F flags or a list of keys.
-    if isinstance(answer, str) and re.fullmatch(r"[TF]+", answer):
-        return f"mc_multi_{len(answer)}"
-    if isinstance(answer, list):
-        return f"mc_multi_{n_opts}"
-    return f"mc_single_{n_opts}"
+    """Answer format for a Q&A record, as the scorer sees it.
+
+    Delegates to ``infer_answer_format`` (the same function
+    ``score_prediction`` dispatches on) so the figure can never disagree with
+    how items are actually graded. The previous local heuristic had two bugs:
+    ranking answers (4-letter permutations like "BDAC") fell through to the
+    single-select branch, hiding 3,192 ranking items, and tensor answers stored
+    as strings were reported as free-form, putting free-form mass in L2 and L3
+    where no free-form template exists.
+    """
+    from src.evaluation.run_foundry_eval import infer_answer_format
+    return infer_answer_format(rec)
 
 
 def load_all() -> pd.DataFrame:
@@ -154,24 +152,28 @@ def main():
 
     # (b) answer-format mix per level (test split, four canonical buckets)
     STYLE_BUCKET = {
-        "numerical":        "Numerical / Tensor",
-        "numerical_tensor": "Numerical / Tensor",
-        "mc_single_3":      "MC single-select",
-        "mc_single_4":      "MC single-select",
-        "mc_multi_4":       "MC multi-select",
-        "free_form":        "Free-form",
+        "numerical":                     "Numerical",
+        "tensor":                        "Tensor",
+        "multiple_choice_single_select":  "MC single-select",
+        "multiple_choice_multi_select":   "MC multi-select",
+        "ranking":                       "Ranking",
+        "free_form":                     "Free-form",
     }
     BUCKET_ORDER = [
-        "Numerical / Tensor",
+        "Numerical",
+        "Tensor",
         "MC single-select",
         "MC multi-select",
+        "Ranking",
         "Free-form",
     ]
     BUCKET_COLOR = {
-        "Numerical / Tensor": TIGER,
-        "MC single-select":   "#3b82f6",
-        "MC multi-select":    FLICKER,
-        "Free-form":          GUNMETAL,
+        "Numerical":        TIGER,
+        "Tensor":           "#f0a94b",
+        "MC single-select": "#3b82f6",
+        "MC multi-select":  FLICKER,
+        "Ranking":          "#7c5cbf",
+        "Free-form":        GUNMETAL,
     }
 
     ax = axes[1]
