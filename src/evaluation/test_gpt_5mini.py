@@ -398,7 +398,15 @@ def _estimate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) 
         ("mistral-large",     2.00,   6.00),
         ("mistral-medium",    0.40,   2.00),
         ("mistral-small",     0.20,   0.60),
-        # self-hosted
+        # Qwen. The 235B moved from a self-hosted Together endpoint to Vertex
+        # Model Garden MaaS, which bills per token — the old blanket ("qwen",
+        # 0, 0) rule silently reported $0 for every 235B call after that
+        # migration. These are order-of-magnitude MaaS rates and are NOT
+        # vendor-confirmed; check the Vertex pricing page before quoting them
+        # in the paper. The 4B stays at zero because it is served from a
+        # self-deployed endpoint billed by the GPU-hour, not per token.
+        ("qwen-3-235b",       0.30,   1.20),
+        ("qwen3-235b",        0.30,   1.20),
         ("qwen",              0.00,   0.00),
         # Time-series foundation models served from local checkpoints
         ("chronos",           0.00,   0.00),

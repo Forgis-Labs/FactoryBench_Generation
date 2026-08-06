@@ -872,6 +872,10 @@ def main() -> None:
     parser.add_argument("--judge-model", type=str, default=DEFAULT_JUDGE_MODEL)
     parser.add_argument("--no-judge", action="store_true",
                         help="Disable LLM-as-judge entirely. Free-form items get score=None.")
+    # Accepted for parity with the Foundry and GCP CLIs. run_pipeline passes it
+    # to every backend unconditionally, so omitting it here made the AWS path
+    # die on `unrecognized arguments` whenever it was driven by the pipeline.
+    parser.add_argument("--eval-level", type=str, default=None)
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
     parser.add_argument("--max-output-tokens", type=int, default=2000)
     parser.add_argument("--overwrite", action="store_true")

@@ -47,7 +47,13 @@ from src.question_generation.utils.time_series import (
     pick_fault_label_from_meta_or_rows,
     sample_subseries_before_event,
 )
-from src.question_generation.level2.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
+from src.question_generation.level2.mc_truth import (
+    DEFAULT_THRESHOLDS,
+    evaluate_mc_statement,
+    is_statement_enabled,
+    robot_key,
+    thresholds_for_robot,
+)
 from src.question_generation.level1.level1 import (
     build_anomaly_single_select as l1_build_anomaly_single_select,
     build_comparative_multi_select as l1_build_comparative_multi_select,
@@ -216,6 +222,55 @@ def sample_subsequent_chunks(
     return chunks
 
 
+def rows_strictly_after_context(
+    rows: List[Dict[str, Any]],
+    subseries: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Rows whose timestamp is strictly greater than the last context timestamp.
+
+    The ranking template asks the model to order segments by when they appear
+    as the event manifests. That is only a question about the future if the
+    segments lie outside the window the model was already shown. Sampling from
+    ``post_event_rows`` directly does not guarantee this: the context window is
+    centred on the event onset and extends past it, and (at L3) the baseline
+    and counterfactual episodes are identical until they diverge, so early
+    post-onset chunks reproduce rows the model can already see and the ordering
+    can be recovered by matching values instead of reasoning about propagation.
+    Measured on the released benchmark, 13% of option segments appeared
+    verbatim inside their own context.
+    """
+    cutoff = get_last_timestamp(subseries)
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        ts = row.get("timestamp_ms")
+        try:
+            if ts is not None and int(float(ts)) > cutoff:
+                out.append(row)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def filter_rows_to_template_features(
+    rows: List[Dict[str, Any]],
+    template: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Restrict rows to the template's ``important_features``.
+
+    ``build_context`` applies this filter to the context but the option
+    segments were encoded from the full row, so a ranking item showed a context
+    defined over ~19 channels while asking the model to order segments carrying
+    ~98, of which 79 appeared in no acronym mapping anywhere in the item. The
+    segments and the context have to describe the same signals for the question
+    to be answerable as posed.
+    """
+    keep = template.get("important_features")
+    if not keep:
+        return rows
+    allowed = set(keep) | {"timestamp_ms"}
+    return [{k: v for k, v in row.items() if k in allowed} for row in rows]
+
+
 def encode_chunk_without_timestamps(rows: List[Dict[str, Any]]) -> str:
     """Encode a chunk after removing timestamp_ms from each row."""
     stripped_rows: List[Dict[str, Any]] = []
@@ -332,6 +387,30 @@ def normalize_mc_option_id(value: str) -> str:
     return f"mc_{int(match.group(1)):03d}"
 
 
+# Statements that read the same underlying quantity. At most one per family is
+# offered in a single item, because a second one is answerable from the first
+# without touching the signal: mc_008/mc_009 are exact complements sharing one
+# sampled threshold, and mc_030/mc_031 are both derived from feedback_pos.
+MC_STATEMENT_FAMILY: Dict[str, str] = {
+    "mc_003": "speed",       "mc_004": "speed",
+    "mc_005": "current",     "mc_012": "current",
+    "mc_013": "current",     "mc_014": "current",
+    "mc_006": "force",       "mc_007": "force",
+    "mc_008": "tracking",    "mc_009": "tracking",
+    "mc_010": "vibration",   "mc_011": "vibration",
+    "mc_015": "tcp",         "mc_016": "tcp",
+    "mc_017": "temperature", "mc_018": "temperature",
+    "mc_030": "joint_motion", "mc_031": "joint_motion",
+    "mc_032": "torque",
+}
+
+
+def _statement_family(option_id: str) -> str:
+    """Family key for mutual exclusion. Unmapped ids get their own family so a
+    new statement is never silently grouped with an unrelated one."""
+    return MC_STATEMENT_FAMILY.get(normalize_mc_option_id(option_id), f"_solo_{option_id}")
+
+
 def _legacy_mc_option_id(value: str) -> str:
     """Convert normalized mc_* IDs to legacy l2_mc_* IDs used by current rules."""
     normalized = normalize_mc_option_id(value)
@@ -404,67 +483,100 @@ def resolve_fixed_option(
     return None, str(token)
 
 
-def _sample_ratio(mean: float, rel_std: float = 0.20, min_value: float = 0.0, max_value: float = 0.99) -> float:
+def _sample_ratio(mean: float, rel_std: float = 0.20, min_value: float = 0.0,
+                  max_value: Optional[float] = None) -> float:
+    """Draw a threshold around ``mean``.
+
+    ``max_value`` defaults to no upper bound. It used to default to 0.99, which
+    silently clipped any centre above 1 back to 0.99 and pinned the statement:
+    fitted centres of 16.6 (speed_stable_tol on UR), 9.5 (tcp_tracking_increase
+    on aursad) and 2.5 (current_peak_increase) were all being clamped, driving
+    their true-rates to 0%, 84% and 91% respectively. Callers that genuinely
+    need a sub-1 cap, the coverage and axis-ratio knobs, pass max_value
+    explicitly and are unaffected.
+    """
     sampled = random.gauss(mean, max(1e-6, abs(mean) * rel_std))
-    return float(min(max(sampled, min_value), max_value))
+    sampled = max(sampled, min_value)
+    if max_value is not None:
+        sampled = min(sampled, max_value)
+    return float(sampled)
 
 
-def sample_thresholds_for_statement(statement_id: str) -> Dict[str, float]:
+def sample_thresholds_for_statement(
+    statement_id: str,
+    robot: Optional[str] = None,
+) -> Dict[str, float]:
+    """Draw this statement's thresholds around the centre fitted for ``robot``.
+
+    Thresholds still vary per item; only the centre they revolve around is
+    robot-specific. Passing robot=None keeps the corpus-wide defaults, which
+    is what unlisted robots get.
+    """
+    centres = thresholds_for_robot(robot)
     sid = _legacy_mc_option_id(str(statement_id))
     if sid == "l2_mc_003":
-        return {"speed_drop_ratio": _sample_ratio(DEFAULT_THRESHOLDS["speed_drop_ratio"])}
+        return {"speed_drop_ratio": _sample_ratio(centres["speed_drop_ratio"])}
     if sid == "l2_mc_004":
-        return {"speed_stable_tol": _sample_ratio(DEFAULT_THRESHOLDS["speed_stable_tol"])}
+        return {"speed_stable_tol": _sample_ratio(centres["speed_stable_tol"])}
     if sid == "l2_mc_005":
         return {
-            "stall_current_increase": _sample_ratio(DEFAULT_THRESHOLDS["stall_current_increase"]),
-            "stall_speed_frac": _sample_ratio(DEFAULT_THRESHOLDS["stall_speed_frac"]),
+            "stall_current_increase": _sample_ratio(centres["stall_current_increase"]),
+            "stall_speed_frac": _sample_ratio(centres["stall_speed_frac"]),
         }
     if sid == "l2_mc_006":
         return {
-            "force_low_increase": _sample_ratio(DEFAULT_THRESHOLDS["force_low_increase"]),
-            "force_low_coverage": _sample_ratio(DEFAULT_THRESHOLDS["force_low_coverage"], rel_std=0.08, min_value=0.50, max_value=0.99),
+            "force_low_increase": _sample_ratio(centres["force_low_increase"]),
+            "force_low_coverage": _sample_ratio(centres["force_low_coverage"], rel_std=0.08, min_value=0.50, max_value=0.99),
         }
     if sid == "l2_mc_007":
-        return {"force_spike_increase": _sample_ratio(DEFAULT_THRESHOLDS["force_spike_increase"])}
-    if sid == "l2_mc_008":
-        return {"tracking_increase": _sample_ratio(DEFAULT_THRESHOLDS["tracking_increase"])}
-    if sid == "l2_mc_009":
-        return {"tracking_stable_increase": _sample_ratio(DEFAULT_THRESHOLDS["tracking_stable_increase"])}
+        return {"force_spike_increase": _sample_ratio(centres["force_spike_increase"])}
+    if sid in {"l2_mc_008", "l2_mc_009"}:
+        # Both gate on the same absolute tracking error, so they share one
+        # sampled threshold and are exact complements of each other.
+        return {"tracking_abs_error": _sample_ratio(centres["tracking_abs_error"])}
     if sid == "l2_mc_010":
-        return {"vibration_spike": _sample_ratio(DEFAULT_THRESHOLDS["vibration_spike"])}
+        return {"vibration_spike": _sample_ratio(centres["vibration_spike"])}
     if sid == "l2_mc_011":
         return {
-            "vibration_nominal_band": _sample_ratio(DEFAULT_THRESHOLDS["vibration_nominal_band"]),
-            "vibration_nominal_coverage": _sample_ratio(DEFAULT_THRESHOLDS["vibration_nominal_coverage"], rel_std=0.06, min_value=0.60, max_value=0.99),
+            "vibration_nominal_band": _sample_ratio(centres["vibration_nominal_band"]),
+            "vibration_nominal_coverage": _sample_ratio(centres["vibration_nominal_coverage"], rel_std=0.06, min_value=0.60, max_value=0.99),
         }
     if sid == "l2_mc_012":
         return {
-            "current_peak_increase": _sample_ratio(DEFAULT_THRESHOLDS["current_peak_increase"]),
-            "current_relax_drop": _sample_ratio(DEFAULT_THRESHOLDS["current_relax_drop"]),
+            # max_value must exceed the calibrated centre: _sample_ratio caps at
+            # 0.99 by default, which silently clipped this back to 99% and left
+            # the statement true on 91% of items.
+            "current_peak_increase": _sample_ratio(centres["current_peak_increase"]),
+            "current_relax_drop": _sample_ratio(centres["current_relax_drop"]),
         }
     if sid == "l2_mc_013":
-        return {"robot_current_stable_range": _sample_ratio(DEFAULT_THRESHOLDS["robot_current_stable_range"])}
+        return {"robot_current_stable_range": _sample_ratio(centres["robot_current_stable_range"])}
     if sid == "l2_mc_014":
-        return {"robot_current_increase": _sample_ratio(DEFAULT_THRESHOLDS["robot_current_increase"])}
+        return {"robot_current_increase": _sample_ratio(centres["robot_current_increase"])}
     if sid == "l2_mc_015":
-        return {"tcp_tracking_stable_increase": _sample_ratio(DEFAULT_THRESHOLDS["tcp_tracking_stable_increase"])}
+        return {"tcp_tracking_stable_increase": _sample_ratio(centres["tcp_tracking_stable_increase"])}
     if sid == "l2_mc_016":
-        return {"tcp_tracking_increase": _sample_ratio(DEFAULT_THRESHOLDS["tcp_tracking_increase"])}
+        return {"tcp_tracking_increase": _sample_ratio(centres["tcp_tracking_increase"])}
     if sid == "l2_mc_017":
-        min_axes = int(round(random.gauss(DEFAULT_THRESHOLDS["temp_rise_min_axes"], 0.4)))
+        min_axes = int(round(random.gauss(centres["temp_rise_min_axes"], 0.4)))
         min_axes = min(max(min_axes, 1), 6)
         return {
-            "temp_rise_slope": _sample_ratio(DEFAULT_THRESHOLDS["temp_rise_slope"], rel_std=0.25, min_value=0.0005, max_value=0.02),
+            "temp_rise_slope": _sample_ratio(centres["temp_rise_slope"], rel_std=0.25, min_value=0.0005, max_value=0.02),
             "temp_rise_min_axes": float(min_axes),
         }
     if sid == "l2_mc_018":
         return {
-            "temp_stable_slope": _sample_ratio(DEFAULT_THRESHOLDS["temp_stable_slope"], rel_std=0.25, min_value=0.0002, max_value=0.01),
-            "temp_stable_axes_ratio": _sample_ratio(DEFAULT_THRESHOLDS["temp_stable_axes_ratio"], rel_std=0.08, min_value=0.50, max_value=0.99),
+            "temp_stable_slope": _sample_ratio(centres["temp_stable_slope"], rel_std=0.25, min_value=0.0002, max_value=0.01),
+            "temp_stable_axes_ratio": _sample_ratio(centres["temp_stable_axes_ratio"], rel_std=0.08, min_value=0.50, max_value=0.99),
         }
     if sid == "l2_mc_019":
-        return {"no_effect_agg_increase": _sample_ratio(DEFAULT_THRESHOLDS["no_effect_agg_increase"])}
+        return {"no_effect_agg_increase": _sample_ratio(centres["no_effect_agg_increase"])}
+    if sid == "l2_mc_030":
+        return {"joint_excursion_deg": _sample_ratio(centres["joint_excursion_deg"])}
+    if sid == "l2_mc_031":
+        return {"joint_path_deg": _sample_ratio(centres["joint_path_deg"])}
+    if sid == "l2_mc_032":
+        return {"torque_p2p_nm": _sample_ratio(centres["torque_p2p_nm"])}
     return {}
 
 
@@ -478,6 +590,21 @@ def render_statement_with_thresholds(
     thresholds: Dict[str, float],
 ) -> str:
     sid = _legacy_mc_option_id(str(statement_id))
+    if sid == "l2_mc_030":
+        return (
+            "Following the event, at least one joint sweeps more than "
+            f"{thresholds['joint_excursion_deg']:.0f} degrees of travel."
+        )
+    if sid == "l2_mc_031":
+        return (
+            "Following the event, the most active joint accumulates more than "
+            f"{thresholds['joint_path_deg']:.0f} degrees of total path length."
+        )
+    if sid == "l2_mc_032":
+        return (
+            "Following the event, at least one joint's commanded torque varies by more than "
+            f"{thresholds['torque_p2p_nm']:.0f} Nm peak-to-peak."
+        )
     if sid == "l2_mc_003":
         return (
             "Following the event, at least one joint speed drops sharply "
@@ -507,13 +634,13 @@ def render_statement_with_thresholds(
         )
     if sid == "l2_mc_008":
         return (
-            "Following the event, tracking error increases noticeably "
-            f"(>={_fmt_pct(thresholds['tracking_increase'])}% above pre-event mean)."
+            "Following the event, mean joint tracking error exceeds "
+            f"{thresholds['tracking_abs_error']:.4f} (absolute, commanded vs measured position)."
         )
     if sid == "l2_mc_009":
         return (
-            "Following the event, tracking error is stable or improved "
-            f"(increase <={_fmt_pct(thresholds['tracking_stable_increase'])}% vs pre-event mean)."
+            "Following the event, mean joint tracking error stays below "
+            f"{thresholds['tracking_abs_error']:.4f} (absolute, commanded vs measured position)."
         )
     if sid == "l2_mc_010":
         return (
@@ -582,31 +709,98 @@ def build_multiselect_options_and_answer(
 ) -> Tuple[Dict[str, str], str]:
     """
     Build exactly 4 multi-select options:
-    1) Keep fixed options from template (if resolvable IDs).
-    2) Sample random additional statements (excluding already selected IDs).
+    1) Keep fixed options from template (if resolvable IDs) that are
+       determinable on this episode.
+    2) Sample random additional determinable statements.
     3) Evaluate each option truth value.
     4) Shuffle and emit A-D options plus T/F answer string.
+
+    Returns ``(None, None)`` when fewer than 4 statements are determinable, so
+    the caller skips the item rather than shipping a padded answer key.
+
+    Determinability gate
+    --------------------
+    ``evaluate_mc_statement`` returns ``None`` when it cannot judge a statement
+    on this episode, which happens whenever the statement's channel carries no
+    data. That is common and robot-specific: KUKA episodes record no
+    ``feedback_speed``, ``est_contact_force`` or ``setpoint_tcp`` at all, so
+    every statement gated on those is undeterminable on every KUKA item.
+
+    This function used to fold ``None`` into "F" via ``truth is True``, which
+    made an unjudgeable statement indistinguishable from a judged-false one and
+    handed the answer key a large block of guaranteed Fs. Worse, both of
+    template 3's *fixed* options are speed-based: ``mc_003`` ("a joint speed
+    drops sharply") and ``mc_004`` ("joint speeds stay close to baseline")
+    both loop over speed channels and fall through to a hardcoded
+    ``return False`` / ``return True`` when no channel yields a series. On a
+    KUKA episode that pins two of the four letters to F and T respectively,
+    independent of the data and of any sampled threshold. Filtering here is
+    what makes the thresholds matter at all.
     """
+    robot = robot_key(episode_metadata)
+
+    def _is_determinable(opt_id: str) -> bool:
+        """Whether this statement can be judged at all on this episode, AND
+        whether it calibrates on this robot.
+
+        Undeterminability comes from absent channel data, not from where the
+        threshold sits, so one probe draw is representative. The enablement
+        check is separate: a statement can be perfectly judgeable and still be
+        near-constant on this robot at every threshold, which is just as much a
+        free letter for the solver.
+        """
+        if not is_statement_enabled(opt_id, robot):
+            return False
+        try:
+            verdict = evaluate_mc_statement(
+                opt_id,
+                subseries=subseries,
+                post_event_rows=post_event_rows,
+                thresholds=sample_thresholds_for_statement(opt_id, robot),
+                episode_metadata=episode_metadata,
+            )
+        except Exception:
+            return False
+        return verdict is not None
+
     selected_ids: List[str] = []
+    used_families: set = set()
+
+    def _take(option_id: str) -> bool:
+        family = _statement_family(option_id)
+        if option_id in selected_ids or family in used_families:
+            return False
+        if not _is_determinable(option_id):
+            return False
+        selected_ids.append(option_id)
+        used_families.add(family)
+        return True
 
     fixed_tokens = answer_format.get("fixed_options") or answer_format.get("fixed_statements") or []
     for token in fixed_tokens:
         option_id, _statement = resolve_fixed_option(token, mc_option_lookup)
-        if option_id and option_id not in selected_ids:
-            selected_ids.append(option_id)
+        # A fixed option that cannot be judged here is dropped, not padded to
+        # F. Template 3 asks for mc_003 + mc_004 on every item; on robots
+        # without velocity telemetry neither survives this check, and they are
+        # the same family anyway so only one could be offered regardless.
+        if option_id:
+            _take(option_id)
 
     all_ids = sorted(mc_option_lookup.keys())
     remaining_ids = [opt_id for opt_id in all_ids if opt_id not in selected_ids]
     random.shuffle(remaining_ids)
 
     while len(selected_ids) < 4 and remaining_ids:
-        selected_ids.append(remaining_ids.pop())
+        _take(remaining_ids.pop())
+
+    if len(selected_ids) < 4:
+        return None, None
 
     selected_ids = selected_ids[:4]
 
     options_data: List[Tuple[str, str, Optional[bool]]] = []
     for opt_id in selected_ids:
-        sampled_thresholds = sample_thresholds_for_statement(opt_id)
+        sampled_thresholds = sample_thresholds_for_statement(opt_id, robot)
         statement = render_statement_with_thresholds(
             opt_id,
             mc_option_lookup.get(opt_id, opt_id),
@@ -619,6 +813,10 @@ def build_multiselect_options_and_answer(
             thresholds=sampled_thresholds,
             episode_metadata=episode_metadata,
         )
+        # The gate above ran on a different threshold draw. A statement that
+        # turns undeterminable on this draw would otherwise re-enter as an F.
+        if truth is None:
+            return None, None
         options_data.append((opt_id, statement, truth))
 
     random.shuffle(options_data)
@@ -631,7 +829,7 @@ def build_multiselect_options_and_answer(
             break
         label = labels[idx]
         options[label] = statement
-        answer_chars.append("T" if truth is True else "F")
+        answer_chars.append("T" if truth else "F")
 
     return options, "".join(answer_chars)
 
@@ -677,7 +875,9 @@ def fill_template(
     acceptance_bounds = None
 
     if tid == 1:
-        chunks = sample_subsequent_chunks(post_event_rows, n_chunks=4, min_chunk=5, max_chunk=7)
+        ranking_pool = rows_strictly_after_context(post_event_rows, subseries)
+        ranking_pool = filter_rows_to_template_features(ranking_pool, template)
+        chunks = sample_subsequent_chunks(ranking_pool, n_chunks=4, min_chunk=5, max_chunk=7)
         if len(chunks) < 4:
             return None
 
@@ -702,6 +902,9 @@ def fill_template(
             mc_option_lookup=mc_option_lookup,
             episode_metadata=episode_metadata,
         )
+        # Gate returned fewer than 4 judgeable statements for this episode.
+        if options is None or answer is None:
+            return None
         question = fill(tmpl_text, anomaly=anomaly_description)
 
     elif tid == 3:
@@ -712,6 +915,9 @@ def fill_template(
             mc_option_lookup=mc_option_lookup,
             episode_metadata=episode_metadata,
         )
+        # Gate returned fewer than 4 judgeable statements for this episode.
+        if options is None or answer is None:
+            return None
         question = fill(tmpl_text, anomaly=anomaly_description)
 
     elif tid == 4:
@@ -1104,6 +1310,7 @@ def generate_level2_questions(
                         "acceptance_bounds": _bounds_local,
                         "provenance": {
                             "dataset": _ds, "episode": _ep_path.stem,
+                            "task": _ep_task,
                             "fault_label": _fl,
                             "subseries_start_index": _start,
                             "subseries_length": len(_sub),

@@ -157,6 +157,55 @@ def sample_subsequent_chunks(
     return chunks
 
 
+def rows_strictly_after_context(
+    rows: List[Dict[str, Any]],
+    subseries: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Rows whose timestamp is strictly greater than the last context timestamp.
+
+    The ranking template asks the model to order segments by when they appear
+    as the event manifests. That is only a question about the future if the
+    segments lie outside the window the model was already shown. Sampling from
+    ``post_event_rows`` directly does not guarantee this: the context window is
+    centred on the event onset and extends past it, and (at L3) the baseline
+    and counterfactual episodes are identical until they diverge, so early
+    post-onset chunks reproduce rows the model can already see and the ordering
+    can be recovered by matching values instead of reasoning about propagation.
+    Measured on the released benchmark, 13% of option segments appeared
+    verbatim inside their own context.
+    """
+    cutoff = get_last_timestamp(subseries)
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        ts = row.get("timestamp_ms")
+        try:
+            if ts is not None and int(float(ts)) > cutoff:
+                out.append(row)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def filter_rows_to_template_features(
+    rows: List[Dict[str, Any]],
+    template: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Restrict rows to the template's ``important_features``.
+
+    ``build_context`` applies this filter to the context but the option
+    segments were encoded from the full row, so a ranking item showed a context
+    defined over ~19 channels while asking the model to order segments carrying
+    ~98, of which 79 appeared in no acronym mapping anywhere in the item. The
+    segments and the context have to describe the same signals for the question
+    to be answerable as posed.
+    """
+    keep = template.get("important_features")
+    if not keep:
+        return rows
+    allowed = set(keep) | {"timestamp_ms"}
+    return [{k: v for k, v in row.items() if k in allowed} for row in rows]
+
+
 def encode_chunk_without_timestamps(rows: List[Dict[str, Any]]) -> str:
     """Encode a chunk after removing timestamp_ms from each row."""
     stripped_rows: List[Dict[str, Any]] = []
@@ -756,7 +805,9 @@ def fill_template(
     acceptance_bounds = None
 
     if tid == 1:
-        chunks = sample_subsequent_chunks(post_event_rows, n_chunks=4, min_chunk=5, max_chunk=7)
+        ranking_pool = rows_strictly_after_context(post_event_rows, subseries)
+        ranking_pool = filter_rows_to_template_features(ranking_pool, template)
+        chunks = sample_subsequent_chunks(ranking_pool, n_chunks=4, min_chunk=5, max_chunk=7)
         if len(chunks) < 4:
             return None
 
@@ -1106,11 +1157,16 @@ def generate_level3_questions(
             _event_label = "an unspecified fault"
 
         # Include injection timestep unless the event spans the whole episode
-        # (event onset at index 0 = episode-wide fault)
+        # (event onset at index 0 = episode-wide fault).
+        # The timestep must be quoted on the same clock as the context the model
+        # sees, which was shifted to start at t=0 by normalize_timestamps above.
+        # event_time_ms is the first timestamp of the normalized post_event_rows,
+        # i.e. the onset on that shifted clock. Reading timestamp_ms straight off
+        # alt_rows here would quote the raw episode clock and point at a timestep
+        # that does not exist in the context window.
         _event_onset_idx = find_event_onset_index(alt_rows)
         if _event_onset_idx is not None and _event_onset_idx > 0:
-            _onset_ts = alt_rows[_event_onset_idx].get("timestamp_ms", _event_onset_idx)
-            _event_desc = f"{_event_label} occurs at timestep {_onset_ts} ms"
+            _event_desc = f"{_event_label} occurs at timestep {event_time_ms} ms"
         else:
             _event_desc = f"{_event_label} occurs"
 

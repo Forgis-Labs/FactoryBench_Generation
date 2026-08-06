@@ -33,6 +33,7 @@ from src.question_generation.utils.hf_streaming import (
     make_uploader_from_args,
 )
 from src.question_generation.utils.io import load_json, load_root_causes, load_templates
+from src.question_generation.utils.phases import PHASE_NAMES as _SHARED_PHASE_NAMES
 from src.question_generation.utils.template import (
     build_context,
     discover_episodes_by_dataset,
@@ -71,43 +72,11 @@ _NO_ANOMALY_DESC = "No anomaly is present; the machine is operating nominally."
 CONTEXT_MIN = 32
 CONTEXT_MAX = 64
 
-# Phase index → human-readable name per task
-PHASE_NAMES: Dict[str, Dict[str, str]] = {
-    "pick_and_place": {
-        "0": "approach to the object",
-        "1": "descent to the object",
-        "2": "pre-grasp pause",
-        "3": "grasp of the object",
-        "4": "lift of the object",
-        "5": "transfer to the bin",
-        "6": "descent to the bin",
-        "7": "release of the object",
-        "8": "retreat from the bin",
-        "9": "return to home",
-    },
-    "screwing": {
-        "0": "approach to the fastener",
-        "1": "descent to the fastener",
-        "2": "tightening of the fastener",
-        "3": "disengagement from the fastener",
-        "4": "retreat to a safe height",
-        "5": "re-descent to the fastener",
-        "6": "loosening of the fastener",
-        "7": "re-engagement with the fastener",
-        "8": "return to home",
-    },
-    "peg_in_hole": {
-        "0": "approach to the hole",
-        "1": "insertion of the peg",
-        "2": "release of the peg",
-        "3": "retreat from the hole",
-        "4": "return to home",
-        "5": "approach to the peg",
-        "6": "grasp of the peg",
-        "7": "lift of the peg",
-        "8": "return to home",
-    },
-}
+# Phase index → human-readable name per task. Defined in utils.phases so the
+# prompt builder can render a legend using the exact wording that lands in the
+# question text; re-exported here under its original name because the rest of
+# this module (and existing question JSON) refers to it that way.
+PHASE_NAMES = _SHARED_PHASE_NAMES
 
 # Variable name → human-readable signal name
 SIGNAL_DISPLAY_NAMES: Dict[str, str] = {}
@@ -727,13 +696,14 @@ def fill_template(
         if not candidate_signals:
             return None
         signal = random.choice(candidate_signals)
-        # steps_ahead: how many steps beyond the given context
+        # steps_ahead: how many rows beyond the given context we ask the model
+        # to forecast. The prompt reports the horizon in milliseconds so that
+        # it aligns with the `t=<ms>` axis of the visible time series rather
+        # than being off by a factor of the sample period; the ms offset is
+        # computed at generation time from the actual timestamps.
         steps_ahead = random.randint(1, 10)
-        # The rows passed in are the context; we need the actual future value
-        # which is stored in kwargs via the generation loop
-        # For now, store steps_ahead and signal; the generation loop provides the answer
         question = fill(tmpl_text, signal=_signal_display_name(signal), n=steps_ahead)
-        answer = None  # set by generation loop
+        answer = None  # set by generation loop (which also rewrites `n` in ms)
         acceptance_bounds = {"signal": signal, "steps_ahead": steps_ahead}
 
     else:
@@ -1013,6 +983,7 @@ def generate_level1_questions(
                         "provenance": {
                             "dataset": ds,
                             "episode": ep_path.stem,
+                            "task": ep_task,
                             "subseries_start_index": start_idx,
                             "subseries_length": len(subseries),
                             "phase_name": _phase[0],
@@ -1054,6 +1025,7 @@ def generate_level1_questions(
                 "provenance": {
                     "dataset": ds,
                     "episode": ep_path.stem,
+                    "task": ep_task,
                     "subseries_start_index": start_idx,
                     "subseries_length": len(subseries),
                     "sampler": sampler_tag,
@@ -1108,6 +1080,22 @@ def generate_level1_questions(
             filled["answer"] = round(float(future_val), 4)
             filled["acceptance_bounds"]["actual_value"] = filled["answer"]
 
+            # Rewrite the forecast horizon in real milliseconds using the source
+            # timestamps. The template originally rendered `T+{steps_ahead}ms`,
+            # which is wrong because `steps_ahead` counts rows (~100ms apart at
+            # the 10Hz resampled rate) rather than milliseconds.
+            last_ctx_ts = rows[start_idx + context_len - 1].get("timestamp_ms")
+            future_ts = rows[future_idx].get("timestamp_ms")
+            if isinstance(last_ctx_ts, (int, float)) and isinstance(future_ts, (int, float)):
+                n_ms = int(round(float(future_ts) - float(last_ctx_ts)))
+                filled["question"] = re.sub(
+                    r"T\+\d+ms",
+                    f"T+{n_ms}ms",
+                    filled.get("question", ""),
+                    count=1,
+                )
+                filled["acceptance_bounds"]["horizon_ms"] = n_ms
+
             if important_features:
                 keep = set(important_features) | {"timestamp_ms"}
                 context_rows = [{k: v for k, v in row.items() if k in keep} for row in subseries]
@@ -1128,6 +1116,7 @@ def generate_level1_questions(
                 "provenance": {
                     "dataset": ds,
                     "episode": ep_path.stem,
+                    "task": ep_task,
                     "subseries_start_index": start_idx,
                     "subseries_length": context_len,
                     "prediction_index": future_idx,
