@@ -494,20 +494,31 @@ def pick_fault_label_from_meta_or_rows(
     metadata, unless it isn't specified"):
 
     1. ``meta['fault_id']`` if present and non-None.
-    2. Most common **non-zero** ``fault_label`` across rows. This recovers
+    2. ``meta['cf_fault_id']``. Counterfactual episodes carry a null
+       ``fault_id`` and name the injected fault here instead, and their rows
+       keep a ``fault_label`` of 0 throughout because the injection was never
+       propagated back into them. Reading only the first two sources left 23
+       such episodes resolving to "no fault", which put 101 released items in
+       front of a model as "a robot exhibiting ." with the anomaly missing
+       from the sentence.
+    3. Most common **non-zero** ``fault_label`` across rows. This recovers
        sparse-anomaly episodes (e.g. factorywave's ~12% with mostly nominal
        rows + a short anomaly burst) which the plain ``pick_fault_label``
        wrongly picks as 0 because zeros outnumber the actual anomaly.
-    3. ``0`` (genuinely nominal — no fault_id in metadata, no non-zero
+    4. ``0`` (genuinely nominal — no fault id anywhere, no non-zero
        fault_label anywhere).
     """
     if meta is not None:
-        fid = meta.get("fault_id")
-        if fid is not None:
-            try:
-                return int(float(fid))
-            except (TypeError, ValueError):
-                pass
+        for key in ("fault_id", "cf_fault_id"):
+            fid = meta.get(key)
+            if fid is None and key == "cf_fault_id":
+                fid = (meta.get("counterfactual") or {}).get("cf_fault_id") \
+                    if isinstance(meta.get("counterfactual"), dict) else None
+            if fid is not None:
+                try:
+                    return int(float(fid))
+                except (TypeError, ValueError):
+                    pass
     nz: List[int] = []
     for row in rows or []:
         val = row.get("fault_label")
