@@ -34,6 +34,11 @@ from src.question_generation.utils.hf_streaming import (
 )
 from src.question_generation.utils.io import load_json, load_root_causes, load_templates
 from src.question_generation.utils.phases import PHASE_NAMES as _SHARED_PHASE_NAMES
+from src.question_generation.utils.pair_balance import (
+    build_index as _build_pair_index,
+    cycle_targets as _cycle_targets,
+    sample_pair as _sample_balanced_pair,
+)
 from src.question_generation.utils.template import (
     build_context,
     discover_episodes_by_dataset,
@@ -321,6 +326,7 @@ def build_anomaly_single_select(
     fault_label: int,
     root_causes: Dict[int, Dict[str, Any]],
     anomaly_lookup: Dict[str, str],
+    fault_prior: Optional[Dict[int, float]] = None,
 ) -> Tuple[Dict[str, str], str]:
     """
     Build 4 single-select options + single letter answer for an
@@ -331,6 +337,16 @@ def build_anomaly_single_select(
     (the root cause matching this episode's fault_label, or "No anomaly"
     for nominal episodes) is always one of the 4. ``anomaly_lookup`` is
     accepted for backward-compatible signature but no longer used.
+
+    ``fault_prior`` weights the distractor draw by how often each fault is the
+    correct answer. Without it the distractors come uniformly from the whole
+    catalogue while the answer follows the corpus, so how often an option is
+    correct given that it appears varies from 0.00 to 0.70 across anomalies.
+    That let a model score 0.608 against a chance rate of 0.250 by learning
+    which strings tend to win, without reading the time series at all. Drawing
+    distractors from the same distribution as the answers pushes every option
+    back to 0.25 and drops anomalies the corpus never exhibits, including the
+    "no anomaly" entry on levels that only use faulty episodes.
     """
     NO_ANOMALY_FID = 0
     is_normal = fault_label == 0 or fault_label not in root_causes
@@ -356,9 +372,35 @@ def build_anomaly_single_select(
         correct_desc = _desc_for(root_causes[fault_label])
 
     distractors = [(fid, d) for (fid, d) in pool if fid != correct_fid]
-    random.shuffle(distractors)
+    picked: List[Tuple[int, str]] = []
+    if fault_prior:
+        weighted = [(fid, d, float(fault_prior.get(fid, 0.0)))
+                    for (fid, d) in distractors]
+        weighted = [w for w in weighted if w[2] > 0]
+        # Weighted draw without replacement: take three, removing each as it
+        # is taken so an option cannot appear twice in one item.
+        while weighted and len(picked) < 3:
+            total = sum(w[2] for w in weighted)
+            cut = random.random() * total
+            run = 0.0
+            for i, (fid, d, wt) in enumerate(weighted):
+                run += wt
+                if run >= cut:
+                    picked.append((fid, d))
+                    weighted.pop(i)
+                    break
+            else:
+                picked.append((weighted[-1][0], weighted[-1][1]))
+                weighted.pop()
+    if len(picked) < 3:
+        # Prior too sparse to fill the item; top up uniformly rather than
+        # emitting an item with fewer than four options.
+        taken = {fid for fid, _ in picked}
+        rest = [(fid, d) for (fid, d) in distractors if fid not in taken]
+        random.shuffle(rest)
+        picked.extend(rest[: 3 - len(picked)])
     chosen: List[Tuple[str, bool]] = [(correct_desc, True)] + [
-        (d, False) for (_, d) in distractors[:3]
+        (d, False) for (_, d) in picked[:3]
     ]
     random.shuffle(chosen)
     chosen = chosen[:4]
@@ -867,6 +909,91 @@ def generate_level1_questions(
             f"No nominal episodes found under {datasets_dir / 'normalized_episodes'} "
             f"for datasets: {allowed}. Level 1 requires fault-free episodes."
         )
+    # Template 3 compares two streams and asks whether their anomalous states
+    # differ. Restricting every L1 template to nominal episodes made that
+    # proposition False in all 2,407 released items, so it carried no
+    # information at all. Keep the full pool for the comparison template while
+    # the single-stream templates stay nominal-only.
+    # ---- balanced pairing support for template 3 -------------------------
+    _balance_targets = _cycle_targets(max(n * 4, 64))
+    _pair_attr_cache: Dict[str, Dict[str, Any]] = {}
+    _pair_pool: List[Dict[str, Any]] = []
+    _pair_index: Dict[Any, List[Dict[str, Any]]] = {}
+    _group_pairs_cache: Dict[Any, List[Any]] = {}
+    _used_pairs: set = set()
+    _phase_cache: Dict[str, Optional[str]] = {}
+
+    def _pair_attrs(ds: str, ep_path: Path) -> Dict[str, Any]:
+        """Cheap comparison attributes for one episode, read from metadata."""
+        key = str(ep_path)
+        cached = _pair_attr_cache.get(key)
+        if cached is not None:
+            return cached
+        fault = 0
+        robot = None
+        meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
+        if meta_path.exists():
+            try:
+                meta = load_json(meta_path) or {}
+                raw = meta.get("fault_id") or meta.get("cf_fault_id") or 0
+                fault = int(float(raw)) if raw else 0
+                # The dataset folder is not the robot: FactoryWave keeps UR and
+                # KUKA episodes side by side under one name, so keying identity
+                # off the folder made "different robots" unsatisfiable.
+                robot = meta.get("robot_type") or meta.get("machine_id")
+            except Exception:
+                fault, robot = 0, None
+        attrs = {
+            "key": key,
+            "dataset": ds,
+            "path": ep_path,
+            "robot": str(robot).lower() if robot is not None else f"ds:{DATASET_MACHINE_ID.get(ds, -1)}",
+            "task": _episode_task(ep_path, ds, dataset_index),
+            "fault": fault,
+        }
+        _pair_attr_cache[key] = attrs
+        return attrs
+
+    def _episode_modal_phase(ep_path: Path) -> Optional[str]:
+        key = str(ep_path)
+        if key in _phase_cache:
+            return _phase_cache[key]
+        phase = None
+        try:
+            rows = load_episode(ep_path)
+            if isinstance(rows, list) and rows:
+                phase = _modal_phase(rows)
+        except Exception:
+            phase = None
+        if len(_phase_cache) > 4096:
+            _phase_cache.clear()
+        _phase_cache[key] = phase
+        return phase
+
+    def _phases_differ(path_a: Path, path_b: Path) -> bool:
+        """Proposition D holds only when the two runs sit in different phases."""
+        pa, pb = _episode_modal_phase(path_a), _episode_modal_phase(path_b)
+        return pa is not None and pb is not None and pa != pb
+
+    def _machine_id_for(ds: str, ep_path: Path) -> int:
+        """Machine id for one episode.
+
+        FactoryWave records a UR3 and a KUKA under a single dataset name, so
+        deriving the machine from the dataset made "different robots" false for
+        every within-FactoryWave pair regardless of which arms were actually
+        compared. Prefer the episode's own robot_type and fall back to the
+        dataset mapping for sources that carry one robot throughout.
+        """
+        robot = str(_pair_attrs(ds, ep_path).get("robot") or "")
+        by_robot = {"ur3": 0, "ur3e": 0, "yu": 2, "kuka": 3}
+        for name, mid in by_robot.items():
+            if robot.lower().startswith(name):
+                return mid
+        return DATASET_MACHINE_ID.get(ds, -1)
+
+    comparison_episodes_by_dataset = {
+        ds: list(paths) for ds, paths in episodes_by_dataset.items() if paths
+    }
     episodes_by_dataset = nominal_episodes_by_dataset
     all_episode_paths = [
         (ds, ep) for ds, eps in episodes_by_dataset.items() for ep in eps
@@ -1129,24 +1256,32 @@ def generate_level1_questions(
         # Template 3: two episodes (prefer different datasets)
         # ------------------------------------------------------------------
         elif tid == 3:
-            if _enum_ep is not None:
-                # Enumerated combo provides primary episode; secondary stays random
-                ds_a = _enum_ds
-                ep_a = _enum_ep
-                if len(available_datasets) >= 2:
-                    other_ds = [d for d in available_datasets if d != ds_a]
-                    ds_b = random.choice(other_ds)
-                else:
-                    ds_b = ds_a
-                ep_b_pool = [p for p in episodes_by_dataset[ds_b] if p != ep_a] or episodes_by_dataset[ds_b]
-                ep_b = random.choice(ep_b_pool)
-            else:
-                if len(available_datasets) >= 2:
-                    ds_a, ds_b = random.sample(available_datasets, 2)
-                else:
-                    ds_a = ds_b = available_datasets[0]
-                ep_a = random.choice(episodes_by_dataset[ds_a])
-                ep_b = random.choice(episodes_by_dataset[ds_b])
+            # Balanced pairing: aim each item at one cell of
+            # (different robot) x (different anomaly) x (different task) so no
+            # proposition is guessable from its prior. See utils.pair_balance.
+            _target = _balance_targets[generated % len(_balance_targets)]
+            # Both episodes come from the sampler: choosing the primary first
+            # and then hunting for a partner is what capped P(different robots)
+            # at 0.30, since the minority robot is 15% of the pool.
+            _cand_ds = list(comparison_episodes_by_dataset.keys()) or available_datasets
+            if not _pair_index:
+                _pair_pool.extend(
+                    _pair_attrs(d, p)
+                    for d in _cand_ds
+                    for p in comparison_episodes_by_dataset.get(d, [])
+                )
+                _pair_index.update(_build_pair_index(_pair_pool))
+            _picked = _sample_balanced_pair(
+                _pair_index, _target,
+                used=_used_pairs,
+                phases_differ=lambda x, y: _phases_differ(x["path"], y["path"]),
+                group_pairs_cache=_group_pairs_cache,
+            )
+            if _picked is None:
+                continue
+            _a, _b = _picked
+            ds_a, ep_a = _a["dataset"], _a["path"]
+            ds_b, ep_b = _b["dataset"], _b["path"]
             rows_a = load_episode(ep_a)
             rows_b_raw = load_episode(ep_b)
 
@@ -1160,8 +1295,26 @@ def generate_level1_questions(
             task_a = _episode_task(ep_a, ds_a, dataset_index)
             task_b = _episode_task(ep_b, ds_b, dataset_index)
 
-            sampled_a = _uniform_window(rows_a, CONTEXT_MIN, CONTEXT_MAX)
-            sampled_b = _uniform_window(rows_b_raw, CONTEXT_MIN, CONTEXT_MAX)
+            # Proposition D is evaluated on the displayed windows, not on the
+            # whole episodes, so a same-task pair whose episodes differ in
+            # modal phase can still yield two windows sitting in the same
+            # phase. Resample the windows until they disagree, otherwise the
+            # cell that was asked for silently becomes a different one.
+            _want_diff_phase = (tid == 3) and not _target[2]
+            sampled_a = sampled_b = None
+            for _win_try in range(24):
+                sampled_a = _uniform_window(rows_a, CONTEXT_MIN, CONTEXT_MAX)
+                sampled_b = _uniform_window(rows_b_raw, CONTEXT_MIN, CONTEXT_MAX)
+                if sampled_a is None or sampled_b is None:
+                    break
+                if not _want_diff_phase:
+                    break
+                _pa = _modal_phase(sampled_a[0])
+                _pb = _modal_phase(sampled_b[0])
+                if _pa is not None and _pb is not None and _pa != _pb:
+                    break
+            else:
+                continue
             if sampled_a is None or sampled_b is None:
                 continue
 
@@ -1173,8 +1326,8 @@ def generate_level1_questions(
             filled = fill_template(
                 template, sub_a, root_causes, anomaly_lookup, mc_option_lookup,
                 rows_b=sub_b,
-                machine_id=DATASET_MACHINE_ID.get(ds_a, -1),
-                machine_id_b=DATASET_MACHINE_ID.get(ds_b, -1),
+                machine_id=_machine_id_for(ds_a, ep_a),
+                machine_id_b=_machine_id_for(ds_b, ep_b),
                 task_id=task_a,
                 task_id_b=task_b,
             )
@@ -1205,11 +1358,11 @@ def generate_level1_questions(
                 "acceptance_bounds": filled.get("acceptance_bounds"),
                 "provenance": {
                     "dataset_a": ds_a,
-                    "machine_id_a": DATASET_MACHINE_ID.get(ds_a, -1),
+                    "machine_id_a": _machine_id_for(ds_a, ep_a),
                     "episode_a": ep_a.stem,
                     "subseries_start_a": start_a,
                     "dataset_b": ds_b,
-                    "machine_id_b": DATASET_MACHINE_ID.get(ds_b, -1),
+                    "machine_id_b": _machine_id_for(ds_b, ep_b),
                     "episode_b": ep_b.stem,
                     "subseries_start_b": start_b,
                     "sampler_a": sampler_a,
@@ -1339,6 +1492,14 @@ def main() -> None:
              "episode does not satisfy the template's preconditions are skipped.",
     )
     add_streaming_args(parser)
+    parser.add_argument(
+        "--template-ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Restrict generation to these template ids (default: all). Useful "
+             "for regenerating a single template without rerunning the rest.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -1348,6 +1509,12 @@ def main() -> None:
     )
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
+    if getattr(args, "template_ids", None):
+        wanted = set(args.template_ids)
+        templates = [t for t in templates if t["id"] in wanted]
+        if not templates:
+            parser.error(f"No templates match --template-ids {sorted(wanted)}")
+
     root_causes = load_root_causes(args.datasets_dir / "labelling" / "rca" / "root_causes.json")
 
     global _ANOMALY_RANKING

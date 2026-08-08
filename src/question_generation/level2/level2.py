@@ -30,6 +30,14 @@ from src.question_generation.utils.hf_streaming import (
     list_completed_combos,
     make_uploader_from_args,
 )
+from src.question_generation.utils.mc_availability import (
+    available_channels,
+    filter_lookup_by_availability,
+)
+from src.question_generation.utils.fault_features import (
+    load_fault_feature_map,
+    select_features as select_fault_features,
+)
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
 from src.question_generation.utils.template import (
     build_context,
@@ -66,9 +74,23 @@ from src.question_generation.level1.level1 import (
     _signal_display_name,
     PHASE_NAMES,
     DATASET_MACHINE_ID,
+    _modal_phase,
+)
+from src.question_generation.utils.pair_balance import (
+    build_index as _build_pair_index,
+    cycle_targets as _cycle_targets,
+    sample_pair as _sample_balanced_pair,
 )
 
 logger = logging.getLogger(__name__)
+
+# fault -> the channels each of its candidate anomalies is read from, composed
+# from root_causes.json and anomalies.json. Loaded once; empty if the labelling
+# is not on disk, in which case feature selection falls back to the template's
+# own fixed list.
+_FAULT_FEATURE_MAP = load_fault_feature_map(
+    Path(__file__).resolve().parents[3] / "data" / "labelling" / "rca"
+)
 
 # Template IDs that use L1-style logic on anomalous data (not the event-based pipeline)
 _L1_STYLE_TEMPLATE_IDS = {6, 7, 8, 9, 10}
@@ -107,16 +129,36 @@ _ANOMALY_INLINE_NAMES: Dict[int, str] = {
 
 
 def _anomaly_inline_name(fault_id: int, root_cause: Dict[str, Any], capitalize: bool = False) -> str:
-    """Return a human-readable anomaly phrase that fits mid-sentence."""
+    """Return a human-readable anomaly phrase that fits mid-sentence.
+
+    Never returns an empty string. Every caller splices the result straight
+    into a prompt, so an empty phrase ships a question that reads "a robot
+    exhibiting ." with nothing where the anomaly should be, which is what 101
+    released items do. Callers must treat "" as a reason to skip the episode,
+    and ``_require_anomaly_phrase`` below enforces that at the emit site.
+    """
     name = _ANOMALY_INLINE_NAMES.get(fault_id)
     if not name:
-        name = root_cause.get("root_cause", f"fault {fault_id}").replace("_", " ")
+        raw = (root_cause or {}).get("root_cause") or ""
+        name = str(raw).replace("_", " ").strip()
+        if not name:
+            return ""
         # Add article if missing
         if not name.startswith(("a ", "an ")):
             name = f"a {name}"
     if capitalize:
         return name[0].upper() + name[1:]
     return name
+
+
+def _require_anomaly_phrase(question: str) -> bool:
+    """False when a template's {anomaly} slot came out empty.
+
+    Checked at the emit site rather than trusted upstream: the phrase is
+    assembled from metadata that is not uniform across sources, and a blank
+    one produces a question no model can answer and no reader can interpret.
+    """
+    return not re.search(r"exhibiting\s*\.|exhibiting\s{2,}|suffers from\s{2,}", question or "")
 
 VALID_DATASETS = ["aursad", "vorausad", "factorywave", "factorywave_kuka"]
 
@@ -403,6 +445,46 @@ MC_STATEMENT_FAMILY: Dict[str, str] = {
     "mc_030": "joint_motion", "mc_031": "joint_motion",
     "mc_032": "torque",
 }
+
+
+
+def _option_channel_reserve(catalogue, level: int) -> list:
+    """One channel group per multiple-choice statement, for the feature budget.
+
+    The context is trimmed before the option filter runs, so a statement whose
+    channels were trimmed away is dropped from the pool. Handing these groups
+    to ``select_features`` keeps at least one channel per statement in the
+    context, which is what makes the statement answerable and therefore
+    eligible. Ordered by statement family so the round-robin spreads across
+    families rather than exhausting one.
+    """
+    from src.question_generation.utils.mc_availability import expand_feature
+    by_family: dict = {}
+    for option in catalogue or []:
+        if not isinstance(option, dict) or not option.get("id"):
+            continue
+        usable = option.get("usable_levels")
+        if usable and level not in usable:
+            continue
+        # One group per required-features entry, not one per option. An option
+        # declaring require="all" needs a channel from each of its entries, so
+        # collapsing them into a single set would let a reserve of one channel
+        # satisfy nothing: the TCP statements ask for a command channel *and* a
+        # measured one and would stay unanswerable.
+        groups = []
+        for spec in option.get("required_features") or []:
+            expanded = expand_feature(spec)
+            if expanded:
+                groups.append(expanded)
+        if not groups:
+            continue
+        if (option.get("require") or "any") != "all":
+            groups = [set().union(*groups)]
+        family = MC_STATEMENT_FAMILY.get(
+            normalize_mc_option_id(str(option["id"])), str(option["id"]))
+        for i, group in enumerate(groups):
+            by_family.setdefault(f"{family}:{i}", set()).update(group)
+    return [sorted(v) for _, v in sorted(by_family.items())]
 
 
 def _statement_family(option_id: str) -> str:
@@ -1026,6 +1108,17 @@ def generate_level2_questions(
     if mc_option_lookup is None:
         mc_option_lookup = {}
 
+    # Full option records (statement + required_features), needed to check an
+    # option's evidence against the episode. The id -> statement lookup above
+    # deliberately drops that metadata, so load the catalogue separately.
+    try:
+        mc_catalogue = load_json(datasets_dir / "mc_options" / "mc_options.json")
+        if not isinstance(mc_catalogue, list):
+            mc_catalogue = []
+    except Exception as exc:
+        logger.warning(f"Could not load MC option catalogue for availability filtering: {exc}")
+        mc_catalogue = []
+
     relevance_specs = relevance_specs or {}
 
     # Load anomaly lookup for L1-style templates (7 = anomaly detection)
@@ -1130,6 +1223,90 @@ def generate_level2_questions(
         + f" — total {len(anomalous_episodes)}"
     )
 
+    # ---- distractor prior for template 7 ---------------------------------
+    # The answer follows whichever faults the corpus actually contains while
+    # the distractors were drawn uniformly from the whole catalogue, so how
+    # often an option was correct given that it appeared ran from 0.00 to 0.70
+    # and picking the historically strongest option scored 0.608 against a
+    # chance rate of 0.250. Weighting the distractor draw by the same
+    # distribution the answers follow removes that.
+    _fault_prior: Dict[int, float] = {}
+    for _ds_p, _p_path in anomalous_episodes:
+        try:
+            _fid = int(float((load_meta(_p_path) or {}).get("fault_id") or 0))
+        except (TypeError, ValueError):
+            continue
+        if _fid:
+            _fault_prior[_fid] = _fault_prior.get(_fid, 0.0) + 1.0
+    logger.info(f"Anomaly-identification distractor prior: {len(_fault_prior)} faults")
+
+    # ---- balanced pairing for template 8 ---------------------------------
+    # The comparison asks four independent yes/no questions and every one of
+    # them was lopsided: different robots held 30% of the time, different
+    # anomalous states 95%, same-task-different-phase 29%. Aiming each item at
+    # one cell of (robot, anomaly, task) fixes all four at once. Unlike L1 both
+    # streams stay faulty here, so "different anomalous states" means two
+    # different faults rather than one healthy run against one faulty run.
+    _balance_targets = _cycle_targets(max(n * 4, 64))
+    _pair_attr_cache: Dict[str, Dict[str, Any]] = {}
+    _pair_index: Dict[Any, List[Dict[str, Any]]] = {}
+    _group_pairs_cache: Dict[Any, List[Any]] = {}
+    _used_pairs: set = set()
+    _phase_cache: Dict[str, Optional[str]] = {}
+
+    def _pair_attrs(ds: str, ep_path: Path) -> Dict[str, Any]:
+        """Comparison attributes for one episode, read from its metadata."""
+        key = str(ep_path)
+        cached = _pair_attr_cache.get(key)
+        if cached is not None:
+            return cached
+        meta = load_meta(ep_path) or {}
+        try:
+            raw_fault = meta.get("fault_id") or meta.get("cf_fault_id") or 0
+            fault = int(float(raw_fault)) if raw_fault else 0
+        except (TypeError, ValueError):
+            fault = 0
+        # FactoryWave stores UR3 and KUKA runs under one dataset name, so the
+        # folder is not the robot; read the arm off the episode itself.
+        robot = meta.get("robot_type") or meta.get("machine_id")
+        attrs = {
+            "key": key,
+            "dataset": ds,
+            "path": ep_path,
+            "robot": str(robot).lower() if robot is not None else f"ds:{DATASET_MACHINE_ID.get(ds, -1)}",
+            "task": meta.get("task", "") or "",
+            "fault": fault,
+        }
+        _pair_attr_cache[key] = attrs
+        return attrs
+
+    def _episode_modal_phase(ep_path: Path) -> Optional[str]:
+        key = str(ep_path)
+        if key in _phase_cache:
+            return _phase_cache[key]
+        phase = None
+        try:
+            rows = load_episode(ep_path)
+            if isinstance(rows, list) and rows:
+                phase = _modal_phase(rows)
+        except Exception:
+            phase = None
+        if len(_phase_cache) > 4096:
+            _phase_cache.clear()
+        _phase_cache[key] = phase
+        return phase
+
+    def _phases_differ(path_a: Path, path_b: Path) -> bool:
+        pa, pb = _episode_modal_phase(path_a), _episode_modal_phase(path_b)
+        return pa is not None and pb is not None and pa != pb
+
+    def _machine_id_for(ds: str, ep_path: Path) -> int:
+        robot = str(_pair_attrs(ds, ep_path).get("robot") or "").lower()
+        for name, mid in (("ur3", 0), ("ur3e", 0), ("yu", 2), ("kuka", 3)):
+            if robot.startswith(name):
+                return mid
+        return DATASET_MACHINE_ID.get(ds, -1)
+
     enum_iter = None
     if enumerate_mode:
         enum_combos = [
@@ -1173,7 +1350,7 @@ def generate_level2_questions(
             continue
 
         _ep_meta = load_meta(ep_path)
-        ep_fault_id = _ep_meta.get("fault_id")
+        ep_fault_id = pick_fault_label_from_meta_or_rows(rows, _ep_meta) or None
         ep_task = _ep_meta.get("task", "")
 
         # Event-based templates need subseries positioned before an event;
@@ -1233,6 +1410,11 @@ def generate_level2_questions(
                 continue
             _rc = root_causes.get(_fl, {})
             _anomaly = _anomaly_inline_name(_fl, _rc)
+            if not _anomaly:
+                # No name for this fault means no usable prompt for any
+                # template that mentions the anomaly. Skip rather than emit a
+                # sentence with a hole in it.
+                continue
             _machine_id = DATASET_MACHINE_ID.get(_ds, -1)
 
             _meta_path = _ep_path.with_name(_ep_path.stem + "_metadata.json")
@@ -1257,6 +1439,19 @@ def generate_level2_questions(
             _sub = normalize_timestamps(_sub, _first_timestamp_ms(_sub))
             if not _validate_relevance(_sub, _spec, _ep_task):
                 continue
+
+            # Same fault-aware feature selection the event-based path does.
+            # These templates build their own context, so without this the
+            # anomaly-identification and phase-isolation items keep the fixed
+            # feature list and can name a fault they show no evidence for.
+            _ff = select_fault_features(
+                _fl, _FAULT_FEATURE_MAP,
+                available=available_channels(_sub),
+                baseline=template.get("important_features") or (),
+                reserve=_option_channel_reserve(mc_catalogue, 2),
+            )
+            if _ff:
+                template = {**template, "important_features": _ff}
 
             _tmpl = template["template"]
             _af = template["answer_format"]
@@ -1321,6 +1516,8 @@ def generate_level2_questions(
                         },
                         "context": _context_local,
                     }
+                    if not _require_anomaly_phrase(item.get("question", "")):
+                        continue
                     out_path = output_dir / f"level2_{generated:04d}.json"
                     with out_path.open("w", encoding="utf-8") as f:
                         json.dump(item, f, indent=2)
@@ -1334,7 +1531,8 @@ def generate_level2_questions(
                 continue  # skip the common write path; t6 wrote its own items
 
             elif _tid == 7:
-                _opts, _ans = l1_build_anomaly_single_select(_fl, root_causes, anomaly_lookup)
+                _opts, _ans = l1_build_anomaly_single_select(
+                    _fl, root_causes, anomaly_lookup, fault_prior=_fault_prior)
                 _tmpl_filled = _tmpl  # no {anomaly} placeholder — the model must identify it
 
             elif _tid == 10:
@@ -1356,43 +1554,93 @@ def generate_level2_questions(
 
             elif _tid == 8:
                 # Comparative multi-select on TWO anomalous episodes (mirror of
-                # L1 t3 but both streams have anomalies). Enumerated ep is one
-                # stream; the second is sampled at random from anomalous_episodes.
+                # L1 t3, except neither stream is healthy). Both episodes come
+                # from the balanced sampler rather than the enumeration, so the
+                # four propositions land near 50/50 instead of following the
+                # shape of the corpus.
                 if len(anomalous_episodes) < 2:
                     continue
-                _other_pool = [(d, p) for (d, p) in anomalous_episodes if p != _ep_path]
-                if not _other_pool:
+                _target = _balance_targets[generated % len(_balance_targets)]
+                if not _pair_index:
+                    _pair_index.update(_build_pair_index(
+                        [_pair_attrs(d, q) for d, q in anomalous_episodes]
+                    ))
+                # Two loops, not one. Proposition D is read off the displayed
+                # windows rather than the whole runs, so a same-task pair whose
+                # episodes differ in modal phase can still fail to yield two
+                # windows in different phases. Dropping those items is what
+                # pushed the same-task cells under their quota, so an exhausted
+                # pair is replaced by another from the same cell instead.
+                _want_diff_phase = not _target[2]
+                _ds_a = _ep_path_a = _fl_a = _ep_task_a = _sub_a = None
+                _ds_b = _ep_path_b = _fl_b = _ep_task_b = _sub_b = None
+                for _pair_try in range(12):
+                    _picked = _sample_balanced_pair(
+                        _pair_index, _target,
+                        used=_used_pairs,
+                        phases_differ=lambda x, y: _phases_differ(x["path"], y["path"]),
+                        group_pairs_cache=_group_pairs_cache,
+                    )
+                    if _picked is None:
+                        break
+                    _pa_at, _pb_at = _picked
+                    _ds_a, _ep_path_a = _pa_at["dataset"], _pa_at["path"]
+                    _ds_b, _ep_path_b = _pb_at["dataset"], _pb_at["path"]
+
+                    _raw_a = load_json(_ep_path_a)
+                    if isinstance(_raw_a, dict):
+                        _raw_a = _raw_a.get("baseline", _raw_a.get("flat", []))
+                    _raw_b = load_json(_ep_path_b)
+                    if isinstance(_raw_b, dict):
+                        _raw_b = _raw_b.get("baseline", _raw_b.get("flat", []))
+                    if not isinstance(_raw_a, list) or len(_raw_a) < CONTEXT_MIN:
+                        continue
+                    if not isinstance(_raw_b, list) or len(_raw_b) < CONTEXT_MIN:
+                        continue
+
+                    _fl_a = pick_fault_label_from_meta_or_rows(_raw_a, load_meta(_ep_path_a))
+                    _fl_b = pick_fault_label_from_meta_or_rows(_raw_b, load_meta(_ep_path_b))
+                    if not _fl_a or not _fl_b:
+                        continue  # L2 compares two faulty runs; no healthy stream
+                    _ep_task_a = _pa_at.get("task", "")
+                    _ep_task_b = _pb_at.get("task", "")
+                    _spec_a = relevance_specs.get(_fl_a) if relevance_specs else None
+                    _spec_b = relevance_specs.get(_fl_b) if relevance_specs else None
+
+                    _sub_a = _sub_b = None
+                    for _win_try in range(24):
+                        _sa = _sample_with_relevance(
+                            _raw_a, _fl_a, _spec_a, _ep_task_a, CONTEXT_MIN, CONTEXT_MAX
+                        )
+                        _sb = _sample_with_relevance(
+                            _raw_b, _fl_b, _spec_b, _ep_task_b, CONTEXT_MIN, CONTEXT_MAX
+                        )
+                        if _sa is None or _sb is None:
+                            break
+                        _ca = normalize_timestamps(_sa[0], _first_timestamp_ms(_sa[0]))
+                        _cb = normalize_timestamps(_sb[0], _first_timestamp_ms(_sb[0]))
+                        if not _validate_relevance(_ca, _spec_a, _ep_task_a):
+                            continue
+                        if not _validate_relevance(_cb, _spec_b, _ep_task_b):
+                            continue
+                        if _want_diff_phase:
+                            _pha, _phb = _modal_phase(_ca), _modal_phase(_cb)
+                            if _pha is None or _phb is None or _pha == _phb:
+                                continue
+                        _sub_a, _sub_b = _ca, _cb
+                        break
+                    if _sub_a is not None and _sub_b is not None:
+                        break
+                if _sub_a is None or _sub_b is None:
                     continue
-                _ds_b, _ep_path_b = random.choice(_other_pool)
-                _raw_b = load_json(_ep_path_b)
-                if isinstance(_raw_b, dict):
-                    _raw_b = _raw_b.get("baseline", _raw_b.get("flat", []))
-                if not isinstance(_raw_b, list) or len(_raw_b) < CONTEXT_MIN:
-                    continue
-                _fl_b = pick_fault_label_from_meta_or_rows(_raw_b, load_meta(_ep_path_b))
-                _meta_b_path = _ep_path_b.with_name(_ep_path_b.stem + "_metadata.json")
-                _ep_task_b = ""
-                if _meta_b_path.exists():
-                    try:
-                        _ep_task_b = load_json(_meta_b_path).get("task", "")
-                    except Exception:
-                        pass
-                _spec_b = relevance_specs.get(_fl_b) if relevance_specs else None
-                _sampled_b = _sample_with_relevance(
-                    _raw_b, _fl_b, _spec_b, _ep_task_b, CONTEXT_MIN, CONTEXT_MAX
-                )
-                if _sampled_b is None:
-                    continue
-                _sub_b, _start_b, _sampler_b = _sampled_b
-                _sub_b = normalize_timestamps(_sub_b, _first_timestamp_ms(_sub_b))
-                if not _validate_relevance(_sub_b, _spec_b, _ep_task_b):
-                    continue
-                _machine_id_b = DATASET_MACHINE_ID.get(_ds_b, -1)
+
+                _machine_id_a = _machine_id_for(_ds_a, _ep_path_a)
+                _machine_id_b = _machine_id_for(_ds_b, _ep_path_b)
                 _result = l1_build_comparative_multi_select(
-                    fault_a=_fl, fault_b=_fl_b,
-                    machine_id_a=_machine_id, machine_id_b=_machine_id_b,
-                    task_id_a=_ep_task, task_id_b=_ep_task_b,
-                    rows_a=_sub, rows_b=_sub_b,
+                    fault_a=_fl_a, fault_b=_fl_b,
+                    machine_id_a=_machine_id_a, machine_id_b=_machine_id_b,
+                    task_id_a=_ep_task_a, task_id_b=_ep_task_b,
+                    rows_a=_sub_a, rows_b=_sub_b,
                     mc_lookup=_l1_comparative_mc_lookup,
                 )
                 if _result is None:
@@ -1404,10 +1652,10 @@ def generate_level2_questions(
                 _imp = template.get("important_features")
                 if _imp:
                     _keep = set(_imp) | {"timestamp_ms"}
-                    _ctx_a = [{k: v for k, v in r.items() if k in _keep} for r in _sub]
+                    _ctx_a = [{k: v for k, v in r.items() if k in _keep} for r in _sub_a]
                     _ctx_b = [{k: v for k, v in r.items() if k in _keep} for r in _sub_b]
                 else:
-                    _ctx_a, _ctx_b = _sub, _sub_b
+                    _ctx_a, _ctx_b = _sub_a, _sub_b
                 _context_dual = {
                     "series_a": build_context(_ctx_a),
                     "series_b": build_context(_ctx_b),
@@ -1423,17 +1671,20 @@ def generate_level2_questions(
                     "answer": _ans,
                     "acceptance_bounds": None,
                     "provenance": {
-                        "dataset_a": _ds, "episode_a": _ep_path.stem,
-                        "fault_label_a": _fl, "machine_id_a": _machine_id,
+                        "dataset_a": _ds_a, "episode_a": _ep_path_a.stem,
+                        "fault_label_a": _fl_a, "machine_id_a": _machine_id_a,
+                        "task_a": _ep_task_a, "task_b": _ep_task_b,
                         "dataset_b": _ds_b, "episode_b": _ep_path_b.stem,
                         "fault_label_b": _fl_b, "machine_id_b": _machine_id_b,
                     },
                     "context": _context_dual,
                 }
+                if not _require_anomaly_phrase(item.get("question", "")):
+                    continue
                 out_path = output_dir / f"level2_{generated:04d}.json"
                 with out_path.open("w", encoding="utf-8") as f:
                     json.dump(item, f, indent=2)
-                logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template 8, {_ds}+{_ds_b})")
+                logger.info(f"✓ [{generated + 1}/{n}] {out_path.name} (template 8, {_ds_a}+{_ds_b})")
                 generated += 1
                 if uploader is not None:
                     uploader.maybe_flush(generated)
@@ -1499,6 +1750,8 @@ def generate_level2_questions(
                     },
                     "context": {},
                 }
+                if not _require_anomaly_phrase(item.get("question", "")):
+                    continue
                 out_path = output_dir / f"level2_{generated:04d}.json"
                 with out_path.open("w", encoding="utf-8") as f:
                     json.dump(item, f, indent=2)
@@ -1533,6 +1786,8 @@ def generate_level2_questions(
                 "context": build_context(_ctx_rows),
             }
 
+            if not _require_anomaly_phrase(item.get("question", "")):
+                continue
             out_path = output_dir / f"level2_{generated:04d}.json"
             with out_path.open("w", encoding="utf-8") as f:
                 json.dump(item, f, indent=2)
@@ -1550,7 +1805,55 @@ def generate_level2_questions(
         if template.get("type") == "predictive":
             effective_mc_lookup = {k: v for k, v in effective_mc_lookup.items() if k not in PREDICTIVE_EXCLUDED_MC_IDS}
 
-        ep_metadata: Optional[Dict[str, Any]] = None
+        # Give the item the channels its own fault is diagnosable from. The
+        # templates carry one fixed feature list each, chosen without reference
+        # to which anomaly the episode actually has, so an item could name a
+        # fault and then show nothing it manifests in: on the released
+        # benchmark 21.9% of items that name a fault show evidence for none of
+        # its candidate anomalies, and only 46.9% cover all of them. Rebinding
+        # the template for this item alone keeps the availability filter, the
+        # option segments and the written context describing the same signals.
+        _fault_feats = select_fault_features(
+            ep_fault_id or 0, _FAULT_FEATURE_MAP,
+            available=available_channels(subseries),
+            baseline=template.get("important_features") or (),
+            reserve=_option_channel_reserve(mc_catalogue, 2),
+        )
+        if _fault_feats:
+            template = {**template, "important_features": _fault_feats}
+
+        # Drop options whose evidence this episode does not carry. Without this
+        # an item can ask about a channel the context never shows; on the
+        # released benchmark that affected 46-74% of options on these
+        # templates. Falls back to the unfiltered pool if too few survive.
+        # Check the option against what the *context* will show, not the whole
+        # episode. The context is trimmed to the template's important_features
+        # before it is written, so an episode can carry a channel the model
+        # never sees. That is how every TCP-tracking option on L2.2 and L2.3
+        # got through: those templates list 30 features and none of them is a
+        # TCP channel, yet the episode has all 24.
+        _avail_rows = list(subseries) + list(post_event_rows)
+        _imp_avail = template.get("important_features")
+        if _imp_avail:
+            _keep_avail = set(_imp_avail) | {"timestamp_ms"}
+            _avail_rows = [
+                {k: v for k, v in r.items() if k in _keep_avail} for r in _avail_rows
+            ]
+        effective_mc_lookup = filter_lookup_by_availability(
+            effective_mc_lookup,
+            mc_catalogue,
+            _avail_rows,
+            level=2,
+        )
+
+
+        # Episode metadata is what identifies the robot, and the robot is what
+        # selects the fitted thresholds and the per-robot disable list. Passing
+        # it only for simulations left robot_key() returning None on every
+        # other dataset, which silently disabled both mechanisms across the
+        # whole corpus: mc_003 evaluated True on 100% of items and mc_012 on
+        # 89% even though both are listed as undeployable on this robot.
+        ep_metadata: Optional[Dict[str, Any]] = _ep_meta or None
         if ds == "simulations":
             meta_path = ep_path.parent / f"{ep_path.stem}_metadata.json"
             if meta_path.exists():
@@ -1599,6 +1902,8 @@ def generate_level2_questions(
             "context": context,
         }
 
+        if not _require_anomaly_phrase(item.get("question", "")):
+            continue
         out_path = output_dir / f"level2_{generated:04d}.json"
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(item, f, indent=2)
@@ -1660,6 +1965,14 @@ def main() -> None:
         help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
     )
     add_streaming_args(parser)
+    parser.add_argument(
+        "--template-ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Restrict generation to these template ids (default: all). Useful "
+             "for regenerating a single template without rerunning the rest.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -1669,6 +1982,12 @@ def main() -> None:
     )
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
+    if getattr(args, "template_ids", None):
+        wanted = set(args.template_ids)
+        templates = [t for t in templates if t["id"] in wanted]
+        if not templates:
+            parser.error(f"No templates match --template-ids {sorted(wanted)}")
+
     root_causes = load_root_causes(args.datasets_dir / "labelling" / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "labelling" / "events.json")
     mc_option_lookup = load_mc_option_lookup(
