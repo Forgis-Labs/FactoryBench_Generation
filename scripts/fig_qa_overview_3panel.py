@@ -95,25 +95,23 @@ def load_all() -> pd.DataFrame:
     token = os.getenv("HF_TOKEN")
     rows = []
     for level in LEVELS:
-        for split in SPLITS:
-            path = f"factorybench_qa/level_{level}/{split}.jsonl"
-            local = hf_hub_download(
-                repo_id=HF_REPO, filename=path, repo_type="dataset",
-                token=token, force_download=False,
-            )
-            with open(local, "r", encoding="utf-8") as f:
-                for line in f:
-                    if not line.strip():
-                        continue
-                    rec = json.loads(line)
-                    ts = rec.get("context", {}).get("time_series", [])
-                    rows.append({
-                        "level":        level,
-                        "split":        split,
-                        "id":           rec.get("id"),
-                        "answer_style": _classify_answer_style(rec),
-                        "ts_rows":      len(ts) if isinstance(ts, list) else 0,
-                    })
+        # one file per level; the release carries no train/validation/test split
+        local = hf_hub_download(
+            repo_id=HF_REPO, filename=f"factorybench_qa/level_{level}.jsonl",
+            repo_type="dataset", token=token, force_download=False,
+        )
+        with open(local, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                rec = json.loads(line)
+                ts = rec.get("context", {}).get("time_series", [])
+                rows.append({
+                    "level":        level,
+                    "id":           rec.get("id"),
+                    "answer_style": _classify_answer_style(rec),
+                    "ts_rows":      len(ts) if isinstance(ts, list) else 0,
+                })
     return pd.DataFrame(rows)
 
 

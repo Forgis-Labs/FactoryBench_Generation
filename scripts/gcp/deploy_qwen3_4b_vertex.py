@@ -63,12 +63,18 @@ MACHINE_SHAPES = {
     "l4": {"machineType": "g2-standard-8", "acceleratorType": "NVIDIA_L4", "acceleratorCount": 1},
     # 16GB, what the original endpoint used. Cheaper, tighter on KV cache.
     "t4": {"machineType": "n1-standard-8", "acceleratorType": "NVIDIA_TESLA_T4", "acceleratorCount": 1},
+    # 40GB. Roughly 4x the L4's bf16 throughput, which is what matters for the
+    # Level-4 free-form items: those prompts run to ~22k tokens, and prefill on
+    # an L4 took ~11 minutes per item, enough to make a 286-item run a 14-hour
+    # job. Costs ~4x per hour but finishes ~4x sooner, so the total is a wash.
+    "a100": {"machineType": "a2-highgpu-1g", "acceleratorType": "NVIDIA_TESLA_A100", "acceleratorCount": 1},
 }
 
 COST_WARNING = """
-  COST: a single L4 or T4 node is roughly $0.35-0.85 per hour and bills from
-  deployment until deletion regardless of traffic. Cheap next to an 8-GPU node,
-  but not free — run --delete when the eval finishes.
+  COST: a T4 or L4 node is roughly $0.35-0.85 per hour and an A100 40GB is
+  roughly $3.70; all bill from deployment until deletion regardless of traffic.
+  Cheap next to an 8-GPU node, but not free — run --delete when the eval
+  finishes.
 """
 
 
