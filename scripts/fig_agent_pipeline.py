@@ -60,10 +60,10 @@ def set_style() -> None:
 # (see paper §5.4 caveat: L4 magnitudes not comparable to signed L1–L3).
 LEVEL_LABELS  = ["L1  State", "L2  Intervention", "L3  Counterfactual", "L4  Decision"]
 # Chance-corrected (L1-L3) and raw judge (L4), on the 200-item paired subset.
-# The agent is at or below zero-shot on every level: giving the driver a weak
-# forecaster and letting it delegate costs more than the sandbox recovers.
-ZERO_SHOT_GPT = [8.0,  6.1, 47.9, 25.0]
-AGENT_GPT     = [9.0, -2.7, 26.7, 16.0]
+# Paired 525-item subset. The sandbox gains on L1; delegating extrapolation to
+# the weak forecaster loses on L3. Net effect over all levels is a wash.
+ZERO_SHOT_GPT = [5.7,  5.8, 29.7, 25.0]
+AGENT_GPT     = [15.5, 2.4, 19.2, 18.0]
 
 
 def panel_a_loop(ax) -> None:
