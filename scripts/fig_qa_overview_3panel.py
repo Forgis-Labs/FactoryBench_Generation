@@ -1,10 +1,10 @@
 """3-panel overview of the released FactoryBench Q&A dataset.
 
-Loads the 12 split files (level_{1..4}/{train,validation,test}.jsonl) from
+Loads the released Q&A files (level_{1..4}) from
 the public HuggingFace dataset and emits a single PDF with:
 
-  (a) Dataset size per level (stacked train/validation/test).
-  (b) Answer-format mix per level (test split, four canonical buckets).
+  (a) Dataset size per level.
+  (b) Answer-format mix per level (four canonical buckets).
   (c) Sub-series length distribution per level.
 
 Output: docs/neurips_tex/figures/fig_qa_overview_3panel.pdf
@@ -125,32 +125,21 @@ def main():
     fig, axes = plt.subplots(3, 1, figsize=(10, 12.5))
     plt.subplots_adjust(hspace=0.45)
 
-    # (a) split sizes per level
+    # (a) size per level. The release is a single undivided pool, so this is
+    # one bar per level rather than a stack.
     ax = axes[0]
-    pivot = (
-        df.pivot_table(index="level", columns="split", values="id", aggfunc="count")
-        .fillna(0)
-        .astype(int)
-    )
-    pivot = pivot[[s for s in SPLITS if s in pivot.columns]]
-    bottom = np.zeros(len(pivot))
-    for split in pivot.columns:
-        vals = pivot[split].values
-        ax.bar(pivot.index, vals, bottom=bottom, color=SPLIT_COLORS[split],
-               label=split, edgecolor="white", linewidth=0.6)
-        for i, v in enumerate(vals):
-            if v > 0:
-                ax.text(pivot.index[i], bottom[i] + v / 2, f"{int(v):,}",
-                        ha="center", va="center", color="white",
-                        fontsize=11, fontweight="bold")
-        bottom += vals
-    ax.set_xticks(list(pivot.index))
-    ax.set_xticklabels([f"L{lvl}" for lvl in pivot.index])
+    sizes = df.groupby("level")["id"].count()
+    ax.bar(sizes.index, sizes.values, color=GUNMETAL,
+           edgecolor="white", linewidth=0.6)
+    for lvl, v in sizes.items():
+        ax.text(lvl, v / 2, f"{int(v):,}", ha="center", va="center",
+                color="white", fontsize=11, fontweight="bold")
+    ax.set_xticks(list(sizes.index))
+    ax.set_xticklabels([f"L{lvl}" for lvl in sizes.index])
     ax.set_ylabel("Samples")
-    ax.legend(title="Split", loc="upper right", frameon=False)
-    ax.set_title(f"(a) Dataset size per level  ({pivot.values.sum():,} samples total)")
+    ax.set_title(f"(a) Dataset size per level  ({sizes.sum():,} samples total)")
 
-    # (b) answer-format mix per level (test split, four canonical buckets)
+    # (b) answer-format mix per level (four canonical buckets)
     STYLE_BUCKET = {
         "numerical":                     "Numerical",
         "tensor":                        "Tensor",
@@ -177,11 +166,11 @@ def main():
     }
 
     ax = axes[1]
-    test_only = df[df.split == "test"].copy()
-    test_only["bucket"] = test_only["answer_style"].map(STYLE_BUCKET).fillna("Other")
+    mix = df.copy()
+    mix["bucket"] = mix["answer_style"].map(STYLE_BUCKET).fillna("Other")
     afmt = (
-        test_only.pivot_table(index="bucket", columns="level",
-                              values="id", aggfunc="count")
+        mix.pivot_table(index="bucket", columns="level",
+                        values="id", aggfunc="count")
         .fillna(0).astype(int)
     )
     afmt = afmt.reindex(index=[b for b in BUCKET_ORDER if b in afmt.index])
@@ -203,7 +192,7 @@ def main():
     ax.set_yticklabels([f"{int(p*100)}%" for p in np.linspace(0, 1, 6)])
     ax.legend(title="Answer format", bbox_to_anchor=(1.02, 1), loc="upper left",
               frameon=False)
-    ax.set_title("(b) Answer-format mix (test split)")
+    ax.set_title("(b) Answer-format mix")
 
     # (c) sub-series length distribution
     ax = axes[2]
