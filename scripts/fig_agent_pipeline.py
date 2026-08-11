@@ -59,8 +59,11 @@ def set_style() -> None:
 # stratified random subset, seed 42). L4 uses the uncorrected LLM-judge rubric
 # (see paper §5.4 caveat: L4 magnitudes not comparable to signed L1–L3).
 LEVEL_LABELS  = ["L1  State", "L2  Intervention", "L3  Counterfactual", "L4  Decision"]
-ZERO_SHOT_GPT = [15.9,  1.3, 18.2, 16.2]
-AGENT_GPT     = [38.8, 15.2, 24.9, 33.2]
+# Chance-corrected (L1-L3) and raw judge (L4), on the 200-item paired subset.
+# The agent is at or below zero-shot on every level: giving the driver a weak
+# forecaster and letting it delegate costs more than the sandbox recovers.
+ZERO_SHOT_GPT = [8.0,  6.1, 47.9, 25.0]
+AGENT_GPT     = [9.0, -2.7, 26.7, 16.0]
 
 
 def panel_a_loop(ax) -> None:
@@ -90,11 +93,17 @@ def panel_a_loop(ax) -> None:
             ax.text(cx, cy - 0.14, lines[1], ha="center", va="center",
                     fontsize=fs - 1.2, color=sub_color, zorder=z + 1)
 
-    def edge(x1, y1, x2, y2, *, color=GUNMETAL, lw=1.0, curve=0.0, z=2, ls="-"):
+    # head=(length, width) overrides the default "-|>" proportions (0.4, 0.2),
+    # which are twice as long as wide and read as elongated on a curved path.
+    # The loop arrows pass an explicit, stubbier head so all three match exactly
+    # regardless of the angle they arrive at.
+    def edge(x1, y1, x2, y2, *, color=GUNMETAL, lw=1.0, curve=0.0, z=2, ls="-",
+             shrinkA=3, shrinkB=3, head=None):
+        style = "-|>" if head is None else f"-|>,head_length={head[0]},head_width={head[1]}"
         ax.add_patch(FancyArrowPatch(
-            (x1, y1), (x2, y2), arrowstyle="-|>", mutation_scale=10,
+            (x1, y1), (x2, y2), arrowstyle=style, mutation_scale=10,
             linewidth=lw, color=color, zorder=z, linestyle=ls,
-            connectionstyle=f"arc3,rad={curve}", shrinkA=3, shrinkB=3))
+            connectionstyle=f"arc3,rad={curve}", shrinkA=shrinkA, shrinkB=shrinkB))
 
     # ── the three states, on a circle ────────────────────────────────
     RX, RY_ = 5.00, 1.92          # cycle centre
@@ -103,13 +112,40 @@ def panel_a_loop(ax) -> None:
     S_READ   = (RX - 1.52, RY_ - 0.50)
     SW, SH = 1.86, 0.60
 
-    # cycle transitions first, so the state boxes sit on top of them
-    edge(S_REASON[0] + 0.55, S_REASON[1] - 0.22, S_CALL[0] + 0.10, S_CALL[1] + 0.34,
-         color=TIGER, lw=1.25, curve=-0.32, z=2)
-    edge(S_CALL[0] - 0.80, S_CALL[1] - 0.10, S_READ[0] + 0.80, S_READ[1] - 0.10,
-         color=TIGER, lw=1.25, curve=-0.26, z=2)
-    edge(S_READ[0] - 0.10, S_READ[1] + 0.34, S_REASON[0] - 0.55, S_REASON[1] - 0.22,
-         color=TIGER, lw=1.25, curve=-0.32, z=2)
+    # Cycle transitions. Every endpoint sits ON the box border (never inside it),
+    # so no arrowhead can end up buried under a state box, and the tails touch
+    # the box they leave rather than floating at an offset. shrinkB lifts the
+    # head a hair off the border so the tip stays fully visible; shrinkA=0 keeps
+    # the tail flush against its own box.
+    HW, HH = SW / 2, SH / 2
+    LOOP_HEAD = (0.34, 0.30)      # shared head geometry for all three cycle arrows
+    ROUND = 0.10                  # matches rounding_size in node()
+    CORNER = ROUND * (1 - 1 / 2 ** 0.5)
+    # The two upper arcs are exact MIRROR IMAGES about the vertical axis through
+    # the centre of the reason box: reason-corner <-> side-box top edge, same
+    # chord, same |rad|. rad is a fraction of the chord, so equal rad on unequal
+    # chords draws unequal curvature; mirroring the endpoints is what makes them
+    # match. The sign stays -0.28 on both: reflecting the path flips the bow's
+    # handedness once, and drawing it in the opposite direction (out of reason
+    # rather than into it) flips it back.
+    edge(S_REASON[0] + HW - CORNER, S_REASON[1] - HH + CORNER,  # reason, bottom-right corner
+         S_CALL[0] - 0.10, S_CALL[1] + HH,                      # call a tool, top edge
+         color=TIGER, lw=1.25, curve=-0.28, z=2, shrinkA=0, shrinkB=0,
+         head=LOOP_HEAD)
+    edge(S_CALL[0] - HW, S_CALL[1] - 0.08,                # call a tool, left edge
+         S_READ[0] + HW, S_READ[1] - 0.08,                # read the result, right edge
+         color=TIGER, lw=1.25, curve=-0.26, z=2, shrinkA=0, shrinkB=1.5,
+         head=LOOP_HEAD)
+    # Aimed at the reason box's bottom-LEFT corner, the corner the arc actually
+    # arrives from. The box is a rounded rect, so its visible corner is not the
+    # bounding-box corner: on the 45-degree diagonal the outline sits at
+    # r - r/sqrt(2) inside it. Landing the tip exactly there makes the head touch
+    # the border with no gap, while everything behind the tip stays outside the
+    # box (drawn on top at z=5) and therefore fully visible.
+    edge(S_READ[0] + 0.10, S_READ[1] + HH,                        # read the result, top edge
+         S_REASON[0] - HW + CORNER, S_REASON[1] - HH + CORNER,    # reason, bottom-left corner
+         color=TIGER, lw=1.25, curve=-0.28, z=2, shrinkA=0, shrinkB=0,
+         head=LOOP_HEAD)
 
     node(*S_REASON, SW, SH, ["reason"], fill=CREAM, edge=TIGER, lw=1.4,
          fs=9.4, bold=True, z=5)
