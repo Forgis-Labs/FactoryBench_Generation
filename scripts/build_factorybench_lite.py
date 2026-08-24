@@ -50,7 +50,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from huggingface_hub import HfApi, hf_hub_download
 
 REPO = "FactoryBench/FactoryBench"
-SPLITS = ("train", "validation", "test")
 LEVELS = (1, 2, 3, 4)
 
 MULTISELECT = {(1, 3), (2, 2), (2, 3), (2, 8), (3, 2), (3, 3)}
