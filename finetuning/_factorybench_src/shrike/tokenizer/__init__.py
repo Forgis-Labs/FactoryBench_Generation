@@ -1,4 +1,4 @@
-"""Time series tokenizers for Shrike.
+"""Time series tokenizers for Shrike. Vendored; see ``shrike/__init__.py``.
 
 Converts raw time series into discrete token sequences that an LLM can process.
 All tokenizers share the same interface:
@@ -20,8 +20,13 @@ Available tokenizers:
         vs CNN FSQ (~0.2%). Inspired by Archetype.
         Located at shrike/tokenizer/fsq_transformer.py
 
-Training:
-    python -m shrike.tokenizer.train_fsq_transformer --levels 5 5 5 5 --epochs 100
+    - FSQ Transformer RoPE: as above with rotary position embeddings.
+        Located at shrike/tokenizer/fsq_transformer_rope.py
+
+Tokenizer *training* lives upstream (shrike.tokenizer.train_fsq_transformer)
+and was not copied into FactoryBench: the four checkpoints being evaluated
+carry their tokenizer weights with them, staged onto S3 as the `totem_ckpt` /
+`fsq_ckpt` input channel. Nothing here trains a tokenizer.
 """
 
 from .fsq import FSQTokenizer, FSQConfig
