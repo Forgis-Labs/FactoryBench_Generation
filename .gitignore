@@ -42,24 +42,10 @@ env/
 Thumbs.db
 
 # FactoryBench specific
-runs/
 *.json.tmp
-charts/
-
-# Frontend
-frontend/node_modules/
-frontend/build/
-frontend/.cache/
-frontend/public/build/
-frontend/.env
-node_modules/
-.cache/
 
 # Logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # data
 datasets/open_datasets/*
@@ -70,11 +56,11 @@ data/factorywave/*
 
 #output
 output/*
+!output/figures/fig_main_heatmap.pdf
 
 # datasets
 datasets/*
 
-figures/paperbanana_runs
 # Claude Code
 .claude/
 
@@ -84,7 +70,6 @@ figures/paperbanana_runs
 *.blg
 *.fdb_latexmk
 *.fls
-*.out
 *.synctex.gz
 *.toc
 *.lof
@@ -92,6 +77,10 @@ figures/paperbanana_runs
 *.nav
 *.snm
 *.vrb
+# hyperref bookmark files, scoped to the paper builds. A bare `*.out` also
+# swallows the `*.jsonl.out` batch-prediction payloads that src/evaluation
+# and src/scoring read back from Bedrock and Vertex.
+docs/**/*.out
 
 # Generator caches and ad-hoc scratch outputs
 data/.*_cache.json
@@ -118,11 +107,8 @@ sims/**/*.SLDASM
 sims/**/*.SLDPRT
 sims/assets/**/Renderings/
 
-*.out
-*.log
-
-scripts/outputs/!output/figures/fig_main_heatmap.pdf
-!output/figures/fig_main_heatmap.pdf
+# Default --outdir of scripts/neurips_image_generator.py
+scripts/outputs/
 
 # Local SageMaker eval/scoring artifacts (downloaded from S3, not source)
 /baseline_bm*.tar.gz
@@ -134,4 +120,3 @@ scripts/outputs/!output/figures/fig_main_heatmap.pdf
 /level_?_predictions.jsonl
 /eval_summary.json
 finetuning/_factorybench_src.zip
-finetuning/__pycache__/
