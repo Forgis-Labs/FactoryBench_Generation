@@ -17,11 +17,14 @@ thing that did not survive the migration intact:
                          identical in shape to the qwen-3-235b path already in
                          ``run_foundry_eval``. Sync only — Vertex exposes no
                          batch surface for MaaS partner models.
-  ``mistral-large-3``    NOT available as MaaS on Vertex. Model Garden ships it
-                         as a self-deploy vLLM container (8xH200 or 8xB200).
-                         Requires ``scripts/gcp/deploy_mistral_large_3.py`` to
-                         have been run, and bills per GPU-hour while the
-                         endpoint is up. Sync only.
+  ``mistral-large-3``    NOT available as MaaS on Vertex, so it is not routed
+                         here at all: ``src/config.py`` sends it to Azure AI
+                         Foundry. Model Garden ships it only as a self-deploy
+                         vLLM container (8xH200 or 8xB200) billing per
+                         GPU-hour. If you do stand one up, set
+                         ``MISTRAL_LARGE_3_VERTEX_ENDPOINT`` and give the model
+                         ``provider: "vertex"`` with ``self_deployed: True``;
+                         the ``vertex_raw_predict`` path below handles it.
 
 Auth is Application Default Credentials — no long-lived API key. On a
 workstation run ``gcloud auth application-default login``; on GCE / GKE /
@@ -182,9 +185,9 @@ def _self_deployed_endpoint(model: str) -> str:
     if not value:
         raise RuntimeError(
             f"{model} is self-deployed on Vertex and has no endpoint yet. "
-            f"Run `python scripts/gcp/deploy_mistral_large_3.py --create` and put the "
-            f"resulting endpoint id in {env}. Note this stands up an 8-GPU node that "
-            f"bills per hour until you tear it down."
+            f"Deploy it from Model Garden and put the resulting endpoint id in "
+            f"{env}. Note this stands up a multi-GPU node that bills per hour "
+            f"until you tear it down."
         )
     # Accept either a bare numeric id or a full resource path.
     return value.rstrip("/").split("/")[-1]

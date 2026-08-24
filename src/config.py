@@ -125,9 +125,8 @@ MODELS: Dict[str, Dict[str, Any]] = {
     # it only as a self-deploy vLLM container on 8xH200 / 8xB200, which bills
     # per GPU-hour whether or not it is serving. The Foundry resource already
     # has a `Mistral-Large-3` deployment on the same endpoint as GPT-5.x, so
-    # this is per-token and needs no new infrastructure.
-    # scripts/gcp/deploy_mistral_large_3.py still stands the Vertex endpoint up
-    # if full GCP parity is ever wanted; see gcp-setup.md section 6.
+    # this is per-token and needs no new infrastructure. Full GCP parity would
+    # mean standing that vLLM container up by hand; see gcp-setup.md section 6.
     "mistral-large-3": {
         "provider": "foundry",
         "endpoint_env": "CHAT_ENDPOINT",

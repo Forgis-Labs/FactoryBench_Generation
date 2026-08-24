@@ -65,15 +65,6 @@ def anomaly_states_differ(fault_a: Any, fault_b: Any) -> bool:
     return fa != 0 and fb != 0 and fa != fb
 
 
-def cell_for(a: Dict[str, Any], b: Dict[str, Any]) -> Tuple[bool, bool, bool]:
-    """Which (A, B, C) cell a candidate pair falls in."""
-    return (
-        a.get("robot") != b.get("robot"),
-        anomaly_states_differ(a.get("fault"), b.get("fault")),
-        a.get("task") != b.get("task"),
-    )
-
-
 def cycle_targets(count: int, seed: Optional[int] = None) -> List[Tuple[bool, bool, bool]]:
     """A shuffled, evenly balanced list of target cells of length ``count``.
 
@@ -87,51 +78,6 @@ def cycle_targets(count: int, seed: Optional[int] = None) -> List[Tuple[bool, bo
     rng.shuffle(targets)
     return targets
 
-
-def pick_pair(
-    primary: Dict[str, Any],
-    candidates: Sequence[Dict[str, Any]],
-    target: Tuple[bool, bool, bool],
-    phases_differ: Optional[Callable[[Dict[str, Any], Dict[str, Any]], bool]] = None,
-    max_tries: int = 400,
-) -> Optional[Dict[str, Any]]:
-    """A partner for ``primary`` landing in ``target``, or None.
-
-    ``candidates`` are dicts carrying at least ``robot``, ``task`` and
-    ``fault``; whatever else they hold is passed back untouched so the caller
-    can recover its own episode handle.
-
-    The attribute test is cheap and runs first. ``phases_differ`` is only
-    consulted for same-task targets, because it is the one predicate that needs
-    the episode rows loaded, and only same-task pairs can satisfy D.
-    """
-    if not candidates:
-        return None
-    want_same_task = not target[2]
-    pool = list(candidates)
-    rng = random
-    for _ in range(min(max_tries, max(len(pool), 1) * 4)):
-        cand = pool[rng.randrange(len(pool))]
-        if cand is primary or cand.get("key") == primary.get("key"):
-            continue
-        if cell_for(primary, cand) != target:
-            continue
-        if want_same_task and phases_differ is not None and not phases_differ(primary, cand):
-            continue
-        return cand
-    return None
-
-
-def summarise(pairs: Sequence[Tuple[Dict[str, Any], Dict[str, Any]]]) -> Dict[str, float]:
-    """P(A), P(B), P(C) over a set of chosen pairs, for verification."""
-    if not pairs:
-        return {}
-    n = len(pairs)
-    tot = [0, 0, 0]
-    for a, b in pairs:
-        for i, flag in enumerate(cell_for(a, b)):
-            tot[i] += int(flag)
-    return {"P(A)": tot[0] / n, "P(B)": tot[1] / n, "P(C)": tot[2] / n}
 
 # --------------------------------------------------------------------------
 # direct cell sampling
