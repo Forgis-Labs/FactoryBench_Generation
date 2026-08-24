@@ -1,0 +1,39 @@
+% ICLR 2027 submission build (double-blind: authors are always blinded).
+% Wrapper only. All prose lives in ../paper/_content.tex, shared verbatim with
+% the two NeurIPS builds in ../neurips_tex/. Never edit content here.
+\documentclass{article}
+
+\newif\ifanon
+\anontrue                     % ICLR submissions are double-blind
+
+% Venue style package, loaded before the shared preamble.
+\usepackage{iclr2027_conference,times}
+
+% The shared content lives in ../paper/ but its \input{figures/...} and
+% \includegraphics{figures/...} paths are written relative to the NeurIPS build
+% directory, which is where the figures live. Point both resolvers there so the
+% content file needs no venue-specific edits.
+\makeatletter
+\def\input@path{{../neurips_tex/}{../paper/}}
+\makeatother
+
+\input{../paper/_preamble_common}
+
+% After the shared preamble: it is graphicx that defines \graphicspath.
+\graphicspath{{../neurips_tex/}{../neurips_tex/figures/}}
+
+% The NeurIPS paper checklist is a venue requirement whose macros (\answerYes
+% etc.) are defined by neurips_2026.sty. ICLR neither requires it nor defines
+% them, so drop it from this build only.
+\neuripschecklistfalse
+
+% ICLR loads natbib in author-year mode (\setcitestyle in its .sty), so the
+% numeric unsrt .bbl the NeurIPS builds use is incompatible. Use the
+% conference's own author-year bst instead. Citation commands are unchanged.
+\renewcommand{\paperbibstyle}{iclr2027_conference}
+
+\input{../paper/_titleauthor}
+
+\begin{document}
+\input{../paper/_content}
+\end{document}

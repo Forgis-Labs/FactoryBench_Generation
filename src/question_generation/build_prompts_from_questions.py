@@ -5,6 +5,11 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from src.question_generation.utils.phases import (
+    DEFAULT_TASKS_PATH,
+    phase_reference_for_question,
+)
+
 
 def load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as f:
@@ -240,6 +245,8 @@ def build_prompt(
     machines: List[Dict[str, Any]],
     grippers: Optional[List[Dict[str, Any]]] = None,
     dataset_index: Optional[Dict[str, Dict[str, Any]]] = None,
+    episodes_root: Optional[Path] = None,
+    tasks_path: Optional[Path] = None,
 ) -> str:
     provenance = question_item.get("provenance") if isinstance(question_item.get("provenance"), dict) else {}
     dataset = str(provenance.get("dataset", ""))
@@ -266,7 +273,19 @@ def build_prompt(
     question_text = str(question_item.get("question", "")).strip()
     options_text = format_options(question_item.get("options"))
 
-    header_parts = [p for p in [machine_sentence, mapping_text] if p]
+    # Phase legend. Only attached when the question or the context actually
+    # involves phases, so prompts with no phase content are unchanged. States
+    # what each phase means and the order they run in; never which timesteps of
+    # this episode belong to which phase, which is what L2 template 6 asks the
+    # model to work out.
+    phase_text = phase_reference_for_question(
+        question_item,
+        episodes_root if episodes_root is not None else Path("data") / "normalized_episodes",
+        tasks_path if tasks_path is not None else DEFAULT_TASKS_PATH,
+        dataset_index=dataset_index,
+    )
+
+    header_parts = [p for p in [machine_sentence, phase_text, mapping_text] if p]
     header = "\n".join(header_parts)
     prompt = f"{header}\n{ts_text}\nQuestion: {question_text}" if header else f"{ts_text}\nQuestion: {question_text}"
     if options_text:
@@ -321,6 +340,25 @@ def main() -> None:
         default=repo_root / "data" / "labelling" / "dataset.json",
         help="Path to dataset.json (maps dataset_id -> gripper_id/machine_id)",
     )
+    parser.add_argument(
+        "--tasks",
+        type=Path,
+        default=repo_root / "data" / "labelling" / "tasks.json",
+        help="Path to tasks.json (source of the task-phase definitions)",
+    )
+    parser.add_argument(
+        "--episodes-root",
+        type=Path,
+        default=repo_root / "data" / "normalized_episodes",
+        help="Root of normalized episodes; used to resolve each question's task "
+             "from its *_metadata.json sidecar so the right phase legend is attached.",
+    )
+    parser.add_argument(
+        "--no-phase-reference",
+        action="store_true",
+        help="Omit the task-phase legend. Only for reproducing the pre-legend "
+             "prompts the published numbers were measured on.",
+    )
 
     args = parser.parse_args()
 
@@ -348,6 +386,12 @@ def main() -> None:
 
     converted = 0
     scanned = 0
+    with_phases = 0
+
+    # A sentinel path that cannot resolve makes phase_reference_for_question
+    # return "" for every item, which is exactly what --no-phase-reference means.
+    tasks_path = Path("\0") if args.no_phase_reference else args.tasks.resolve()
+    episodes_root = args.episodes_root.resolve()
 
     for in_path in iter_question_files(input_dir):
         scanned += 1
@@ -359,7 +403,13 @@ def main() -> None:
         if not is_question_payload(payload):
             continue
 
-        prompt = build_prompt(payload, machines, grippers, dataset_index)
+        prompt = build_prompt(
+            payload, machines, grippers, dataset_index,
+            episodes_root=episodes_root,
+            tasks_path=tasks_path,
+        )
+        if "The task runs through the following phases" in prompt:
+            with_phases += 1
         rel = in_path.relative_to(input_dir)
         out_path = output_dir / rel
         write_json(out_path, {
@@ -369,6 +419,10 @@ def main() -> None:
         converted += 1
 
     print(f"Scanned {scanned} JSON files; converted {converted} question files to prompts in {output_dir}")
+    if args.no_phase_reference:
+        print("Phase legend: disabled (--no-phase-reference)")
+    else:
+        print(f"Phase legend: attached to {with_phases}/{converted} prompts")
 
 
 if __name__ == "__main__":

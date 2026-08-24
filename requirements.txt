@@ -1,4 +1,12 @@
-# AWS SDK for Bedrock + SageMaker eval (src/evaluation/run_aws_eval.py)
+# GCP SDKs for Vertex AI eval (src/evaluation/run_gcp_eval.py).
+# google-auth supplies ADC; google-cloud-storage handles batch-prediction I/O.
+# The Vertex REST calls go through `requests` directly, so the heavyweight
+# google-cloud-aiplatform client is deliberately not a dependency.
+google-auth>=2.35.0
+google-cloud-storage>=2.18.0
+
+# AWS SDK for the retired Bedrock + SageMaker path
+# (src/evaluation/run_aws_eval.py, reachable via FB_INFERENCE_CLOUD=aws).
 boto3>=1.35.0
 sagemaker>=2.235.0,<3
 

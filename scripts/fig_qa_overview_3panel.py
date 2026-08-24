@@ -1,10 +1,10 @@
 """3-panel overview of the released FactoryBench Q&A dataset.
 
-Loads the 12 split files (level_{1..4}/{train,validation,test}.jsonl) from
+Loads the released Q&A files (level_{1..4}) from
 the public HuggingFace dataset and emits a single PDF with:
 
-  (a) Dataset size per level (stacked train/validation/test).
-  (b) Answer-format mix per level (test split, four canonical buckets).
+  (a) Dataset size per level.
+  (b) Answer-format mix per level (four canonical buckets).
   (c) Sub-series length distribution per level.
 
 Output: docs/neurips_tex/figures/fig_qa_overview_3panel.pdf
@@ -26,6 +26,9 @@ load_dotenv(r"C:\Users\ymerz\OneDrive\Documents\Work\Forgis\FactoryBench\.env",
             override=True)
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
+import sys
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))  # so `src.evaluation` resolves when run from anywhere
 HF_REPO = "FactoryBench/FactoryBench"
 LEVELS = (1, 2, 3, 4)
 SPLITS = ("train", "validation", "test")
@@ -74,48 +77,41 @@ def set_style() -> None:
 
 
 def _classify_answer_style(rec: dict) -> str:
-    """Map a Q&A record to one of: numerical, numerical_tensor, mc_single_K,
-    mc_multi_4, free_form."""
-    options = rec.get("options") or {}
-    answer = rec.get("answer")
-    if isinstance(answer, list):
-        return "numerical_tensor"
-    if not options:
-        if isinstance(answer, (int, float)):
-            return "numerical"
-        return "free_form"
-    n_opts = len(options)
-    # Multi-select answers tend to be a string of T/F flags or a list of keys.
-    if isinstance(answer, str) and re.fullmatch(r"[TF]+", answer):
-        return f"mc_multi_{len(answer)}"
-    if isinstance(answer, list):
-        return f"mc_multi_{n_opts}"
-    return f"mc_single_{n_opts}"
+    """Answer format for a Q&A record, as the scorer sees it.
+
+    Delegates to ``infer_answer_format`` (the same function
+    ``score_prediction`` dispatches on) so the figure can never disagree with
+    how items are actually graded. The previous local heuristic had two bugs:
+    ranking answers (4-letter permutations like "BDAC") fell through to the
+    single-select branch, hiding 3,192 ranking items, and tensor answers stored
+    as strings were reported as free-form, putting free-form mass in L2 and L3
+    where no free-form template exists.
+    """
+    from src.evaluation.run_foundry_eval import infer_answer_format
+    return infer_answer_format(rec)
 
 
 def load_all() -> pd.DataFrame:
     token = os.getenv("HF_TOKEN")
     rows = []
     for level in LEVELS:
-        for split in SPLITS:
-            path = f"factorybench_qa/level_{level}/{split}.jsonl"
-            local = hf_hub_download(
-                repo_id=HF_REPO, filename=path, repo_type="dataset",
-                token=token, force_download=False,
-            )
-            with open(local, "r", encoding="utf-8") as f:
-                for line in f:
-                    if not line.strip():
-                        continue
-                    rec = json.loads(line)
-                    ts = rec.get("context", {}).get("time_series", [])
-                    rows.append({
-                        "level":        level,
-                        "split":        split,
-                        "id":           rec.get("id"),
-                        "answer_style": _classify_answer_style(rec),
-                        "ts_rows":      len(ts) if isinstance(ts, list) else 0,
-                    })
+        # one file per level; the release carries no train/validation/test split
+        local = hf_hub_download(
+            repo_id=HF_REPO, filename=f"factorybench_qa/level_{level}.jsonl",
+            repo_type="dataset", token=token, force_download=False,
+        )
+        with open(local, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                rec = json.loads(line)
+                ts = rec.get("context", {}).get("time_series", [])
+                rows.append({
+                    "level":        level,
+                    "id":           rec.get("id"),
+                    "answer_style": _classify_answer_style(rec),
+                    "ts_rows":      len(ts) if isinstance(ts, list) else 0,
+                })
     return pd.DataFrame(rows)
 
 
@@ -127,59 +123,52 @@ def main():
     fig, axes = plt.subplots(3, 1, figsize=(10, 12.5))
     plt.subplots_adjust(hspace=0.45)
 
-    # (a) split sizes per level
+    # (a) size per level. The release is a single undivided pool, so this is
+    # one bar per level rather than a stack.
     ax = axes[0]
-    pivot = (
-        df.pivot_table(index="level", columns="split", values="id", aggfunc="count")
-        .fillna(0)
-        .astype(int)
-    )
-    pivot = pivot[[s for s in SPLITS if s in pivot.columns]]
-    bottom = np.zeros(len(pivot))
-    for split in pivot.columns:
-        vals = pivot[split].values
-        ax.bar(pivot.index, vals, bottom=bottom, color=SPLIT_COLORS[split],
-               label=split, edgecolor="white", linewidth=0.6)
-        for i, v in enumerate(vals):
-            if v > 0:
-                ax.text(pivot.index[i], bottom[i] + v / 2, f"{int(v):,}",
-                        ha="center", va="center", color="white",
-                        fontsize=11, fontweight="bold")
-        bottom += vals
-    ax.set_xticks(list(pivot.index))
-    ax.set_xticklabels([f"L{lvl}" for lvl in pivot.index])
+    sizes = df.groupby("level")["id"].count()
+    ax.bar(sizes.index, sizes.values, color=GUNMETAL,
+           edgecolor="white", linewidth=0.6)
+    for lvl, v in sizes.items():
+        ax.text(lvl, v / 2, f"{int(v):,}", ha="center", va="center",
+                color="white", fontsize=11, fontweight="bold")
+    ax.set_xticks(list(sizes.index))
+    ax.set_xticklabels([f"L{lvl}" for lvl in sizes.index])
     ax.set_ylabel("Samples")
-    ax.legend(title="Split", loc="upper right", frameon=False)
-    ax.set_title(f"(a) Dataset size per level  ({pivot.values.sum():,} samples total)")
+    ax.set_title(f"(a) Dataset size per level  ({sizes.sum():,} samples total)")
 
-    # (b) answer-format mix per level (test split, four canonical buckets)
+    # (b) answer-format mix per level (four canonical buckets)
     STYLE_BUCKET = {
-        "numerical":        "Numerical / Tensor",
-        "numerical_tensor": "Numerical / Tensor",
-        "mc_single_3":      "MC single-select",
-        "mc_single_4":      "MC single-select",
-        "mc_multi_4":       "MC multi-select",
-        "free_form":        "Free-form",
+        "numerical":                     "Numerical",
+        "tensor":                        "Tensor",
+        "multiple_choice_single_select":  "MC single-select",
+        "multiple_choice_multi_select":   "MC multi-select",
+        "ranking":                       "Ranking",
+        "free_form":                     "Free-form",
     }
     BUCKET_ORDER = [
-        "Numerical / Tensor",
+        "Numerical",
+        "Tensor",
         "MC single-select",
         "MC multi-select",
+        "Ranking",
         "Free-form",
     ]
     BUCKET_COLOR = {
-        "Numerical / Tensor": TIGER,
-        "MC single-select":   "#3b82f6",
-        "MC multi-select":    FLICKER,
-        "Free-form":          GUNMETAL,
+        "Numerical":        TIGER,
+        "Tensor":           "#f0a94b",
+        "MC single-select": "#3b82f6",
+        "MC multi-select":  FLICKER,
+        "Ranking":          "#7c5cbf",
+        "Free-form":        GUNMETAL,
     }
 
     ax = axes[1]
-    test_only = df[df.split == "test"].copy()
-    test_only["bucket"] = test_only["answer_style"].map(STYLE_BUCKET).fillna("Other")
+    mix = df.copy()
+    mix["bucket"] = mix["answer_style"].map(STYLE_BUCKET).fillna("Other")
     afmt = (
-        test_only.pivot_table(index="bucket", columns="level",
-                              values="id", aggfunc="count")
+        mix.pivot_table(index="bucket", columns="level",
+                        values="id", aggfunc="count")
         .fillna(0).astype(int)
     )
     afmt = afmt.reindex(index=[b for b in BUCKET_ORDER if b in afmt.index])
@@ -201,7 +190,7 @@ def main():
     ax.set_yticklabels([f"{int(p*100)}%" for p in np.linspace(0, 1, 6)])
     ax.legend(title="Answer format", bbox_to_anchor=(1.02, 1), loc="upper left",
               frameon=False)
-    ax.set_title("(b) Answer-format mix (test split)")
+    ax.set_title("(b) Answer-format mix")
 
     # (c) sub-series length distribution
     ax = axes[2]

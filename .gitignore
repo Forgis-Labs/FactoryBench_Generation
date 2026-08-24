@@ -123,3 +123,15 @@ sims/assets/**/Renderings/
 
 scripts/outputs/!output/figures/fig_main_heatmap.pdf
 !output/figures/fig_main_heatmap.pdf
+
+# Local SageMaker eval/scoring artifacts (downloaded from S3, not source)
+/baseline_bm*.tar.gz
+/baseline_bm*/
+/baseline_l*/
+/finetuned_bm*.tar.gz
+/finetuned_bm*/
+/finetuned_l*/
+/level_?_predictions.jsonl
+/eval_summary.json
+finetuning/_factorybench_src.zip
+finetuning/__pycache__/

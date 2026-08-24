@@ -1,0 +1,84 @@
+% Venue-neutral preamble shared by every build (NeurIPS anon/deanon, ICLR).
+% The venue style package is loaded by the wrapper BEFORE this file.
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc} % use 8-bit T1 fonts
+\usepackage{float} % provides [H] for strict in-place float positioning (must precede hyperref)
+\usepackage{hyperref} % hyperlinks
+\usepackage{url} % simple URL typesetting
+\usepackage{booktabs} % professional-quality tables
+\usepackage{longtable} % multi-page tables
+\usepackage{array} % extended column specifiers
+\usepackage{amsfonts} % blackboard math symbols
+\usepackage{amsmath} % math environments
+\usepackage{nicefrac} % compact symbols for 1/2, etc.
+\usepackage{microtype} % microtypography
+\usepackage{xcolor} % colors
+\usepackage{graphicx}
+\usepackage{subcaption}
+\graphicspath{{../../}{./}}
+\usepackage{multirow}
+\usepackage{enumerate}
+\usepackage{fontawesome5}
+\usepackage[textcolor=black, backgroundcolor=orange!20]{todonotes}
+
+
+% Figures
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{amsmath,amssymb,amsfonts,bm}
+\usepackage{xcolor}
+
+% BRAND colors
+\definecolor{tiger}{HTML}{FF5A00}
+\definecolor{fire}{HTML}{FF4D00}
+\definecolor{flicker}{HTML}{DC4B07}
+\definecolor{black}{HTML}{878F92}
+\definecolor{gunmetal}{HTML}{122128}
+\definecolor{panel}{HTML}{202E35}
+
+% FIGURE colors
+\definecolor{dark_navy}{HTML}{122128}
+\definecolor{forgis_orange}{HTML}{FF5A00}
+\definecolor{forgis_fire}{HTML}{FF4D00}
+\definecolor{forgis_flicker}{HTML}{DC4B07}
+\definecolor{blue}{HTML}{3A7BD5}
+\definecolor{green}{HTML}{2ECC71}
+\definecolor{panelbg}{HTML}{F0F4F8}
+\definecolor{warm_amber}{HTML}{FFF3CD}
+
+% LEVEL colors
+\definecolor{L1bg}{HTML}{FCF0E0}
+\definecolor{L1border}{HTML}{FB9E6C}
+\definecolor{L2bg}{HTML}{FCF0E0}
+\definecolor{L2border}{HTML}{FF7F3A}
+\definecolor{L3bg}{HTML}{FCF0E0}
+\definecolor{L3border}{HTML}{FF5A00}
+\definecolor{L4bg}{HTML}{FCF0E0}
+\definecolor{L4border}{HTML}{81360F}
+
+% Additional colors for Pearl's ladder figure (figure_02)
+\definecolor{darknavy}{HTML}{122128}
+\definecolor{forgisorange}{HTML}{FF5A00}
+\definecolor{figgreen}{HTML}{2ECC71}
+\definecolor{figsteel}{HTML}{878F92}
+\definecolor{figcontext}{HTML}{D4A017} % mustard - context signal $C$
+% Sequential cool->warm, colourblind-friendly: passive observation -> final decision.
+\definecolor{L1tint}{HTML}{4A6FA5} % steel blue   - L1 Seeing (passive observation)
+\definecolor{L2tint}{HTML}{C9A227} % warm amber   - L2 Doing (intervention)
+\definecolor{L3tint}{HTML}{FF5A00} % brand orange - L3 Imagining (counterfactual)
+\definecolor{L4tint}{HTML}{6F1A0A} % deep maroon  - L4 Deciding (action)
+
+\usetikzlibrary{arrows.meta, positioning, calc, fit, shapes.geometric,
+  decorations.pathreplacing, decorations.markings, backgrounds, patterns, shadows}
+
+% Bibliography style, overridable per venue. NeurIPS keeps numeric unsrt; the
+% ICLR wrapper renews this to the conference's own author-year bst.
+\providecommand{\paperbibstyle}{unsrt}
+
+% Venue toggle: include the NeurIPS paper checklist?
+% Declared and defaulted to true here, so the NeurIPS builds need do nothing.
+% A wrapper that does not want it says \neuripschecklistfalse AFTER inputting
+% this file (declaring it again in the wrapper would reset it to false).
+\newif\ifneuripschecklist
+\neuripschecklisttrue
