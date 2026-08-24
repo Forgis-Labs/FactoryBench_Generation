@@ -125,9 +125,10 @@ def main() -> int:
                     f"({cfg.get('endpoint_env')} unset)"
                 )
                 print(
-                    "      This model has no MaaS offering on Vertex. Either run "
-                    "scripts/gcp/deploy_mistral_large_3.py --create (8-GPU node, "
-                    "billed hourly) or exclude it from --models."
+                    "      This model has no MaaS offering on Vertex. Stand the "
+                    "Model Garden vLLM container up by hand (8-GPU node, billed "
+                    f"hourly), set {cfg.get('endpoint_env')} to its endpoint id, "
+                    "or exclude it from --models."
                 )
                 continue
             url = (

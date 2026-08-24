@@ -114,7 +114,7 @@ GCS_PREFIX=factorybench/
 # DEEPSEEK_V32_VERTEX_MODEL=deepseek-ai/deepseek-v3.2-maas
 # DEEPSEEK_V32_VERTEX_REGION=global
 
-# Only after scripts/gcp/deploy_mistral_large_3.py --create --yes:
+# Only if you self-deploy Mistral Large 3 on Vertex (section 6):
 # MISTRAL_LARGE_3_VERTEX_ENDPOINT=<numeric endpoint id>
 ```
 
@@ -154,22 +154,15 @@ args    --tensor-parallel-size=8 --tokenizer_mode=mistral --config_format=mistra
 
 Same weights as the Bedrock model, so results stay comparable. The cost model does not: an 8-GPU A3-Ultra node is on the order of tens of dollars per hour, billed from endpoint creation to deletion regardless of traffic. `--cost-limit` in the runner bounds *token* spend and does nothing about this.
 
-Your options, in the order I would consider them:
+**What we actually did:** none of the above. `mistral-large-3` routes to Azure AI Foundry, which already has a `Mistral-Large-3` deployment on the same endpoint as GPT-5.x. Per-token, no new infrastructure, no idle burn. See its entry in `src/config.py`.
 
-1. **Deploy, run, tear down the same day.** Cheapest way to keep the model. The deploy script pairs create with delete for exactly this.
+The alternatives, if you want it on GCP anyway:
+
+1. **Self-deploy from Model Garden, run, tear down the same day.** Cheapest way to keep it on Vertex. Set `MISTRAL_LARGE_3_VERTEX_ENDPOINT` to the endpoint id afterwards. You will likely need a quota increase for `custom_model_serving_a3_ultra_gpus` in the target region.
 2. **Drop `mistral-large-3` from the GCP sweep** and cite the Bedrock numbers for it, noting the serving difference. Honest and free.
 3. **Keep only Mistral on AWS** via `FB_INFERENCE_CLOUD=aws` (section 8). Preserves the numbers but keeps an AWS dependency alive.
 
-To deploy:
-
-```bash
-python scripts/gcp/deploy_mistral_large_3.py                 # plan, no action
-python scripts/gcp/deploy_mistral_large_3.py --create --yes  # ~30-60 min for 675B
-python scripts/gcp/deploy_mistral_large_3.py --status        # is it billing?
-python scripts/gcp/deploy_mistral_large_3.py --delete --yes  # tear down
-```
-
-You will likely need a quota increase for `custom_model_serving_a3_ultra_gpus` in the target region; the script detects quota denials and says so.
+A `scripts/gcp/deploy_mistral_large_3.py` used to automate option 1. It was removed: the Foundry route made it unnecessary, and it had stopped working when `mistral-large-3` moved to `provider: "foundry"`, since it looked itself up in `VERTEX_MODELS` and raised `KeyError` on every subcommand.
 
 ---
 
@@ -242,5 +235,5 @@ FB_INFERENCE_CLOUD=aws python -m src.pipeline.run_pipeline --stages eval ...
 | `src/pipeline/run_pipeline.py` | Routes `provider == "vertex"` to the new runner |
 | `scripts/gcp/provision_inference.sh` | APIs, bucket, service account, IAM |
 | `scripts/gcp/preflight_check.py` | Read-only verification |
-| `scripts/gcp/deploy_mistral_large_3.py` | Self-deploy lifecycle for the one model without MaaS |
+| `scripts/gcp/deploy_qwen3_4b_vertex.py` | Stands up the self-hosted Qwen3-4B custom endpoint |
 | `src/evaluation/run_aws_eval.py` | Unchanged behavior, retained for `FB_INFERENCE_CLOUD=aws` |

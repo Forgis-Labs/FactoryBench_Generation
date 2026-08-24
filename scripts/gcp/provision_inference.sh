@@ -145,9 +145,10 @@ cat <<EOF
   b) DeepSeek V3.2 MaaS is self-serve and needs no enablement step.
 
   c) Mistral Large 3 has NO managed offering on Vertex. It only ships as a
-     self-deploy vLLM container on 8xH200 or 8xB200. If you need it, run:
-       python scripts/gcp/deploy_mistral_large_3.py --create
-     That stands up an 8-GPU node billing by the hour. Check quota first:
+     self-deploy vLLM container on 8xH200 or 8xB200, billing by the hour
+     whether or not it serves a request, so FactoryBench routes this model to
+     Azure AI Foundry instead (see src/config.py). If you want it on Vertex
+     anyway, deploy it from Model Garden by hand and check quota first:
        $GCLOUD compute regions describe $REGION --project $PROJECT
 
 --- Add to .env
@@ -155,7 +156,7 @@ GCP_PROJECT=$PROJECT
 GCP_REGION=$REGION
 GCS_BUCKET=$BUCKET
 GCS_PREFIX=factorybench/
-# MISTRAL_LARGE_3_VERTEX_ENDPOINT=<set after deploy_mistral_large_3.py --create>
+# MISTRAL_LARGE_3_VERTEX_ENDPOINT=<only if you self-deploy it on Vertex>
 
 --- Verify without spending anything
 python scripts/gcp/preflight_check.py
