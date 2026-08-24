@@ -33,7 +33,8 @@
 
 % The two connector macros are declared in _preamble_common.tex, not here:
 % a venue file is \input BEFORE this one, so a \providecommand at this point
-% would run after the venue's enewcommand and be too late to define them.
+% would run after the venue's 
+enewcommand and be too late to define them.
 
 \section{Related work}
 
@@ -165,7 +166,7 @@ Reliable ground truth for Level~4 troubleshooting requires machine-specific reco
 \subsection{Zero-shot evaluation}
 \label{sec:zero-shot}
 
-We evaluate a cross-vendor panel of frontier LLMs available at submission time (April 2026): Claude Sonnet 4.6 \cite{anthropic2025sonnet46} and GPT-5.1 \cite{openai2025gpt51} on the closed-weight side, and DeepSeek V3.2 \cite{deepseek2025v32}, Mistral Large 3 \cite{mistral2025large3}, and Qwen3-235B \cite{qwen2025qwen3} on the open-weight side, plus Qwen3-4B \cite{qwen2025qwen3} as a lightweight reference. For calibration we report a non-LLM baseline that dispatches per item by answer format: linear regression on the target signal for scalar and tensor templates, and uniform random over the option set for single- and multi-select MCQ and ranking templates (free-form Level~4 templates are excluded, as no traditional method maps cleanly to producing a remediation protocol). Figure~\ref{fig:results} reports chance-corrected accuracy for the full panel.
+We evaluate a cross-vendor panel of frontier LLMs available at submission time (April 2026): Claude Sonnet 4.6 \cite{anthropic2025sonnet46} and GPT-5.1 \cite{openai2025gpt51} on the closed-weight side, and DeepSeek V3.2 \cite{deepseek2025v32}, Mistral Large 3 \cite{mistral2025large3}, and Qwen3-235B \cite{qwen2025qwen3} on the open-weight side, plus Qwen3-4B \cite{qwen2025qwen3} as a lightweight reference. For calibration we report a non-LLM baseline that dispatches per item by answer format: linear regression on the target signal for scalar and tensor templates, and uniform random over the option set for single- and multi-select MCQ and ranking templates (free-form Level~4 templates are excluded, as no traditional method maps cleanly to producing a remediation protocol). The panel is evaluated on FactoryBench-Lite, the balanced $3{,}000$-item subset described above, so that each level aggregate weights its templates equally instead of inheriting the episode pool's template mass; every model answers the identical items. Figure~\ref{fig:results} reports chance-corrected accuracy for the full panel.
 
 \ifworkshopcompact
 \begin{figure}[htbp]
@@ -200,7 +201,7 @@ We evaluate a cross-vendor panel of frontier LLMs available at submission time (
 Under the signed chance correction the non-LLM baseline lands at $+4.3\%$ on L1. Four of six LLMs fail to clear it: Qwen3-4B ($-1.8\%$) and DeepSeek V3.2 ($-0.3\%$) score below chance outright, and GPT-5.1 ($+3.2\%$) and Qwen3-235B ($+3.6\%$) sit below the baseline despite being the largest models in the panel. Only Mistral Large 3 ($+5.9\%$) and Claude Sonnet 4.6 ($+11.8\%$) clear it, and Mistral only barely. Raw scale does not reliably confer the ability to extract precise state from dense industrial signals.
 
 \paragraph{Models that struggle on Level~1 still outperform the baseline on Levels~2 and~3, and rank order is stable across the three.}
-DeepSeek V3.2 ($+5.8\%$, $+17.1\%$) and GPT-5.1 ($+6.9\%$, $+27.5\%$) both lift clear of the L2/L3 baseline values ($-0.2\%$, $+6.2\%$) despite trailing it on L1, yet the model rank order is nearly identical across L1--L3: Claude Sonnet 4.6 leads at L2 and L3 ($+14.6\%$, $+45.7\%$), Qwen3-235B is the strongest open-weight model ($+20.6\%$ on L3), and Mistral Large 3 follows ($+5.3\%$, $+19.7\%$). This points toward state comprehension propagating into intervention and counterfactual reasoning rather than being substituted by it.
+DeepSeek V3.2 ($+5.8\%$, $+17.1\%$) and GPT-5.1 ($+6.9\%$, $+27.5\%$) both lift clear of the L2/L3 baseline values ($-0.2\%$, $+6.2\%$) despite trailing it on L1, yet the model rank order is nearly identical across L1--L3: Claude Sonnet 4.6 leads at L2 and L3 ($+14.6\%$, $+45.7\%$), Qwen3-235B is the strongest open-weight model ($+20.6\%$ on L3), and Mistral Large 3 follows ($+5.3\%$, $+19.7\%$). This points toward state comprehension propagating into intervention and counterfactual reasoning rather than being substituted by it. The L3 margins carry one caveat: the trajectory-prediction template L3.5 awards the non-LLM baseline $+37.2\%$, which is not possible if that template's assumed chance level were correct, so part of every model's L3 figure reflects its scoring margin rather than counterfactual competence. We report L3 as measured rather than recalibrating, since changing the margin would redefine the metric and break comparability with the numbers released alongside the dataset.
 
 \paragraph{A human expert reaches near-ceiling on Levels~1--2, but not on Level~3.}
 \ifworkshopcompact
