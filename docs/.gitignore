@@ -1,0 +1,16 @@
+# Build output: staged submission archives and their PDFs.
+# Rebuild with: make -C docs archives
+dist/
+
+# LaTeX aux files
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.synctex.gz
+
+# Workshop PDFs are build output, not sources. `make -C docs archive-<venue>`
+# regenerates them into dist/ along with the submission zip. (The full-paper
+# PDFs under neurips_tex/ and iclr_tex/ predate this rule and stay tracked.)
+workshop_tex/*.pdf

@@ -1,0 +1,75 @@
+% ============================================================
+% TEMPLATE for a new workshop submission. COPY, DO NOT EDIT IN PLACE.
+%
+% FactoryBench is submitted to several non-archival workshops. Each one gets:
+%   1. this file, copied to  docs/paper/_workshop_<venue>.tex   (venue framing)
+%   2. a wrapper,  copied to docs/workshop_tex/main_<venue>.tex (venue style)
+%   3. a target added to     docs/Makefile
+% The body (related work, framework, generation, evaluation, limitations,
+% conclusion) is NOT copied: every venue shares ../paper/_workshop_core.tex.
+% Fix a result once there and every workshop PDF is correct on next compile.
+%
+% Steps to add a venue, in full:
+%   cp docs/paper/_workshop_TEMPLATE.tex docs/paper/_workshop_<venue>.tex
+%   cp docs/workshop_tex/main_TEMPLATE.tex docs/workshop_tex/main_<venue>.tex
+%   - edit \workshoptitle{} in the wrapper to the venue's official name
+%   - edit the three marked spots below
+%   - add `<venue>` to WORKSHOPS in docs/Makefile
+%   make -C docs workshop-<venue>
+%
+% CROSS-REFERENCES: a workshop build has NO APPENDIX. Never \ref an app:*
+% label from here or the build emits an undefined reference.
+%
+% PAGE BUDGET: _workshop_core.tex runs ~6 pages, so this file has ~2 pages of
+% room against an 8-page limit (abstract + introduction + title block).  For a
+% 6-page venue set \workshopcompacttrue in the wrapper, which drops three
+% optional floats from the core and buys ~2 pages back.
+% ============================================================
+
+\maketitle
+
+\begin{center}\vspace{-2.4em}\small
+    \ifanon
+    {\faGithub}\ Code: \href{https://anonymous.4open.science/r/FactoryBench/README.md}{\nolinkurl{anonymous.4open.science/r/FactoryBench}} \\[0.15em]
+    \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ Dataset: released on HuggingFace; link withheld for anonymous review
+    \else
+    {\faGithub}\ Code: \href{https://github.com/Forgis-Labs/Factorybench}{\nolinkurl{github.com/Forgis-Labs/Factorybench}} \\[0.15em]
+    \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ Dataset: \href{https://huggingface.co/datasets/FactoryBench/FactoryBench}{\nolinkurl{huggingface.co/datasets/FactoryBench/FactoryBench}}
+    \fi
+\end{center}
+\vspace{-0.4em}
+\input{figures/figure_pipeline}
+\vspace{-1.5em}
+
+% ---- EDIT 1 of 3: the abstract -----------------------------------------
+% Start from the abstract in ../paper/_content.tex and adjust emphasis to the
+% venue. Keep every number identical to the extended paper.
+\begin{abstract}
+    We introduce \textbf{FactoryBench}, a benchmark for evaluating time-series models and LLMs on machine understanding over industrial robotic telemetry. Q\&A pairs are organized along four causal levels (state, intervention, counterfactual, decision) instantiating Pearl's ladder of causation, and span five answer formats: four structured formats are scored deterministically and free-form answers are scored by an LLM-as-judge voting protocol. We propose a scalable Q\&A generation framework built around structured question templates, present \textbf{FactoryWave} (a dense, multitask, multivariate sensor dataset collected from a UR3 cobot and a KUKA KR10 industrial arm), and construct FactoryBench as a large-scale benchmark of over 70k Q\&A items grounded in roughly 15k normalized episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2023vorausad}. Zero-shot evaluation of six frontier LLMs shows that no model exceeds 50\% (chance-corrected) on the structured levels and that the panel ordering reshuffles on the decision-making level, with the L1--L3 leader falling to the bottom of the L4 ranking; both findings reveal a wide gap between current models and operational machine understanding.
+\end{abstract}
+
+% ---- EDIT 2 of 3: the introduction --------------------------------------
+% The four paragraphs below are the venue-neutral introduction. Add one or two
+% sentences to the third paragraph connecting the four levels to this
+% workshop's theme; that is usually the only change needed.
+\section{Introduction}
+
+Modern robotic manufacturing systems emit dense multivariate telemetry, encoding joint states, torques, forces, velocities, contact events, task phases, and fault indicators. Extracting actionable knowledge from these signals is central to monitoring, diagnostics, anomaly detection, and decision support.
+
+Traditional time-series models excel at narrow tasks such as prediction, classification, and anomaly detection \cite{zhou2021informer,su2019omni,audibert2020usad}, but they are typically specialized, hard to interpret, output labels without explicit reasoning, and generalize poorly outside their training task \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}, limiting their utility for automated engineering decisions in a factory setting. Large language models, in contrast, possess strong general reasoning and can produce structured technical explanations \cite{wei2022chain,yao2023tree}, but underperform when applied directly to dense numerical time series \cite{gruver2023llmtime,jin2024timellm}.
+
+Evaluating whether language-based systems truly reason about machine behavior, rather than pattern-matching on textual cues, remains challenging. By \emph{machine-behavior understanding} we mean the ability to (i)~interpret the current operational state from raw multivariate signals, (ii)~predict the effect of an intervention, (iii)~reason counterfactually about alternative histories, and (iv)~recommend remedial actions grounded in physical and engineering constraints. How current LLMs perform across these four competences on dense industrial telemetry has not yet been systematically measured. General benchmarks such as MMLU, BIG-bench, and MMMU \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} target textual or multimodal understanding and cannot probe machine behavior; closer-in-spirit time-series Q\&A benchmarks (TimeSeriesExam~\cite{cai2024timeseriesexamtimeseriesunderstanding}, ChatTS~\cite{Xie_2025}, EngineMT-QA~\cite{wang2025itformerbridgingtimeseries}, Time-MQA~\cite{kong2025timemqatimeseriesmultitask}, QuAnTS~\cite{wenkel2024quants}) restrict themselves to synthetic or univariate data, omit counterfactual reasoning, or do not involve a robotic system under closed-loop control.
+
+To address this gap we propose FactoryBench, a benchmark for machine-behavior reasoning in time-series models and LLMs. FactoryBench is grounded in \textbf{FactoryWave}, a dense multivariate dataset collected from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. Industrial-robot data of this kind is rare in public benchmarks: such systems live in restricted production environments behind proprietary controllers with limited telemetry and plant-level confidentiality. To our knowledge FactoryWave is the first extensive anomaly dataset to (partly) cover an industrial robot, explicitly bridging the cobot-to-industrial-machine gap. To populate the benchmark, we introduce a scalable question-generation framework of 21 structured templates spanning state, intervention, counterfactual, and decision-making reasoning, applicable to general machine data flows; instantiated over FactoryWave (and AURSAD / voraus-AD), they yield the full FactoryBench Q\&A corpus. For cheaper evaluation we additionally release \textbf{FactoryBench-Lite}, a $3{,}000$-item subset that is balanced both across templates and within each template on the dimension that determines its answer, so that level aggregates are not weighted by how many items a template happens to contribute.
+
+% ---- EDIT 3 of 3: the two connectors ------------------------------------
+% One sentence each, tying FactoryBench to this venue's theme. The core body
+% carries the argument; these only bridge to it. Leave them empty and the
+% build still works (the core \providecommand's empty defaults).
+\renewcommand{\workshoprelatedworknote}{%
+    % One bridging sentence, printed at the end of Related Work, immediately
+    % before the benchmark comparison table.
+}
+\renewcommand{\workshopclosingnote}{%
+    % One closing sentence, printed at the end of the Conclusion.
+}

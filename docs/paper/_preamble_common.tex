@@ -82,3 +82,28 @@
 % this file (declaring it again in the wrapper would reset it to false).
 \newif\ifneuripschecklist
 \neuripschecklisttrue
+
+% Venue toggle: compact workshop body?
+% Read by _workshop_core.tex to drop the three optional floats (the benchmark
+% comparison table, the levels-examples table, the FactoryWave collage) and the
+% prose that depends on them, taking the shared body from ~6 pages to ~4 for a
+% venue with a tighter cap. Nothing load-bearing is gated: every claim and
+% number survives compact mode.
+%
+% Declared and defaulted to FALSE here, so an 8-page workshop wrapper need do
+% nothing. A wrapper for a 6-page or shorter venue says \workshopcompacttrue
+% AFTER inputting this file. The full-paper builds never read it, but it must
+% be declared for them too, because _workshop_core.tex and _content.tex share
+% the same preamble.
+\newif\ifworkshopcompact
+\workshopcompactfalse
+
+% Workshop connector macros, expanded by _workshop_core.tex at the end of its
+% Related Work and its Conclusion. A per-venue file (_workshop_<venue>.tex)
+% renews them with one sentence each, tying FactoryBench to that venue theme.
+% They are declared here rather than in the core body because the venue file
+% is loaded first: a declaration inside the core would land after the venue
+% had already renewed them, and be too late to define them. Empty defaults,
+% so a build that sets neither still compiles.
+\providecommand{\workshoprelatedworknote}{}
+\providecommand{\workshopclosingnote}{}
