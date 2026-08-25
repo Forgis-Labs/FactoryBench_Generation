@@ -56,7 +56,18 @@ data/factorywave/*
 
 #output
 output/*
+# Re-including a file needs its directory re-included first: git will not
+# descend into an excluded directory to find negations.
+!output/figures/
+output/figures/*
+# Figures the appendix needs that cannot be regenerated: their data and code
+# left with their author, and these copies were recovered as vector crops
+# from a compiled PDF. Losing them again would mean redrawing from scratch.
 !output/figures/fig_main_heatmap.pdf
+!output/figures/fig_agent_pipeline_results.pdf
+!output/figures/fig_judge_agreement.pdf
+!output/figures/fig_probe_vs_readout.pdf
+!output/figures/fig_probe_layerwise.pdf
 
 # datasets
 datasets/*
