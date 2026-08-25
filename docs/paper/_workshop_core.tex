@@ -146,7 +146,7 @@ Scalable ground-truth generation is the central challenge of any Q\&A benchmark 
 \ifworkshopcompact\else
 \begin{figure}[!h]
     \centering
-    \includegraphics[width=0.9\linewidth]{figures/factorybench-collage.pdf}
+    \includegraphics[width=\collagefrac\linewidth]{figures/factorybench-collage.pdf}
     \caption{FactoryWave tasks and fault catalogue. Photographs of the robotic platforms (UR3, KUKA KR10) executing the three tasks (pick-and-place, peg-in-hole, screwdriving) and a representative subset of the 27 systematically injected fault conditions.}
     \label{fig:factorywave_collage}
 \end{figure}
@@ -180,13 +180,13 @@ We evaluate a cross-vendor panel of frontier LLMs available at submission time (
     \centering
     \begin{subfigure}[t]{\linewidth}
         \centering
-        \includegraphics[width=0.85\linewidth]{../../output/figures/fig_main_heatmap.pdf}
+        \includegraphics[width=\resultsafrac\linewidth]{../../output/figures/fig_main_heatmap.pdf}
         \caption{Chance-corrected accuracy (\%) on FactoryBench's four reasoning levels.}
         \label{fig:results-heatmap}
     \end{subfigure}\\[0.5em]
     \begin{subfigure}[t]{\linewidth}
         \centering
-        \makebox[\linewidth][c]{\includegraphics[width=0.95\linewidth]{figures/fig_l4_gpt51_byrootcause.pdf}}
+        \makebox[\linewidth][c]{\includegraphics[width=\resultsbfrac\linewidth]{figures/fig_l4_gpt51_byrootcause.pdf}}
         \caption{GPT-5.1 L4 score distribution by ground-truth root cause (left, troubleshooting) and misconfigured parameter (right, optimization). Each bar shows the proportion of items scored 0/0.5/1; the right-edge value is the per-category mean accuracy.}
         \label{fig:results-gpt51-l4}
     \end{subfigure}

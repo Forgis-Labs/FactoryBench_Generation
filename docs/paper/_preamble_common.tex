@@ -116,3 +116,15 @@
 % a reader decides whether to keep reading. Below about 0.80 the node
 % labels start to get hard to read.
 \providecommand{\herowidth}{\linewidth}
+
+% Body-figure widths, as fractions of \linewidth, overridable per venue.
+% Same purpose as \herowidth: a workshop sitting on its page limit can reclaim
+% a few lines by tightening a float instead of cutting prose. Defaults are the
+% sizes the figures were authored at, so any build that does not set them is
+% unchanged.
+%   \collagefrac    the FactoryWave tasks/faults collage
+%   \resultsafrac   panel (a) of the main results figure, the heatmap
+%   \resultsbfrac   panel (b), the GPT-5.1 L4 breakdown
+\providecommand{\collagefrac}{0.9}
+\providecommand{\resultsafrac}{0.85}
+\providecommand{\resultsbfrac}{0.95}
