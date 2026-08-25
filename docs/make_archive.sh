@@ -129,12 +129,52 @@ fi
 [ "$fail" -eq 0 ] || exit 1
 
 # --- package -------------------------------------------------------------
-cp main.pdf "../factorybench-${VENUE}-workshop.pdf"
+# Everything is stamped with the build date, so an archive on disk can always
+# be matched to the version it was cut from.
+DATE="$(date +%F)"
+BASE="factorybench-${VENUE}-workshop-${DATE}"
+
+cp main.pdf "../${BASE}.pdf"
 rm -f main.aux main.log main.blg main.out main.pdf   # keep main.bbl: portals need it
 cd ..
-rm -f "factorybench-${VENUE}-workshop-source.zip"
-( cd "${VENUE}-source" && zip -q -r "../factorybench-${VENUE}-workshop-source.zip" . )
+
+# 1. arXiv-ready source: FLAT, sources at the zip root, .bbl included so the
+#    portal does not have to run bibtex. arXiv rejects a nested layout.
+rm -f "${BASE}-arxiv-source.zip"
+( cd "${VENUE}-source" && zip -q -r "../${BASE}-arxiv-source.zip" . )
+
+# 2. Full package: the PDF, the sources under latex/, and a README recording
+#    what this is and where it goes. For your records and for OpenReview
+#    supplementary material; NOT the thing to hand arXiv, which wants (1).
+PKG="${BASE}-full"
+rm -rf "$PKG" "${PKG}.zip"
+mkdir -p "$PKG/latex"
+cp "${BASE}.pdf" "$PKG/"
+cp -r "${VENUE}-source/." "$PKG/latex/"
+
+{
+    echo "FactoryBench - ${VENUE} workshop submission"
+    echo "Built ${DATE}"
+    echo
+    echo "CONTENTS"
+    echo "  ${BASE}.pdf   the paper; this is what you upload"
+    echo "  latex/                       complete LaTeX sources"
+    echo
+    echo "TO REBUILD (no bibtex needed, main.bbl is included):"
+    echo "  cd latex && pdflatex main && pdflatex main"
+    echo
+    echo "FOR ARXIV: do not upload this zip. Upload the flat one instead,"
+    echo "  ${BASE}-arxiv-source.zip"
+    echo "arXiv requires the .tex files at the root of the archive."
+    echo
+    echo "VENUE TERMS (from the CFP comment block in the wrapper):"
+    awk '/CFP \(checked/{on=1} on && /^%%/{sub(/^%% ?/,"");print "  " $0; next} on{exit}'         "$PKG/latex/main.tex" 
+} > "$PKG/README.txt"
+
+( zip -q -r "${PKG}.zip" "$PKG" )
+rm -rf "$PKG"
 
 echo
-echo "OK  dist/factorybench-${VENUE}-workshop.pdf"
-echo "OK  dist/factorybench-${VENUE}-workshop-source.zip"
+echo "OK  dist/${BASE}.pdf                  <- upload this to OpenReview"
+echo "OK  dist/${BASE}-arxiv-source.zip     <- upload this to arXiv (flat)"
+echo "OK  dist/${BASE}-full.zip             <- PDF + sources + README"

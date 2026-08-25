@@ -244,5 +244,10 @@ We introduced FactoryBench, a four-level benchmark for machine understanding ove
 We introduced FactoryBench, a four-level benchmark for machine understanding over industrial robotic telemetry, grounded in FactoryWave and structured around Pearl's causal hierarchy. Zero-shot evaluation of six frontier LLMs shows that signal comprehension and protocol-grounded decision-making are distinct capabilities that do not co-develop: the panel ordering on Levels~1--3 reshuffles on Level~4, with GPT-5.1 taking the L4 lead despite being mediocre on the structured levels while the L1--L3 leader ranks near the bottom on L4. Structured-level scores remain well below 50\% (chance-corrected) and no model approaches saturation on any level. \workshopclosingnote{} Full dataset details, extended per-format and per-robot breakdowns, the human-baseline protocol, and the full probing methodology are available in the extended paper and released alongside the dataset and code (links above).
 \fi
 
+% References begin on a fresh page. Every workshop build sits exactly at its
+% CFP page limit, so letting the bibliography start halfway down the last body
+% page makes it ambiguous whether that page counts as a main page. A clean
+% break removes the question and reads better.
+\clearpage
 \bibliographystyle{\paperbibstyle}
 \bibliography{../paper/references}
