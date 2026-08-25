@@ -52,7 +52,7 @@ docs/
   neurips_tex/               NeurIPS wrappers + all figures + checklist
   iclr_tex/                  ICLR wrapper + ICLR style files
   workshop_tex/              workshop wrappers + neurips_2026.sty
-  arxiv/                     FROZEN arXiv v1 record — see arxiv/README.md
+  arxiv/                     FROZEN arXiv v1 record, see arxiv/README.md
   dist/                      build output (gitignored)
 ```
 
@@ -142,8 +142,8 @@ aborts on any LaTeX error, undefined citation or reference, or missing input.
 
 Each venue produces:
 
-- `dist/factorybench-<venue>-workshop.pdf` — the PDF to upload
-- `dist/factorybench-<venue>-workshop-source.zip` — flat sources that build with
+- `dist/factorybench-<venue>-workshop.pdf`, the PDF to upload
+- `dist/factorybench-<venue>-workshop-source.zip`, flat sources that build with
   a bare `pdflatex main` (includes `main.bbl`, which portals that do not run
   bibtex require)
 

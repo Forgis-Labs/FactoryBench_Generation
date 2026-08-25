@@ -2,11 +2,11 @@
 
 Two distinct modes:
 
-  * `score_free_form(...)` — the paper's §3.2 protocol for `free_form` answers:
+  * `score_free_form(...)`, the paper's §3.2 protocol for `free_form` answers:
     classify the model's answer as Wrong (0.0) / Neutral (0.5) / Correct (1.0)
     against a reference. Always invoked for free-form (no deterministic option).
 
-  * `extract(...)` — escalation path for the deterministic formats. When the
+  * `extract(...)`, escalation path for the deterministic formats. When the
     parser cascade returns `unparseable`, we ask the judge to extract the
     model's INTENDED answer in the canonical format (a letter, a TFTF string,
     a number, etc.). The caller then re-runs the parser on the extracted text
@@ -171,14 +171,12 @@ class LLMJudge:
 
     # ---- Free-form scoring (always uses judge) ----
     def score_free_form(
-        self, *, question: str | None, prediction: str, reference: Any,
-    ) -> ParseResult:
+        self, *, question: str | None, prediction: str, reference: Any) -> ParseResult:
         self._ensure_call()
         prompt = _FREE_FORM_PROMPT.format(
             question=(question or "(question text not available in trace)")[:6000],
             reference=str(reference)[:2000],
-            prediction=str(prediction)[:PREDICTION_MAX_CHARS],
-        )
+            prediction=str(prediction)[:PREDICTION_MAX_CHARS])
         try:
             raw, _body = self._call(self.model, prompt, self.max_tokens)
         except Exception as e:
@@ -194,8 +192,7 @@ class LLMJudge:
 
     # ---- Canonical-answer extraction (escalation for deterministic formats) ----
     def extract(
-        self, *, answer_format: str, prediction: str, ground_truth: Any,
-    ) -> tuple[str | None, str]:
+        self, *, answer_format: str, prediction: str, ground_truth: Any) -> tuple[str | None, str]:
         """Returns (extracted_canonical_answer, judge_reason).
 
         `extracted` is None when the format is unsupported or the judge said

@@ -4,7 +4,7 @@ Built-in event applicators.
 BUILTIN_APPLICATORS is a dict mapping event_id → applicator instance,
 ready to pass to EventScheduler.
 
-Only physics-level injections are included — sensor-only corruptions
+Only physics-level injections are included, sensor-only corruptions
 (Transient Spike/Dip) were removed because they don't affect the
 actual simulation.
 """

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-sweep_mass_friction.py — grid-search over cube mass & friction ranges.
+sweep_mass_friction.py, grid-search over cube mass & friction ranges.
 
 Uses the same simulation code as run.py. With --workers N, launches N
 parallel Isaac Sim processes to split the grid (each pays startup once).
@@ -73,7 +73,7 @@ parser.add_argument("--headless", action="store_true", default=True,
                     help="Run headless (default: True)")
 parser.add_argument("--visual", action="store_true",
                     help="Run with rendering (forces --workers 1)")
-# Internal: worker mode — runs a slice of the grid and writes results to a file
+# Internal: worker mode, runs a slice of the grid and writes results to a file
 parser.add_argument("--_worker_cells", type=str, default=None,
                     help=argparse.SUPPRESS)
 parser.add_argument("--_worker_outfile", type=str, default=None,
@@ -300,7 +300,7 @@ def run_worker():
     import run as _run_module
     _run_module._args.headless = _headless
 
-    # All constants from run.py — run.py loads these from task.yaml,
+    # All constants from run.py, run.py loads these from task.yaml,
     # so any config change is automatically picked up by the sweep.
     ROBOT_PRIM         = _run_module.ROBOT_PRIM
     EEF_PRIM           = _run_module.EEF_PRIM
@@ -362,14 +362,12 @@ def run_worker():
         joint_opened_positions=np.array([0.0]),
         joint_closed_positions=np.array([np.radians(GRIPPER_CLOSE_DEG_MAX)]),
         action_deltas=None,
-        use_mimic_joints=True,
-    )
+        use_mimic_joints=True)
     gripper.initialize(
         articulation_apply_action_func=robot.apply_action,
         get_joint_positions_func=robot.get_joint_positions,
         set_joint_positions_func=robot.set_joint_positions,
-        dof_names=robot.dof_names,
-    )
+        dof_names=robot.dof_names)
 
     _GRIP_INDICES = np.array([6, 7, 8, 9, 10, 11])
     _init_kp, _init_kd, _ = _run_module._grip_strength_for_mass(
@@ -457,8 +455,7 @@ def run_worker():
                 cspace_controller=rmp_controller,
                 gripper=gripper,
                 end_effector_initial_height=EEF_INITIAL_HEIGHT,
-                events_dt=EVENTS_DT,
-            )
+                events_dt=EVENTS_DT)
 
             robot.set_joint_positions(home_full)
             robot.set_joint_velocities(np.zeros(n_dof))
@@ -494,7 +491,7 @@ def run_worker():
                 if np.any(np.abs(cube_pos) > 10.0):
                     cube_pos = cur_spawn.copy()
 
-                # Drop detection — immediate, same as run.py
+                # Drop detection, immediate, same as run.py
                 if cube_pos[2] < -0.15:
                     reason = "dropped"
                     break
@@ -503,14 +500,13 @@ def run_worker():
                     reason = "timeout"
                     break
 
-                # PickPlaceController — identical to run.py
+                # PickPlaceController, identical to run.py
                 current_joints = robot.get_joint_positions()
                 action = pick_place.forward(
                     picking_position=pick_pos,
                     placing_position=place_pos,
                     current_joint_positions=current_joints,
-                    end_effector_orientation=ee_orient,
-                )
+                    end_effector_orientation=ee_orient)
                 robot.apply_action(action)
 
                 phase = min(pick_place.get_current_event(), 9)
@@ -524,7 +520,7 @@ def run_worker():
                     np.array([[grip_target]]), joint_indices=np.array([fj_idx])
                 )
 
-                # Success check — identical to run.py
+                # Success check, identical to run.py
                 if pick_place.is_done():
                     cube_final, _ = cube.get_world_pose()
                     cube_final = np.asarray(cube_final)

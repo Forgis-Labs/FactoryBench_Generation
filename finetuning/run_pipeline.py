@@ -3,16 +3,16 @@
 For each selected checkpoint, runs three stages in sequence and blocks on
 each until SageMaker reports completion:
 
-    1. Baseline eval        — pretrained Shrike/Bearing on FactoryBench test
-    2. DoRA-on-DoRA finetune — train a fresh adapter on FactoryBench train
-    3. Finetuned eval        — same model with the new adapter stacked on top
+    1. Baseline eval, pretrained Shrike/Bearing on FactoryBench test
+    2. DoRA-on-DoRA finetune, train a fresh adapter on FactoryBench train
+    3. Finetuned eval, same model with the new adapter stacked on top
 
 Stages run sequentially within a model and models run sequentially across the
 sweep, so at any moment only ONE SageMaker training job is consuming quota.
 This is the right shape when your per-instance-type spot limit is 1.
 
 Usage:
-    # All 4 models, full pipeline (long-running — ~12-24h depending on quotas)
+    # All 4 models, full pipeline (long-running, ~12-24h depending on quotas)
     python finetuning/run_pipeline.py
 
     # Just one model
@@ -34,7 +34,7 @@ from argparse import Namespace
 from datetime import datetime
 from pathlib import Path
 
-# Same dir as the existing launchers — import them to reuse the per-checkpoint
+# Same dir as the existing launchers, import them to reuse the per-checkpoint
 # config and the estimator builders, so there's exactly one source of truth.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -43,11 +43,9 @@ import sagemaker
 
 from launch_dora_sweep import (  # noqa: E402
     CHECKPOINTS, BUCKET, REGION,
-    TRAIN_DEFAULTS, build_estimator as build_train_estimator,
-)
+    TRAIN_DEFAULTS, build_estimator as build_train_estimator)
 from launch_eval_sweep import (  # noqa: E402
-    EVAL_DEFAULTS, build_estimator as build_eval_estimator,
-)
+    EVAL_DEFAULTS, build_estimator as build_eval_estimator)
 
 
 STAGES = ("baseline", "train", "finetuned")
@@ -94,9 +92,9 @@ def _format_elapsed(seconds: float) -> str:
 def _run_stage(label: str, fit_callable) -> None:
     """Call fit_callable (which wraps estimator.fit(wait=True)) and time it."""
     t0 = time.time()
-    print(f"\n>>> {label} — submitting", flush=True)
+    print(f"\n>>> {label}, submitting", flush=True)
     fit_callable()
-    print(f"<<< {label} — done in {_format_elapsed(time.time() - t0)}", flush=True)
+    print(f"<<< {label}, done in {_format_elapsed(time.time() - t0)}", flush=True)
 
 
 def _submit_with_quota_retry(estimator, inputs: dict, job_name: str,
@@ -105,7 +103,7 @@ def _submit_with_quota_retry(estimator, inputs: dict, job_name: str,
 
     SageMaker rejects the create-training-job call immediately if you're at
     your per-instance-type quota cap. Rather than failing the pipeline, we
-    sleep for ``retry_seconds`` and try again — typically the blocking job
+    sleep for ``retry_seconds`` and try again, typically the blocking job
     will free its slot within that interval. Caps total wait at
     ``max_wait_seconds`` so a permanently-stuck quota doesn't hang forever.
     """
@@ -118,7 +116,7 @@ def _submit_with_quota_retry(estimator, inputs: dict, job_name: str,
         except Exception as e:
             msg = str(e)
             if "ResourceLimitExceeded" not in msg:
-                # Anything else (auth, bad channel, etc.) — let it bubble up.
+                # Anything else (auth, bad channel, etc.), let it bubble up.
                 raise
             elapsed = time.time() - t0
             if elapsed >= max_wait_seconds:
@@ -137,9 +135,9 @@ def run_pipeline_for_model(key: str, cfg: dict, args: Namespace,
     All 3 SageMaker job names get the same timestamp suffix, so:
       * re-running the pipeline never collides with names from a prior run;
       * the finetuned-eval can find its adapter by deriving the S3 path from
-        the (timestamped) training job name — they share the suffix.
+        the (timestamped) training job name, they share the suffix.
     """
-    # One timestamp per (model, pipeline invocation) — flows into every stage.
+    # One timestamp per (model, pipeline invocation), flows into every stage.
     suffix = datetime.now().strftime("%Y%m%d-%H%M%S")
     cfg_run = dict(cfg)
     cfg_run["job_name"] = f"{cfg['job_name']}-{suffix}"
@@ -184,7 +182,7 @@ def run_pipeline_for_model(key: str, cfg: dict, args: Namespace,
 
     # ---------------- Stage 3: finetuned eval ----------------
     # build_eval_estimator derives the adapter URI from cfg_run['job_name'],
-    # which is the timestamped training name above — so the eval job picks up
+    # which is the timestamped training name above, so the eval job picks up
     # the adapter that the training stage just wrote.
     if "finetuned" not in args.skip:
         def _fit_finetuned():
@@ -222,7 +220,7 @@ def main() -> None:
                    help="Validation-set cap.")
     p.add_argument("--dry-run", action="store_true",
                    help="Print the per-model plan; don't submit anything.")
-    # Quota-retry behavior — defaults are generous; tune if you know your
+    # Quota-retry behavior, defaults are generous; tune if you know your
     # other jobs are short or you want to bail out faster.
     p.add_argument("--quota-retry-seconds", type=int, default=300,
                    help="Seconds to wait between retries when a submission "
@@ -240,7 +238,7 @@ def main() -> None:
                          f"Valid: {list(CHECKPOINTS)}")
 
     print("=" * 72)
-    print(f"FactoryBench full pipeline — {len(keys)} model(s), sequential")
+    print(f"FactoryBench full pipeline, {len(keys)} model(s), sequential")
     print(f"Models:  {keys}")
     print(f"Skip:    {sorted(args.skip) or '<none>'}")
     print(f"Spot:    {args.spot}")

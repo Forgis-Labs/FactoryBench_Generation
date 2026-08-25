@@ -67,7 +67,7 @@ gcloud auth application-default login
 gcloud config set project forgisprova
 ```
 
-`gcloud auth login` alone is **not** enough — the runner needs the *application-default* variant. If only the plain login is present, `src/evaluation/run_foundry_eval._vertex_access_token()` falls back to shelling out to `gcloud auth print-access-token`, which works but re-shells on every token refresh.
+`gcloud auth login` alone is **not** enough, the runner needs the *application-default* variant. If only the plain login is present, `src/evaluation/run_foundry_eval._vertex_access_token()` falls back to shelling out to `gcloud auth print-access-token`, which works but re-shells on every token refresh.
 
 **Unattended (CI, Cloud Batch, GCE):** the metadata server supplies ADC automatically once the VM or job runs as the service account from section 3. No key file needed, and none should be created.
 
@@ -107,7 +107,7 @@ GCP_REGION=us-central1
 GCS_BUCKET=factorybench-batch-io
 GCS_PREFIX=factorybench/
 
-# All optional — defaults live in src/config.py and are the verified values.
+# All optional: defaults live in src/config.py and are the verified values.
 # CLAUDE_SONNET_46_VERTEX_MODEL=claude-sonnet-4-6
 # CLAUDE_SONNET_46_VERTEX_REGION=global
 # CLAUDE_SONNET_46_VERTEX_BATCH_REGION=us-central1

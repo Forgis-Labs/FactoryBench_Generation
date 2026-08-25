@@ -181,8 +181,7 @@ def main() -> None:
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     project = os.getenv("OPIK_PROJECT_NAME", "FactoryBench")
     workspace = os.getenv("OPIK_WORKSPACE", "forgis")
@@ -200,8 +199,7 @@ def main() -> None:
     traces = client.search_traces(
         project_name=project,
         max_results=args.max_traces,
-        filter_string=f'start_time > "{args.since}"',
-    )
+        filter_string=f'start_time > "{args.since}"')
     logger.info("Fetched %d traces", len(traces))
 
     if args.limit:
@@ -235,7 +233,7 @@ def main() -> None:
             n_missing_data += 1
             continue
 
-        # Override answer_format from local QA index (when set) — fixes traces
+        # Override answer_format from local QA index (when set), fixes traces
         # logged before infer_answer_format learned to honour answer_format.type.
         was_overridden = False
         if qa_format_index:
@@ -266,8 +264,7 @@ def main() -> None:
             ground_truth=ground_truth,
             question=question,
             acceptance_bounds=acceptance_bounds,
-            judge=judge,
-        )
+            judge=judge)
 
         # Telemetry
         provenance_counts[result.provenance] += 1
@@ -293,8 +290,7 @@ def main() -> None:
         if args.dry_run:
             logger.info(
                 "[%d/%d] %s %s score=%s prov=%s",
-                i + 1, len(traces), model_name, answer_format, result.score, result.provenance,
-            )
+                i + 1, len(traces), model_name, answer_format, result.score, result.provenance)
             continue
 
         # Queue feedback writes for batch flush
@@ -320,8 +316,7 @@ def main() -> None:
         if (i + 1) % 50 == 0:
             logger.info(
                 "Progress: %d/%d traces | judge calls: %d (free-form) + %d (escalation)",
-                i + 1, len(traces), n_judge_free_form, n_judge_escalation,
-            )
+                i + 1, len(traces), n_judge_free_form, n_judge_escalation)
 
     # Flush remaining writes
     if not args.dry_run and pending_writes:

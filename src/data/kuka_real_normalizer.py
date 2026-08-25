@@ -88,29 +88,29 @@ def _build_column_mapping() -> Dict[str, Optional[str]]:
     m: Dict[str, Optional[str]] = {}
 
     for i in range(6):
-        # INTENT — joint setpoints
+        # INTENT, joint setpoints
         m[f"setpoint_pos_{i}"]          = f"kuka_robot_setpoint_pos_{i}"
         m[f"setpoint_speed_{i}"]        = None  # not available
         m[f"setpoint_acc_{i}"]          = None  # not available
 
-        # OUTCOME — joint feedback
+        # OUTCOME, joint feedback
         m[f"feedback_pos_{i}"]          = f"kuka_robot_joint_{i}"
         m[f"feedback_speed_{i}"]        = None  # not available
 
-        # OUTCOME — effort
+        # OUTCOME, effort
         m[f"effort_current_{i}"]        = f"kuka_robot_motor_current_{i}"
         m[f"effort_target_current_{i}"] = None  # not available
         m[f"effort_target_torque_{i}"]  = f"kuka_robot_motor_torque_{i}"
 
-        # OUTCOME — controller output (commanded torque not exposed by KUKA)
+        # OUTCOME, controller output (commanded torque not exposed by KUKA)
         m[f"control_output_{i}"]        = None
 
-        # CONTEXT — per-joint
+        # CONTEXT, per-joint
         m[f"joint_temp_{i}"]            = f"kuka_robot_motor_temp_{i}"
         m[f"joint_mode_{i}"]            = None  # not available
         m[f"joint_voltage_{i}"]         = None  # not available
 
-    # INTENT / OUTCOME — TCP
+    # INTENT / OUTCOME, TCP
     # Handled with unit conversion in normalize_row(); mark source columns here.
     # feedback_tcp_0/1/2 ← tcp_x/y/z (mm → m), feedback_tcp_3/4/5 ← tcp_a/b/c (deg → rad)
     for i in range(6):
@@ -119,21 +119,21 @@ def _build_column_mapping() -> Dict[str, Optional[str]]:
         m[f"feedback_tcp_{i}"]          = None  # handled manually in normalize_row
         m[f"feedback_tcp_speed_{i}"]    = None
 
-    # OUTCOME — forces / vibration
+    # OUTCOME, forces / vibration
     for i in range(6):
         m[f"true_force_{i}"]            = None  # no force sensor
         m[f"est_contact_force_{i}"]     = None
     m["acoustic_0"]                     = None
     m["protective_stop_state"]          = None
 
-    # OUTCOME — vibration: cart accelerometer axes (handled in normalize_row for sign/unit)
+    # OUTCOME, vibration: cart accelerometer axes (handled in normalize_row for sign/unit)
     for i in range(3):
         m[f"vibration_{i}"]             = None  # handled manually
 
-    # INTENT — gripper
+    # INTENT, gripper
     m["gripper_command"]                = None
 
-    # CONTEXT — system-level
+    # CONTEXT, system-level
     m["robot_mode"]                     = None
     m["safety_mode"]                    = None
     m["digital_input_bits"]             = "kuka_robot_digital_inputs"
@@ -188,8 +188,7 @@ def _to_int(value) -> Optional[int]:
 def normalize_row(
     row: pd.Series,
     first_timestamp_ms: int,
-    convert_mm: bool = True,
-) -> Dict[str, Any]:
+    convert_mm: bool = True) -> Dict[str, Any]:
     """Convert one CSV row to UR3e schema dict.
 
     Args:
@@ -262,8 +261,7 @@ def normalize_dataset(
     episode_id: str,
     include_metadata: bool = True,
     convert_mm: bool = True,
-    downsample_q: int = 1,
-) -> None:
+    downsample_q: int = 1) -> None:
     """Normalize a single KUKA real-robot CSV to UR3e schema JSON."""
     logger.info(f"Loading {input_file.name} ...")
     df = pd.read_csv(input_file)
@@ -357,47 +355,39 @@ def main():
         "--input",
         type=Path,
         required=True,
-        help="Path to CSV file (or directory containing CSVs) to normalize.",
-    )
+        help="Path to CSV file (or directory containing CSVs) to normalize.")
     parser.add_argument(
         "--output",
         type=Path,
         required=True,
-        help="Output directory for normalized JSON files.",
-    )
+        help="Output directory for normalized JSON files.")
     parser.add_argument(
         "--episode-id",
         type=str,
         default=None,
-        help="Episode identifier. Defaults to the input file stem.",
-    )
+        help="Episode identifier. Defaults to the input file stem.")
     parser.add_argument(
         "--no-mm-conversion",
         action="store_true",
-        help="Skip mm→m conversion for TCP position (use if data is already in metres).",
-    )
+        help="Skip mm→m conversion for TCP position (use if data is already in metres).")
     parser.add_argument(
         "--source-hz",
         type=int,
         default=None,
-        help="Source sampling rate in Hz.  Required when --target-hz is given.",
-    )
+        help="Source sampling rate in Hz.  Required when --target-hz is given.")
     parser.add_argument(
         "--target-hz",
         type=int,
         default=None,
-        help="Target sampling rate in Hz.  Enables anti-aliased decimation.",
-    )
+        help="Target sampling rate in Hz.  Enables anti-aliased decimation.")
     parser.add_argument(
         "--no-metadata",
         action="store_true",
-        help="Skip generating metadata files.",
-    )
+        help="Skip generating metadata files.")
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="Enable verbose logging.",
-    )
+        help="Enable verbose logging.")
     args = parser.parse_args()
 
     downsample_q = 1
@@ -412,8 +402,7 @@ def main():
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     input_path: Path = args.input
 
@@ -437,8 +426,7 @@ def main():
                 episode_id=episode_id,
                 include_metadata=not args.no_metadata,
                 convert_mm=not args.no_mm_conversion,
-                downsample_q=downsample_q,
-            )
+                downsample_q=downsample_q)
         except Exception as e:
             logger.error(f"Failed to normalize {csv_file.name}: {e}")
             import traceback

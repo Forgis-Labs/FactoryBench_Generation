@@ -1,5 +1,5 @@
 """
-EventScheduler — loads event definitions, schedules random events per episode,
+EventScheduler, loads event definitions, schedules random events per episode,
 and dispatches active events each step.
 """
 
@@ -83,8 +83,7 @@ class EventScheduler:
         rng_seed: int = 0,
         num_events_range: Tuple[int, int] = (0, 2),
         margin_steps: int = 30,
-        force_event_id: Optional[int] = None,
-    ):
+        force_event_id: Optional[int] = None):
         self._rng = np.random.default_rng(rng_seed)
         self._task = task_name
         self._applicators = applicators
@@ -162,7 +161,7 @@ class EventScheduler:
             duration = max(1, int(params.pop("_duration", 1)))
             lo, hi = self._get_trigger_range(applicator, duration, max_episode_steps)
             # For persistent events (very large duration), don't shrink the
-            # trigger range — pick any step within the valid phases.
+            # trigger range, pick any step within the valid phases.
             trigger_hi = max(lo + 1, hi - duration + 1) if duration < hi - lo else hi
             trigger = int(self._rng.integers(lo, max(lo + 1, trigger_hi)))
             se = ScheduledEvent(
@@ -171,8 +170,7 @@ class EventScheduler:
                 trigger_step=trigger,
                 duration=duration,
                 params=params,
-                applicator=applicator,
-            )
+                applicator=applicator)
             self._scheduled.append(se)
             print(f"[EventScheduler] FORCED: {se.event_name}@step{se.trigger_step}"
                   f"(dur={se.duration})")
@@ -203,12 +201,12 @@ class EventScheduler:
             lo, hi = self._get_trigger_range(applicator, duration, max_episode_steps)
             earliest_start = max(next_available, lo)
             if duration >= hi - lo:
-                # Persistent event — can start anywhere in the valid range
+                # Persistent event, can start anywhere in the valid range
                 latest_start = hi - 1
             else:
                 latest_start = min(hi - duration, max_episode_steps - self._margin - duration)
             if earliest_start > latest_start:
-                # No room left for this event — skip it
+                # No room left for this event, skip it
                 continue
             trigger = int(self._rng.integers(earliest_start, latest_start + 1))
 
@@ -218,8 +216,7 @@ class EventScheduler:
                 trigger_step=trigger,
                 duration=duration,
                 params=params,
-                applicator=applicator,
-            )
+                applicator=applicator)
             self._scheduled.append(se)
 
             # Next event can only start after this one ends
@@ -235,8 +232,7 @@ class EventScheduler:
         return self._scheduled
 
     def _get_trigger_range(
-        self, applicator: BaseApplicator, duration: int, max_steps: int,
-    ) -> Tuple[int, int]:
+        self, applicator: BaseApplicator, duration: int, max_steps: int) -> Tuple[int, int]:
         """Return the (earliest, latest) step range for an event trigger."""
         if applicator.valid_phases is not None and hasattr(self, "_phase_bounds") \
                 and self._phase_bounds is not None:

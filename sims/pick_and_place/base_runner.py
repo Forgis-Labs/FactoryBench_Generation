@@ -3,7 +3,7 @@ FactoryBench / pick_and_place / base_runner.py
 Shared pick-and-place simulation for any UR robot + Robotiq 2F-85 gripper.
 
 All robot-specific values are loaded from a task_shared.yaml config file.
-This module is never run directly — use the per-robot thin wrappers instead.
+This module is never run directly, use the per-robot thin wrappers instead.
 
 Logic, phase ordering, success checks, event injection, and slip detection
 are identical to the original FactoryBench/ur5/pick_and_place/run.py.
@@ -73,7 +73,7 @@ def init_from_config(cfg: dict, task_dir: str) -> RC:
     rc.gripper_eef_prim        = g.get("eef_prim", None)
 
     if rc.gripper_builtin:
-        # Built-in gripper (e.g. Franka Panda) — no external USD to load
+        # Built-in gripper (e.g. Franka Panda), no external USD to load
         rc.gripper_usd       = None
         rc.gripper_prim      = None
         rc.gripper_base_link = None
@@ -88,7 +88,7 @@ def init_from_config(cfg: dict, task_dir: str) -> RC:
         rc.grip_close_targets = rc.gripper_close_positions
         rc.grip_open_targets  = rc.gripper_open_positions
     else:
-        # External gripper (Robotiq) — load from USD and attach via FixedJoint
+        # External gripper (Robotiq), load from USD and attach via FixedJoint
         rc.gripper_usd       = str(Path(_FACTORYBENCH_DIR) / g["usd"])
         rc.gripper_prim      = g["prim"]
         rc.gripper_base_link = g["base_link"]
@@ -99,7 +99,7 @@ def init_from_config(cfg: dict, task_dir: str) -> RC:
         rc.mimic_joints      = g.get("mimic_joints", [])
         rc.finger_pad_links  = g.get("finger_pad_links", [])
         rc.grip_kp_range     = tuple(g.get("grip_kp_range", [5000.0, 12000.0]))
-        # Grip targets in radians — use close_deg_max as the ParallelGripper
+        # Grip targets in radians, use close_deg_max as the ParallelGripper
         # close limit (runtime close angle is scaled per-episode via
         # _grip_strength_for_mass).
         rc.grip_close_targets = np.array([np.radians(rc.close_deg_max)])
@@ -211,8 +211,7 @@ def _apply_physics_material(stage, prim_path, static_friction, dynamic_friction,
         UsdShade.MaterialBindingAPI(prim).Bind(
             UsdShade.Material(mat_prim),
             UsdShade.Tokens.weakerThanDescendants,
-            "physics",
-        )
+            "physics")
 
     from pxr import UsdPhysics as _UP
     if not mat_prim.HasAPI(_UP.MaterialAPI):
@@ -305,18 +304,15 @@ def setup_hud(headless):
             flags=(ui.WINDOW_FLAGS_NO_RESIZE
                    | ui.WINDOW_FLAGS_NO_SCROLLBAR
                    | ui.WINDOW_FLAGS_NO_COLLAPSE
-                   | ui.WINDOW_FLAGS_NO_MOVE),
-        )
+                   | ui.WINDOW_FLAGS_NO_MOVE))
         with _hud_window.frame:
             with ui.VStack(spacing=4, height=0):
                 _hud_mass_label = ui.Label(
                     "mass: -- kg",
-                    style={"font_size": 22, "color": 0xFFFFFFFF},
-                )
+                    style={"font_size": 22, "color": 0xFFFFFFFF})
                 _hud_friction_label = ui.Label(
                     "friction: --",
-                    style={"font_size": 22, "color": 0xFFFFFFFF},
-                )
+                    style={"font_size": 22, "color": 0xFFFFFFFF})
         print("[HUD] Cube info overlay created")
     except Exception as e:
         print(f"[HUD] Could not create overlay: {e}")
@@ -351,25 +347,21 @@ def setup_event_indicator(headless):
                    | ui.WINDOW_FLAGS_NO_SCROLLBAR
                    | ui.WINDOW_FLAGS_NO_COLLAPSE
                    | ui.WINDOW_FLAGS_NO_MOVE
-                   | ui.WINDOW_FLAGS_NO_TITLE_BAR),
-        )
+                   | ui.WINDOW_FLAGS_NO_TITLE_BAR))
         with _evt_window.frame:
             with ui.ZStack(height=0):
                 _evt_rect = ui.Rectangle(
                     style={"background_color": 0xFF333333,
-                           "border_radius": 4},
-                )
+                           "border_radius": 4})
                 with ui.VStack(spacing=2):
                     _evt_label = ui.Label(
                         "  No active event",
                         style={"font_size": 18, "color": 0xFF888888},
-                        alignment=ui.Alignment.LEFT_CENTER,
-                    )
+                        alignment=ui.Alignment.LEFT_CENTER)
                     _evt_params_label = ui.Label(
                         "",
                         style={"font_size": 14, "color": 0xFFCCCCCC},
-                        alignment=ui.Alignment.LEFT_CENTER,
-                    )
+                        alignment=ui.Alignment.LEFT_CENTER)
         print("[HUD] Event indicator created")
     except Exception as e:
         print(f"[HUD] Event indicator failed: {e}")
@@ -641,8 +633,7 @@ def spawn_workpiece(world, rng, spawn_pos, dims, rc: RC, existing_cube=None):
             position=spawn_pos,
             scale=dims,
             color=color,
-            mass=0.5,
-        ))
+            mass=0.5))
         return cube
     existing_cube.set_local_scale(dims)
     # Update visual color each episode
@@ -708,7 +699,7 @@ def setup_gripper(stage, rc: RC):
     else:
         offset_pos = Gf.Vec3d(0, 0, 0)
 
-    # Create FixedJoint — under the gripper root, not the base_link
+    # Create FixedJoint, under the gripper root, not the base_link
     joint_path = GRIPPER_ROOT + "/wrist_fixed_joint"
     joint_prim = stage.GetPrimAtPath(joint_path)
     if not joint_prim.IsValid():
@@ -806,7 +797,7 @@ def _grip_strength_for_mass(cube_mass, rc: RC):
     kp_lo, kp_hi = rc.grip_kp_range
     kp = kp_lo + t * (kp_hi - kp_lo)
     kd = kp * 0.08
-    # Close angle — heavier cubes get more overshoot for stronger squeeze
+    # Close angle, heavier cubes get more overshoot for stronger squeeze
     close_deg = rc.close_deg_base + t * (rc.close_deg_max - rc.close_deg_base)
     close_rad = np.radians(close_deg)
     return kp, kd, close_rad
@@ -830,8 +821,7 @@ def update_gripper_for_episode(stage, rng, robot, cube_mass, cube_friction, rc: 
     robot._articulation_view.set_gains(
         kps=np.array([[kp] * len(rc.grip_joint_indices)]),
         kds=np.array([[kd] * len(rc.grip_joint_indices)]),
-        joint_indices=rc.grip_joint_indices,
-    )
+        joint_indices=rc.grip_joint_indices)
 
     print(f"[Gripper] pad_μ={pad_friction:.2f}  cube_μ={cube_friction:.2f}  "
           f"cube_mass={cube_mass:.3f}kg  kp={kp:.0f}  kd={kd:.0f}  "
@@ -863,16 +853,14 @@ def create_rmpflow_controller(name, robot_articulation, rmpflow_name, physics_dt
                 self._articulation_motion_policy._robot_articulation.get_world_pose()
             self._motion_policy.set_robot_base_pose(
                 robot_position=self._default_position,
-                robot_orientation=self._default_orientation,
-            )
+                robot_orientation=self._default_orientation)
             print(f"[RMPFlow] {rmpflow_name} controller initialized.")
 
         def reset(self):
             mg.MotionPolicyController.reset(self)
             self._motion_policy.set_robot_base_pose(
                 robot_position=self._default_position,
-                robot_orientation=self._default_orientation,
-            )
+                robot_orientation=self._default_orientation)
 
     return _URRMPFlowController()
 
@@ -958,13 +946,12 @@ def run(config_path: str, cli_args=None):
     _ensure_surface_friction(stage, "/World/cell/bin_floor", friction=0.8)
     _ensure_surface_friction(stage, "/World/cell/bin_stand_top", friction=0.6)
 
-    # Load robot — USD from Isaac Sim assets, or URDF from local file
+    # Load robot, USD from Isaac Sim assets, or URDF from local file
     if rc.robot_usd.endswith(".urdf"):
         from isaacsim.asset.importer.urdf import import_robot
         result = import_robot(
             asset_path=rc.robot_usd,
-            prim_path=rc.robot_prim,
-        )
+            prim_path=rc.robot_prim)
         print(f"[Robot] Imported URDF: {rc.robot_usd} -> {rc.robot_prim}")
     else:
         assets_root = get_assets_root_path()
@@ -973,7 +960,7 @@ def run(config_path: str, cli_args=None):
 
     # Load gripper
     if not rc.gripper_builtin:
-        # External gripper (Robotiq) — load USD and attach via FixedJoint
+        # External gripper (Robotiq), load USD and attach via FixedJoint
         add_reference_to_stage(rc.gripper_usd, rc.gripper_prim)
         setup_gripper(stage, rc)
 
@@ -1015,14 +1002,12 @@ def run(config_path: str, cli_args=None):
         joint_opened_positions=_pg_open,
         joint_closed_positions=_pg_close,
         action_deltas=None,
-        use_mimic_joints=rc.gripper_use_mimic,
-    )
+        use_mimic_joints=rc.gripper_use_mimic)
     gripper.initialize(
         articulation_apply_action_func=robot.apply_action,
         get_joint_positions_func=robot.get_joint_positions,
         set_joint_positions_func=robot.set_joint_positions,
-        dof_names=robot.dof_names,
-    )
+        dof_names=robot.dof_names)
     fj_idx = gripper.joint_dof_indicies[0]
 
     # Gripper drive gains left at USD asset's original values.
@@ -1034,16 +1019,14 @@ def run(config_path: str, cli_args=None):
         name=f"{rc.robot_name}_rmpflow",
         robot_articulation=robot,
         rmpflow_name=rc.rmpflow_name,
-        physics_dt=rc.sim_dt,
-    )
+        physics_dt=rc.sim_dt)
 
     pick_place = PickPlaceController(
         name=f"{rc.robot_name}_pick_place",
         cspace_controller=rmp_controller,
         gripper=gripper,
         end_effector_initial_height=rc.eef_initial_height,
-        events_dt=rc.events_dt,
-    )
+        events_dt=rc.events_dt)
 
     if not stage.GetPrimAtPath(rc.eef_prim).IsValid():
         carb.log_error(f"EEF prim {rc.eef_prim} not found. Aborting.")
@@ -1091,8 +1074,7 @@ def run(config_path: str, cli_args=None):
             applicators=BUILTIN_APPLICATORS,
             rng_seed=cli_args.seed + 10000,
             num_events_range=(0, cli_args.max_events_per_episode),
-            force_event_id=cli_args.event_i,
-        )
+            force_event_id=cli_args.event_i)
         event_scheduler.set_phase_boundaries(_phase_boundaries)
 
     cur_mass, cur_friction = randomize_cube_physics(cube, rng, rc, stage, UsdPhysics)
@@ -1102,8 +1084,7 @@ def run(config_path: str, cli_args=None):
         robot._articulation_view.set_gains(
             kps=np.array([[_init_kp] * len(rc.grip_joint_indices)]),
             kds=np.array([[_init_kd] * len(rc.grip_joint_indices)]),
-            joint_indices=rc.grip_joint_indices,
-        )
+            joint_indices=rc.grip_joint_indices)
         _, _cur_close_rad = update_gripper_for_episode(stage, rng, robot, cur_mass, cur_friction, rc)
     else:
         _cur_close_rad = _CLOSE_RAD
@@ -1172,8 +1153,7 @@ def run(config_path: str, cli_args=None):
             cube_dims=cur_dims, cube_spawn=cur_spawn,
             sim_time=sim_time,
             plan_attempts=plan_attempts,
-            pick_attempts=pick_attempts,
-        )
+            pick_attempts=pick_attempts)
         episode       += 1
         sim_time       = 0.0
         plan_attempts  = 0
@@ -1243,8 +1223,7 @@ def run(config_path: str, cli_args=None):
                 cube_prim_path=rc.cube_prim,
                 robot_prim_path=rc.robot_prim,
                 sim_dt=rc.sim_dt,
-                extra={"robot": robot},
-            )
+                extra={"robot": robot})
             event_scheduler.reset(_setup_ctx)
             event_scheduler.schedule_episode(max_episode_steps=1500)
             event_scheduler.setup_episode(_setup_ctx)
@@ -1263,8 +1242,7 @@ def run(config_path: str, cli_args=None):
             cube_prim_path=rc.cube_prim,
             robot_prim_path=rc.robot_prim,
             sim_dt=rc.sim_dt,
-            extra={"robot": robot},
-        )
+            extra={"robot": robot})
         event_scheduler.schedule_episode(max_episode_steps=1500)
         event_scheduler.setup_episode(_setup_ctx)
 
@@ -1297,11 +1275,10 @@ def run(config_path: str, cli_args=None):
             picking_position=pick_pos,
             placing_position=place_pos,
             current_joint_positions=current_joints,
-            end_effector_orientation=ee_orient,
-        )
+            end_effector_orientation=ee_orient)
         robot.apply_action(action)
 
-        # Reinforce gripper target every step — PickPlaceController only
+        # Reinforce gripper target every step, PickPlaceController only
         # sends the close/open command during phases 3 and 7, but
         # apply_action during arm phases can clear the gripper target.
         phase = min(pick_place.get_current_event(), 9)
@@ -1317,7 +1294,7 @@ def run(config_path: str, cli_args=None):
             )
         phase_name = PHASE_NAMES[phase]
 
-        # Sensor logging — record everything
+        # Sensor logging, record everything
         # Determine current Cartesian target based on controller phase
         if phase < 4:
             _ee_target = pick_pos
@@ -1347,10 +1324,9 @@ def run(config_path: str, cli_args=None):
             ee_target_quat=ee_orient,
             gripper_cmd_rad=_grip_cmd,
             gripper_pos_rad=_gripper_actual,
-            controller_phase=phase,
-        )
+            controller_phase=phase)
 
-        # Slip detection — compare cube and EEF velocities via finite
+        # Slip detection, compare cube and EEF velocities via finite
         # difference so both have identical lag characteristics.
         # A real slip produces sustained negative relative Z velocity.
         _slip_just_detected = False
@@ -1398,8 +1374,7 @@ def run(config_path: str, cli_args=None):
                 sim_dt=rc.sim_dt,
                 episode_step=ep_step,
                 state_machine=phase_name,
-                extra={"robot": robot, "action": action},
-            )
+                extra={"robot": robot, "action": action})
             active_events = event_scheduler.step(ep_step, evt_ctx)
             if active_events:
                 evt = active_events[0]
@@ -1411,7 +1386,7 @@ def run(config_path: str, cli_args=None):
                 sensor_row["event_params"] = pstr
             update_event_indicator(active_events)
 
-        # Show slip detection on the HUD — persists once detected
+        # Show slip detection on the HUD, persists once detected
         if _slip_just_detected or _slip_detected:
             if _evt_label is not None:
                 _evt_label.text = "  EVENT: Grip Slip (id=1)"
@@ -1433,10 +1408,10 @@ def run(config_path: str, cli_args=None):
             cube_final = np.asarray(cube_final)
             in_bin = check_in_bin(cube_final, rc)
             if in_bin:
-                print(f"[{step:6d}] Cycle complete — cube in bin.")
+                print(f"[{step:6d}] Cycle complete, cube in bin.")
                 reset_episode(success=True, reason="placed")
             else:
-                print(f"[{step:6d}] Cycle complete — cube NOT in bin "
+                print(f"[{step:6d}] Cycle complete, cube NOT in bin "
                       f"(pos={np.round(cube_final, 3)}).")
                 reset_episode(success=False, reason="missed_bin")
 

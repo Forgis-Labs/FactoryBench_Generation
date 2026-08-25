@@ -1,9 +1,9 @@
-"""Shrike — Time Series Understanding via Discrete Tokenization.
+"""Shrike, Time Series Understanding via Discrete Tokenization.
 
 A backbone-agnostic framework that turns any decoder-only LLM into a
 time-series reasoner through discrete VQ-VAE tokenization.
 
-VENDORED CODE — DO NOT EDIT TO ADD FEATURES
+VENDORED CODE, DO NOT EDIT TO ADD FEATURES
 ===========================================
 This is not FactoryBench code. It is a **partial copy** of the internal Forgis
 Shrike/TSLM repository, taken at the state that produced the checkpoints
@@ -48,8 +48,8 @@ Quick start::
     print(forecast.values)
 
 Submodules present in this copy:
-    shrike.model       — Shrike and BearingModel wrappers
-    shrike.tokenizer   — TOTEM, FSQ, FSQ-Transformer and FSQ-Transformer-RoPE
+    shrike.model, Shrike and BearingModel wrappers
+    shrike.tokenizer, TOTEM, FSQ, FSQ-Transformer and FSQ-Transformer-RoPE
 
 Upstream submodules NOT copied: shrike.data, shrike.eval, shrike.train.
 """

@@ -33,21 +33,18 @@ import numpy as np
 from src.question_generation.utils.hf_streaming import (
     HfStreamUploader,
     add_streaming_args,
-    make_uploader_from_args,
-)
+    make_uploader_from_args)
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates, load_ur3_mapping
 from src.question_generation.utils.template import (
     build_context,
-    discover_episodes_by_dataset,
-)
+    discover_episodes_by_dataset)
 from src.question_generation.utils.time_series import parse_event_id
 from src.question_generation.utils.relevance import (
     is_enabled as relevance_enabled,
     load_specs as load_relevance_specs,
     relevance_report,
     sample_with_relevance,
-    validate_relevance,
-)
+    validate_relevance)
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +100,7 @@ def get_root_cause_for_subseries(
     root_causes: Dict[int, Dict[str, Any]],
     events: List[Dict[str, Any]],
     all_rows: Optional[List[Dict[str, Any]]] = None,
-    start_idx: int = 0,
-) -> Dict[str, Any]:
+    start_idx: int = 0) -> Dict[str, Any]:
     """
     Determine the anomaly status and root cause for a subseries.
 
@@ -164,7 +160,7 @@ def get_root_cause_for_subseries(
             "anomaly_present": False,
             "fault_label": 0,
             "root_cause": "normal",
-            "description": "Normal operation — no anomaly present.",
+            "description": "Normal operation, no anomaly present.",
             "event_id": None,
             "event_name": None,
             "event_context": None,
@@ -177,7 +173,7 @@ def get_root_cause_for_subseries(
             "anomaly_present": False,
             "fault_label": 0,
             "root_cause": "normal",
-            "description": "Normal operation — no anomaly present.",
+            "description": "Normal operation, no anomaly present.",
             "event_id": None,
             "event_name": None,
             "event_context": None,
@@ -206,14 +202,13 @@ def _extract_episode_meta(raw: Any) -> Dict[str, Any]:
 
 def _build_ranking_context(
     labeled_rows: List[Tuple[str, List[Dict[str, Any]]]],
-    important_features: Optional[List[str]],
-) -> Dict[str, Any]:
+    important_features: Optional[List[str]]) -> Dict[str, Any]:
     """
     Build a multi-stream context for ranking questions.
 
     Each episode is padded to the common maximum length (repeating the last row)
     then encoded independently with build_context.  The result is a dict
-    {"streams": {"A": <context>, "B": <context>, ...}}.
+    {"streams": {"A": <context>, "B": <context>...}}.
     """
     max_len = max((len(rows) for _, rows in labeled_rows), default=0)
     keep = (set(important_features) | {"timestamp_ms"}) if important_features else None
@@ -234,8 +229,7 @@ def _try_generate_ranking_question(
     template: Dict[str, Any],
     episodes_by_dataset: Dict[str, List[Path]],
     available_datasets: List[str],
-    raw_cache: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    raw_cache: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Attempt to build a ranking question (templates 3 and 4).
 
@@ -315,8 +309,7 @@ def generate_level4_questions(
     ur3_mapping: Optional[Dict[str, Dict[str, Any]]] = None,
     relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     enumerate_mode: bool = False,
-    uploader: Optional[HfStreamUploader] = None,
-) -> None:
+    uploader: Optional[HfStreamUploader] = None) -> None:
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
@@ -499,14 +492,13 @@ def generate_level4_questions(
             if template["id"] == 1:
                 rc_info = get_root_cause_for_subseries(
                     subseries, root_causes, events,
-                    all_rows=rows, start_idx=start_idx,
-                )
+                    all_rows=rows, start_idx=start_idx)
                 root_cause = rc_info.get("root_cause")
                 if rc_info.get("anomaly_present"):
                     ur3_entry = (ur3_mapping or {}).get(root_cause, {})
                     if not ur3_entry.get("ur3_protocol"):
                         # No remediation protocol for this root cause (typically
-                        # placeholder/undocumented faults like fault 6, 12) — skip
+                        # placeholder/undocumented faults like fault 6, 12), skip
                         # rather than ship an item with answer=null.
                         continue
                     answer = ur3_entry["ur3_protocol"]
@@ -607,14 +599,12 @@ def main() -> None:
         "--datasets-dir",
         type=Path,
         default=repo_root / "data",
-        help="Root data directory (default: <repo>/data)",
-    )
+        help="Root data directory (default: <repo>/data)")
     parser.add_argument(
         "--output",
         type=Path,
         default=repo_root / "output" / "questions" / "level4",
-        help="Output directory (default: <repo>/output/questions/level4)",
-    )
+        help="Output directory (default: <repo>/output/questions/level4)")
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
@@ -625,30 +615,26 @@ def main() -> None:
              "of random sampling. -n becomes an upper cap. Combinations whose "
              "episode does not satisfy the template's preconditions are skipped. "
              "For ranking templates (t3/t4) the primary episode walks; the other "
-             "3 episodes per question are still sampled at random.",
-    )
+             "3 episodes per question are still sampled at random.")
     add_streaming_args(parser)
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
-        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
-    )
+        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}")
     parser.add_argument(
         "--template-ids",
         type=int,
         nargs="+",
         default=None,
         help="Restrict generation to these template ids (default: all). Useful "
-             "for regenerating a single template without rerunning the rest.",
-    )
+             "for regenerating a single template without rerunning the rest.")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
     if getattr(args, "template_ids", None):
@@ -687,8 +673,7 @@ def main() -> None:
         datasets=args.datasets,
         ur3_mapping=ur3_mapping,
         enumerate_mode=args.enumerate_mode,
-        uploader=uploader,
-    )
+        uploader=uploader)
 
 
 if __name__ == "__main__":

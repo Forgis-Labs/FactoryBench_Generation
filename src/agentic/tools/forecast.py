@@ -1,4 +1,4 @@
-"""forecast — Chronos-Bolt point/quantile forecaster.
+"""forecast, Chronos-Bolt point/quantile forecaster.
 
 Wraps ``amazon/chronos-bolt-small`` (~200 M params, CPU-fast) so the agent
 can delegate any "predict future value" subtask. Model is loaded lazily
@@ -40,8 +40,7 @@ def _load_pipeline():
         # device_map, then move.
         _PIPELINE = ChronosBoltPipeline.from_pretrained(
             "amazon/chronos-bolt-small",
-            torch_dtype=torch.float32,
-        )
+            torch_dtype=torch.float32)
         # Move to CPU explicitly to guarantee no meta tensors survive.
         try:
             _PIPELINE.model = _PIPELINE.model.to("cpu")
@@ -67,10 +66,10 @@ class ForecastTool:
                     "Forecast the value of a channel N steps ahead using Chronos-Bolt "
                     "(pretrained 200M-parameter time-series foundation model). "
                     "USE THIS for any question of the form 'expected value of "
-                    "<signal> at T+N ms/steps' — the tool predicts more accurately "
+                    "<signal> at T+N ms/steps', the tool predicts more accurately "
                     "than you can extrapolate from text. Do NOT try the arithmetic "
                     "yourself. The response contains `predicted_value_at_horizon` "
-                    "(a single float, the value AT T+horizon) — that is the number "
+                    "(a single float, the value AT T+horizon), that is the number "
                     "to return as the final answer. Optional `q10_at_horizon` and "
                     "`q90_at_horizon` give the 80% prediction interval at the same step."
                 ),
@@ -103,16 +102,15 @@ class ForecastTool:
             quantiles, mean = pipe.predict_quantiles(
                 inputs=inputs,
                 prediction_length=int(horizon),
-                quantile_levels=[0.1, 0.5, 0.9],
-            )
-            q10  = quantiles[0, :, 0].tolist()
-            med  = quantiles[0, :, 1].tolist()   # q50
-            q90  = quantiles[0, :, 2].tolist()
+                quantile_levels=[0.1, 0.5, 0.9])
+            q10  = quantiles[0:, 0].tolist()
+            med  = quantiles[0:, 1].tolist()   # q50
+            q90  = quantiles[0:, 2].tolist()
             idx = int(horizon) - 1
             return {
                 "channel": channel,
                 "horizon": int(horizon),
-                # Primary field — a single scalar. Answer with THIS number.
+                # Primary field, a single scalar. Answer with THIS number.
                 "predicted_value_at_horizon": round(float(med[idx]), 4),
                 "q10_at_horizon":             round(float(q10[idx]), 4),
                 "q90_at_horizon":             round(float(q90[idx]), 4),

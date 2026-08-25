@@ -15,7 +15,7 @@ the series. That ambiguity is a property of the prompt, not of the model, and
 it shows up as noise in the scores.
 
 ``build_phase_reference`` renders a legend joining the three names for each
-phase — integer label, canonical name, question prose — with the one-line
+phase, integer label, canonical name, question prose, with the one-line
 description from ``data/labelling/tasks.json``. ``build_prompts_from_questions``
 attaches it to any prompt whose question or context involves phases.
 
@@ -93,7 +93,7 @@ _PHASE_WORD = re.compile(r"\bphases?\b", re.IGNORECASE)
 def load_tasks(tasks_path: str) -> Dict[str, Dict[str, Any]]:
     """Load ``tasks.json`` into ``{task_id: task_object}``.
 
-    Returns an empty dict when the file is missing or malformed — callers treat
+    Returns an empty dict when the file is missing or malformed, callers treat
     an empty vocabulary as "emit no legend" rather than failing the build.
     """
     path = Path(tasks_path)
@@ -116,8 +116,7 @@ def load_tasks(tasks_path: str) -> Dict[str, Dict[str, Any]]:
 def resolve_task_from_episode(
     dataset: str,
     episode: str,
-    episodes_root: Path,
-) -> Optional[str]:
+    episodes_root: Path) -> Optional[str]:
     """Look up an episode's task from its ``*_metadata.json`` sidecar.
 
     Mirrors ``level1._episode_task``, but reachable from the prompt builder,
@@ -183,7 +182,7 @@ def resolve_task_from_context_labels(context: Any) -> Optional[str]:
 
     Mirrors ``src.data.factorywave_normalizer._infer_task_from_phases``: only
     pick_and_place has a phase 9, so seeing one is decisive. A maximum of 8 is
-    shared by screwing and peg_in_hole and stays unresolved — emitting the
+    shared by screwing and peg_in_hole and stays unresolved, emitting the
     wrong task's definitions would be worse than emitting none.
     """
     labels = observed_phase_labels(context)
@@ -196,7 +195,7 @@ def resolve_task_from_question_text(question_text: str) -> Optional[str]:
     """Infer the task from phase prose that is unique to one task.
 
     Fallback for episodes whose metadata sidecar is missing. Only fires when
-    the matched wording belongs to exactly one task — "return to home" appears
+    the matched wording belongs to exactly one task, "return to home" appears
     in all three and resolves nothing, while "insertion of the peg" is
     unambiguous.
     """
@@ -229,8 +228,7 @@ MIXED_TASK_SENTINEL = "mixed"
 
 def resolve_task_from_dataset(
     dataset: str,
-    dataset_index: Optional[Dict[str, Dict[str, Any]]],
-) -> Optional[str]:
+    dataset_index: Optional[Dict[str, Dict[str, Any]]]) -> Optional[str]:
     """Dataset-level task from ``dataset.json`` (aursad -> screwing, etc.).
 
     Returns None for datasets marked ``mixed``, which carry more than one task
@@ -247,8 +245,7 @@ def resolve_task_from_dataset(
 def resolve_task(
     question_item: Dict[str, Any],
     episodes_root: Path,
-    dataset_index: Optional[Dict[str, Dict[str, Any]]] = None,
-) -> Optional[str]:
+    dataset_index: Optional[Dict[str, Dict[str, Any]]] = None) -> Optional[str]:
     """Best-effort task id for a question.
 
     Four sources, most to least specific: provenance, the episode's metadata
@@ -336,8 +333,7 @@ def needs_phase_reference(question_item: Dict[str, Any]) -> bool:
 def build_phase_reference(
     task_id: Optional[str],
     tasks: Dict[str, Dict[str, Any]],
-    include_label_column: bool = True,
-) -> str:
+    include_label_column: bool = True) -> str:
     """Render the phase legend for ``task_id``.
 
     One line per phase: integer label, canonical name, the question-template
@@ -345,7 +341,7 @@ def build_phase_reference(
     only printed when it differs from the canonical name, so the block stays
     readable rather than repeating itself.
 
-    Returns "" when the task is unknown or absent from ``tasks.json`` — a
+    Returns "" when the task is unknown or absent from ``tasks.json``, a
     missing legend is better than a guessed one.
     """
     if not task_id:
@@ -400,8 +396,7 @@ def phase_reference_for_question(
     question_item: Dict[str, Any],
     episodes_root: Path,
     tasks_path: Path = DEFAULT_TASKS_PATH,
-    dataset_index: Optional[Dict[str, Dict[str, Any]]] = None,
-) -> str:
+    dataset_index: Optional[Dict[str, Dict[str, Any]]] = None) -> str:
     """Legend for ``question_item``, or "" when one is not warranted."""
     if not needs_phase_reference(question_item):
         return ""
@@ -412,5 +407,4 @@ def phase_reference_for_question(
     return build_phase_reference(
         task_id,
         tasks,
-        include_label_column=context_mentions_task_phase(question_item.get("context")),
-    )
+        include_label_column=context_mentions_task_phase(question_item.get("context")))

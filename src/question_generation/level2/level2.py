@@ -28,16 +28,13 @@ from src.question_generation.utils.hf_streaming import (
     HfStreamUploader,
     add_streaming_args,
     list_completed_combos,
-    make_uploader_from_args,
-)
+    make_uploader_from_args)
 from src.question_generation.utils.mc_availability import (
     available_channels,
-    filter_lookup_by_availability,
-)
+    filter_lookup_by_availability)
 from src.question_generation.utils.fault_features import (
     load_fault_feature_map,
-    select_features as select_fault_features,
-)
+    select_features as select_fault_features)
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
 from src.question_generation.utils.template import (
     build_context,
@@ -47,21 +44,18 @@ from src.question_generation.utils.template import (
     fill_event_description,
     get_last_timestamp,
     pick_constrained_signal,
-    pick_scalar_signal,
-)
+    pick_scalar_signal)
 from src.question_generation.utils.time_series import (
     parse_event_id,
     pick_fault_label,
     pick_fault_label_from_meta_or_rows,
-    sample_subseries_before_event,
-)
+    sample_subseries_before_event)
 from src.question_generation.level2.mc_truth import (
     DEFAULT_THRESHOLDS,
     evaluate_mc_statement,
     is_statement_enabled,
     robot_key,
-    thresholds_for_robot,
-)
+    thresholds_for_robot)
 from src.question_generation.level1.level1 import (
     build_anomaly_single_select as l1_build_anomaly_single_select,
     build_comparative_multi_select as l1_build_comparative_multi_select,
@@ -74,13 +68,11 @@ from src.question_generation.level1.level1 import (
     _signal_display_name,
     PHASE_NAMES,
     DATASET_MACHINE_ID,
-    _modal_phase,
-)
+    _modal_phase)
 from src.question_generation.utils.pair_balance import (
     build_index as _build_pair_index,
     cycle_targets as _cycle_targets,
-    sample_pair as _sample_balanced_pair,
-)
+    sample_pair as _sample_balanced_pair)
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +166,7 @@ MIN_POST_EVENT_TIMESTAMPS_AFTER = 5
 
 # MC option IDs that require signals absent from simulation data
 NON_SIMULATION_EXCLUDED_MC_IDS = {
-    "mc_020",  # task_success — only available in simulation metadata
+    "mc_020",  # task_success, only available in simulation metadata
 }
 
 SIMULATION_EXCLUDED_MC_IDS = {
@@ -236,8 +228,7 @@ def sample_subsequent_chunks(
     rows: List[Dict[str, Any]],
     n_chunks: int = 4,
     min_chunk: int = 5,
-    max_chunk: int = 7,
-) -> List[List[Dict[str, Any]]]:
+    max_chunk: int = 7) -> List[List[Dict[str, Any]]]:
     """
     Sample n_chunks contiguous, subsequent chunks from rows.
 
@@ -266,8 +257,7 @@ def sample_subsequent_chunks(
 
 def rows_strictly_after_context(
     rows: List[Dict[str, Any]],
-    subseries: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    subseries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Rows whose timestamp is strictly greater than the last context timestamp.
 
     The ranking template asks the model to order segments by when they appear
@@ -295,8 +285,7 @@ def rows_strictly_after_context(
 
 def filter_rows_to_template_features(
     rows: List[Dict[str, Any]],
-    template: Dict[str, Any],
-) -> List[Dict[str, Any]]:
+    template: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Restrict rows to the template's ``important_features``.
 
     ``build_context`` applies this filter to the context but the option
@@ -325,8 +314,7 @@ def encode_chunk_without_timestamps(rows: List[Dict[str, Any]]) -> str:
 
 def get_row_at_or_after_timestamp(
     rows: List[Dict[str, Any]],
-    target_timestamp_ms: int,
-) -> Optional[Dict[str, Any]]:
+    target_timestamp_ms: int) -> Optional[Dict[str, Any]]:
     """Return the first row whose timestamp_ms is >= target_timestamp_ms."""
     for row in rows:
         ts = row.get("timestamp_ms")
@@ -354,8 +342,7 @@ def _first_timestamp_ms(rows: List[Dict[str, Any]]) -> int:
 
 def normalize_timestamps(
     rows: List[Dict[str, Any]],
-    base_timestamp_ms: int,
-) -> List[Dict[str, Any]]:
+    base_timestamp_ms: int) -> List[Dict[str, Any]]:
     """Return a copy of rows with timestamp_ms shifted by base_timestamp_ms."""
     normalized: List[Dict[str, Any]] = []
     for row in rows:
@@ -373,8 +360,7 @@ def normalize_timestamps(
 
 
 def split_event_segment(
-    post_event_rows: List[Dict[str, Any]],
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    post_event_rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Split rows starting at event onset into:
     - full contiguous event segment (same non-zero event token)
@@ -550,8 +536,7 @@ def load_mc_option_lookup(path: Path, level: int) -> Dict[str, str]:
 
 def resolve_fixed_option(
     token: Any,
-    mc_option_lookup: Dict[str, str],
-) -> Tuple[Optional[str], str]:
+    mc_option_lookup: Dict[str, str]) -> Tuple[Optional[str], str]:
     """
     Resolve a fixed option token to (canonical_option_id, rendered_statement).
     If token is not a known MC ID, returns (None, str(token)).
@@ -586,8 +571,7 @@ def _sample_ratio(mean: float, rel_std: float = 0.20, min_value: float = 0.0,
 
 def sample_thresholds_for_statement(
     statement_id: str,
-    robot: Optional[str] = None,
-) -> Dict[str, float]:
+    robot: Optional[str] = None) -> Dict[str, float]:
     """Draw this statement's thresholds around the centre fitted for ``robot``.
 
     Thresholds still vary per item; only the centre they revolve around is
@@ -669,8 +653,7 @@ def _fmt_pct(value: float) -> str:
 def render_statement_with_thresholds(
     statement_id: str,
     default_statement: str,
-    thresholds: Dict[str, float],
-) -> str:
+    thresholds: Dict[str, float]) -> str:
     sid = _legacy_mc_option_id(str(statement_id))
     if sid == "l2_mc_030":
         return (
@@ -787,8 +770,7 @@ def build_multiselect_options_and_answer(
     subseries: List[Dict[str, Any]],
     post_event_rows: List[Dict[str, Any]],
     mc_option_lookup: Dict[str, str],
-    episode_metadata: Optional[Dict[str, Any]] = None,
-) -> Tuple[Dict[str, str], str]:
+    episode_metadata: Optional[Dict[str, Any]] = None) -> Tuple[Dict[str, str], str]:
     """
     Build exactly 4 multi-select options:
     1) Keep fixed options from template (if resolvable IDs) that are
@@ -839,8 +821,7 @@ def build_multiselect_options_and_answer(
                 subseries=subseries,
                 post_event_rows=post_event_rows,
                 thresholds=sample_thresholds_for_statement(opt_id, robot),
-                episode_metadata=episode_metadata,
-            )
+                episode_metadata=episode_metadata)
         except Exception:
             return False
         return verdict is not None
@@ -886,15 +867,13 @@ def build_multiselect_options_and_answer(
         statement = render_statement_with_thresholds(
             opt_id,
             mc_option_lookup.get(opt_id, opt_id),
-            sampled_thresholds,
-        )
+            sampled_thresholds)
         truth = evaluate_mc_statement(
             opt_id,
             subseries=subseries,
             post_event_rows=post_event_rows,
             thresholds=sampled_thresholds,
-            episode_metadata=episode_metadata,
-        )
+            episode_metadata=episode_metadata)
         # The gate above ran on a different threshold draw. A statement that
         # turns undeterminable on this draw would otherwise re-enter as an F.
         if truth is None:
@@ -929,8 +908,7 @@ def fill_template(
     mc_option_lookup: Dict[str, str],
     steps_ahead: Optional[int] = None,
     episode_metadata: Optional[Dict[str, Any]] = None,
-    anomaly_description: str = "",
-) -> Optional[Dict[str, Any]]:
+    anomaly_description: str = "") -> Optional[Dict[str, Any]]:
     """
     Fill a Level 2 question template.
 
@@ -982,8 +960,7 @@ def fill_template(
             subseries=subseries,
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
-            episode_metadata=episode_metadata,
-        )
+            episode_metadata=episode_metadata)
         # Gate returned fewer than 4 judgeable statements for this episode.
         if options is None or answer is None:
             return None
@@ -995,8 +972,7 @@ def fill_template(
             subseries=subseries,
             post_event_rows=post_event_rows,
             mc_option_lookup=mc_option_lookup,
-            episode_metadata=episode_metadata,
-        )
+            episode_metadata=episode_metadata)
         # Gate returned fewer than 4 judgeable statements for this episode.
         if options is None or answer is None:
             return None
@@ -1099,8 +1075,7 @@ def generate_level2_questions(
     relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     enumerate_mode: bool = False,
     uploader: Optional[HfStreamUploader] = None,
-    completed_combos: Optional[set] = None,
-) -> None:
+    completed_combos: Optional[set] = None) -> None:
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
@@ -1182,8 +1157,7 @@ def generate_level2_questions(
             meta_cache[key] = meta
         return meta_cache[key]
 
-    # Pre-filter: only episodes containing anomalies. Metadata-driven only —
-    # no per-row scan, which used to spike memory at scale.
+    # Pre-filter: only episodes containing anomalies. Metadata-driven only, # no per-row scan, which used to spike memory at scale.
     #   * If metadata carries ``fault_id`` (factorywave-style), keep iff
     #     ``fault_id != 0``.
     #   * If metadata lacks ``fault_id`` (aursad/vorausad-style), include the
@@ -1220,7 +1194,7 @@ def generate_level2_questions(
     logger.info(
         "L2 eligible (anomalous-by-meta) episodes: "
         + ", ".join(f"{ds}={per_ds_counts.get(ds, 0)}" for ds in sorted(per_ds_counts))
-        + f" — total {len(anomalous_episodes)}"
+        + f", total {len(anomalous_episodes)}"
     )
 
     # ---- distractor prior for template 7 ---------------------------------
@@ -1368,12 +1342,10 @@ def generate_level2_questions(
                 CONTEXT_MIN,
                 CONTEXT_MAX,
                 min_post_event_after=MIN_POST_EVENT_TIMESTAMPS_AFTER,
-                return_metadata=True,
-            )
+                return_metadata=True)
             subseries, post_event_rows, subseries_start_index, subseries_length = cast(
                 Tuple[List[Dict[str, Any]], List[Dict[str, Any]], int, int],
-                sampled,
-            )
+                sampled)
             if not subseries:
                 continue
 
@@ -1390,7 +1362,7 @@ def generate_level2_questions(
         # (built by load_meta(p).get("fault_id") earlier), so we use it directly
         # instead of re-picking. In random mode we restrict the pool to
         # anomalous_episodes too, so every L2 question is grounded in an actual
-        # anomaly — never a nominal episode.
+        # anomaly, never a nominal episode.
         if template["id"] in _L1_STYLE_TEMPLATE_IDS:
             if enum_iter is not None:
                 _ds, _ep_path = ds, ep_path
@@ -1429,8 +1401,7 @@ def generate_level2_questions(
             from src.question_generation.utils.relevance import (
                 sample_with_relevance as _sample_with_relevance,
                 validate_relevance as _validate_relevance,
-                relevance_report as _relevance_report,
-            )
+                relevance_report as _relevance_report)
             _spec = relevance_specs.get(_fl) if relevance_specs else None
             _sampled = _sample_with_relevance(_raw, _fl, _spec, _ep_task, CONTEXT_MIN, CONTEXT_MAX)
             if _sampled is None:
@@ -1448,8 +1419,7 @@ def generate_level2_questions(
                 _fl, _FAULT_FEATURE_MAP,
                 available=available_channels(_sub),
                 baseline=template.get("important_features") or (),
-                reserve=_option_channel_reserve(mc_catalogue, 2),
-            )
+                reserve=_option_channel_reserve(mc_catalogue, 2))
             if _ff:
                 template = {**template, "important_features": _ff}
 
@@ -1491,8 +1461,7 @@ def generate_level2_questions(
                     _tmpl_filled_local = fill(
                         _tmpl, anomaly=_anomaly,
                         phase=_phase_display_name(_pn, _ep_task),
-                        window_length=_pl + 5,
-                    )
+                        window_length=_pl + 5)
                     item = {
                         "id": str(uuid.uuid4()),
                         "level": 2,
@@ -1533,7 +1502,7 @@ def generate_level2_questions(
             elif _tid == 7:
                 _opts, _ans = l1_build_anomaly_single_select(
                     _fl, root_causes, anomaly_lookup, fault_prior=_fault_prior)
-                _tmpl_filled = _tmpl  # no {anomaly} placeholder — the model must identify it
+                _tmpl_filled = _tmpl  # no {anomaly} placeholder, the model must identify it
 
             elif _tid == 10:
                 _rn = {0: "Universal Robots UR3e", 2: "Agile Robots Yu 5 Industrial", 3: "KUKA KR 10 R1100-2"}
@@ -1579,8 +1548,7 @@ def generate_level2_questions(
                         _pair_index, _target,
                         used=_used_pairs,
                         phases_differ=lambda x, y: _phases_differ(x["path"], y["path"]),
-                        group_pairs_cache=_group_pairs_cache,
-                    )
+                        group_pairs_cache=_group_pairs_cache)
                     if _picked is None:
                         break
                     _pa_at, _pb_at = _picked
@@ -1641,8 +1609,7 @@ def generate_level2_questions(
                     machine_id_a=_machine_id_a, machine_id_b=_machine_id_b,
                     task_id_a=_ep_task_a, task_id_b=_ep_task_b,
                     rows_a=_sub_a, rows_b=_sub_b,
-                    mc_lookup=_l1_comparative_mc_lookup,
-                )
+                    mc_lookup=_l1_comparative_mc_lookup)
                 if _result is None:
                     continue
                 _opts, _ans = _result
@@ -1726,8 +1693,7 @@ def generate_level2_questions(
                     _segments, root_causes,
                     important_features=template.get("important_features"),
                     relevance_specs=relevance_specs,
-                    tasks=_seg_tasks,
-                )
+                    tasks=_seg_tasks)
                 if _result is None:
                     continue
                 _opts, _ans = _result
@@ -1817,8 +1783,7 @@ def generate_level2_questions(
             ep_fault_id or 0, _FAULT_FEATURE_MAP,
             available=available_channels(subseries),
             baseline=template.get("important_features") or (),
-            reserve=_option_channel_reserve(mc_catalogue, 2),
-        )
+            reserve=_option_channel_reserve(mc_catalogue, 2))
         if _fault_feats:
             template = {**template, "important_features": _fault_feats}
 
@@ -1843,8 +1808,7 @@ def generate_level2_questions(
             effective_mc_lookup,
             mc_catalogue,
             _avail_rows,
-            level=2,
-        )
+            level=2)
 
 
         # Episode metadata is what identifies the robot, and the robot is what
@@ -1871,8 +1835,7 @@ def generate_level2_questions(
         filled = fill_template(
             template, subseries, post_event_rows, events, effective_mc_lookup,
             steps_ahead=steps_ahead, episode_metadata=ep_metadata,
-            anomaly_description=_anomaly_desc,
-        )
+            anomaly_description=_anomaly_desc)
         if filled is None:
             continue
 
@@ -1940,14 +1903,12 @@ def main() -> None:
         "--datasets-dir",
         type=Path,
         default=repo_root / "data",
-        help="Root data directory (default: <repo>/data)",
-    )
+        help="Root data directory (default: <repo>/data)")
     parser.add_argument(
         "--output",
         type=Path,
         default=repo_root / "output" / "questions" / "level2",
-        help="Output directory (default: <repo>/output/questions/level2)",
-    )
+        help="Output directory (default: <repo>/output/questions/level2)")
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
@@ -1956,14 +1917,12 @@ def main() -> None:
         action="store_true",
         help="Walk every (template x episode) combination deterministically instead "
              "of random sampling. -n becomes an upper cap. Combinations whose "
-             "episode does not satisfy the template's preconditions are skipped.",
-    )
+             "episode does not satisfy the template's preconditions are skipped.")
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
-        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
-    )
+        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}")
     add_streaming_args(parser)
     parser.add_argument(
         "--template-ids",
@@ -1971,15 +1930,13 @@ def main() -> None:
         nargs="+",
         default=None,
         help="Restrict generation to these template ids (default: all). Useful "
-             "for regenerating a single template without rerunning the rest.",
-    )
+             "for regenerating a single template without rerunning the rest.")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
     if getattr(args, "template_ids", None):
@@ -1992,13 +1949,11 @@ def main() -> None:
     events = load_events(args.datasets_dir / "labelling" / "events.json")
     mc_option_lookup = load_mc_option_lookup(
         args.datasets_dir / "mc_options" / "mc_options.json",
-        level=2,
-    )
+        level=2)
 
     from src.question_generation.utils.relevance import (
         is_enabled as _relevance_enabled,
-        load_specs as _load_relevance_specs,
-    )
+        load_specs as _load_relevance_specs)
     relevance_specs = (
         _load_relevance_specs(args.datasets_dir / "labelling" / "rca" / "relevance_specs.json")
         if _relevance_enabled() else {}
@@ -2011,8 +1966,7 @@ def main() -> None:
         completed_combos, max_shard_idx = list_completed_combos(
             repo_id=args.hf_repo,
             dataset_folder=args.hf_dataset_folder,
-            level=2,
-        )
+            level=2)
         # Resume from the next shard index so we don't overwrite existing files.
         if uploader is not None and max_shard_idx > 0:
             uploader.batch_index = max_shard_idx
@@ -2030,8 +1984,7 @@ def main() -> None:
         relevance_specs=relevance_specs,
         enumerate_mode=args.enumerate_mode,
         uploader=uploader,
-        completed_combos=completed_combos,
-    )
+        completed_combos=completed_combos)
 
 
 if __name__ == "__main__":

@@ -29,7 +29,7 @@ import numpy as np
 from event_injection.applicators.base import BaseApplicator
 from event_injection.context import SimContext
 
-_DEFAULT_PHASE_OFFSET_RANGE = (7.0, 12.0)   # degrees — targets ~25% CF rate
+_DEFAULT_PHASE_OFFSET_RANGE = (7.0, 12.0)   # degrees, targets ~25% CF rate
 
 _JOINT_INDEX_TO_NAME = [
     "shoulder_pan", "shoulder_lift", "elbow",
@@ -42,21 +42,20 @@ _MOTOR_CHOICES = [f"motor_{i}" for i in range(6)]
 # This controls the amplitude of the sinusoidal wobble injected
 # into the joint's position target each step.
 #
-#   5° offset → peak ±0.015 rad (±0.86°)  — subtle tracking error
-#  15° offset → peak ±0.045 rad (±2.6°)   — noticeable, some failures
-#  30° offset → peak ±0.090 rad (±5.2°)   — significant, frequent drops
+#   5° offset → peak ±0.015 rad (±0.86°), subtle tracking error
+#  15° offset → peak ±0.045 rad (±2.6°), noticeable, some failures
+#  30° offset → peak ±0.090 rad (±5.2°), significant, frequent drops
 _RAD_PER_DEGREE = 0.003
 
 
 class MotorMiscommutationApplicator(BaseApplicator):
-    """Event 12: Motor Miscommutation — injects position-target ripple."""
+    """Event 12: Motor Miscommutation, injects position-target ripple."""
 
     valid_phases = [0, 1, 2, 3, 4, 5, 6]  # any phase with arm motion
 
     def __init__(
         self,
-        phase_offset_range: tuple = _DEFAULT_PHASE_OFFSET_RANGE,
-    ):
+        phase_offset_range: tuple = _DEFAULT_PHASE_OFFSET_RANGE):
         self._phase_range = phase_offset_range
         self._step_count = 0
 
@@ -66,7 +65,7 @@ class MotorMiscommutationApplicator(BaseApplicator):
         return {
             "motor": motor,
             "phase_offset_deg": phase_offset,
-            "_duration": 999999,  # persistent — lasts the entire episode
+            "_duration": 999999,  # persistent, lasts the entire episode
         }
 
     def on_start(self, params: Dict[str, Any], ctx: SimContext) -> None:
@@ -130,8 +129,7 @@ class MotorMiscommutationApplicator(BaseApplicator):
                 new_target = ctrl_target + offset_rad
                 robot._articulation_view.set_joint_position_targets(
                     np.array([[new_target]]),
-                    joint_indices=np.array([motor_idx]),
-                )
+                    joint_indices=np.array([motor_idx]))
             except Exception as e:
                 print(f"[MotorMiscommutation] target perturbation failed: {e}")
 

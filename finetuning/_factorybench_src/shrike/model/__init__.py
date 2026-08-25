@@ -1,6 +1,6 @@
 """Shrike and BearingModel wrappers. Vendored; see ``shrike/__init__.py``."""
 
-# Lazy imports — avoids pulling in peft/transformers when only
+# Lazy imports, avoids pulling in peft/transformers when only
 # the tokenizer subpackage is needed (e.g., tokenizer training on SageMaker).
 def __getattr__(name):
     if name in ("Shrike", "ShrikeConfig"):

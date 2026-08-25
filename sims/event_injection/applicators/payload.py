@@ -19,18 +19,17 @@ from event_injection.applicators.base import BaseApplicator
 from event_injection.context import SimContext
 
 # Default ranges
-_DEFAULT_MASS_DELTA_RANGE = (0.35, 0.70)  # kg to add — targets ~25% CF rate
+_DEFAULT_MASS_DELTA_RANGE = (0.35, 0.70)  # kg to add, targets ~25% CF rate
 
 
 class PayloadAdditionApplicator(BaseApplicator):
-    """Event 6: Payload Addition — temporarily increases workpiece mass."""
+    """Event 6: Payload Addition, temporarily increases workpiece mass."""
 
-    valid_phases = [4, 5, 6]  # lift, move_xy, lower — robot is carrying
+    valid_phases = [4, 5, 6]  # lift, move_xy, lower, robot is carrying
 
     def __init__(
         self,
-        mass_delta_range: tuple = _DEFAULT_MASS_DELTA_RANGE,
-    ):
+        mass_delta_range: tuple = _DEFAULT_MASS_DELTA_RANGE):
         self._mass_range = mass_delta_range
         self._original_mass: float | None = None
 
@@ -38,7 +37,7 @@ class PayloadAdditionApplicator(BaseApplicator):
         x = float(rng.uniform(self._mass_range[0], self._mass_range[1]))
         return {
             "x": x,
-            "_duration": 999999,  # persistent — lasts the entire episode
+            "_duration": 999999,  # persistent, lasts the entire episode
         }
 
     def on_start(self, params: Dict[str, Any], ctx: SimContext) -> None:
@@ -59,7 +58,7 @@ class PayloadAdditionApplicator(BaseApplicator):
             print(f"[PayloadAddition] on_start failed: {e}")
 
     def on_step(self, params: Dict[str, Any], ctx: SimContext) -> None:
-        # The mass change persists via USD — nothing to do per step.
+        # The mass change persists via USD, nothing to do per step.
         pass
 
     def on_end(self, params: Dict[str, Any], ctx: SimContext) -> None:

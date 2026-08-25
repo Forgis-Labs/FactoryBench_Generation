@@ -10,7 +10,7 @@ thick dark navy arrows.
 remove, or rephrase any text.
 
 ═══════════════════════════════════════════════════════════════
-COLUMN 1 — DATA SOURCES
+COLUMN 1, DATA SOURCES
 ═══════════════════════════════════════════════════════════════
 Header label: "Data Sources"
 
@@ -32,7 +32,7 @@ Card 3:
   Subtitle: "Simulated faults\n& edge cases"
 
 ═══════════════════════════════════════════════════════════════
-COLUMN 2 — INPUTS & CAUSAL SCHEMA
+COLUMN 2, INPUTS & CAUSAL SCHEMA
 ═══════════════════════════════════════════════════════════════
 Header label in bold dark navy: "Inputs"
 
@@ -73,21 +73,21 @@ A dashed arrow labeled "fusion" connects Section A and Section B downward
 into a single thick arrow pointing right toward Column 3.
 
 ═══════════════════════════════════════════════════════════════
-COLUMN 3 — Q&A BENCHMARK ENGINE
+COLUMN 3, Q&A BENCHMARK ENGINE
 ═══════════════════════════════════════════════════════════════
 Header label in bold dark navy: "Q&A Benchmark"
 
 A single large rounded rectangle containing a vertical stack of three items:
 
-Item 1 — rounded pill shape:
+Item 1, rounded pill shape:
   Bold: "80 Expert Templates"
   Small gray: "PhD-authored, each probes\none reasoning capability"
 
-Item 2 — rounded pill shape:
+Item 2, rounded pill shape:
   Bold: "Variable Sampling"
   Small gray: "Signals, timestamps,\nthresholds from episodes"
 
-Item 3 — rounded pill shape:
+Item 3, rounded pill shape:
   Bold: "Deterministic Ground Truth"
   Small gray: "Computed from labeled data,\nnever imputed"
 
@@ -95,7 +95,7 @@ Small downward arrows connect each item to the next.
 A thick rightward arrow exits the box toward Column 4.
 
 ═══════════════════════════════════════════════════════════════
-COLUMN 4 — FOUR EVALUATION LEVELS
+COLUMN 4, FOUR EVALUATION LEVELS
 ═══════════════════════════════════════════════════════════════
 Header label in bold dark navy: "Evaluation Levels"
 
@@ -106,23 +106,23 @@ An upward arrow on the left side of the stack is labeled:
 "Increasing causal depth  →  Decreasing LLM accuracy"
 
 Box L1:
-  Title bold: "L1 — State"
+  Title bold: "L1, State"
   Subtitle italic: "Interpret current machine state"
   Example right-aligned, small, in quotes:
   "What is the current of joint 3 at t=250ms?"
 
 Box L2:
-  Title bold: "L2 — Intervention"
+  Title bold: "L2, Intervention"
   Subtitle italic: "Predict impact of present actions"
   Example in quotes: "If force on joint 3 increases to 12N now, what happens?"
 
 Box L3:
-  Title bold: "L3 — Counterfactual"
+  Title bold: "L3, Counterfactual"
   Subtitle italic: "Simulate alternative past timelines"
   Example in quotes: "If force had risen to 12N at t=20ms, what would have happened?"
 
 Box L4:
-  Title bold: "L4 — Decision Making"
+  Title bold: "L4, Decision Making"
   Subtitle italic: "Generate multi-step troubleshooting"
   Example in quotes: "Robot stopped with error C203A. Recovery steps?"
 
@@ -130,12 +130,12 @@ Below the four boxes, a small annotation:
 "Design principle: success at Level N requires Level N−1"
 
 ═══════════════════════════════════════════════════════════════
-BOTTOM BANNER — MOTIVATION
+BOTTOM BANNER, MOTIVATION
 ═══════════════════════════════════════════════════════════════
 Below the entire figure, a thin horizontal divider line, then
 a single-line bold italic caption:
 
-"Figure 1: FactoryBench overview — a Q&A benchmark evaluating LLM agents
+"Figure 1: FactoryBench overview, a Q&A benchmark evaluating LLM agents
 on causal machine understanding over industrial time-series data, from
 reading sensor values (L1) to generating troubleshooting procedures (L4)."
 

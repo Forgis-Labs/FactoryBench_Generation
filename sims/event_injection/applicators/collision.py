@@ -12,13 +12,13 @@ arm.
 
 The prim is spawned as **visual-only** (no RigidBodyAPI, no
 CollisionAPI).  During flight it is moved along the ballistic arc
-by updating its USD translate op each step — PhysX never sees it,
+by updating its USD translate op each step, PhysX never sees it,
 so it cannot interfere with other bodies.
 
 One step before impact the physics APIs (RigidBodyAPI, CollisionAPI,
 MassAPI, CCD) are added together with the flight velocity.  PhysX
 discovers a brand-new *dynamic* body and the projectile naturally
-collides with the robot on the next step — a real, mass-based
+collides with the robot on the next step, a real, mass-based
 collision with realistic force.
 
 Lifecycle:
@@ -38,7 +38,7 @@ import numpy as np
 from event_injection.applicators.base import BaseApplicator
 from event_injection.context import SimContext
 
-_DEFAULT_IMPULSE_RANGE = (6.0, 12.0)  # target impact momentum in kg·m/s — targets ~25% CF rate
+_DEFAULT_IMPULSE_RANGE = (6.0, 12.0)  # target impact momentum in kg·m/s, targets ~25% CF rate
 # Duration must cover the full flight (up to 0.50 s) plus post-impact settling.
 _DEFAULT_DURATION_RANGE = (30, 50)
 # Flight time is clamped so objects neither teleport nor float.
@@ -97,7 +97,7 @@ _GRAVITY = 9.81
 
 
 class CollisionApplicator(BaseApplicator):
-    """Event 16: Collision — spawns a projectile that hits the robot arm."""
+    """Event 16: Collision, spawns a projectile that hits the robot arm."""
 
     valid_phases = [4, 5, 6]
 
@@ -105,8 +105,7 @@ class CollisionApplicator(BaseApplicator):
         self,
         impulse_range: tuple = _DEFAULT_IMPULSE_RANGE,
         duration_range: tuple = _DEFAULT_DURATION_RANGE,
-        force_object: str | None = None,
-    ):
+        force_object: str | None = None):
         self._impulse_range = impulse_range
         self._dur_range = duration_range
         self._force_object = force_object
@@ -206,13 +205,13 @@ class CollisionApplicator(BaseApplicator):
         # RigidBody on parent (dynamic, not kinematic)
         UsdPhysics.RigidBodyAPI.Apply(prim)
 
-        # Mass — scales with volume (scale³)
-        base_mass = _OBJECT_PROPS.get(self._obj_type, (0.1,))[0]
+        # Mass, scales with volume (scale³)
+        base_mass = _OBJECT_PROPS.get(self._obj_type, (0.1))[0]
         mass = base_mass * (scale ** 3)
         mass_api = UsdPhysics.MassAPI.Apply(prim)
         mass_api.GetMassAttr().Set(mass)
 
-        # CCD (safe — body is dynamic)
+        # CCD (safe, body is dynamic)
         physx_rb = PhysxSchema.PhysxRigidBodyAPI.Apply(prim)
         physx_rb.GetEnableCCDAttr().Set(True)
 
@@ -220,7 +219,7 @@ class CollisionApplicator(BaseApplicator):
         for child in prim.GetChildren():
             UsdPhysics.CollisionAPI.Apply(child)
 
-    # ── Spawn helpers (VISUAL ONLY — no physics APIs) ─────────────────
+    # ── Spawn helpers (VISUAL ONLY, no physics APIs) ─────────────────
 
     def _make_parent(self, stage, position, scale: float = 1.0):
         from pxr import UsdGeom, Gf
@@ -288,7 +287,7 @@ class CollisionApplicator(BaseApplicator):
         self._bind_material(head.GetPrim(), mat_head)
 
     def _spawn_bolt(self, position, ctx, scale=1.0):
-        """Hex bolt — cylinder shaft + hexagonal head (approximated as a
+        """Hex bolt, cylinder shaft + hexagonal head (approximated as a
         short, wide cylinder)."""
         from pxr import UsdGeom, Gf
         stage = ctx.stage
@@ -311,7 +310,7 @@ class CollisionApplicator(BaseApplicator):
         self._bind_material(head.GetPrim(), mat)
 
     def _spawn_pipe_section(self, position, ctx, scale=1.0):
-        """Short steel pipe segment — outer cylinder with a thinner inner
+        """Short steel pipe segment, outer cylinder with a thinner inner
         cylinder subtracted visually (two concentric cylinders)."""
         from pxr import UsdGeom, Gf
         stage = ctx.stage
@@ -370,7 +369,7 @@ class CollisionApplicator(BaseApplicator):
         self._bind_material(plate.GetPrim(), mat)
 
     def _spawn_gear(self, position, ctx, scale=1.0):
-        """Spur gear — thick toothed disc approximated as a large cylinder
+        """Spur gear, thick toothed disc approximated as a large cylinder
         (body) with smaller cylinders for the hub and a central bore."""
         from pxr import UsdGeom, Gf
         stage = ctx.stage
@@ -404,7 +403,7 @@ class CollisionApplicator(BaseApplicator):
         self._bind_material(bore.GetPrim(), mat_bore)
 
     def _spawn_bottle(self, position, ctx, scale=1.0):
-        """Plastic coolant / lubricant bottle — cylinder body + smaller
+        """Plastic coolant / lubricant bottle, cylinder body + smaller
         cylinder neck + sphere cap."""
         from pxr import UsdGeom, Gf
         stage = ctx.stage
@@ -554,7 +553,7 @@ class CollisionApplicator(BaseApplicator):
             impulse = params["impact_impulse"]
             scale = params.get("_scale", 1.0)
             self._obj_type = params["object"]
-            base_mass = _OBJECT_PROPS.get(self._obj_type, (0.1,))[0]
+            base_mass = _OBJECT_PROPS.get(self._obj_type, (0.1))[0]
             mass = base_mass * (scale ** 3)
             impact_speed = impulse / mass  # m/s needed at impact
 
@@ -562,8 +561,7 @@ class CollisionApplicator(BaseApplicator):
             # clamped to keep the visual trajectory readable.
             self._t_flight = float(np.clip(
                 dist / max(impact_speed, 1e-3),
-                _T_FLIGHT_MIN, _T_FLIGHT_MAX,
-            ))
+                _T_FLIGHT_MIN, _T_FLIGHT_MAX))
 
             vx = delta[0] / self._t_flight
             vy = delta[1] / self._t_flight
@@ -621,7 +619,7 @@ class CollisionApplicator(BaseApplicator):
                     )
 
                 self._in_flight = False
-                print(f"[Collision] Handoff — dynamic body created, "
+                print(f"[Collision] Handoff, dynamic body created, "
                       f"speed={np.linalg.norm(cur_vel):.2f}m/s")
 
         # ── Corrupt sensor data ──────────────────────────────────────

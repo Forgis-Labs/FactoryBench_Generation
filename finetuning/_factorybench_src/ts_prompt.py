@@ -12,7 +12,7 @@ To match the Shrike/Bearing pretraining format, we need to:
   2. Group across timesteps to get one 1-D signal per feature → "channel".
   3. Push each channel through wrapper.tokenize_ts() to get integer codes.
   4. Emit ``{channel_name} (mean=…, std=…) <ts_start> <ts_X> <ts_Y> ... <ts_end>``
-     for each channel — mirroring shrike.model.shrike.Shrike.build_text.
+     for each channel, mirroring shrike.model.shrike.Shrike.build_text.
 
 The ``<ts_*>`` strings tokenize to single token IDs because the LLM tokenizer
 was extended at model-load time with N codebook entries as special tokens.
@@ -26,7 +26,7 @@ import numpy as np
 import torch
 
 
-# Hard cap on channels included per signal block — protects long-context
+# Hard cap on channels included per signal block, protects long-context
 # blowups on samples with 100+ features. Channels beyond this are dropped
 # in declaration order (i.e. we keep the FIRST K).
 DEFAULT_MAX_CHANNELS = 64
@@ -139,16 +139,16 @@ def build_ts_prompt(sample: dict, wrapper, max_channels: int = DEFAULT_MAX_CHANN
 
     parts: list[str] = []
 
-    # Keep the feature-mapping cheat sheet — it's small and helps the
+    # Keep the feature-mapping cheat sheet, it's small and helps the
     # model line up channel descriptions with the acronyms in the question.
     if acronym_map:
         mapping_str = ", ".join(
             f"{k}={v}" for k, v in list(acronym_map.items())[:10])
         if len(acronym_map) > 10:
-            mapping_str += f", ... ({len(acronym_map)} total)"
+            mapping_str += f"... ({len(acronym_map)} total)"
         parts.append(f"Feature mapping: {mapping_str}")
 
-    # Main signal — per-channel <ts_*> blocks
+    # Main signal, per-channel <ts_*> blocks
     if isinstance(ts_rows, list) and ts_rows:
         parts.append("Time series data:\n" + _ts_section(
             ts_rows, wrapper, acronym_map, max_channels))

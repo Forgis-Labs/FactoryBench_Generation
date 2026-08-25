@@ -1,4 +1,4 @@
-"""FSQ Transformer Tokenizer — Transformer encoder + FSQ quantization.
+"""FSQ Transformer Tokenizer, Transformer encoder + FSQ quantization.
 
 Inspired by Archetype: a 1D Transformer autoencoder that compresses raw time series
 into discrete tokens using FSQ. Each token captures semantically meaningful patterns
@@ -68,7 +68,7 @@ class FSQTransformerConfig:
 
 
 class FSQLayer(nn.Module):
-    """Finite Scalar Quantization — same as before."""
+    """Finite Scalar Quantization, same as before."""
 
     def __init__(self, levels: List[int]):
         super().__init__()
@@ -127,7 +127,7 @@ class PatchEmbedding(nn.Module):
         b, l = x.shape
         n = l // self.patch_size
         # Reshape into patches
-        x = x[:, :n * self.patch_size].reshape(b, n, self.patch_size)
+        x = x[::n * self.patch_size].reshape(b, n, self.patch_size)
         return self.proj(x)
 
 
@@ -178,8 +178,7 @@ class FSQTransformerTokenizer(nn.Module):
             dim_feedforward=config.d_ff,
             dropout=config.dropout,
             batch_first=True,
-            norm_first=True,
-        )
+            norm_first=True)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=config.n_encoder_layers)
 
         # Project to FSQ dimension
@@ -198,8 +197,7 @@ class FSQTransformerTokenizer(nn.Module):
             dim_feedforward=config.d_ff,
             dropout=config.dropout,
             batch_first=True,
-            norm_first=True,
-        )
+            norm_first=True)
         self.decoder = nn.TransformerEncoder(decoder_layer, num_layers=config.n_decoder_layers)
 
         # Reconstruct patches
@@ -223,9 +221,9 @@ class FSQTransformerTokenizer(nn.Module):
         # Patch embed + positional encoding
         h = self.patch_embed(x)  # (b, n_patches, d_model)
         n = h.shape[1]
-        h = h + self.pos_embed[:, :n, :]
+        h = h + self.pos_embed[::n:]
 
-        # Transformer encoder — global context
+        # Transformer encoder, global context
         h = self.encoder(h)  # (b, n_patches, d_model)
 
         # Project to FSQ dim
@@ -250,7 +248,7 @@ class FSQTransformerTokenizer(nn.Module):
 
         # Add positional encoding
         n = h.shape[1]
-        h = h + self.pos_embed[:, :n, :]
+        h = h + self.pos_embed[::n:]
 
         # Transformer decoder
         h = self.decoder(h)  # (b, n_patches, d_model)
@@ -276,7 +274,7 @@ class FSQTransformerTokenizer(nn.Module):
         """Encode signal to flat code IDs.
 
         Args:
-            x: (batch, seq_len) or (seq_len,) raw signal
+            x: (batch, seq_len) or (seq_len) raw signal
 
         Returns:
             codes: (batch, n_patches) flat integer codes
@@ -307,7 +305,7 @@ class FSQTransformerTokenizer(nn.Module):
             Scalar loss
         """
         # L1 difference between adjacent positions
-        diff = z_pre[:, 1:, :] - z_pre[:, :-1, :]
+        diff = z_pre[:, 1::] - z_pre[::-1:]
         return diff.abs().mean()
 
     def trainable_summary(self) -> dict:
@@ -330,8 +328,7 @@ class FSQTransformerTokenizer(nn.Module):
             n_decoder_layers=cfg_dict.get("n_decoder_layers", 4),
             d_ff=cfg_dict.get("d_ff", 512),
             dropout=cfg_dict.get("dropout", 0.0),  # no dropout at inference
-            temporal_weight=cfg_dict.get("temporal_weight", 0.1),
-        )
+            temporal_weight=cfg_dict.get("temporal_weight", 0.1))
 
         model = cls(config).to(device)
         model.load_state_dict(ckpt["model_state"], strict=False)

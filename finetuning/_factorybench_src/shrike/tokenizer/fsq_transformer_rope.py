@@ -1,8 +1,8 @@
-"""FSQ Transformer Tokenizer with RoPE — variable-length time series tokenization.
+"""FSQ Transformer Tokenizer with RoPE, variable-length time series tokenization.
 
 Drop-in replacement for FSQTransformerTokenizer that uses Rotary Position
 Embeddings instead of learned absolute position embeddings. This allows
-tokenizing signals of any length without retraining — a 128-point HAR signal
+tokenizing signals of any length without retraining, a 128-point HAR signal
 and a 2048-point bearing signal both get correct positional information.
 
 Architecture is identical to fsq_transformer.py except:
@@ -49,8 +49,8 @@ def _apply_rope(x: torch.Tensor, freqs: torch.Tensor) -> torch.Tensor:
     """Apply rotary position embedding to a tensor.
 
     Args:
-        x: (batch, n_heads, seq_len, head_dim) — query or key
-        freqs: (seq_len, head_dim // 2) complex — from _build_rope_freqs
+        x: (batch, n_heads, seq_len, head_dim), query or key
+        freqs: (seq_len, head_dim // 2) complex, from _build_rope_freqs
 
     Returns:
         Rotated tensor, same shape as x.
@@ -132,8 +132,7 @@ class RoPETransformerLayer(nn.Module):
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(d_ff, d_model),
-            nn.Dropout(dropout),
-        )
+            nn.Dropout(dropout))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x + self.attn(self.norm1(x))
@@ -190,8 +189,7 @@ class FSQTransformerRoPETokenizer(nn.Module):
             n_heads=config.n_heads,
             d_ff=config.d_ff,
             n_layers=config.n_encoder_layers,
-            dropout=config.dropout,
-        )
+            dropout=config.dropout)
 
         # Project to FSQ dimension
         self.to_fsq = nn.Linear(config.d_model, config.fsq_dim)
@@ -208,8 +206,7 @@ class FSQTransformerRoPETokenizer(nn.Module):
             n_heads=config.n_heads,
             d_ff=config.d_ff,
             n_layers=config.n_decoder_layers,
-            dropout=config.dropout,
-        )
+            dropout=config.dropout)
 
         # Reconstruct patches
         self.patch_reconstruct = PatchReconstruct(config.patch_size, config.d_model)
@@ -222,13 +219,13 @@ class FSQTransformerRoPETokenizer(nn.Module):
         """Encode raw signal to FSQ codes.
 
         Args:
-            x: (batch, seq_len) raw signal — ANY length (must be divisible by patch_size)
+            x: (batch, seq_len) raw signal, ANY length (must be divisible by patch_size)
 
         Returns:
             quantized, indices, z_pre
         """
         h = self.patch_embed(x)  # (b, n_patches, d_model)
-        # No positional embedding added — RoPE handles it inside attention
+        # No positional embedding added, RoPE handles it inside attention
         h = self.encoder(h)
         z = self.to_fsq(h)
         quantized, indices = self.fsq(z)
@@ -237,7 +234,7 @@ class FSQTransformerRoPETokenizer(nn.Module):
     def decode(self, quantized: torch.Tensor) -> torch.Tensor:
         """Decode quantized vectors back to signal."""
         h = self.from_fsq(quantized)
-        # No positional embedding — RoPE inside decoder attention
+        # No positional embedding, RoPE inside decoder attention
         h = self.decoder(h)
         return self.patch_reconstruct(h)
 
@@ -265,7 +262,7 @@ class FSQTransformerRoPETokenizer(nn.Module):
 
     def temporal_smoothness_loss(self, z_pre: torch.Tensor) -> torch.Tensor:
         """Penalize rapid changes in pre-quantization latents."""
-        diff = z_pre[:, 1:, :] - z_pre[:, :-1, :]
+        diff = z_pre[:, 1::] - z_pre[::-1:]
         return diff.abs().mean()
 
     def trainable_summary(self) -> dict:
@@ -295,8 +292,7 @@ class FSQTransformerRoPETokenizer(nn.Module):
             n_decoder_layers=cfg_dict.get("n_decoder_layers", 4),
             d_ff=cfg_dict.get("d_ff", 512),
             dropout=cfg_dict.get("dropout", 0.0),
-            temporal_weight=cfg_dict.get("temporal_weight", 0.1),
-        )
+            temporal_weight=cfg_dict.get("temporal_weight", 0.1))
 
         model = cls(config).to(device)
 

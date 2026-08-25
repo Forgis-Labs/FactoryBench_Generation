@@ -45,8 +45,7 @@ from src.data.factorywave_normalizer import (
     load_episode_metadata,
     _inject_fault_flip_if_missing,
     _align_fault_flip_to_protective_stop,
-    _infer_task_from_phases,
-)
+    _infer_task_from_phases)
 
 logger = logging.getLogger(__name__)
 
@@ -68,32 +67,32 @@ def _build_kuka_column_mapping() -> Dict[str, Optional[str]]:
     m: Dict[str, Optional[str]] = {}
 
     for i in range(6):
-        # INTENT — joint commands. KUKA records setpoint position only.
+        # INTENT, joint commands. KUKA records setpoint position only.
         m[f"setpoint_pos_{i}"]   = f"setpoint_pos_{i}"
         m[f"setpoint_speed_{i}"] = None
         m[f"setpoint_acc_{i}"]   = None
 
-        # OUTCOME — joint feedback
+        # OUTCOME, joint feedback
         m[f"feedback_pos_{i}"]   = f"joint_{i}"
         m[f"feedback_speed_{i}"] = None
 
-        # OUTCOME — effort. KUKA exposes motor current and motor torque.
+        # OUTCOME, effort. KUKA exposes motor current and motor torque.
         m[f"effort_current_{i}"]        = f"motor_current_{i}"
         m[f"effort_target_current_{i}"] = None
         m[f"effort_target_torque_{i}"]  = f"motor_torque_{i}"
         m[f"control_output_{i}"]        = None
 
-        # CONTEXT — per-joint
+        # CONTEXT, per-joint
         m[f"joint_temp_{i}"]    = f"motor_temp_{i}"
         m[f"joint_mode_{i}"]    = None
         m[f"joint_voltage_{i}"] = None
 
-    # INTENT — TCP commands (KUKA records feedback only)
+    # INTENT, TCP commands (KUKA records feedback only)
     for i in range(6):
         m[f"setpoint_tcp_{i}"]       = None
         m[f"setpoint_tcp_speed_{i}"] = None
 
-    # OUTCOME — TCP feedback. KUKA stores pose as (x, y, z, a, b, c) Euler.
+    # OUTCOME, TCP feedback. KUKA stores pose as (x, y, z, a, b, c) Euler.
     # Mapping lines up with UR's (x, y, z, rx, ry, rz) by index.
     for i, axis in enumerate(["x", "y", "z", "a", "b", "c"]):
         m[f"feedback_tcp_{i}"]       = f"tcp_{axis}"
@@ -104,17 +103,17 @@ def _build_kuka_column_mapping() -> Dict[str, Optional[str]]:
         m[f"true_force_{i}"]        = None
         m[f"est_contact_force_{i}"] = None
 
-    # OUTCOME — vibration: KUKA IMU accelerometer at end-effector
+    # OUTCOME, vibration: KUKA IMU accelerometer at end-effector
     for i, axis in enumerate(["x", "y", "z"]):
         m[f"vibration_{i}"] = f"acc_{axis}"
 
     m["acoustic_0"]            = None
     m["protective_stop_state"] = None
 
-    # INTENT — gripper (same column name on both robots)
+    # INTENT, gripper (same column name on both robots)
     m["gripper_command"] = "force"
 
-    # CONTEXT — system-level
+    # CONTEXT, system-level
     m["robot_mode"]            = "process_state"
     m["safety_mode"]           = None
     # Sentinel values: handled specially in normalize_kuka_episode_df below.
@@ -166,8 +165,7 @@ def _pack_bits(row: pd.Series, prefix: str) -> Optional[int]:
 def normalize_kuka_episode_df(
     ep_df: pd.DataFrame,
     first_timestamp_us: int,
-    metadata_fault_id: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+    metadata_fault_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """Convert one KUKA episode DataFrame to the UR3e-style row dicts."""
     rows: List[Dict[str, Any]] = []
 
@@ -264,8 +262,7 @@ def _decimate_kuka_episode(ep_df: pd.DataFrame, target_hz: int) -> pd.DataFrame:
                     onset_row.reset_index(drop=True),
                     decimated.iloc[decimated_onset + 1 :],
                 ],
-                ignore_index=True,
-            )
+                ignore_index=True)
     return decimated
 
 
@@ -279,8 +276,7 @@ def normalize_kuka_dataset(
     target_hz: int = TARGET_HZ,
     limit: Optional[int] = None,
     cf_limit: Optional[int] = None,
-    tasks: Optional[List[str]] = None,
-) -> None:
+    tasks: Optional[List[str]] = None) -> None:
     episode_path = input_dir / "episode.parquet"
     sig_path     = input_dir / "kuka_signals.parquet"
     if not episode_path.exists():
@@ -306,8 +302,8 @@ def normalize_kuka_dataset(
 
     # CF groups, using the precomputed selected_cf_variant_id from each baseline.
     cf_pairs: Dict[str, str]    = {}   # baseline_id -> chosen variant_id
-    cf_variant_ids: set         = set()  # ALL variants (selected or not) — never written standalone
-    selected_variant_ids: set   = set()  # only the selected ones — bundled into their baseline file
+    cf_variant_ids: set         = set()  # ALL variants (selected or not), never written standalone
+    selected_variant_ids: set   = set()  # only the selected ones, bundled into their baseline file
     baseline_ids: set           = set()
     has_selection_col = "selected_cf_variant_id" in ep_table.columns
     for _, r in ep_table.iterrows():
@@ -327,7 +323,7 @@ def normalize_kuka_dataset(
     logger.info(f"KUKA cf pairs (baseline -> chosen variant): {len(cf_pairs)}")
     logger.info(f"KUKA cf variants total: {len(cf_variant_ids)} (skipped from regular pass)")
     if not has_selection_col:
-        logger.warning("episode.parquet has no `selected_cf_variant_id` column — "
+        logger.warning("episode.parquet has no `selected_cf_variant_id` column, "
                        "cf pairs will not be written. Run the sig-kernel MMD step first.")
 
     # Episodes whose signals we actually need.
@@ -392,7 +388,7 @@ def normalize_kuka_dataset(
     logger.info(f"Loaded {len(episode_dfs)} KUKA episodes ({decimated} decimated to {target_hz} Hz)")
 
     # ---------------------------------------------------------------
-    # Pass 1 — counterfactual pairs (baseline + selected variant)
+    # Pass 1, counterfactual pairs (baseline + selected variant)
     # ---------------------------------------------------------------
     cf_processed, cf_skipped = 0, 0
     for bl_id, cf_id in cf_pairs_to_process:
@@ -455,7 +451,7 @@ def normalize_kuka_dataset(
     logger.info(f"  CF pairs: {cf_processed} processed, {cf_skipped} skipped")
 
     # ---------------------------------------------------------------
-    # Pass 2 — non-cf episodes (normal, fault)
+    # Pass 2, non-cf episodes (normal, fault)
     # ---------------------------------------------------------------
     regular_processed, regular_skipped = 0, 0
     for eid, ep_df in episode_dfs.items():
@@ -514,7 +510,7 @@ def normalize_kuka_dataset(
     logger.info(f"  Regular episodes: {regular_processed} processed, {regular_skipped} skipped")
 
     # ---------------------------------------------------------------
-    # Pass 3 — refresh metadata for already-done KUKA episodes
+    # Pass 3, refresh metadata for already-done KUKA episodes
     # ---------------------------------------------------------------
     if already_done:
         logger.info(f"Refreshing metadata for {len(already_done)} pre-existing files...")
@@ -561,8 +557,7 @@ def normalize_kuka_dataset(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Normalize FactoryWave KUKA signals to UR3e schema JSON.",
-    )
+        description="Normalize FactoryWave KUKA signals to UR3e schema JSON.")
     repo_root = Path(__file__).resolve().parents[2]
     parser.add_argument("--input",  type=Path, default=repo_root / "data" / "factorywave" / "data")
     parser.add_argument("--output", type=Path, default=repo_root / "data" / "normalized_episodes")
@@ -579,8 +574,7 @@ def main() -> int:
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     try:
         normalize_kuka_dataset(
@@ -589,8 +583,7 @@ def main() -> int:
             target_hz=args.target_hz,
             limit=args.limit,
             cf_limit=args.cf_limit,
-            tasks=args.tasks,
-        )
+            tasks=args.tasks)
         return 0
     except Exception as e:
         logger.error(f"KUKA normalization failed: {e}")

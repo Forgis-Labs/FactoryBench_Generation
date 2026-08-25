@@ -20,8 +20,7 @@ except ImportError:
 def decimate_dataframe(
     df: pd.DataFrame,
     q: int,
-    continuous_cols: Optional[Set[str]] = None,
-) -> pd.DataFrame:
+    continuous_cols: Optional[Set[str]] = None) -> pd.DataFrame:
     """Downsample *df* by factor *q* with anti-alias filtering.
 
     Parameters
@@ -55,7 +54,7 @@ def decimate_dataframe(
 
     n_out = len(df) // q
     if n_out == 0:
-        # Signal shorter than one decimation period — return the first row.
+        # Signal shorter than one decimation period, return the first row.
         return df.iloc[:1].reset_index(drop=True)
 
     out: dict = {}
@@ -68,7 +67,7 @@ def decimate_dataframe(
             valid_count = int(numeric.notna().sum())
 
             if valid_count < 2 * q:
-                # Too few valid samples for meaningful filtering — subsample.
+                # Too few valid samples for meaningful filtering, subsample.
                 out[col] = values[::q][:n_out]
             else:
                 filled = (
@@ -84,10 +83,10 @@ def decimate_dataframe(
                     decimated = _sp_decimate(filled, q)
                     out[col] = decimated[:n_out]
                 except ValueError:
-                    # Signal too short for the anti-alias filter — fall back to subsample
+                    # Signal too short for the anti-alias filter, fall back to subsample
                     out[col] = filled[::q][:n_out]
         else:
-            # Categorical / integer / string — just pick every q-th value.
+            # Categorical / integer / string, just pick every q-th value.
             out[col] = values[::q][:n_out]
 
     return pd.DataFrame(out)

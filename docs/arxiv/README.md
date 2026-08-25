@@ -1,4 +1,4 @@
-# FROZEN — arXiv v1 submission record
+# FROZEN: arXiv v1 submission record
 
 This directory is the source bundle exactly as submitted to arXiv on
 2026-05-25, kept as a record of what was published. **Do not edit it.**

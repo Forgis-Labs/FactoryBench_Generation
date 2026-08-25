@@ -27,8 +27,7 @@ import numpy as np
 from src.question_generation.utils.hf_streaming import (
     HfStreamUploader,
     add_streaming_args,
-    make_uploader_from_args,
-)
+    make_uploader_from_args)
 from src.question_generation.utils.mc_availability import filter_lookup_by_availability
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
 from src.question_generation.utils.template import (
@@ -39,19 +38,16 @@ from src.question_generation.utils.template import (
     fill_event_description,
     get_last_timestamp,
     pick_constrained_signal,
-    pick_scalar_signal,
-)
+    pick_scalar_signal)
 from src.question_generation.utils.time_series import (
     parse_event_id,
-    pick_fault_label,
-)
+    pick_fault_label)
 from src.question_generation.level3.mc_truth import (
     DEFAULT_THRESHOLDS,
     UNCALIBRATABLE_MC_IDS,
     complement_of,
     evaluate_mc_statement,
-    thresholds_for,
-)
+    thresholds_for)
 from src.question_generation.level2.mc_truth import robot_key
 
 
@@ -71,7 +67,7 @@ CF_DATASET_FOLDERS = ["factorywave"]  # full list; filtered at runtime via --dat
 
 # MC option IDs that require signals absent from simulation data
 NON_SIMULATION_EXCLUDED_MC_IDS = {
-    "mc_020",  # task_success — only available in simulation metadata
+    "mc_020",  # task_success, only available in simulation metadata
 }
 
 SIMULATION_EXCLUDED_MC_IDS = {
@@ -88,7 +84,7 @@ PREDICTIVE_EXCLUDED_MC_IDS = {
     "mc_019",  # safety_mode
 }
 
-# Collision event IDs — excluded from predictive templates because collision
+# Collision event IDs, excluded from predictive templates because collision
 # effects are sharp discontinuities not predictable from the pre-event trajectory.
 COLLISION_EVENT_IDS = {16, 17, 18, 19}
 
@@ -137,8 +133,7 @@ def sample_subsequent_chunks(
     rows: List[Dict[str, Any]],
     n_chunks: int = 4,
     min_chunk: int = 5,
-    max_chunk: int = 7,
-) -> List[List[Dict[str, Any]]]:
+    max_chunk: int = 7) -> List[List[Dict[str, Any]]]:
     """
     Sample n_chunks contiguous, subsequent chunks from rows.
 
@@ -167,8 +162,7 @@ def sample_subsequent_chunks(
 
 def rows_strictly_after_context(
     rows: List[Dict[str, Any]],
-    subseries: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    subseries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Rows whose timestamp is strictly greater than the last context timestamp.
 
     The ranking template asks the model to order segments by when they appear
@@ -196,8 +190,7 @@ def rows_strictly_after_context(
 
 def filter_rows_to_template_features(
     rows: List[Dict[str, Any]],
-    template: Dict[str, Any],
-) -> List[Dict[str, Any]]:
+    template: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Restrict rows to the template's ``important_features``.
 
     ``build_context`` applies this filter to the context but the option
@@ -226,8 +219,7 @@ def encode_chunk_without_timestamps(rows: List[Dict[str, Any]]) -> str:
 
 def get_row_at_or_after_timestamp(
     rows: List[Dict[str, Any]],
-    target_timestamp_ms: int,
-) -> Optional[Dict[str, Any]]:
+    target_timestamp_ms: int) -> Optional[Dict[str, Any]]:
     """Return the first row whose timestamp_ms is >= target_timestamp_ms."""
     for row in rows:
         ts = row.get("timestamp_ms")
@@ -255,8 +247,7 @@ def _first_timestamp_ms(rows: List[Dict[str, Any]]) -> int:
 
 def normalize_timestamps(
     rows: List[Dict[str, Any]],
-    base_timestamp_ms: int,
-) -> List[Dict[str, Any]]:
+    base_timestamp_ms: int) -> List[Dict[str, Any]]:
     """Return a copy of rows with timestamp_ms shifted by base_timestamp_ms."""
     normalized: List[Dict[str, Any]] = []
     for row in rows:
@@ -274,8 +265,7 @@ def normalize_timestamps(
 
 
 def split_event_segment(
-    post_event_rows: List[Dict[str, Any]],
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    post_event_rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Split rows starting at event onset into:
     - full contiguous event segment (same non-zero event token)
@@ -387,8 +377,7 @@ def load_mc_option_lookup(path: Path, level: int) -> Dict[str, str]:
 
 def discover_cf_episode_pairs(
     datasets_dir: Path,
-    cf_dataset_folders: List[str],
-) -> List[Dict[str, Any]]:
+    cf_dataset_folders: List[str]) -> List[Dict[str, Any]]:
     """
     Discover paired episode files inside cf dataset folders.
 
@@ -480,8 +469,7 @@ def sample_window_around_index(
     center_index: int,
     min_len: int,
     max_len: int,
-    margin: int = 5,
-) -> Optional[Tuple[List[Dict[str, Any]], int, int]]:
+    margin: int = 5) -> Optional[Tuple[List[Dict[str, Any]], int, int]]:
     """
     Sample one contiguous subseries containing center_index with at least
     `margin` timesteps from the subseries borders.
@@ -518,8 +506,7 @@ def sample_window_around_index(
 
 def resolve_fixed_option(
     token: Any,
-    mc_option_lookup: Dict[str, str],
-) -> Tuple[Optional[str], str]:
+    mc_option_lookup: Dict[str, str]) -> Tuple[Optional[str], str]:
     """
     Resolve a fixed option token to (canonical_option_id, rendered_statement).
     If token is not a known MC ID, returns (None, str(token)).
@@ -552,8 +539,7 @@ def _sample_ratio(mean: float, rel_std: float = 0.20, min_value: float = 0.0,
 
 def sample_thresholds_for_statement(
     statement_id: str,
-    source: Optional[str] = None,
-) -> Dict[str, float]:
+    source: Optional[str] = None) -> Dict[str, float]:
     """Draw this statement's thresholds around the centre fitted for ``source``.
 
     Thresholds still vary per item; only the centre they revolve around is
@@ -626,8 +612,7 @@ def _fmt_pct(value: float) -> str:
 def render_statement_with_thresholds(
     statement_id: str,
     default_statement: str,
-    thresholds: Dict[str, float],
-) -> str:
+    thresholds: Dict[str, float]) -> str:
     sid = _legacy_mc_option_id(str(statement_id))
     if sid == "l2_mc_003":
         return (
@@ -729,8 +714,7 @@ def build_multiselect_options_and_answer(
     post_event_rows: List[Dict[str, Any]],
     mc_option_lookup: Dict[str, str],
     episode_metadata: Optional[Dict[str, Any]] = None,
-    source: Optional[str] = None,
-) -> Tuple[Dict[str, str], str]:
+    source: Optional[str] = None) -> Tuple[Dict[str, str], str]:
     """
     Build exactly 4 multi-select options:
     1) Keep fixed options from template (if resolvable IDs).
@@ -791,15 +775,13 @@ def build_multiselect_options_and_answer(
         statement = render_statement_with_thresholds(
             opt_id,
             mc_option_lookup.get(opt_id, opt_id),
-            sampled_thresholds,
-        )
+            sampled_thresholds)
         truth = evaluate_mc_statement(
             opt_id,
             subseries=baseline_subseries,
             post_event_rows=post_event_rows,
             thresholds=sampled_thresholds,
-            episode_metadata=episode_metadata,
-        )
+            episode_metadata=episode_metadata)
         options_data.append((opt_id, statement, truth))
 
     random.shuffle(options_data)
@@ -833,8 +815,7 @@ def fill_template(
     steps_ahead: Optional[int] = None,
     episode_metadata: Optional[Dict[str, Any]] = None,
     dataset_name: Optional[str] = None,
-    event_description: str = "",
-) -> Optional[Dict[str, Any]]:
+    event_description: str = "") -> Optional[Dict[str, Any]]:
     """
     Fill a Level 3 question template.
 
@@ -892,8 +873,7 @@ def fill_template(
                 post_event_rows=post_event_rows,
                 mc_option_lookup=mc_option_lookup,
                 episode_metadata=episode_metadata,
-                source=robot_key(episode_metadata),
-            )
+                source=robot_key(episode_metadata))
         except ValueError:
             # Not enough usable statements for this episode; skip the item
             # rather than emit one with fewer than four options.
@@ -908,8 +888,7 @@ def fill_template(
                 post_event_rows=post_event_rows,
                 mc_option_lookup=mc_option_lookup,
                 episode_metadata=episode_metadata,
-                source=robot_key(episode_metadata),
-            )
+                source=robot_key(episode_metadata))
         except ValueError:
             # Not enough usable statements for this episode; skip the item
             # rather than emit one with fewer than four options.
@@ -1050,8 +1029,7 @@ def generate_level3_questions(
     mc_option_lookup: Optional[Dict[str, str]] = None,
     datasets: Optional[List[str]] = None,
     enumerate_mode: bool = False,
-    uploader: Optional[HfStreamUploader] = None,
-) -> None:
+    uploader: Optional[HfStreamUploader] = None) -> None:
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
@@ -1164,8 +1142,7 @@ def generate_level3_questions(
             center_index=event_onset_idx,
             min_len=CONTEXT_MIN,
             max_len=CONTEXT_MAX,
-            margin=5,
-        )
+            margin=5)
         if sampled_window is None:
             continue
 
@@ -1230,8 +1207,7 @@ def generate_level3_questions(
             effective_mc_lookup,
             mc_catalogue,
             _avail_rows,
-            level=3,
-        )
+            level=3)
 
 
         ep_metadata: Optional[Dict[str, Any]] = None
@@ -1288,8 +1264,7 @@ def generate_level3_questions(
             steps_ahead=steps_ahead,
             episode_metadata=ep_metadata,
             dataset_name=sampled_dataset,
-            event_description=_event_desc,
-        )
+            event_description=_event_desc)
         if filled is None:
             continue
 
@@ -1359,30 +1334,26 @@ def main() -> None:
         "--datasets-dir",
         type=Path,
         default=repo_root / "data",
-        help="Root data directory (default: <repo>/data)",
-    )
+        help="Root data directory (default: <repo>/data)")
     parser.add_argument(
         "--output",
         type=Path,
         default=repo_root / "output" / "questions" / "level3",
-        help="Output directory (default: <repo>/output/questions/level3)",
-    )
+        help="Output directory (default: <repo>/output/questions/level3)")
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
-        help=f"Datasets to sample from (default: all). Choices: {CF_DATASET_FOLDERS}",
-    )
+        help=f"Datasets to sample from (default: all). Choices: {CF_DATASET_FOLDERS}")
     parser.add_argument(
         "--enumerate",
         dest="enumerate_mode",
         action="store_true",
         help="Walk every (template x cf_pair) combination deterministically instead "
              "of random sampling. -n becomes an upper cap. Combinations whose "
-             "pair does not satisfy the template's preconditions are skipped.",
-    )
+             "pair does not satisfy the template's preconditions are skipped.")
     add_streaming_args(parser)
     parser.add_argument(
         "--template-ids",
@@ -1390,15 +1361,13 @@ def main() -> None:
         nargs="+",
         default=None,
         help="Restrict generation to these template ids (default: all). Useful "
-             "for regenerating a single template without rerunning the rest.",
-    )
+             "for regenerating a single template without rerunning the rest.")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
     if getattr(args, "template_ids", None):
@@ -1411,8 +1380,7 @@ def main() -> None:
     events = load_events(args.datasets_dir / "labelling" / "events.json")
     mc_option_lookup = load_mc_option_lookup(
         args.datasets_dir / "mc_options" / "mc_options.json",
-        level=3,
-    )
+        level=3)
 
     args.output.mkdir(parents=True, exist_ok=True)
     uploader = make_uploader_from_args(args, level=3, output_dir=args.output)
@@ -1428,8 +1396,7 @@ def main() -> None:
         uploader=uploader,
         n=args.n,
         seed=args.seed,
-        datasets=args.datasets,
-    )
+        datasets=args.datasets)
 
 
 if __name__ == "__main__":

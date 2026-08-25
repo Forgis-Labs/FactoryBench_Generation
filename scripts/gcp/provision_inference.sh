@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FactoryBench — provision the GCP side of the inference pipeline.
+# FactoryBench, provision the GCP side of the inference pipeline.
 #
 # Creates everything the Vertex evaluation path needs and nothing it doesn't:
 # enabled APIs, a regional GCS bucket for batch I/O, a service account, and the

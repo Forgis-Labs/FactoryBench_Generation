@@ -1,4 +1,4 @@
-"""Bearing diagnosis model — loads NanoHyperion checkpoints.
+"""Bearing diagnosis model, loads NanoHyperion checkpoints.
 
 The hyperion_v4 bearing model was trained with the NanoHyperion class
 (attention-only LoRA, TOTEM 256 codes, Qwen3-4B). This module wraps
@@ -12,8 +12,7 @@ Usage:
         "checkpoints/hyperion_v4_multi5bearing/best_model.pt",
         totem_ckpt="checkpoints/totem_clean_local.pt",
         llm_id="Qwen/Qwen3-4B",
-        device="cuda",
-    )
+        device="cuda")
     answer = model.analyze(signal, "Diagnose this bearing.", context="SKF 6205...")
 """
 
@@ -88,8 +87,7 @@ class BearingModel(nn.Module):
         self.llm = AutoModelForCausalLM.from_pretrained(
             config.llm_id,
             torch_dtype=torch.bfloat16,
-            attn_implementation=attn_impl,
-        )
+            attn_implementation=attn_impl)
         self.llm.resize_token_embeddings(len(self.tokenizer))
 
         # --- Init TS embeddings from TOTEM codebook ---
@@ -128,8 +126,7 @@ class BearingModel(nn.Module):
             lora_dropout=config.lora_dropout,
             target_modules=config.lora_target_modules,
             bias="none",
-            **lora_kwargs,
-        )
+            **lora_kwargs)
         self.llm = get_peft_model(self.llm, lora_config)
 
         # --- Gradient mask ---
@@ -234,13 +231,11 @@ class BearingModel(nn.Module):
         self,
         batch: list[dict],
         max_new_tokens: int = 400,
-        use_chatml: bool = False,
-    ) -> list[str]:
+        use_chatml: bool = False) -> list[str]:
         texts = [self.build_text(s, use_chatml=use_chatml) for s in batch]
         tokenized = self.tokenizer(
             texts, padding="longest", return_tensors="pt",
-            truncation=True, max_length=self.config.max_length,
-        )
+            truncation=True, max_length=self.config.max_length)
         input_ids = tokenized.input_ids.to(self.device_str)
         attention_mask = tokenized.attention_mask.to(self.device_str)
 
@@ -256,12 +251,11 @@ class BearingModel(nn.Module):
             attention_mask=attention_mask,
             max_new_tokens=max_new_tokens,
             eos_token_id=eos_ids,
-            pad_token_id=self.tokenizer.pad_token_id,
-        )
+            pad_token_id=self.tokenizer.pad_token_id)
         answer_ids = gen_ids[:, input_ids.shape[1]:]
         return self.tokenizer.batch_decode(answer_ids, skip_special_tokens=True)
 
-    # ── analyze() — same API as Shrike ────────────────────────────
+    # ── analyze(), same API as Shrike ────────────────────────────
 
     def analyze(
         self,
@@ -270,8 +264,7 @@ class BearingModel(nn.Module):
         signal_label: str = "Signal:",
         context: str = "",
         max_new_tokens: int = 400,
-        use_chatml: bool = False,
-    ) -> str:
+        use_chatml: bool = False) -> str:
         """Analyze a time series and answer a question about it.
 
         Args:
@@ -301,15 +294,13 @@ class BearingModel(nn.Module):
         checkpoint_path: str,
         totem_ckpt: str | None = None,
         llm_id: str = "Qwen/Qwen3-4B",
-        device: str = "cpu",
-    ) -> "BearingModel":
+        device: str = "cpu") -> "BearingModel":
         """Load a NanoHyperion/hyperion checkpoint."""
         ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
 
         config = BearingConfig(
             llm_id=llm_id,
-            totem_ckpt=totem_ckpt,
-        )
+            totem_ckpt=totem_ckpt)
 
         model = cls(config, device=device)
 

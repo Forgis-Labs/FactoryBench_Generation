@@ -128,7 +128,7 @@
         \coordinate (poolMid)   at ($(pool.east)!0.5!(poolSplit |- pool)$);
 
         % --- 4 Level icons, vertically stacked (the generator box has been
-        % removed — these levels themselves represent the four kinds of Q&A
+        % removed, these levels themselves represent the four kinds of Q&A
         % the generator emits).  Inputs (templates, pool, KG) feed the column;
         % outputs go to the model under test.
         \node[align=center, inner sep=3pt, text width=2.0cm] (qa1) at (\colLvl,  1.70) {%
@@ -249,7 +249,7 @@
 
         % --- Templates: icon-only (no box), inline icon+title (as before).
         % Centred (default anchor) at (\colPool, 2.20) so the templates
-        % bbox is bisected vertically by y = 2.20 — the arrow exits the
+        % bbox is bisected vertically by y = 2.20, the arrow exits the
         % east face at y = tmpl.center.y, putting its horizontal segment
         % through the middle of templates rather than under it.
         \node[iconplain] (tmpl) at (\colPool, 1.70) {%
@@ -319,7 +319,7 @@
               anchor=south, align=center, text width=2.8cm]
             at (\exX, 2.25) {Example of template:\\L3 counterfactual};
 
-        % Template content (top) — no rectangle box, no "Template" label.
+        % Template content (top), no rectangle box, no "Template" label.
         \node[align=left, inner sep=4pt, text width=2.3cm,
               font=\sffamily\fontsize{5.4}{6.6}\selectfont\color{gunmetal}]
             (extmpl) at (\exX, 1.55) {%
@@ -327,7 +327,7 @@
             {\color{tiger}\{t\}}\,ms, what would
             {\color{tiger}\{signal\}} be at T+{\color{tiger}\{n\}}\,ms?};
 
-        % Instantiated content (middle) — no rectangle box, no "Instantiated question" label.
+        % Instantiated content (middle), no rectangle box, no "Instantiated question" label.
         \node[align=left, inner sep=4pt, text width=2.3cm,
               font=\sffamily\fontsize{5.4}{6.6}\selectfont\color{gunmetal}]
             (exq) at (\exX, -0.80) {%
@@ -336,7 +336,7 @@
             {\color{tiger}\bfseries joint accelerations} be at
             T+{\color{tiger}\bfseries 500}\,ms?};
 
-        % Ground-truth answer (bottom) — no rectangle box.
+        % Ground-truth answer (bottom), no rectangle box.
         \node[align=left, inner sep=4pt, text width=2.3cm,
               font=\sffamily\fontsize{5.4}{6.6}\selectfont\color{gunmetal}]
             (exa) at (\exX, -3.15) {%
@@ -426,7 +426,7 @@
         % horizontal span.
         \coordinate (predJ) at (9.565, -5.25);
 
-        % --- TOP BRANCH: Parsing (icon-only, no box) — receives the L1-3
+        % --- TOP BRANCH: Parsing (icon-only, no box), receives the L1-3
         % answer trunk and feeds the score box.
         \node[iconplain, anchor=east] (parsing) at (5.865, -4.55) {%
             {\color{gunmetal}\faTools}\;\bfseries Parsing};

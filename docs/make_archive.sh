@@ -71,7 +71,7 @@ grep -oE '\.\./[A-Za-z0-9_./-]+\.(png|pdf|jpe?g|tex)' "$LOG" \
 # The appendix pulls figures from ../../output/figures/ rather than the build
 # directory; those land in figures/ too and the path rewrite below matches.
 # (`[ -f x ] && cp` would return 1 on the last miss and, under set -e, kill the
-# script — hence the explicit if.)
+# script, hence the explicit if.)
 grep -oE '\.\./\.\./output/figures/[A-Za-z0-9_.-]+\.(pdf|png)' "$LOG" | sort -u \
   | while read -r ref; do
         src="workshop_tex/$ref"
@@ -84,7 +84,7 @@ echo ">>> staged $(find "$STAGE/figures" -type f | wc -l) figures for ${VENUE}"
 # Rewrite the copies only; the repo sources keep their shared layout.
 cd "$STAGE"
 # \input{../paper/x} -> \input{x}, \bibliography{../paper/references} ->
-# {references}, ../../output/figures/y -> figures/y, and the two search paths
+# {references}../../output/figures/y -> figures/y, and the two search paths
 # the wrapper points at ../neurips_tex/ -> here.
 sed -i \
     -e 's|\.\./paper/||g' \
@@ -138,7 +138,7 @@ cp main.pdf "../${BASE}.pdf"
 rm -f main.aux main.log main.blg main.out main.pdf   # keep main.bbl: portals need it
 cd ..
 
-# 1. arXiv-ready source: FLAT, sources at the zip root, .bbl included so the
+# 1. arXiv-ready source: FLAT, sources at the zip root.bbl included so the
 #    portal does not have to run bibtex. arXiv rejects a nested layout.
 rm -f "${BASE}-arxiv-source.zip"
 ( cd "${VENUE}-source" && zip -q -r "../${BASE}-arxiv-source.zip" . )

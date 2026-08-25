@@ -1,5 +1,5 @@
 """
-SimContext — a lightweight container passed to every applicator on each step.
+SimContext, a lightweight container passed to every applicator on each step.
 
 This is the *only* coupling between the injection framework and the
 simulation.  Applicators never import Isaac Sim directly; they read/write
@@ -32,7 +32,7 @@ class SimContext:
     robot_prim_path : str
         USD path of the robot articulation root.
     joint_names : list[str]
-        Ordered joint names (e.g. ``["shoulder_pan", ..., "wrist_3"]``).
+        Ordered joint names (e.g. ``["shoulder_pan"..., "wrist_3"]``).
     sim_dt : float
         Physics timestep in seconds.
     episode_step : int

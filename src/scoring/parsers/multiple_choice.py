@@ -20,30 +20,27 @@ def _strip_prompt_leak(text: str) -> str:
 # Strict: the entire response is just a letter (with optional whitespace).
 _STRICT_RE = re.compile(r"^\s*([A-Da-d])\s*$")
 
-# Lenient layer 1 — explicit "Answer: X" cues, with optional markdown emphasis.
+# Lenient layer 1, explicit "Answer: X" cues, with optional markdown emphasis.
 # Captures `Answer: B`, `**Answer: B**`, `Final Answer: B`, `Answer = B`, etc.
 _ANSWER_CUE_RE = re.compile(
     r"(?:\*{1,2}\s*)?(?:final\s+)?answer\s*[:=]\s*\*{0,2}\s*([A-Da-d])\b",
-    re.IGNORECASE,
-)
+    re.IGNORECASE)
 
-# Lenient layer 2 — "the correct/right answer is X" phrasing.
+# Lenient layer 2, "the correct/right answer is X" phrasing.
 _IS_CUE_RE = re.compile(
     r"(?:correct|right)\s+answer\s+is\s*:?\s*\*{0,2}\s*([A-Da-d])\b",
-    re.IGNORECASE,
-)
+    re.IGNORECASE)
 
-# Lenient layer 3 — standalone bolded letter, e.g. `**B**`.
+# Lenient layer 3, standalone bolded letter, e.g. `**B**`.
 _BOLD_LETTER_RE = re.compile(r"\*{1,2}\s*([A-Da-d])\s*\*{1,2}")
 
-# Lenient layer 4 — last non-empty line is just the letter
+# Lenient layer 4, last non-empty line is just the letter
 # (optionally bolded, optionally trailing period). Multiline.
 _LINE_LETTER_RE = re.compile(
     r"^\s*\*{0,2}\s*([A-Da-d])\s*\*{0,2}\s*\.?\s*$",
-    re.MULTILINE,
-)
+    re.MULTILINE)
 
-# Lenient layer 5 (last resort) — bare [A-D] anywhere, with light unit-context filter.
+# Lenient layer 5 (last resort), bare [A-D] anywhere, with light unit-context filter.
 _BARE_LETTER_RE = re.compile(r"\b([A-Da-d])\b")
 # A letter is "unit-like" if it follows a number (e.g., "0.38 A", "5 N").
 _UNIT_CONTEXT_RE = re.compile(r"\d\s*$")
@@ -57,7 +54,7 @@ def _last_match(pattern: re.Pattern[str], text: str) -> re.Match[str] | None:
 
 
 class MCMultiParser(Parser):
-    """multiple_choice_multi_select — extracts a T/F string of fixed length."""
+    """multiple_choice_multi_select, extracts a T/F string of fixed length."""
 
     answer_format: ClassVar[str] = "multiple_choice_multi_select"
 
@@ -82,8 +79,7 @@ class MCMultiParser(Parser):
         # example: "Answer: TFFT", "**Answer: TFFT**", "Final Answer = TFFT", etc.
         cue_pat = re.compile(
             rf"(?:final\s+)?answer\s*[:=]\s*\*{{0,2}}\s*([TFtf]{{{n}}})\b",
-            re.IGNORECASE,
-        )
+            re.IGNORECASE)
         m = _last_match(cue_pat, cleaned)
         if m is not None:
             return self._score(m.group(1).upper(), gt, "lenient")
@@ -122,7 +118,7 @@ class MCMultiParser(Parser):
 
 
 class MCSingleParser(Parser):
-    """multiple_choice_single_select — extracts a single letter A-D."""
+    """multiple_choice_single_select, extracts a single letter A-D."""
 
     answer_format: ClassVar[str] = "multiple_choice_single_select"
 

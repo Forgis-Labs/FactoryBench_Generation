@@ -66,8 +66,7 @@ BUCKET = _require_env(
     "FB_SAGEMAKER_BUCKET",
     "S3 bucket holding the Shrike checkpoints, TS tokenizers and FactoryBench "
     "training JSONLs, and receiving training/eval output.",
-    "my-sagemaker-bucket",
-)
+    "my-sagemaker-bucket")
 REGION = (os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "").strip()
 if not REGION:
     raise SystemExit(
@@ -78,12 +77,11 @@ if not REGION:
 ROLE = _require_env(
     "FB_SAGEMAKER_ROLE_ARN",
     "SageMaker execution role ARN, needs read/write on the bucket above.",
-    "arn:aws:iam::<acct>:role/service-role/AmazonSageMaker-ExecutionRole-<id>",
-)
+    "arn:aws:iam::<acct>:role/service-role/AmazonSageMaker-ExecutionRole-<id>")
 # Key prefix under which the Shrike checkpoints and tokenizers are staged.
 S3_PREFIX = (os.environ.get("FB_SAGEMAKER_PREFIX") or "shrike").strip()
 
-# Pre-staged base LLM weights (already on S3 — used as the "llm" channel)
+# Pre-staged base LLM weights (already on S3, used as the "llm" channel)
 S3_LLM = {
     "Qwen/Qwen3-4B":   f"s3://{BUCKET}/{S3_PREFIX}/llm/Qwen3-4B/",
     "Qwen/Qwen3-1.7B": f"s3://{BUCKET}/{S3_PREFIX}/llm/Qwen3-1.7B/",
@@ -137,7 +135,7 @@ CHECKPOINTS = {
                      f"phase0_best.pt",
         "checkpoint_type": "shrike",
         "tokenizer_type": "totem",
-        # Matches phase0_totem.yaml (`fsq_ckpt: totem_625_best.pt` — yes, the
+        # Matches phase0_totem.yaml (`fsq_ckpt: totem_625_best.pt`, yes, the
         # field is misnamed in that config but it's the 625-code TOTEM).
         "ts_tokenizer_s3": f"s3://{BUCKET}/{S3_PREFIX}/tokenizer/totem_625_best.pt",
         "ts_tokenizer_channel": "totem_ckpt",
@@ -150,7 +148,7 @@ CHECKPOINTS = {
 
 
 # -- Defaults for training hyperparameters ------------------------------
-# Same shape as launch_factorybench.py — kept identical so the two sweeps are
+# Same shape as launch_factorybench.py, kept identical so the two sweeps are
 # directly comparable. The fresh DoRA targets attention + MLP (the FactoryBench
 # default in train_factorybench.py); existing per-checkpoint DoRA surface is
 # absorbed by merge_and_unload before the fresh adapter is attached.
@@ -237,8 +235,7 @@ def build_estimator(name: str, cfg: dict, args: argparse.Namespace,
             {"Key": "Sweep",   "Value": "dora-on-dora"},
             {"Key": "Base",    "Value": name},
         ],
-        **spot_kwargs,
-    )
+        **spot_kwargs)
 
     data_channels = {
         "llm":       S3_LLM[cfg["llm_id"]],
@@ -278,7 +275,7 @@ def main() -> None:
                          f"Valid: {list(CHECKPOINTS)}")
 
     print("=" * 72)
-    print(f"FactoryBench DoRA-on-DoRA sweep — {len(keys)} job(s)")
+    print(f"FactoryBench DoRA-on-DoRA sweep, {len(keys)} job(s)")
     print(f"Spot:        {args.spot}")
     print(f"LoRA r/α:    {args.lora_r}/{args.lora_alpha}, DoRA={args.use_dora}")
     print(f"Epochs:      {args.epochs}  Batch: {args.batch_size}x{args.grad_accum}")

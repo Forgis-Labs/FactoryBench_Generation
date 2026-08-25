@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FactoryBench — Full data installation and normalization pipeline.
+# FactoryBench, Full data installation and normalization pipeline.
 #
 # Downloads open datasets, normalizes all sources to UR3e schema JSON,
 # and injects synthetic events.
@@ -31,7 +31,7 @@ for arg in "$@"; do
 done
 
 echo "============================================"
-echo " FactoryBench — Data Installation Pipeline"
+echo " FactoryBench, Data Installation Pipeline"
 echo "============================================"
 echo ""
 

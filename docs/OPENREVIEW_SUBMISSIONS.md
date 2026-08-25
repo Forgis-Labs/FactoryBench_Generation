@@ -124,7 +124,7 @@ Industrial robots emit dense multivariate telemetry that determines their operat
 
   The source zip is fully anonymous and well under the 100 MB cap. It is
   optional; upload it only if you want reviewers to see the LaTeX. Do **not**
-  upload `factorybench-physunderstanding-workshop-2026-08-25-full.zip` — that one is for your records.
+  upload `factorybench-physunderstanding-workshop-2026-08-25-full.zip`, that one is for your records.
 
 ---
 
@@ -158,7 +158,7 @@ Robot foundation models are increasingly deployed zero-shot: downloaded pretrain
 
   The source zip is fully anonymous and well under the 100 MB cap. It is
   optional; upload it only if you want reviewers to see the LaTeX. Do **not**
-  upload `factorybench-robotlearning-workshop-2026-08-25-full.zip` — that one is for your records.
+  upload `factorybench-robotlearning-workshop-2026-08-25-full.zip`, that one is for your records.
 
 ---
 
@@ -192,7 +192,7 @@ We introduce FactoryBench, a benchmark for evaluating whether time-series models
 
   The source zip is fully anonymous and well under the 100 MB cap. It is
   optional; upload it only if you want reviewers to see the LaTeX. Do **not**
-  upload `factorybench-wmphysai-workshop-2026-08-25-full.zip` — that one is for your records.
+  upload `factorybench-wmphysai-workshop-2026-08-25-full.zip`, that one is for your records.
 
 ---
 

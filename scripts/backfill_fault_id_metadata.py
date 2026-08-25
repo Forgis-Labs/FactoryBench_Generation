@@ -2,7 +2,7 @@
 
 These two datasets ship metadata without a ``fault_id`` field (the per-episode
 fault is encoded as ``fault_label`` on each row instead). Every other generator
-expects ``meta.fault_id`` as the canonical anomaly identifier — without it,
+expects ``meta.fault_id`` as the canonical anomaly identifier, without it,
 L2/L3/L4 either over-include nominal episodes or have to do expensive per-row
 scans at runtime.
 
@@ -126,19 +126,16 @@ def main() -> None:
         "--datasets",
         nargs="+",
         default=list(DEFAULT_DATASETS),
-        help=f"Datasets to backfill (default: {DEFAULT_DATASETS}).",
-    )
+        help=f"Datasets to backfill (default: {DEFAULT_DATASETS}).")
     parser.add_argument(
         "--rewrite",
         action="store_true",
-        help="Recompute fault_id even when the metadata already has one.",
-    )
+        help="Recompute fault_id even when the metadata already has one.")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     total = (0, 0, 0)
     for ds in args.datasets:

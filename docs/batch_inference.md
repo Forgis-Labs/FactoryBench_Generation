@@ -64,7 +64,7 @@ HF_API_TOKEN="<your_hf_token>"
 # --- Azure Foundry (gpt-5.1-1) ---
 AZURE_API_KEY="<your_azure_key>"
 CHAT_ENDPOINT="https://student-research-lab-resource.services.ai.azure.com/openai/v1"
-# OPTIONAL — separate deployment for batch on a globalbatch SKU. See "GPT-5.1
+# OPTIONAL: separate deployment for batch on a globalbatch SKU. See "GPT-5.1
 # batch caveat" below. Leave unset to use the default deployment for batch.
 GPT_5_1_BATCH_DEPLOYMENT="gpt-5.1-batch"
 
@@ -154,7 +154,7 @@ HTTP 400** `invalid_deployment_type`. Two ways to fix:
    Set `GPT_5_1_BATCH_DEPLOYMENT="gpt-5.1-batch"` in `.env`. The runner
    automatically routes batch traffic to the override and sync traffic to
    the original.
-2. Or upgrade the existing deployment to `globalbatch` in place — but then
+2. Or upgrade the existing deployment to `globalbatch` in place, but then
    *sync calls fail*, breaking the LLM-as-judge.
 
 If batch ever falls back to sync, the pipeline logs:

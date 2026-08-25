@@ -82,8 +82,7 @@ def run(config_path: str, cli_args=None):
     world = World(
         physics_dt=sim_dt,
         rendering_dt=sim_dt,
-        stage_units_in_meters=1.0,
-    )
+        stage_units_in_meters=1.0)
     stage = omni.usd.get_context().get_stage()
 
     # Configure PhysX scene for contact-rich simulation
@@ -160,7 +159,7 @@ def run(config_path: str, cli_args=None):
     bolt_prim = stage.GetPrimAtPath(BOLT_PRIM)
 
     # The Factory bolt USD has its own internal rigid body child.
-    # Don't add another RigidBodyAPI on the parent — just position it.
+    # Don't add another RigidBodyAPI on the parent, just position it.
     bolt_xf = UsdGeom.Xformable(bolt_prim)
     bolt_xf.ClearXformOpOrder()
     bolt_xf.AddTranslateOp().Set(Gf.Vec3f(float(bolt_pos[0]), float(bolt_pos[1]), float(bolt_pos[2])))
@@ -179,7 +178,7 @@ def run(config_path: str, cli_args=None):
     nut_prim = stage.GetPrimAtPath(NUT_PRIM)
 
     # The Factory nut USD has its own internal rigid body child.
-    # Don't add another RigidBodyAPI — just position it.
+    # Don't add another RigidBodyAPI, just position it.
     nut_init_pos = bolt_pos.copy()
     nut_init_pos[2] += 0.05  # above bolt
     nut_xf = UsdGeom.Xformable(nut_prim)
@@ -213,7 +212,7 @@ def run(config_path: str, cli_args=None):
     robot.set_solver_position_iteration_count(192)
     robot.set_solver_velocity_iteration_count(1)
 
-    # RMPFlow will control arm joints (0-6) — leave their USD drives at
+    # RMPFlow will control arm joints (0-6), leave their USD drives at
     # zero stiffness (as the Factory USD has them).  Only set PD gains
     # on the gripper joints so they can hold closed/open.
     n_arm = len(home_joints)
@@ -266,7 +265,7 @@ def run(config_path: str, cli_args=None):
         robot_position=base_pos, robot_orientation=base_ori)
     print("[RMPFlow] Franka controller initialized")
 
-    # Bolt tip position — where the nut threads onto
+    # Bolt tip position, where the nut threads onto
     bolt_height = float(scfg.get("bolt_height", 0.025))
     bolt_base_height = float(scfg.get("bolt_base_height", 0.01))
     bolt_tip = bolt_pos.copy()
@@ -312,7 +311,7 @@ def run(config_path: str, cli_args=None):
     print(f"[Logger] Writing to {os.path.abspath(log_dir)}/")
 
     # -----------------------------------------------------------------------
-    # Main loop — the robot starts above the bolt and attempts threading
+    # Main loop, the robot starts above the bolt and attempts threading
     # -----------------------------------------------------------------------
     step = 0
     episode = 0

@@ -2,10 +2,10 @@
 
 Walks output/replies/level{1..4}/<model>/*_answer.json, joins with question
 payloads for answer_format, and produces:
-  1. model_x_level.png  — grouped bar: mean score per (model, level)
-  2. model_x_format.png — grouped bar: mean score per (model, answer_format)
-  3. heatmap.png        — model × level mean score heatmap
-  4. summary.csv        — full pivot table
+  1. model_x_level.png, grouped bar: mean score per (model, level)
+  2. model_x_format.png, grouped bar: mean score per (model, answer_format)
+  3. heatmap.png, model × level mean score heatmap
+  4. summary.csv, full pivot table
 
 Usage:
     python -m src.evaluation.plot_benchmark
@@ -47,8 +47,7 @@ def _question_stem_from_reply_stem(reply_stem: str) -> str:
 
 def load_records(
     replies_root: Path,
-    questions_root: Path,
-) -> List[Dict[str, Any]]:
+    questions_root: Path) -> List[Dict[str, Any]]:
     q_indices: Dict[int, Dict[str, Dict[str, Any]]] = {}
     for lvl_dir in sorted(questions_root.glob("level*")):
         m = LEVEL_RE.match(lvl_dir.name)
@@ -202,7 +201,7 @@ def plot_heatmap(records, output: Path) -> None:
             val = mat[i, j]
             n = int(counts[i, j]) if not np.isnan(counts[i, j]) else 0
             if n == 0 or np.isnan(val):
-                ax.text(j, i, "—", ha="center", va="center", color="#999999", fontsize=11)
+                ax.text(j, i, ", ", ha="center", va="center", color="#999999", fontsize=11)
                 continue
             text_color = "white" if val < 0.55 else "black"
             ax.text(j, i - 0.12, f"{val:.2f}", ha="center", va="center",
@@ -278,8 +277,7 @@ def plot_score_box_by_level(records, output: Path) -> None:
         ]
         bp = ax.boxplot(
             data, positions=positions, widths=width * 0.9, patch_artist=True,
-            medianprops={"color": "black"}, showfliers=False,
-        )
+            medianprops={"color": "black"}, showfliers=False)
         for patch in bp["boxes"]:
             patch.set_facecolor(PALETTE[i % len(PALETTE)])
             patch.set_alpha(0.7)
@@ -358,7 +356,7 @@ def plot_template_type_heatmap(records, output: Path) -> None:
             val = mat[i, j]
             n = data.get((models[i], types[j]), (np.nan, 0))[1]
             if n == 0 or np.isnan(val):
-                cell, color = "—", "gray"
+                cell, color = ", ", "gray"
             else:
                 cell = f"{val:.2f}\nn={n}"
                 color = "white" if val < 0.5 else "black"
@@ -375,7 +373,7 @@ def plot_level_composition(records, output: Path) -> None:
     """Stacked bar: question count composition per level by answer_format."""
     levels = sorted({r["level"] for r in records})
     formats = sorted({r["answer_format"] for r in records})
-    # Count unique (level, format, question) — collapse models so each question
+    # Count unique (level, format, question), collapse models so each question
     # is counted once per level (use any single model to avoid inflating).
     # Simple approach: divide count by number of models.
     models = sorted({r["model"] for r in records})
@@ -424,7 +422,7 @@ def plot_heatmap_per_level(records, output_dir: Path) -> None:
                 val = mat[i, j]
                 n = data.get((models[i], formats[j]), (np.nan, 0))[1]
                 if n == 0 or np.isnan(val):
-                    cell = "—"
+                    cell = ", "
                     color = "gray"
                 else:
                     cell = f"{val:.2f}\n(n={n})"
@@ -462,7 +460,7 @@ def plot_heatmap_per_model(records, output_dir: Path) -> None:
                 val = mat[i, j]
                 n = data.get((levels[i], formats[j]), (np.nan, 0))[1]
                 if n == 0 or np.isnan(val):
-                    cell = "—"
+                    cell = ", "
                     color = "gray"
                 else:
                     cell = f"{val:.2f}\n(n={n})"
@@ -527,8 +525,7 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     records = load_records(args.replies_root, args.questions_root)
     if not records:

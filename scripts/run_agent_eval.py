@@ -9,7 +9,7 @@ JSON shape so downstream aggregators / judge scripts pick them up
 without any changes.
 
 Only Foundry chat is supported for the driver model right now
-(GPT-5.1). Judges are optional (default off) — free-form scoring runs
+(GPT-5.1). Judges are optional (default off), free-form scoring runs
 via the same 3-judge batch script as the other panel cells.
 
 Usage:
@@ -32,7 +32,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-# Load .env before any auth resolution — matches what run_foundry_eval does.
+# Load .env before any auth resolution, matches what run_foundry_eval does.
 try:
     from dotenv import find_dotenv, load_dotenv
     load_dotenv(find_dotenv(usecwd=True))
@@ -43,13 +43,11 @@ import numpy as np
 
 from src.agentic.agent import Agent, BedrockAgent
 from src.agentic.tools import (
-    ForecastTool, ManualRAGTool, PythonSandboxTool, SignalStatsTool,
-)
+    ForecastTool, ManualRAGTool, PythonSandboxTool, SignalStatsTool)
 from src.config import MODELS, get_upstream_model_id
 from src.evaluation.run_foundry_eval import (
     _openai_client, build_question_index, infer_answer_format,
-    resolve_api_key, resolve_endpoint, score_prediction,
-)
+    resolve_api_key, resolve_endpoint, score_prediction)
 from src.evaluation.test_gpt_5mini import _estimate_cost as estimate_cost
 
 logger = logging.getLogger(__name__)
@@ -65,13 +63,13 @@ def _parse_ts(question: Dict[str, Any]) -> Dict[str, np.ndarray]:
     rows = ctx.get("time_series") or []
     ts: Dict[str, List[float]] = {}
     if isinstance(rows, list) and rows and isinstance(rows[0], dict):
-        # dict form: each row is {channel: value, ...}
+        # dict form: each row is {channel: value...}
         for row in rows:
             for k, v in row.items():
                 if isinstance(v, (int, float)) and not isinstance(v, bool):
                     ts.setdefault(k, []).append(float(v))
         return {k: np.asarray(v, dtype=float) for k, v in ts.items()}
-    # string form: each row is "t=<ts>: k1=v1, k2=v2, ..."
+    # string form: each row is "t=<ts>: k1=v1, k2=v2..."
     for row in rows:
         if not isinstance(row, str):
             continue
@@ -115,8 +113,7 @@ def _process_one(
     rag: ManualRAGTool,
     output_dir: Path,
     max_tool_calls: int,
-    overwrite: bool,
-) -> Optional[Dict[str, Any]]:
+    overwrite: bool) -> Optional[Dict[str, Any]]:
     custom_id = prompt_path.stem
     out_path = output_dir / f"{custom_id}_answer.json"
     if out_path.exists() and not overwrite:
@@ -126,9 +123,9 @@ def _process_one(
     prompt_text = prompt_payload.get("prompt") or ""
     # Question lookup: try every plausible stem transform.
     # Prompt naming shapes seen in this repo:
-    #   (a) "<uuid>_<idx>"           — KUKA subset (stage_kuka_from_hf) — strip _<idx>
-    #   (b) "level<N>_<uuid>_<idx>"  — some builds — strip both prefix + suffix
-    #   (c) "level<N>_<uuid>"        — paper prompts — strip prefix, no suffix
+    #   (a) "<uuid>_<idx>", KUKA subset (stage_kuka_from_hf), strip _<idx>
+    #   (b) "level<N>_<uuid>_<idx>", some builds, strip both prefix + suffix
+    #   (c) "level<N>_<uuid>", paper prompts, strip prefix, no suffix
     # UUIDs contain hyphens, not underscores, so any underscore in custom_id is
     # either the level prefix separator or the _<idx> separator.
     candidates = [custom_id]
@@ -271,8 +268,7 @@ def main() -> int:
     def _run(pp):
         return _process_one(
             pp, questions, client, args.model, upstream_model_id, rag,
-            args.output_dir, args.max_tool_calls, args.overwrite,
-        )
+            args.output_dir, args.max_tool_calls, args.overwrite)
 
     if args.concurrency <= 1:
         for pp in prompt_files:

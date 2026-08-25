@@ -31,8 +31,7 @@ _UNIT_SUFFIX_RE = re.compile(
     r"kJ|J|"
     r"kHz|MHz|Hz"
     r")\.?\s*$",
-    re.IGNORECASE,
-)
+    re.IGNORECASE)
 
 # Markdown emphasis around a value: **0.5**, *0.5*, `0.5`
 _EMPHASIS_RE = re.compile(r"^\s*[\*`]+\s*(.*?)\s*[\*`]+\s*$", re.DOTALL)
@@ -40,8 +39,7 @@ _EMPHASIS_RE = re.compile(r"^\s*[\*`]+\s*(.*?)\s*[\*`]+\s*$", re.DOTALL)
 # Cue patterns. Use re.DOTALL for tolerance to multiline answers.
 _ANSWER_CUE_RE = re.compile(
     r"(?:final\s+)?answer\s*[:=]\s*\*{0,2}\s*(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)",
-    re.IGNORECASE,
-)
+    re.IGNORECASE)
 
 
 def _strip_emphasis_and_unit(s: str) -> str:
@@ -62,7 +60,7 @@ def _try_float(s: str) -> float | None:
 
 
 class NumericalParser(Parser):
-    """numerical — extracts a single float."""
+    """numerical, extracts a single float."""
 
     answer_format: ClassVar[str] = "numerical"
 
@@ -100,8 +98,7 @@ class NumericalParser(Parser):
         # answers without an explicit cue go to the judge instead.
         last_line = next(
             (ln for ln in reversed(cleaned.splitlines()) if ln.strip()),
-            "",
-        )
+            "")
         last_line_floats = _FLOAT_RE.findall(_strip_emphasis_and_unit(last_line))
         if last_line_floats:
             if (val := _try_float(last_line_floats[-1])) is not None:

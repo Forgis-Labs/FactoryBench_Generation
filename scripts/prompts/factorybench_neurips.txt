@@ -4,7 +4,7 @@ called "FactoryBench". White background, flat design, clean sans-serif typograph
 with four main zones connected by thick dark navy arrows (#122128).
  
 ═══════════════════════════════════════════════════════
-ZONE 1 — LEFT: Paper thumbnail (width ~15% of total)
+ZONE 1, LEFT: Paper thumbnail (width ~15% of total)
 ═══════════════════════════════════════════════════════
 A realistic miniature academic paper preview with:
 - Title in bold: "FactoryBench"
@@ -17,7 +17,7 @@ A realistic miniature academic paper preview with:
 - arXiv-style preprint header at top
  
 ═══════════════════════════════════════════════════════
-ZONE 2 — CENTER-TOP: Question box (full width of center)
+ZONE 2, CENTER-TOP: Question box (full width of center)
 ═══════════════════════════════════════════════════════
 A prominent rounded rectangle with:
 - Background: warm amber/yellow (#FFF3CD)
@@ -28,14 +28,14 @@ A prominent rounded rectangle with:
 - A thin orange left-border accent bar
  
 ═══════════════════════════════════════════════════════
-ZONE 2 — CENTER: Main data panel
+ZONE 2, CENTER: Main data panel
 ═══════════════════════════════════════════════════════
 Large rounded rectangle, light blue-gray background (#f0f4f8), dark navy border.
 Header label in dark navy bold: "Sensor Data, Figures and Captions"
  
 Contains THREE sub-elements arranged horizontally:
  
-[Sub-element A: Time series plot — leftmost, largest]
+[Sub-element A: Time series plot, leftmost, largest]
 A matplotlib-style line chart titled "Joint Current (t=0 to 500ms)"
 X-axis label: "Time (ms)", Y-axis label: "Current (A)"
 Shows EXACTLY THREE signal groups (not random noise):
@@ -47,7 +47,7 @@ Shows EXACTLY THREE signal groups (not random noise):
     and label "anomaly detected"
 Clean white plot background, gridlines in light gray.
  
-[Sub-element B: Data table — center]
+[Sub-element B: Data table, center]
 A clean bordered table with header row in dark navy (#122128) with white text.
 Columns: Joint | Current (A) | Speed (rad/s) | Friction Δ% | Status
 Rows with alternating white/light-gray:
@@ -58,7 +58,7 @@ Rows with alternating white/light-gray:
   Joint 4 | 1.19 | 0.85 | +2.8% | OK  (green dot)
   Joint 5 | 1.44 | 0.77 | +3.9% | OK  (green dot)
  
-[Sub-element C: Bar chart — rightmost]
+[Sub-element C: Bar chart, rightmost]
 A simple bar chart titled "Model Accuracy by Level"
 X-axis: L1 State, L2 Intervention, L3 Counterfactual, L4 Decision
 Y-axis: Accuracy (%) from 0 to 100
@@ -68,7 +68,7 @@ A horizontal dashed gray line at 50% labeled "random baseline"
 Clean white background, no grid clutter.
  
 ═══════════════════════════════════════════════════════
-ZONE 3 — RIGHT CENTER: Input/Output funnel
+ZONE 3, RIGHT CENTER: Input/Output funnel
 ═══════════════════════════════════════════════════════
 Two vertically stacked boxes with a large rightward arrow between them:
 Top box: light orange background (#FFF0E6), border #FF762B, label "Input Prompt"
@@ -76,7 +76,7 @@ Bottom box: white background, border #122128, label "Model Response"
 Both are connected to zone 4 via arrows that branch into three paths.
  
 ═══════════════════════════════════════════════════════
-ZONE 4 — FAR RIGHT: Three evaluation conditions
+ZONE 4, FAR RIGHT: Three evaluation conditions
 ═══════════════════════════════════════════════════════
 Three vertically stacked rounded rectangles, each with:
 - A colored left-accent bar (4px wide)

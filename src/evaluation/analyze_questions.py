@@ -3,10 +3,10 @@
 Analyze Q&A pair distributions for FactoryBench and save publication figures.
 
 Outputs (saved to --figures-dir, default: figures/):
-  f2_level_dist.png         — Question count by level
-  f2_template_dist.png      — Template type distribution per level
-  f2_answer_balance.png     — Per-position T/F balance across levels
-  f2_provenance_dist.png    — Dataset provenance distribution
+  f2_level_dist.png, Question count by level
+  f2_template_dist.png, Template type distribution per level
+  f2_answer_balance.png, Per-position T/F balance across levels
+  f2_provenance_dist.png, Dataset provenance distribution
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def _build_level_provenance(questions: List[Dict]):
 # ── Option A: Stacked horizontal bar ─────────────────────────────────────────
 
 def fig_option_a(questions: List[Dict], out: Path) -> None:
-    """Stacked horizontal bars — one row per level, segments coloured by dataset."""
+    """Stacked horizontal bars, one row per level, segments coloured by dataset."""
     by_level, levels, all_datasets, ds_colors, total = _build_level_provenance(questions)
     levels_rev = levels[::-1]
     level_labels = [LEVEL_NAMES.get(l, f"L{l}") for l in levels_rev]
@@ -127,7 +127,7 @@ def fig_option_a(questions: List[Dict], out: Path) -> None:
 # ── Option C: Bubble / dot matrix ────────────────────────────────────────────
 
 def fig_option_c(questions: List[Dict], out: Path) -> None:
-    """Bubble matrix — rows = datasets, cols = levels, bubble area ∝ count."""
+    """Bubble matrix, rows = datasets, cols = levels, bubble area ∝ count."""
     by_level, levels, all_datasets, ds_colors, total = _build_level_provenance(questions)
 
     fig, ax = plt.subplots(figsize=(max(5, len(levels) * 1.5), max(3, len(all_datasets) * 1.1) + 1))
@@ -235,14 +235,12 @@ def main() -> None:
         "--input",
         type=Path,
         default=Path("output/questions"),
-        help="Root directory containing Q&A JSON files (searched recursively)",
-    )
+        help="Root directory containing Q&A JSON files (searched recursively)")
     parser.add_argument(
         "--figures-dir",
         type=Path,
         default=Path("figures"),
-        help="Output directory for figures (default: figures/)",
-    )
+        help="Output directory for figures (default: figures/)")
     args = parser.parse_args()
 
     root = args.input.resolve()
@@ -258,7 +256,7 @@ def main() -> None:
         return
 
     figures_dir.mkdir(parents=True, exist_ok=True)
-    print(f"\nFactoryBench — Q&A Distribution Analysis")
+    print(f"\nFactoryBench, Q&A Distribution Analysis")
     print(f"Source : {root}  ({len(questions):,} pairs)")
     print(f"Figures: {figures_dir}\n")
 
