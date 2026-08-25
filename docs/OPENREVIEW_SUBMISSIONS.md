@@ -9,6 +9,23 @@ deadline, so upload it the day before.
 
 ---
 
+## Status: submitted
+
+All three submitted from the `2026-08-25` build. Correspondence author: Jonas
+Petersen.
+
+**Supplementary material was deliberately not uploaded** for any of the three.
+The paper already carries the code and dataset links on page 1, so the source
+zip would add nothing a reviewer cannot already reach. The
+`*-arxiv-source.zip` files stay in `docs/dist/` for arXiv, where a flat source
+upload is required rather than optional.
+
+Nothing below needs action unless a paper is revised; then rebuild with
+`make -C docs archives` and regenerate this sheet so the abstracts stay in
+step with the PDFs.
+
+---
+
 ## Shared across all three
 
 ### Title
@@ -32,16 +49,13 @@ FactoryBench: Evaluating Industrial Machine Understanding
 | 10 | Jonas Petersen *(equal senior)* | ETH Zurich; Forgis | `~TODO` |
 | 11 | Philipp Petersen *(equal senior)* | University of Vienna | `~TODO` |
 
-Correspondence: `ymerzouki@ethz.ch`.
+Correspondence: `jep79@cantab.ac.uk`.
 
 > **Two things to settle before you paste this in.**
 > 1. **OpenReview profile IDs.** The form wants `~Firstname_Lastname1` per
 >    author. I do not have them; look each up, or add co-authors by email and
 >    let OpenReview resolve them.
-> 2. **Yanis Merzouki is first author and the correspondence address**, and he
->    has left. He did the work and should stay on the list, but confirm the ETH
->    address still reaches him, or move correspondence to an author who is
->    reachable for the review period.
+> 2. **Jonas will be the correspondence author.**
 
 ### Confirmation checkboxes
 
@@ -95,7 +109,7 @@ industrial robotics, physical understanding, decision-making, benchmark, large l
 
 ### TL;DR
 ```
-FactoryBench measures physical perception and physically grounded decision-making on the same real-robot episodes and shows they are dissociable: probes recover a fault the model itself cannot report.
+FactoryBench evaluates a model's ability to understand machines and specifically robots like an experienced operator would by using Q&A based evaluation across 4 abstraction levels.
 ```
 
 ### Abstract
