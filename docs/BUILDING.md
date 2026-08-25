@@ -13,7 +13,7 @@ directories.** If two venues disagree about a number, the copy is the bug.
 make -C docs neurips                # neurips_tex/main.pdf       (real authors)
 make -C docs anon                   # neurips_tex/main_anon.pdf  (double-blind)
 make -C docs iclr                   # iclr_tex/main_iclr.pdf     (ICLR 2027)
-make -C docs workshop-worldmodels   # workshop_tex/main_worldmodels.pdf
+make -C docs workshop-wmphysai      # one target per venue
 make -C docs archives               # dist/*.pdf + dist/*-source.zip per venue
 make -C docs clean                  # drop aux files, keep the PDFs
 ```
@@ -24,9 +24,9 @@ passes by hand:
 
 ```bash
 cd docs/workshop_tex
-pdflatex -interaction=nonstopmode main_worldmodels.tex && bibtex main_worldmodels \
-  && pdflatex -interaction=nonstopmode main_worldmodels.tex \
-  && pdflatex -interaction=nonstopmode main_worldmodels.tex
+pdflatex -interaction=nonstopmode main_wmphysai.tex && bibtex main_wmphysai \
+  && pdflatex -interaction=nonstopmode main_wmphysai.tex \
+  && pdflatex -interaction=nonstopmode main_wmphysai.tex
 ```
 
 Engine is `pdflatex` + `bibtex`, four passes. Not latexmk, not tectonic.
@@ -91,8 +91,15 @@ venue's theme, and the two connector macros
 (`\workshoprelatedworknote`, `\workshopclosingnote`) that
 `_workshop_core.tex` expands at the end of Related Work and the Conclusion.
 
-In the **wrapper** edit `\workshoptitle{}` and, if the limit is under 8 pages,
-`\workshopcompacttrue`.
+In the **wrapper** edit `\workshoptitle{}`, record the CFP terms in the comment
+block beside it, set `\herowidth` (see below), and, if the limit is under 8
+pages, `\workshopcompacttrue`.
+
+`\herowidth` scales the pipeline figure uniformly. Shrinking it pulls the
+abstract onto page 1, which is worth doing: 0.82 for `wmphysai` and 0.88 for
+`robotlearning` both achieve it, and `wmphysai` gains a body page as a result.
+Find the value by rebuilding and checking which page the Introduction starts
+on.
 
 Do not copy body prose. Related work, framework, generation, evaluation,
 limitations and conclusion all come from `_workshop_core.tex`, so fixing a
@@ -100,9 +107,20 @@ result once corrects every workshop PDF on the next compile.
 
 ### Page budget
 
-`_workshop_core.tex` runs ~6 pages, leaving ~2 for title block, abstract and
-introduction against an 8-page limit. The `worldmodels` build measures 11 pages
-total with the body ending on page 8 and references running 8–11.
+Each venue's limit comes from its CFP, and each wrapper records the CFP URL,
+limit, blinding rule, OpenReview id and deadline beside its `\workshoptitle`.
+As submitted (checked 2026-08-25):
+
+| venue | CFP limit | main pages | shape |
+|---|---|---|---|
+| `wmphysai` | 8, refs excluded | 8 | full body, no appendix |
+| `physunderstanding` | 9, refs **and appendix** excluded | 9 | full body + shared appendix |
+| `robotlearning` | 6, refs excluded | 6 | `\workshopcompacttrue` |
+
+All three sit exactly at their limit, so **any addition to
+`_workshop_core.tex` pushes at least one of them over**. Re-check with
+`make -C docs archives` and count to the page carrying the `References`
+heading; if body text appears above it on that page, that page counts.
 
 Compact mode drops the benchmark-comparison table, the levels-examples table
 and the FactoryWave collage, and buys back ~2 pages. Nothing load-bearing is
@@ -138,28 +156,35 @@ Before uploading a double-blind submission:
 
 ```bash
 pdftotext dist/factorybench-<venue>-workshop.pdf - | \
-  grep -inE 'forgis|kth|github\.com/Forgis|huggingface\.co/datasets'
+  grep -inE 'forgis|kth|xelerit|github\.com/Forgis'
 ```
 
 Page 1 must read `Anonymous Author(s)` and the code link must resolve to
-`anonymous.4open.science`. Self-citations in the bibliography are expected and
-permitted: they are cited in the third person like any other prior work.
+`anonymous.4open.science`. Check the document info dictionary too
+(`pdfinfo`): `Author` and `Title` must be empty.
+
+The Hugging Face dataset URL is **not** a leak and is deliberately shown: the
+org is named `FactoryBench`, which is the paper's own name and identifies no
+author. Self-citations in the bibliography are expected and permitted, cited in
+the third person like any other prior work; note ICLR's author-year style
+renders them inline as "Petersen et al. (2026a)", which is more visible than a
+bracketed number.
 
 Note that `main.pdf` (the deanonymised NeurIPS build) currently still blinds its
 author block, because `neurips_2026.sty`'s `eandd` option forces anonymity
 unless `final` or `preprint` is also passed. Add `final` to its option list
 before using it as a camera-ready.
 
-## Known gaps
+## Recovered figures
 
-Three appendix figures are referenced by `_appendix.tex` but absent from
-`output/figures/`, so the full-paper builds render empty boxes:
+Three appendix figures had no generator in this repository: `fig_judge_agreement`
+needed an uncommitted reply tree, and `fig_probe_vs_readout` /
+`fig_probe_layerwise` had no script anywhere. All three were recovered as vector
+crops from the compiled workshop PDF that still contained them
+(`docs/reference-drafts/main_physunderstanding.pdf`), using
+`\includegraphics[page=N,trim=...,clip]` plus `pdfcrop`, and are now tracked
+under `output/figures/`.
 
-| Figure | Generator |
-|---|---|
-| `fig_judge_agreement.pdf` | `scripts/generate_figures.py` — needs the reply tree (`--replies-root`), which is not committed |
-| `fig_probe_vs_readout.pdf` | **none in this repo** |
-| `fig_probe_layerwise.pdf` | **none in this repo** |
-
-The two probe figures exist only on their author's machine. The workshop builds
-are unaffected: they have no appendix.
+They are therefore **not regenerable from data**. If the underlying numbers ever
+change, these three must be redrawn from scratch: the probing experiment's code
+and outputs are gone.

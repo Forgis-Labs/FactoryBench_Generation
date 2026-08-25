@@ -109,18 +109,10 @@ bibtex main >/dev/null 2>&1 || true
 pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1 || true
 pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1 || true
 
-# Three appendix figures are known to be absent from the repository: their
-# generator left with their author and cannot be re-run, and only the venue
-# that ships the appendix reaches them. They render as empty boxes, which the
-# submitter must be told about, but must not block producing the archive.
-# Anything else is a real packaging bug and does block.
-KNOWN_MISSING='fig_judge_agreement.pdf|fig_probe_vs_readout.pdf|fig_probe_layerwise.pdf'
-
 fail=0
-errs=$(grep -n '^!' main.log | grep -vE "$KNOWN_MISSING" || true)
-if [ -n "$errs" ]; then
+if grep -q '^!' main.log; then
     echo "FAIL: LaTeX errors in the staged archive:" >&2
-    printf '%s\n' "$errs" >&2
+    grep -n '^!' main.log >&2
     fail=1
 fi
 if grep -qE "(Citation|Reference) \`[^']*' on page [0-9]+ undefined" main.log; then
@@ -129,17 +121,9 @@ if grep -qE "(Citation|Reference) \`[^']*' on page [0-9]+ undefined" main.log; t
     fail=1
 fi
 if grep -qE "File \`[^']*' not found" main.log; then
-    missing=$(grep -oE "File \`[^']*' not found" main.log | sort -u)
-    unexpected=$(printf '%s\n' "$missing" | grep -vE "$KNOWN_MISSING" || true)
-    if [ -n "$unexpected" ]; then
-        echo "FAIL: missing input files:" >&2
-        printf '%s\n' "$unexpected" >&2
-        fail=1
-    fi
-    expected=$(printf '%s\n' "$missing" | grep -E "$KNOWN_MISSING" || true)
-    if [ -n "$expected" ]; then
-        WARNED=$(printf '%s\n' "$expected" | sed 's/.*`//; s/. not found//' | tr '\n' ' ')
-    fi
+    echo "FAIL: missing input files:" >&2
+    grep -oE "File \`[^']*' not found" main.log | sort -u >&2
+    fail=1
 fi
 [ -f main.pdf ] || { echo "FAIL: no PDF produced" >&2; fail=1; }
 [ "$fail" -eq 0 ] || exit 1
@@ -154,10 +138,3 @@ rm -f "factorybench-${VENUE}-workshop-source.zip"
 echo
 echo "OK  dist/factorybench-${VENUE}-workshop.pdf"
 echo "OK  dist/factorybench-${VENUE}-workshop-source.zip"
-if [ -n "${WARNED:-}" ]; then
-    echo
-    echo "WARNING: this archive renders empty boxes for: ${WARNED}"
-    echo "         Those figures are absent from the repository and have no"
-    echo "         generator; see the Known gaps section of docs/BUILDING.md."
-    echo "         Check the affected appendix pages before submitting."
-fi
