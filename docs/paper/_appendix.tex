@@ -769,6 +769,9 @@ Two design choices govern what each Q\&A item actually shows the model: \emph{wh
 \section{Validation of solvability}
 \label{app:solvability}
 
+\ifworkshopbuild
+This appendix collects the diagnostic checks we ran to convince ourselves that FactoryBench items are answerable from the released time-series context rather than from question wording alone.
+\else
 This appendix collects the diagnostic checks we ran to convince ourselves that FactoryBench items are answerable from the released time-series context, rather than from question wording alone, and that the templates flagged as ``too easy'' by the noise-substitution check are nevertheless grounded in genuine signal structure.
 
 \subsection{Noise-substitution check}
@@ -810,6 +813,7 @@ where $\sigma$ is shared across all features. The same substitution is applied t
         \bottomrule
     \end{tabular}
 \end{table}
+\fi
 
 \subsection{Human expert baseline}
 \label{app:human_baseline}
@@ -825,7 +829,9 @@ The strongest evidence that an item is solvable from the released telemetry is a
 \paragraph{Composition.}
 $13$ items at Level~1, $37$ at Level~2, and $10$ at Level~3, drawn across $14$ distinct templates and covering all five answer formats. We plan on extending the baseline to address this current imbalance.
 
+\ifworkshopbuild\else
 \paragraph{Results.} Table~\ref{tab:agent-results} reports the paired comparison. The headline is that tool access is close to a wash: $-2.9$ pp overall, with a confidence interval spanning zero ($[-7.4, +1.6]$). Underneath that average the tools do two opposite things. Where the task is computational, they help: L1 gains $+9.8$ pp, carried by segment localisation (L1.1, $+21.3$ pp) and multi-select state reading (L1.3, $+20.0$ pp), both of which the numerical sandbox can attack directly and neither of which invokes the forecaster. Where the agent delegates its extrapolation, they hurt: L3 loses $10.5$ pp with the interval excluding zero, and the loss is concentrated in the two templates that call the forecaster on every item, L3.4 ($-26.7$ pp) and L3.5 ($-16.0$ pp). Inspecting the traces shows the mechanism is literal rather than statistical: on L3.4 the agent's final answer is character-for-character the forecaster's \texttt{predicted\_value\_at\_horizon}, so a call to \textsc{Chronos-Bolt} replaces the model's own estimate outright. Appendix~\ref{app:chronos-baseline} measures that forecaster near chance on these templates, which is why the substitution costs accuracy. The effect is not uniform across every forecasting template, L2.4 and L2.5 come out marginally ahead ($+2.7$ pp each), so the reliable statement is narrower than \emph{tools hurt}: delegation is harmful exactly where the delegate is weaker than the caller.
+\fi
 
 \begin{table}[htbp]
     \centering
@@ -856,7 +862,12 @@ We are extending the baseline to at least $100$ Q\&A pairs with a minimum of $25
 \subsection{Distribution-shift analysis}
 \label{app:arm_disturbance}
 
-For the templates that produced a small noise-substitution $\Delta$ in the previous subsection, we confirm that they are nevertheless solvable by further empirical analysis, for example by inspecting how the sensor data distribution shifts when a fault is present. Figure~\ref{fig:arm_disturbance} illustrates this by comparing multiple healthy KUKA episodes (blue) against multiple faulty episodes with an arm-disturbance fault (orange) drawn from FactoryWave (Figure~\ref{fig:arm_disturbance_kuka} shows the physical setup of the fault for visual intuition), and reveals a clear distributional shift between the two groups on the channels the affected templates read from. The shift is more pronounced on some joints than on others, as the angle at which the disturbance is applied loads them unequally.
+\ifworkshopbuild
+We further confirm solvability by inspecting how the sensor data distribution shifts when a fault is present.
+\else
+For the templates that produced a small noise-substitution $\Delta$ in the previous subsection, we confirm that they are nevertheless solvable by further empirical analysis, for example by inspecting how the sensor data distribution shifts when a fault is present.
+\fi
+Figure~\ref{fig:arm_disturbance} illustrates this by comparing multiple healthy KUKA episodes (blue) against multiple faulty episodes with an arm-disturbance fault (orange) drawn from FactoryWave (Figure~\ref{fig:arm_disturbance_kuka} shows the physical setup of the fault for visual intuition), and reveals a clear distributional shift between the two groups on the channels the affected templates read from. The shift is more pronounced on some joints than on others, as the angle at which the disturbance is applied loads them unequally.
 
 \begin{figure}[htbp]
     \centering
@@ -868,7 +879,7 @@ For the templates that produced a small noise-substitution $\Delta$ in the previ
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/arm_disturbance_analysis.jpeg}
-    \caption{Sensor data distribution across multiple healthy KUKA episodes (blue) versus multiple faulty episodes with an arm-disturbance fault (orange) in FactoryWave. The visible shift between the two groups confirms that templates with small noise-substitution $\Delta$ are still solvable from the released signal; the magnitude of the shift varies across joints because the disturbance angle loads them unequally.}
+    \caption{Sensor data distribution across multiple healthy KUKA episodes (blue) versus multiple faulty episodes with an arm-disturbance fault (orange) in FactoryWave. \ifworkshopbuild The visible shift between the two groups confirms that the affected templates are still solvable from the released signal\else The visible shift between the two groups confirms that templates with small noise-substitution $\Delta$ are still solvable from the released signal\fi; the magnitude of the shift varies across joints because the disturbance angle loads them unequally.}
     \label{fig:arm_disturbance}
 \end{figure}
 
@@ -1136,6 +1147,7 @@ To check whether the LLM panel is the right comparison set on a benchmark whose 
 \paragraph{Interpretation.} Two messages emerge. \textbf{First, on the templates where forecasting is the right tool, a 200\,M-parameter pretrained forecaster is competitive with frontier LLMs}, consistent with the main paper's observation that LLMs struggle with precise numerical state extraction at L1. The LLM panel is not the only, nor the most viable model class on the forecasting slice. This opens the door to tool-assisted LLM agents that delegate forecasting subtasks to a specialised TSFM and reserve the LLM for the linguistic, classification, and decision-making templates where it has the structural advantage. \textbf{Second, the remaining 18 of 21 FactoryBench templates (classification, ranking, counterfactual reasoning, free-form troubleshooting and optimization) are structurally outside any current TSFM's scope.} Together these reinforce the paper's central claim: the gap between current models and operational machine understanding is not closed by solely scaling LLMs or deploying purpose-built forecasters.
 
 
+\ifworkshopbuild\else
 \section{Tool-augmented LLM agent baseline}
 \label{app:agent-baseline}
 
@@ -1185,6 +1197,7 @@ Figure~\ref{fig:agent-pipeline} shows the state loop and the per-level lift.
 
 \paragraph{Tool usage.} Across the $525$-item evaluation the agent issued $471$ tool calls, dominated by the forecaster ($370$), with the numerical sandbox second ($91$) and signal statistics and the manual retriever almost unused ($9$ and $1$). The distribution is itself informative: the driver spends most of its budget on the one tool that costs it accuracy, and effectively ignores the retriever even on L4, where vendor protocol text is the evidence the rubric rewards. A better policy would invert those proportions.
 \paragraph{Interpretation.} The agent baseline confirms the paper's core hypothesis in the direction predicted by the Chronos-Bolt appendix: a specialised numerical tool is complementary to an LLM driver, and the LLM+tools composition beats each part alone. The remaining gap to human-level performance is largest on L3 (counterfactual reasoning, only $+6.6$ pp lift), where none of the four tools directly address the reasoning demand; closing L3 is the natural next target for a domain-specific tool (e.g.\ a causal-intervention simulator).
+\fi
 
 
 \section{Example question-answer pairs and question templates}

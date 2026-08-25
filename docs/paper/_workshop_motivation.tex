@@ -1,0 +1,27 @@
+% ============================================================
+% SHARED INTRO MOTIVATION. Two arguments common to every workshop build:
+%   (1) why we evaluate on telemetry alone, with no visual channel
+%       (industrial lights-out / dark-factory operation), and
+%   (2) why the panel is LLMs and LLM-driven agents rather than classifiers
+%       (an engineer must be able to audit the reasoning before acting).
+% Edit here once and every workshop intro updates.
+%
+% Deliberately venue-neutral: no workshop, venue, or community is named, and
+% no venue-specific framing (world models, zero-shot, physical understanding)
+% is assumed. Venue framing belongs in _workshop_<venue>.tex.
+%
+% \input from the middle of each venue's Introduction, after the paragraph
+% that sets up the gap and before the FactoryBench/FactoryWave paragraph.
+% Honours \workshopcompact: tight venues get a condensed version carrying
+% the same claims and the same citations.
+% ============================================================
+
+\ifworkshopcompact
+Evaluating on telemetry alone matches where industry is heading. Plants increasingly run \emph{lights-out} to cut labour and energy costs: FANUC has operated a lights-out robot factory since 2001, running unsupervised for up to 30 days with lighting and HVAC reduced or eliminated \cite{imts2026lightsout}, and Xiaomi's Changping facility builds on the order of 10 million smartphones a year the same way \cite{metrology2024darkfactory}. The human who would have caught a fault by sight or sound is off the floor, and where cameras are deployed it is overwhelmingly for \emph{product} inspection rather than machine health \cite{metrology2024darkfactory}, which lives in quantities no camera observes: joint torque, motor current, tracking error, controller mode. Controller telemetry is emitted by default by every industrial machine and is the one modality guaranteed across a heterogeneous plant.
+
+We evaluate LLMs and LLM-driven agents rather than specialised classifiers because in an unattended plant the artefact that matters is the justification, not the label. A classifier emits a fault class with no account of which signals produced it; a language model emits a trace from signal to root cause to procedure, checkable against the telemetry and the vendor manual, and rejectable when the reasoning is unsound even if the label is right. Downtime sets the stakes: unplanned downtime costs Fortune Global 500 industrial organizations almost \$1.5\,trillion a year, 11\% of turnover, and an idle automotive line runs past \$2\,million an hour \cite{siemens2023downtime}.
+\else
+Dropping the visual channel is not a difficulty we impose artificially; it is where industry is heading. Plants increasingly run \emph{lights-out} to cut labour and energy costs: FANUC has operated a lights-out robot factory since 2001, producing around 50 robots per day and running unsupervised for up to 30 days, with lighting and HVAC reduced or eliminated because nobody is there who needs them \cite{imts2026lightsout}; Xiaomi's Changping facility builds on the order of 10 million smartphones a year the same way \cite{metrology2024darkfactory}. Most manufacturers adopt this cell by cell rather than plant-wide, but two consequences already follow. The human who would have caught a fault by sight or sound is off the floor, so the diagnostic loop must close automatically. And where cameras are deployed it is overwhelmingly for \emph{product} inspection, pointed at the part rather than the machine \cite{metrology2024darkfactory}, while machine health lives in quantities no camera observes: joint torque, motor current, tracking error, controller mode. Controller telemetry is emitted by default by every industrial machine, is the one modality guaranteed across a heterogeneous plant, and is far less restricted than video. We therefore evaluate on telemetry alone.
+
+We evaluate LLMs and LLM-driven agents rather than the specialised classifiers that dominate industrial anomaly detection, because in an unattended plant the artefact that matters is the justification, not the label. A maintenance action (locking out a cell, dismantling a gripper, revising a payload configuration) is itself costly and safety-relevant, so an engineer must audit the reasoning before committing to it. A classifier emits a fault class with no account of which signals produced it; a language model emits a trace from the observed signal to the named root cause to the prescribed procedure, checkable step by step against the telemetry and the vendor manual, and rejectable when the reasoning is unsound even if the label happens to be right. That auditability is what makes a prediction actionable rather than merely accurate, and it is why our decision-making level asks for free-form answers. Downtime sets the stakes: unplanned downtime costs Fortune Global 500 industrial organizations almost \$1.5\,trillion a year, 11\% of turnover and about \$129\,million per facility, and an idle automotive line runs past \$2\,million an hour \cite{siemens2023downtime}.
+\fi

@@ -82,3 +82,19 @@
 % this file (declaring it again in the wrapper would reset it to false).
 \newif\ifneuripschecklist
 \neuripschecklisttrue
+
+% Venue toggle: compact the shared workshop body (docs/paper/_workshop_core.tex)
+% for venues with a tighter page limit than the usual 8. Dropping the optional
+% floats and their surrounding prose saves roughly two pages, enough for a
+% 6-page limit. Defaults to false; a wrapper that needs it says
+% \workshopcompacttrue AFTER inputting this file.
+\newif\ifworkshopcompact
+\workshopcompactfalse
+
+% Venue toggle: is this any workshop build (as opposed to the main-conference
+% paper)? Set true by ../paper/_workshop_header.tex, which every workshop
+% venue file inputs and the main paper never does. Used to drop content from
+% the shared appendix (../paper/_appendix.tex) that only workshop builds pull
+% in wholesale but should not carry, without touching the main paper's copy.
+\newif\ifworkshopbuild
+\workshopbuildfalse

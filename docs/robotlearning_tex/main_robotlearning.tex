@@ -1,0 +1,43 @@
+% 8th Robot Learning Workshop ("Is Physical AI Going Zero-Shot?")
+% @ NeurIPS 2026 submission build. Up to 6 pages in NeurIPS format.
+% Wrapper only. This workshop's prose lives in
+% ../paper/_workshop_robotlearning.tex (abstract + intro, specific to this
+% venue), which pulls in the body shared by every workshop build from
+% ../paper/_workshop_core.tex. Never edit content here.
+\documentclass{article}
+
+\newif\ifanon
+\anontrue                     % CFP states no blind policy; anonymize anyway,
+                              % which is valid under either review model
+
+% Venue style package, loaded before the shared preamble.
+\usepackage[dblblindworkshop]{neurips_2026}
+\workshoptitle{8th Robot Learning Workshop: Is Physical AI Going Zero-Shot?}
+
+% The shared preamble's \input{figures/...} and \includegraphics{figures/...}
+% paths are written relative to the NeurIPS build directory, which is where
+% the figures live. Point both resolvers there so the content file needs no
+% venue-specific edits.
+\makeatletter
+\def\input@path{{../neurips_tex/}{../paper/}}
+\makeatother
+
+\input{../paper/_preamble_common}
+
+% After the shared preamble: it is graphicx that defines \graphicspath.
+\graphicspath{{../neurips_tex/}{../neurips_tex/figures/}}
+
+% The NeurIPS paper checklist is a main-conference requirement; this CFP does
+% not ask for it and it would blow past the 6-page limit.
+\neuripschecklistfalse
+
+% 6 pages, two tighter than the shared body targets: drop the optional floats
+% from ../paper/_workshop_core.tex. No claim or number is lost, only the
+% illustrative table/figure treatments.
+\workshopcompacttrue
+
+\input{../paper/_titleauthor}
+
+\begin{document}
+\input{../paper/_workshop_robotlearning}
+\end{document}

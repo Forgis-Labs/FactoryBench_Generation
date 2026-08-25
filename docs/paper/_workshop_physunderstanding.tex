@@ -1,0 +1,45 @@
+% ============================================================
+% Physical Understanding for Decision-Making Workshop @ NeurIPS 2026.
+% Only file with prose specific to this workshop: abstract, introduction,
+% and the two connector sentences consumed by ../paper/_workshop_core.tex
+% (the method/results/limitations/conclusion shared with every other
+% workshop build).
+%
+% CFP constraints this build targets (checked 2026-08-10): Full Paper track,
+% <=9 MAIN pages, with UNLIMITED references AND appendix, NeurIPS 2026
+% format, double-blind, non-archival.
+%
+% This is the one workshop so far whose CFP exempts the appendix, so unlike
+% the other workshop builds this one appends the full shared appendix from
+% ../paper/_appendix.tex after the core's bibliography. The 9-page main
+% budget is also loose enough to keep the core's floats, so the wrapper does
+% NOT set \workshopcompacttrue.
+% Only used by docs/physunderstanding_tex/main_physunderstanding.tex.
+% ============================================================
+
+\input{../paper/_workshop_header}
+
+\begin{abstract}
+    Industrial robots emit dense multivariate telemetry that determines their operating state, and acting on a fault requires both reading that state and knowing the procedure that resolves it. These are separate abilities, and they are usually measured separately: perception benchmarks stop at the reading, while control benchmarks score the resulting action without isolating which of the two failed. We introduce \textbf{FactoryBench}, a benchmark that measures both on the same episodes from real industrial robots, so that physical perception and physically grounded decision-making can be told apart. Q\&A pairs are organized along four levels, physical state estimation, intervention, counterfactual reasoning, and engineering decision-making, and span five answer formats: four are scored deterministically and free-form answers by an LLM-as-judge voting protocol. We release \textbf{FactoryWave} (a dense, multitask, multivariate sensor dataset from a UR3 cobot and a KUKA KR10 industrial arm, with counterfactual episodes recorded on hardware by re-executing a task under held-fixed conditions to approximate the do-operation) and build FactoryBench as over 70k Q\&A items grounded in roughly 15k normalized episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2023vorausad}. Evaluating six frontier models, none exceeds 50\% (chance-corrected) on the perception-side levels, and the ranking reshuffles entirely at the decision level: the leader on the first three levels falls to the bottom of the fourth. Linear probes show this is not one deficit but two, recovering fault presence from a frozen model's activations at $0.83$ where its own answer is below chance (a read-out failure), while fault type is no more decodable than from an untrained network (a representational one). Physical understanding and physically grounded decision-making are dissociable, and current models fail at both in different ways.
+\end{abstract}
+
+\section{Introduction}
+
+A model can track a physical system accurately and still be useless for acting on it. This gap is easy to state and hard to measure, because the two halves are usually evaluated separately: perception benchmarks score state estimation without asking what follows from it, and control benchmarks score task success without isolating whether failures come from misreading the physics or from mis-planning over a correct reading. For deployment the distinction is the whole question. An operator handed a diagnosis needs to know whether to trust the reading or the recommendation, and a researcher deciding where to spend the next unit of effort needs to know whether the bottleneck is representation or read-out.
+
+We build a benchmark that keeps both halves on the same items so the gap between them is directly observable. Industrial robots are a good place to do this: they are physical systems with contact, payload dynamics, and controller constraints; they emit dense telemetry that fully determines their state; and, unlike most physical-reasoning testbeds, they come with an unambiguous notion of a correct action, since manufacturers publish the recovery procedure for each fault condition. That last property is what makes the decision half gradable rather than a matter of taste. FactoryBench is grounded in \textbf{FactoryWave}, a dense multivariate dataset from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals; to our knowledge it is the first extensive anomaly dataset to (partly) cover an industrial robot, a class of machine normally locked behind proprietary controllers and plant confidentiality.
+
+Counterfactual reasoning gets particular attention because it is where physical understanding is usually asserted rather than measured. Simulated environments make counterfactuals free but change the dynamics being tested; real hardware makes them expensive and, strictly, impossible, since two runs never share an identical pre-injection state. We approximate the do-operation empirically instead: for each baseline episode we re-execute the task 3--5 times with every controllable condition held fixed, inject the target fault at a fixed timestep, and retain the run whose pre-injection segment minimizes signature-kernel MMD against the baseline. This yields counterfactual ground truth recorded on the physical system rather than assumed from a simulator, at the cost of being a proxy whose quality we quantify rather than hide. Existing evaluations offer no equivalent: general benchmarks \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} do not probe physical behavior, and time-series Q\&A benchmarks are typically synthetic or univariate and omit counterfactuals entirely, while neither specialized time-series models \cite{zhou2021informer,su2019omni,audibert2020usad} nor LLMs applied to dense numerical series \cite{gruver2023llmtime,jin2024timellm} have been tested across perception and decision-making jointly.
+
+\input{../paper/_workshop_motivation}
+
+\newcommand{\workshoprelatedworknote}{Physical reasoning is most often benchmarked in simulated or rendered environments, where dynamics are synthetic and counterfactual ground truth is generated by re-running the simulator; FactoryBench instead instantiates the association--intervention--counterfactual hierarchy on hardware-recorded telemetry from real robots under closed-loop control, and pairs it with a decision level whose ground truth comes from manufacturer recovery protocols, so physical understanding and its downstream use are measured on the same episodes.}
+
+\newcommand{\workshopclosingnote}{For physical understanding aimed at decision-making, the practical lesson is that the two must be measured jointly: our panel's perception-side ranking does not predict its decision-side ranking, and the probing analysis shows the decision failures decompose into a calibration problem where the physical concept is present and a representation problem where it is not, which are not addressed by the same interventions.}
+
+\input{../paper/_workshop_core}
+
+% This venue exempts the appendix from the page limit, so the full shared
+% appendix is attached. Its outbound cross-references (sec:sce, sec:density,
+% sec:zero-shot, subsec:l4, fig:results) are all defined by _workshop_core.
+\input{../paper/_appendix}

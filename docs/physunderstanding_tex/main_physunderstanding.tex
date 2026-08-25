@@ -1,0 +1,44 @@
+% Physical Understanding for Decision-Making Workshop @ NeurIPS 2026
+% submission build. Full Paper track: <=9 main pages, unlimited references
+% and appendix, double-blind.
+% Wrapper only. This workshop's prose lives in
+% ../paper/_workshop_physunderstanding.tex (abstract + intro, specific to
+% this venue), which pulls in the body shared by every workshop build from
+% ../paper/_workshop_core.tex and then the full shared appendix from
+% ../paper/_appendix.tex. Never edit content here.
+\documentclass{article}
+
+\newif\ifanon
+\anontrue                     % workshop review is double-blind
+
+% Venue style package, loaded before the shared preamble.
+\usepackage[dblblindworkshop]{neurips_2026}
+\workshoptitle{Physical Understanding for Decision-Making}
+
+% The shared preamble's \input{figures/...} and \includegraphics{figures/...}
+% paths are written relative to the NeurIPS build directory, which is where
+% the figures live. Point both resolvers there so the content file needs no
+% venue-specific edits.
+\makeatletter
+\def\input@path{{../neurips_tex/}{../paper/}}
+\makeatother
+
+\input{../paper/_preamble_common}
+
+% After the shared preamble: it is graphicx that defines \graphicspath.
+\graphicspath{{../neurips_tex/}{../neurips_tex/figures/}}
+
+% The NeurIPS paper checklist is a main-conference requirement; this CFP does
+% not ask for it.
+\neuripschecklistfalse
+
+% NOT \workshopcompacttrue: the 9-page main budget comfortably fits the
+% shared core's full tables and figures. (Checked directly: main content
+% ends on page 7, just after the Conclusion and before "References" starts;
+% references and the appendix are both exempt from this venue's page limit.)
+
+\input{../paper/_titleauthor}
+
+\begin{document}
+\input{../paper/_workshop_physunderstanding}
+\end{document}

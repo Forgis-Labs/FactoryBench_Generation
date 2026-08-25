@@ -1,0 +1,38 @@
+% World Models in Physical AI Workshop @ NeurIPS 2026 submission build.
+% Double-blind, 8 pages excluding references.
+% Wrapper only. This workshop's prose lives in ../paper/_workshop_wmphysai.tex
+% (abstract + intro, specific to this venue), which pulls in the body shared
+% by every workshop build from ../paper/_workshop_core.tex. Never edit
+% content here; see ../paper/_workshop_core.tex for how to add another
+% workshop build.
+\documentclass{article}
+
+\newif\ifanon
+\anontrue                     % workshop review is double-blind
+
+% Venue style package, loaded before the shared preamble.
+\usepackage[dblblindworkshop]{neurips_2026}
+\workshoptitle{World Models in Physical AI}
+
+% The shared preamble's \input{figures/...} and \includegraphics{figures/...}
+% paths are written relative to the NeurIPS build directory, which is where
+% the figures live. Point both resolvers there so the content file needs no
+% venue-specific edits.
+\makeatletter
+\def\input@path{{../neurips_tex/}{../paper/}}
+\makeatother
+
+\input{../paper/_preamble_common}
+
+% After the shared preamble: it is graphicx that defines \graphicspath.
+\graphicspath{{../neurips_tex/}{../neurips_tex/figures/}}
+
+% The NeurIPS paper checklist is a main-conference requirement; the workshop
+% CFP does not ask for it and it would blow well past the 8-page limit.
+\neuripschecklistfalse
+
+\input{../paper/_titleauthor}
+
+\begin{document}
+\input{../paper/_workshop_wmphysai}
+\end{document}

@@ -1,0 +1,34 @@
+% ============================================================
+% World Models in Physical AI Workshop @ NeurIPS 2026 (Sydney).
+% Only file with prose specific to this workshop: abstract, introduction,
+% and the two connector sentences consumed by ../paper/_workshop_core.tex
+% (the method/results/limitations/conclusion shared with every other
+% workshop build). Everything else is \input from shared files below.
+%
+% CFP constraints this build targets (worldmodels-physicalai.com/cfp.html,
+% checked 2026-08-10): <=8 pages excluding references, NeurIPS 2026
+% template, double-blind, non-archival, no appendix exemption stated.
+% Only used by docs/wmphysai_tex/main_wmphysai.tex.
+% ============================================================
+
+\input{../paper/_workshop_header}
+
+\begin{abstract}
+    We introduce \textbf{FactoryBench}, a benchmark for evaluating whether time-series models and LLMs hold an implicit \textbf{world model} of a physical system: an internal representation of its state and dynamics accurate enough to predict how the system evolves under an intervention and to reason about it counterfactually. Q\&A pairs are organized along four levels, state estimation, action-conditioned forward prediction, counterfactual rollout, and decision-making, instantiating Pearl's ladder of causation, and span five answer formats: four are scored deterministically and free-form answers are scored by an LLM-as-judge voting protocol. We propose a scalable Q\&A generation framework built around structured templates, release \textbf{FactoryWave} (a dense, multitask, multivariate sensor dataset from a UR3 cobot and a KUKA KR10 industrial arm), and construct FactoryBench as a benchmark of over 70k Q\&A items grounded in roughly 15k normalized episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2023vorausad}. Zero-shot evaluation of six frontier LLMs shows that no model exceeds 50\% (chance-corrected) on state, intervention, or counterfactual reasoning, and that the ranking reshuffles entirely on decision-making, with the leader on the first three levels falling to the bottom of the fourth: current models' implicit world models are far from adequate for physically grounded, closed-loop decision-making.
+\end{abstract}
+
+\section{Introduction}
+
+World models predict how an environment evolves, optionally conditioned on an agent's action, and can be rolled out to imagine future outcomes. For Physical AI this is what turns raw sensing into planning: an agent that can simulate its world can evaluate an intervention before executing it and reason about alternatives it never observed. Most evidence for the capability comes from pixel- or video-based models in rendered or simulated environments, where dynamics are easy to observe and counterfactual ground truth is free to generate. Whether it survives on the dense, multivariate telemetry of a real robot, with no renderer and no simulator, is largely untested.
+
+That signal is rich: joint states, torques, forces, velocities, contact events, task phases, and fault indicators. Traditional time-series models excel at narrow prediction, classification, and anomaly detection \cite{zhou2021informer,su2019omni,audibert2020usad}, but are specialized, hard to interpret, and generalize poorly off-task \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}; they hold no forward model an operator could query or roll out. Large language models reason well and produce structured technical explanations \cite{wei2022chain,yao2023tree}, but underperform on dense numerical series \cite{gruver2023llmtime,jin2024timellm}. Neither family has been tested for an implicit model of the machine supporting state estimation, action-conditioned prediction, and counterfactual rollback, which general benchmarks such as MMLU, BIG-bench, or MMMU \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} cannot probe.
+
+\input{../paper/_workshop_motivation}
+
+FactoryBench is grounded in \textbf{FactoryWave}, a dense multivariate dataset from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. Data of this kind is rare publicly, for the confidentiality reasons above; to our knowledge FactoryWave is the first extensive anomaly dataset to (partly) cover an industrial robot, bridging the cobot-to-industrial-machine gap. A generation framework of 21 structured templates, parameterized over generic primitives rather than hard-coded to a machine, instantiates over FactoryWave (and AURSAD / voraus-AD) to yield the full Q\&A corpus.
+
+\newcommand{\workshoprelatedworknote}{World models for physical dynamics are most developed in the visual and simulated-physics regime (e.g., CLEVR/CLEVRER-style compositional and causal video QA); FactoryBench instead grounds the same association--intervention--counterfactual hierarchy in real, dense, multivariate telemetry from physical robots under closed-loop control, where the dynamics are governed by controller and mechanical constraints rather than rendered pixels.}
+
+\newcommand{\workshopclosingnote}{Framed as a world-modeling problem, FactoryBench asks whether a model's internal representation of a physical system is accurate enough to roll forward under an intervention and backward under a counterfactual, without a renderer or simulator standing in for the dynamics; until it is, imagined rollouts on real physical systems cannot be trusted for planning or control.}
+
+\input{../paper/_workshop_core}

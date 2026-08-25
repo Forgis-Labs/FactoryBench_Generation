@@ -1,0 +1,40 @@
+% ============================================================
+% 8th Robot Learning Workshop: "Is Physical AI Going Zero-Shot?"
+% @ NeurIPS 2026 (Sydney).
+% Only file with prose specific to this workshop: abstract, introduction,
+% and the two connector sentences consumed by ../paper/_workshop_core.tex
+% (the method/results/limitations/conclusion shared with every other
+% workshop build). Everything else is \input from shared files below.
+%
+% CFP constraints this build targets (robot-learning.ml/2026/submissions/,
+% checked 2026-08-10): up to 6 pages in NeurIPS format, non-archival,
+% OpenReview. The CFP states neither a references exemption nor a blind
+% policy; we target 6 pages excluding references (the NeurIPS convention)
+% and submit anonymized, which is safe under either review model.
+% The tighter limit is why the wrapper sets \workshopcompacttrue.
+% Only used by docs/robotlearning_tex/main_robotlearning.tex.
+% ============================================================
+
+\input{../paper/_workshop_header}
+
+\begin{abstract}
+    Robot foundation models are increasingly deployed \textbf{zero-shot}: downloaded pretrained and pointed at a machine they were never trained on. We ask what such a model understands about a physical system it is seeing for the first time, and introduce \textbf{FactoryBench}, a zero-shot benchmark over dense industrial robot telemetry. Q\&A pairs span four levels (state estimation, intervention, counterfactual reasoning, and engineering decision-making) and five answer formats, four scored deterministically and free-form answers by an LLM-as-judge protocol. We release \textbf{FactoryWave} (a dense multitask sensor dataset from a UR3 cobot and a KUKA KR10 industrial arm) and build FactoryBench as over 70k items grounded in roughly 15k episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2023vorausad}. Across six frontier models, none exceeds 50\% (chance-corrected) on the structured levels, two fail to beat a linear-regression baseline on state estimation, and the ranking reshuffles entirely on decision-making, with the leader on the first three levels falling to the bottom of the fourth. A human expert reaches 0.96--0.98 on the same items, so the headroom is real rather than an artifact of unanswerable questions. Zero-shot transfer to an unseen industrial machine is not yet reliable enough to act on.
+\end{abstract}
+
+\section{Introduction}
+
+The premise of zero-shot Physical AI is that a pretrained model can be pointed at a machine it has never seen and be immediately useful, with no task-specific data collection or finetuning on that platform. Industrial settings are where this would pay off most and where it is hardest to validate: production robots are expensive to instrument and cannot be run to failure for data collection. If a generalist model could diagnose an unfamiliar arm from its signals alone, the economics of industrial monitoring would change. Whether it can is underdetermined, because the evaluations that would answer it do not exist.
+
+Zero-shot competence on a physical system is not one capability but several: reading operational state from raw multivariate signals, predicting what an intervention does to that state, reasoning counterfactually about histories that did not occur, and turning all of it into an action an operator could execute. These come apart, since a system can track a signal well and still have no idea what to do about it, and existing evaluations do not separate them. General benchmarks such as MMLU, BIG-bench, and MMMU \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} probe textual or multimodal understanding rather than machine behavior, and time-series Q\&A benchmarks are typically synthetic or univariate and omit counterfactuals. Neither specialized time-series models \cite{zhou2021informer,su2019omni,audibert2020usad}, which generalize poorly off-task \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}, nor LLMs on dense numerical series \cite{gruver2023llmtime,jin2024timellm}, have been evaluated on the full set.
+
+\input{../paper/_workshop_motivation}
+
+Testing language models is also an increasingly good proxy for testing robot policies: current vision-language-action models are largely built by post-training a pretrained LLM or VLM backbone rather than training a controller from scratch (RT-2~\cite{brohan2023rt2}, OpenVLA~\cite{kim2024openvla}, $\pi_0$~\cite{black2024pi0}), so the reasoning limits we measure here bound what the resulting VLA can do on an unfamiliar platform, and are cheaper to measure than full policy rollouts.
+
+We propose FactoryBench to measure exactly this, evaluating every model strictly zero-shot: no finetuning, no in-context examples from the target platform, no exposure to the robot under test. It is grounded in \textbf{FactoryWave}, a dense multivariate dataset from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. To our knowledge it is the first extensive anomaly dataset to (partly) cover an industrial robot, which poses the cross-embodiment question directly: the cheap-to-instrument cobot and the production-grade industrial arm appear under the same schema. A framework of 21 structured templates, parameterized over generic primitives rather than hard-coded to a machine, instantiates over FactoryWave (and AURSAD / voraus-AD) to yield the full corpus, and extends to a new platform by populating its signal mapping.
+
+\newcommand{\workshoprelatedworknote}{Generalist robot policies and robot foundation models are typically evaluated on task success under visuomotor control; FactoryBench is complementary, holding the platform fixed and asking what a model understands about a machine it has never seen, from the controller and sensor signals that any deployed system already emits, which is the modality available in industrial settings where cameras and teleoperation demonstrations are not.}
+
+\newcommand{\workshopclosingnote}{Zero-shot deployment onto unseen hardware is not yet reliable: models transfer some competence to a machine they have never seen, but not enough for an operator to act on it, at the level that matters most.}
+
+\input{../paper/_workshop_core}

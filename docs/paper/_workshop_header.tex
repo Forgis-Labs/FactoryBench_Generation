@@ -1,0 +1,22 @@
+% ============================================================
+% Shared boilerplate for every workshop build (title block, code/dataset
+% links, teaser figure). Identical across all workshop submissions, so it
+% is factored out once: edit here and every workshop PDF picks it up.
+% \input by each docs/paper/_workshop_<venue>.tex, before its \begin{abstract}.
+% ============================================================
+
+\workshopbuildtrue
+
+\maketitle
+
+\begin{center}\vspace{-2.4em}\small
+    \ifanon
+    {\faGithub}\ Code: \href{https://anonymous.4open.science/r/FactoryBench/README.md}{\nolinkurl{anonymous.4open.science/r/FactoryBench}} \\[0.15em]
+    \else
+    {\faGithub}\ Code: \href{https://github.com/Forgis-Labs/Factorybench}{\nolinkurl{github.com/Forgis-Labs/Factorybench}} \\[0.15em]
+    \fi
+    \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ Dataset: \href{https://huggingface.co/datasets/FactoryBench/FactoryBench}{\nolinkurl{huggingface.co/datasets/FactoryBench/FactoryBench}}
+\end{center}
+\vspace{-0.4em}
+\input{figures/figure_pipeline}
+\vspace{-1.5em}
