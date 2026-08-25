@@ -4,10 +4,10 @@
 #   make anon                 ->  neurips_tex/main_anon.pdf  (NeurIPS, double-blind)
 #   make iclr                 ->  iclr_tex/main_iclr.pdf     (ICLR 2027, double-blind)
 #   make workshops            ->  every workshop PDF in WORKSHOPS below
-#   make workshop-worldmodels ->  workshop_tex/main_worldmodels.pdf
+#   make workshop-wmphysai    ->  workshop_tex/main_wmphysai.pdf (one per venue)
 #   make all                  ->  the three full-paper builds
 #   make everything           ->  all + workshops
-#   make archives             ->  dist/<name>-submission.zip, one per workshop
+#   make archives             ->  dist/factorybench-<venue>-workshop.{pdf,zip}
 #   make clean                ->  drop LaTeX aux files (keeps the PDFs)
 #
 # FULL PAPER. Every line of prose lives in paper/_content.tex and is shared
@@ -48,7 +48,7 @@ LATEX  ?= pdflatex -interaction=nonstopmode
 BIBTEX ?= bibtex
 
 # Workshop venues. One name per submission; each needs the two files above.
-WORKSHOPS ?= worldmodels
+WORKSHOPS ?= wmphysai physunderstanding robotlearning
 
 WORKSHOP_TARGETS  := $(addprefix workshop-,$(WORKSHOPS))
 WORKSHOP_ARCHIVES := $(addprefix archive-,$(WORKSHOPS))

@@ -1,0 +1,63 @@
+%% WORKSHOP BUILD: Physical Understanding workshop (double-blind, 8 pages
+%% excluding references AND appendix).
+%% Wrapper only. Venue framing (title block, abstract, introduction, connector
+%% sentences) lives in ../paper/_workshop_physunderstanding.tex; the body is
+%% shared with every other workshop build via ../paper/_workshop_core.tex.
+%% Never edit content here.
+\PassOptionsToPackage{numbers,compress,sort&compress}{natbib}
+\documentclass{article}
+
+\newif\ifanon
+\anontrue                     % workshop submissions are double-blind
+
+%% Venue style package, loaded before the shared preamble. neurips_2026.sty
+%% supports workshop tracks natively: dblblindworkshop blinds the author block
+%% and prints \workshoptitle in the footer banner.
+\usepackage[dblblindworkshop]{neurips_2026}
+%% NOTE: the venue's official name is not printed in a submission-mode build,
+%% so it could not be recovered from the reference PDF. Placeholder below --
+%% confirm against the CFP before submitting.
+\workshoptitle{Workshop on Physical Understanding}
+
+%% The shared content lives in ../paper/ but its \input{figures/...} and
+%% \includegraphics{figures/...} paths are written relative to the NeurIPS
+%% build directory, which is where the figures live. Point both resolvers
+%% there so no content file needs a venue-specific edit. (Same mechanism the
+%% ICLR wrapper uses; this directory is deliberately a sibling of
+%% ../neurips_tex/ so the relative depth matches.)
+\makeatletter
+\def\input@path{{../neurips_tex/}{../paper/}}
+\makeatother
+
+\input{../paper/_preamble_common}
+
+%% Hero-figure width, as a fraction of the text width. The figure scales
+%% uniformly, so this shrinks height with width and introduces no
+%% distortion. Chosen by measurement: this abstract is ~5 lines too long to fit page 1 at any
+%% figure size, so this matches the other two venues for a
+%% consistent look rather than chasing a fit that is not there.
+%% Rebuild and check which page the Introduction starts on before changing it.
+\renewcommand{\herowidth}{0.82\linewidth}
+
+%% After the shared preamble: it is graphicx that defines \graphicspath.
+\graphicspath{{../neurips_tex/}{../neurips_tex/figures/}}
+
+%% 8-page limit excluding references, so the full body fits. A 6-page venue
+%% would say \workshopcompacttrue here instead.
+\workshopcompactfalse
+
+%% This venue's CFP exempts the appendix from the page limit, so this build
+%% ships ../paper/_appendix.tex. It is \input at the bottom of
+%% _workshop_physunderstanding.tex, after that file inputs the shared core,
+%% because _appendix.tex must follow the bibliography that ends the core.
+%% The NeurIPS paper checklist is still a main-conference requirement only.
+\neuripschecklistfalse
+
+\input{../paper/_titleauthor}
+
+\begin{document}
+%% Single input: _workshop_physunderstanding.tex itself pulls in
+%% _workshop_core.tex and then _appendix.tex. Do NOT add \input of the core
+%% here as the other wrappers do, or the body is typeset twice.
+\input{../paper/_workshop_physunderstanding}
+\end{document}

@@ -1,0 +1,69 @@
+% ============================================================
+% PER-VENUE WORKSHOP FILE: World Models in Physical AI.
+%
+% This file holds everything specific to this venue:
+%   - the title block, resource links and teaser figure
+%   - the abstract
+%   - the introduction, framed for this workshop's theme
+%   - the two connector macros that _workshop_core.tex expands
+%
+% Everything after the introduction (related work, framework, generation,
+% evaluation, limitations, conclusion) comes from ../paper/_workshop_core.tex,
+% which every workshop build shares. Never copy body prose in here.
+%
+% To add another workshop, copy _workshop_TEMPLATE.tex, not this file, so this
+% venue's framing does not travel with it.
+%
+% CROSS-REFERENCES: a workshop build has NO APPENDIX, so nothing here may
+% \ref an app:* label. Where the extended paper points at an appendix, point
+% the reader at the released artefacts instead.
+%
+% ANONYMITY: the \ifanon branch below must never carry the live dataset URL,
+% an author name or an affiliation. Under review the dataset link is withheld.
+% ============================================================
+
+\maketitle
+
+\begin{center}\vspace{-2.4em}\small
+    \ifanon
+    {\faGithub}\ Code: \href{https://anonymous.4open.science/r/FactoryBench/README.md}{\nolinkurl{anonymous.4open.science/r/FactoryBench}} \\[0.15em]
+    \else
+    {\faGithub}\ Code: \href{https://github.com/Forgis-Labs/Factorybench}{\nolinkurl{github.com/Forgis-Labs/Factorybench}} \\[0.15em]
+    \fi
+    \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ Dataset: \href{https://huggingface.co/datasets/FactoryBench/FactoryBench}{\nolinkurl{huggingface.co/datasets/FactoryBench/FactoryBench}}
+\end{center}
+\vspace{-0.4em}
+\input{figures/figure_pipeline}
+\vspace{-1.5em}
+
+\begin{abstract}
+    We introduce \textbf{FactoryBench}, a benchmark for evaluating whether time-series models and LLMs hold an implicit world model of a physical system: an internal representation of its state and dynamics accurate enough to predict how the system evolves under an intervention and to reason about it counterfactually. Q\&A pairs are organized along four levels, state estimation, action-conditioned forward prediction, counterfactual rollout, and decision-making, instantiating Pearl's ladder of causation, and span five answer formats: four are scored deterministically and free-form answers are scored by an LLM-as-judge voting protocol. We propose a scalable Q\&A generation framework built around structured templates, release \textbf{FactoryWave} (a dense, multitask, multivariate sensor dataset from a UR3 cobot and a KUKA KR10 industrial arm), and construct FactoryBench as a benchmark of over 70k Q\&A items grounded in roughly 15k normalized episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2023vorausad}. Zero-shot evaluation of six frontier LLMs shows that no model exceeds 50\% (chance-corrected) on state, intervention, or counterfactual reasoning, and that the ranking reshuffles entirely on decision-making, with the leader on the first three levels falling to the bottom of the fourth: current models' implicit world models are far from adequate for physically grounded, closed-loop decision-making.
+\end{abstract}
+
+\section{Introduction}
+
+World models predict how an environment evolves, optionally conditioned on an agent's action, and can be rolled out to imagine future outcomes. For Physical AI this is what turns raw sensing into planning: an agent that can simulate its world can evaluate an intervention before executing it and reason about alternatives it never observed. Most evidence for the capability comes from pixel- or video-based models in rendered or simulated environments, where dynamics are easy to observe and counterfactual ground truth is free to generate. Whether it survives on the dense, multivariate telemetry of a real robot, with no renderer and no simulator, is largely untested.
+
+That signal is rich: joint states, torques, forces, velocities, contact events, task phases, and fault indicators. Traditional time-series models excel at narrow prediction, classification, and anomaly detection \cite{zhou2021informer,su2019omni,audibert2020usad}, but are specialized, hard to interpret, and generalize poorly off-task \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}; they hold no forward model an operator could query or roll out. Large language models reason well and produce structured technical explanations \cite{wei2022chain,yao2023tree}, but underperform on dense numerical series \cite{gruver2023llmtime,jin2024timellm}. Neither family has been tested for an implicit model of the machine supporting state estimation, action-conditioned prediction, and counterfactual rollback, which general benchmarks such as MMLU, BIG-bench, or MMMU \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} cannot probe.
+
+Dropping the visual channel is not a difficulty we impose artificially; it is where industry is heading. Plants increasingly run lights-out to cut labour and energy costs: FANUC has operated a lights-out robot factory since 2001, producing around 50 robots per day and running unsupervised for up to 30 days, with lighting and HVAC reduced or eliminated because nobody is there who needs them~\cite{imts2026lightsout}%
+; Xiaomi's Changping facility builds on the order of 10 million smartphones a year the same way~\cite{metrologynews2024darkfactory}%
+. Most manufacturers adopt this cell by cell rather than plant-wide, but two consequences already follow. The human who would have caught a fault by sight or sound is off the floor, so the diagnostic loop must close automatically. And where cameras are deployed it is overwhelmingly for product inspection, pointed at the part rather than the machine~\cite{metrologynews2024darkfactory}%
+, while machine health lives in quantities no camera observes: joint torque, motor current, tracking error, controller mode. Controller telemetry is emitted by default by every industrial machine, is the one modality guaranteed across a heterogeneous plant, and is far less restricted than video. We therefore evaluate on telemetry alone.
+
+We evaluate LLMs and LLM-driven agents rather than the specialised classifiers that dominate industrial anomaly detection, because in an unattended plant the artefact that matters is the justification, not the label. A maintenance action (locking out a cell, dismantling a gripper, revising a payload configuration) is itself costly and safety-relevant, so an engineer must audit the reasoning before committing to it. A classifier emits a fault class with no account of which signals produced it; a language model emits a trace from the observed signal to the named root cause to the prescribed procedure, checkable step by step against the telemetry and the vendor manual, and rejectable when the reasoning is unsound even if the label happens to be right. That auditability is what makes a prediction actionable rather than merely accurate, and it is why our decision-making level asks for free-form answers. Downtime sets the stakes: unplanned downtime costs Fortune Global 500 industrial organizations almost \$1.5 trillion a year, 11\% of turnover and about \$129 million per facility, and an idle automotive line runs past \$2 million an hour~\cite{senseye2023downtime}%
+.
+
+FactoryBench is grounded in FactoryWave, a dense multivariate dataset from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. Data of this kind is rare publicly, for the confidentiality reasons above; to our knowledge FactoryWave is the first extensive anomaly dataset to (partly) cover an industrial robot, bridging the cobot-to-industrial-machine gap. A generation framework of 21 structured templates, parameterized over generic primitives rather than hard-coded to a machine, instantiates over FactoryWave (and AURSAD / voraus-AD) to yield the full Q\&A corpus.
+
+% ------------------------------------------------------------
+% CONNECTORS. _workshop_core.tex expands these two macros at the end of its
+% Related Work and its Conclusion. One sentence each, tying FactoryBench to
+% this workshop's theme. Keep them short: the core body carries the argument.
+% ------------------------------------------------------------
+\renewcommand{\workshoprelatedworknote}{%
+    World models for physical dynamics are most developed in the visual and simulated-physics regime (e.g., CLEVR/CLEVRER-style compositional and causal video QA); FactoryBench instead grounds the same association--intervention--counterfactual hierarchy in real, dense, multivariate telemetry from physical robots under closed-loop control, where the dynamics are governed by controller and mechanical constraints rather than rendered pixels.%
+}
+\renewcommand{\workshopclosingnote}{%
+    Framed as a world-modeling problem, FactoryBench asks whether a model's internal representation of a physical system is accurate enough to roll forward under an intervention and backward under a counterfactual, without a renderer or simulator standing in for the dynamics; until it is, imagined rollouts on real physical systems cannot be trusted for planning or control.%
+}

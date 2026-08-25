@@ -1,0 +1,52 @@
+%% WORKSHOP BUILD: World Models in Physical AI (double-blind, 8 pages).
+%% Wrapper only. Venue framing (title block, abstract, introduction, connector
+%% sentences) lives in ../paper/_workshop_wmphysai.tex; the body is shared
+%% with every other workshop build via ../paper/_workshop_core.tex. Never edit
+%% content here.
+\PassOptionsToPackage{numbers,compress,sort&compress}{natbib}
+\documentclass{article}
+
+\newif\ifanon
+\anontrue                     % workshop submissions are double-blind
+
+%% Venue style package, loaded before the shared preamble. neurips_2026.sty
+%% supports workshop tracks natively: dblblindworkshop blinds the author block
+%% and prints \workshoptitle in the footer banner.
+\usepackage[dblblindworkshop]{neurips_2026}
+\workshoptitle{World Models in Physical AI}
+
+%% The shared content lives in ../paper/ but its \input{figures/...} and
+%% \includegraphics{figures/...} paths are written relative to the NeurIPS
+%% build directory, which is where the figures live. Point both resolvers
+%% there so no content file needs a venue-specific edit. (Same mechanism the
+%% ICLR wrapper uses; this directory is deliberately a sibling of
+%% ../neurips_tex/ so the relative depth matches.)
+\makeatletter
+\def\input@path{{../neurips_tex/}{../paper/}}
+\makeatother
+
+\input{../paper/_preamble_common}
+
+%% Hero-figure width, as a fraction of the text width. The figure scales
+%% uniformly, so this shrinks height with width and introduces no
+%% distortion. Chosen by measurement: the whole abstract lands on page 1; 0.84 spills two lines.
+%% Rebuild and check which page the Introduction starts on before changing it.
+\renewcommand{\herowidth}{0.82\linewidth}
+
+%% After the shared preamble: it is graphicx that defines \graphicspath.
+\graphicspath{{../neurips_tex/}{../neurips_tex/figures/}}
+
+%% 8-page limit excluding references, so the full body fits (the benchmark
+%% comparison table is present). A 6-page venue would say
+%% \workshopcompacttrue here instead.
+\workshopcompactfalse
+
+%% No appendix in a workshop build, hence no checklist either.
+\neuripschecklistfalse
+
+\input{../paper/_titleauthor}
+
+\begin{document}
+\input{../paper/_workshop_wmphysai}
+\input{../paper/_workshop_core}
+\end{document}

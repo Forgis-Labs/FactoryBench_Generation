@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build a self-contained submission archive for one workshop venue.
 #
-#   ./make_archive.sh worldmodels      (or: make -C docs archive-worldmodels)
+#   ./make_archive.sh wmphysai         (or: make -C docs archive-wmphysai)
 #
 # The repo keeps workshop sources split across three directories so that every
 # venue shares one body (see ../Makefile). A submission portal cannot be handed
@@ -29,6 +29,12 @@ STAGE="dist/${VENUE}-source"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/figures"
 
+# Everything staged below is derived from the build's own log, so a venue that
+# reads a file the others do not (the one shipping the appendix, say) packages
+# correctly without this script knowing which venue is which.
+LOG="workshop_tex/main_${VENUE}.log"
+[ -f "$LOG" ] || { echo "no build log: $LOG -- run make workshop-${VENUE} first" >&2; exit 1; }
+
 # --- sources -------------------------------------------------------------
 # The wrapper becomes main.tex so the archive builds with a bare `pdflatex main`.
 cp "$WRAPPER"                       "$STAGE/main.tex"
@@ -39,15 +45,40 @@ cp paper/_workshop_core.tex         "$STAGE/"
 cp "$CONTENT"                       "$STAGE/"
 cp paper/references.bib             "$STAGE/"
 
-# --- figures -------------------------------------------------------------
-# Only the ones this build actually reads. Anything unused stays out: a
-# submission archive carrying 25 MB of unreferenced assets is not a clean one.
-for f in figure_pipeline.tex huggingface_logo.png factorybench_logo.png \
-         FactoryWave.png AURSAD.png VORAUSAD.png \
-         factorybench-collage.pdf fig_l4_gpt51_byrootcause.pdf; do
-    cp "neurips_tex/figures/$f" "$STAGE/figures/"
+# Any other shared source this venue reads -- _appendix.tex for the venue whose
+# CFP exempts it, and whatever a future venue adds.
+grep -oE '\.\./paper/[A-Za-z0-9_-]+\.tex' "$LOG" | sort -u | while read -r ref; do
+    src="workshop_tex/$ref"
+    if [ -f "$src" ]; then cp "$src" "$STAGE/"; fi
 done
-cp ../output/figures/fig_main_heatmap.pdf "$STAGE/figures/"
+
+# --- figures -------------------------------------------------------------
+# Only what this build actually reads, derived from its own log rather than a
+# hardcoded list: venues differ (the one that ships the appendix pulls in
+# figures the others never touch), and a hardcoded list silently rots. An
+# archive carrying 25 MB of unreferenced assets is not a clean one.
+grep -oE '\.\./[A-Za-z0-9_./-]+\.(png|pdf|jpe?g|tex)' "$LOG" \
+  | sort -u \
+  | while read -r ref; do
+        src="workshop_tex/$ref"
+        [ -f "$src" ] || continue
+        case "$ref" in
+            */figures/*) cp "$src" "$STAGE/figures/" ;;   # graphics and figure .tex
+            *)           : ;;                            # shared sources, copied above
+        esac
+    done
+
+# The appendix pulls figures from ../../output/figures/ rather than the build
+# directory; those land in figures/ too and the path rewrite below matches.
+# (`[ -f x ] && cp` would return 1 on the last miss and, under set -e, kill the
+# script — hence the explicit if.)
+grep -oE '\.\./\.\./output/figures/[A-Za-z0-9_.-]+\.(pdf|png)' "$LOG" | sort -u \
+  | while read -r ref; do
+        src="workshop_tex/$ref"
+        if [ -f "$src" ]; then cp "$src" "$STAGE/figures/"; fi
+    done
+
+echo ">>> staged $(find "$STAGE/figures" -type f | wc -l) figures for ${VENUE}"
 
 # --- flatten the paths ---------------------------------------------------
 # Rewrite the copies only; the repo sources keep their shared layout.
@@ -78,10 +109,18 @@ bibtex main >/dev/null 2>&1 || true
 pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1 || true
 pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1 || true
 
+# Three appendix figures are known to be absent from the repository: their
+# generator left with their author and cannot be re-run, and only the venue
+# that ships the appendix reaches them. They render as empty boxes, which the
+# submitter must be told about, but must not block producing the archive.
+# Anything else is a real packaging bug and does block.
+KNOWN_MISSING='fig_judge_agreement.pdf|fig_probe_vs_readout.pdf|fig_probe_layerwise.pdf'
+
 fail=0
-if grep -q '^!' main.log; then
+errs=$(grep -n '^!' main.log | grep -vE "$KNOWN_MISSING" || true)
+if [ -n "$errs" ]; then
     echo "FAIL: LaTeX errors in the staged archive:" >&2
-    grep -n '^!' main.log >&2
+    printf '%s\n' "$errs" >&2
     fail=1
 fi
 if grep -qE "(Citation|Reference) \`[^']*' on page [0-9]+ undefined" main.log; then
@@ -90,9 +129,17 @@ if grep -qE "(Citation|Reference) \`[^']*' on page [0-9]+ undefined" main.log; t
     fail=1
 fi
 if grep -qE "File \`[^']*' not found" main.log; then
-    echo "FAIL: missing input files:" >&2
-    grep -oE "File \`[^']*' not found" main.log | sort -u >&2
-    fail=1
+    missing=$(grep -oE "File \`[^']*' not found" main.log | sort -u)
+    unexpected=$(printf '%s\n' "$missing" | grep -vE "$KNOWN_MISSING" || true)
+    if [ -n "$unexpected" ]; then
+        echo "FAIL: missing input files:" >&2
+        printf '%s\n' "$unexpected" >&2
+        fail=1
+    fi
+    expected=$(printf '%s\n' "$missing" | grep -E "$KNOWN_MISSING" || true)
+    if [ -n "$expected" ]; then
+        WARNED=$(printf '%s\n' "$expected" | sed 's/.*`//; s/. not found//' | tr '\n' ' ')
+    fi
 fi
 [ -f main.pdf ] || { echo "FAIL: no PDF produced" >&2; fail=1; }
 [ "$fail" -eq 0 ] || exit 1
@@ -107,3 +154,10 @@ rm -f "factorybench-${VENUE}-workshop-source.zip"
 echo
 echo "OK  dist/factorybench-${VENUE}-workshop.pdf"
 echo "OK  dist/factorybench-${VENUE}-workshop-source.zip"
+if [ -n "${WARNED:-}" ]; then
+    echo
+    echo "WARNING: this archive renders empty boxes for: ${WARNED}"
+    echo "         Those figures are absent from the repository and have no"
+    echo "         generator; see the Known gaps section of docs/BUILDING.md."
+    echo "         Check the affected appendix pages before submitting."
+fi

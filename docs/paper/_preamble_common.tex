@@ -107,3 +107,12 @@
 % so a build that sets neither still compiles.
 \providecommand{\workshoprelatedworknote}{}
 \providecommand{\workshopclosingnote}{}
+
+% Hero (pipeline) figure width. The figure is drawn inside a
+% resizebox that scales it to this width, so shrinking the value scales
+% width and height together: no distortion, just a smaller figure.
+% Defaults to full text width, which is what the full-paper builds use.
+% A workshop wrapper narrows it to pull the abstract up onto page 1, where
+% a reader decides whether to keep reading. Below about 0.80 the node
+% labels start to get hard to read.
+\providecommand{\herowidth}{\linewidth}
