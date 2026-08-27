@@ -33,21 +33,18 @@ import numpy as np
 from src.question_generation.utils.hf_streaming import (
     HfStreamUploader,
     add_streaming_args,
-    make_uploader_from_args,
-)
+    make_uploader_from_args)
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates, load_ur3_mapping
 from src.question_generation.utils.template import (
     build_context,
-    discover_episodes_by_dataset,
-)
+    discover_episodes_by_dataset)
 from src.question_generation.utils.time_series import parse_event_id
 from src.question_generation.utils.relevance import (
     is_enabled as relevance_enabled,
     load_specs as load_relevance_specs,
     relevance_report,
     sample_with_relevance,
-    validate_relevance,
-)
+    validate_relevance)
 
 logger = logging.getLogger(__name__)
 
@@ -65,13 +62,45 @@ CONTEXT_MAX = 64
 # ---------------------------------------------------------------------------
 
 
+
+NO_ANOMALY_TEXT = (
+    "No anomalous behavior detected in the sensor stream. "
+    "The machine is operating normally; no remediation is required."
+)
+
+
+def _optimization_answer(fault_id: Optional[int], meta: Dict[str, Any]) -> Optional[str]:
+    """The corrective action for one episode, or None when it is not derivable."""
+    if fault_id == 22:
+        configured, correct = meta.get("tcp_offset_configured"), meta.get("correct_tcp_offset")
+        if configured is None or correct is None:
+            return None
+        return (f"The TCP offset is misconfigured at {configured} instead of the correct "
+                f"{correct}. Update the TCP position offset in the installation settings "
+                f"to {correct}.")
+    if fault_id == 23:
+        configured, correct = meta.get("payload_mass_configured"), meta.get("correct_payload_mass")
+        if configured is None or correct is None:
+            return None
+        return (f"The payload mass is set to {configured} kg but the actual payload weighs "
+                f"{correct} kg. Update the payload mass in the installation settings to "
+                f"{correct} kg.")
+    if fault_id == 28:
+        configured, correct = meta.get("payload_cog_configured"), meta.get("correct_payload_cog")
+        if configured is None or correct is None:
+            return None
+        return (f"The payload center of gravity is set to {configured} but the actual center "
+                f"of gravity is {correct}. Update the payload CoG in the installation "
+                f"settings to {correct}.")
+    return None
+
+
 def get_root_cause_for_subseries(
     subseries: List[Dict[str, Any]],
     root_causes: Dict[int, Dict[str, Any]],
     events: List[Dict[str, Any]],
     all_rows: Optional[List[Dict[str, Any]]] = None,
-    start_idx: int = 0,
-) -> Dict[str, Any]:
+    start_idx: int = 0) -> Dict[str, Any]:
     """
     Determine the anomaly status and root cause for a subseries.
 
@@ -131,7 +160,7 @@ def get_root_cause_for_subseries(
             "anomaly_present": False,
             "fault_label": 0,
             "root_cause": "normal",
-            "description": "Normal operation — no anomaly present.",
+            "description": "Normal operation, no anomaly present.",
             "event_id": None,
             "event_name": None,
             "event_context": None,
@@ -144,7 +173,7 @@ def get_root_cause_for_subseries(
             "anomaly_present": False,
             "fault_label": 0,
             "root_cause": "normal",
-            "description": "Normal operation — no anomaly present.",
+            "description": "Normal operation, no anomaly present.",
             "event_id": None,
             "event_name": None,
             "event_context": None,
@@ -173,14 +202,13 @@ def _extract_episode_meta(raw: Any) -> Dict[str, Any]:
 
 def _build_ranking_context(
     labeled_rows: List[Tuple[str, List[Dict[str, Any]]]],
-    important_features: Optional[List[str]],
-) -> Dict[str, Any]:
+    important_features: Optional[List[str]]) -> Dict[str, Any]:
     """
     Build a multi-stream context for ranking questions.
 
     Each episode is padded to the common maximum length (repeating the last row)
     then encoded independently with build_context.  The result is a dict
-    {"streams": {"A": <context>, "B": <context>, ...}}.
+    {"streams": {"A": <context>, "B": <context>...}}.
     """
     max_len = max((len(rows) for _, rows in labeled_rows), default=0)
     keep = (set(important_features) | {"timestamp_ms"}) if important_features else None
@@ -201,8 +229,7 @@ def _try_generate_ranking_question(
     template: Dict[str, Any],
     episodes_by_dataset: Dict[str, List[Path]],
     available_datasets: List[str],
-    raw_cache: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    raw_cache: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Attempt to build a ranking question (templates 3 and 4).
 
@@ -282,8 +309,7 @@ def generate_level4_questions(
     ur3_mapping: Optional[Dict[str, Dict[str, Any]]] = None,
     relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     enumerate_mode: bool = False,
-    uploader: Optional[HfStreamUploader] = None,
-) -> None:
+    uploader: Optional[HfStreamUploader] = None) -> None:
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
@@ -337,7 +363,18 @@ def generate_level4_questions(
             if meta_path.exists():
                 try:
                     meta = load_json(meta_path)
+                    # Counterfactual episodes leave fault_id null and name the
+                    # injected fault in cf_fault_id instead, with a fault_label
+                    # of 0 on every row because the injection was never
+                    # propagated back into them. Reading only fault_id made
+                    # every such episode look healthy, which on a
+                    # factorywave-only run turned all 6,461 troubleshooting
+                    # items into "no anomalous behavior detected".
                     fid = meta.get("fault_id")
+                    if fid is None:
+                        fid = meta.get("cf_fault_id")
+                    if fid is None and isinstance(meta.get("counterfactual"), dict):
+                        fid = meta["counterfactual"].get("cf_fault_id")
                     if fid is not None:
                         fid = int(float(fid))
                 except Exception:
@@ -349,8 +386,16 @@ def generate_level4_questions(
     all_episodes: List[Tuple[str, Path]] = [
         (ds, p) for ds, paths in episodes_by_dataset.items() for p in paths
     ]
+    # Torque is not the discriminating channel and requiring it was wrong.
+    # effort_target_torque exists only on KUKA, where it turns out to be
+    # measured current times a fixed per-joint gain rather than anything the
+    # controller predicted, so requiring it selected exactly the slice that
+    # cannot answer the question and excluded UR3, which does carry a genuine
+    # model-side channel in effort_target_current. The rendering fix supplies
+    # that pair instead; the pool just needs an optimization fault.
     optimization_episodes = [
-        (ds, p) for ds, p in all_episodes if load_meta(p)[0] in _OPTIMIZATION_FAULTS
+        (ds, p) for ds, p in all_episodes
+        if load_meta(p)[0] in _OPTIMIZATION_FAULTS
     ]
     troubleshooting_episodes = [
         (ds, p) for ds, p in all_episodes if load_meta(p)[0] not in _OPTIMIZATION_FAULTS
@@ -447,58 +492,38 @@ def generate_level4_questions(
             if template["id"] == 1:
                 rc_info = get_root_cause_for_subseries(
                     subseries, root_causes, events,
-                    all_rows=rows, start_idx=start_idx,
-                )
+                    all_rows=rows, start_idx=start_idx)
                 root_cause = rc_info.get("root_cause")
                 if rc_info.get("anomaly_present"):
                     ur3_entry = (ur3_mapping or {}).get(root_cause, {})
-                    answer = ur3_entry.get("ur3_protocol")
-                    if not answer:
+                    if not ur3_entry.get("ur3_protocol"):
                         # No remediation protocol for this root cause (typically
-                        # placeholder/undocumented faults like fault 6, 12) — skip
+                        # placeholder/undocumented faults like fault 6, 12), skip
                         # rather than ship an item with answer=null.
                         continue
+                    answer = ur3_entry["ur3_protocol"]
                 else:
-                    answer = (
-                        "No anomalous behavior detected in the sensor stream. "
-                        "The machine is operating normally; no remediation is required."
-                    )
+                    answer = NO_ANOMALY_TEXT
 
             elif template["id"] == 2:
+                # KUKA carries no genuine model-side channel: its
+                # effort_target_torque is measured current times a fixed
+                # per-joint gain, so a configuration error leaves no trace
+                # anywhere on the page. Intervention testing put the
+                # pose-conditioned response at +0.021 Nm/kg against the
+                # -5.07 Nm/kg a real model-side channel would show. The slice
+                # is unanswerable rather than merely hard, so it is excluded.
+                if str(ep_meta.get("robot_type", "")).lower().startswith("kuka"):
+                    continue
                 assert ep_fault_id is not None
                 rc_entry = root_causes.get(ep_fault_id, {})
                 root_cause = rc_entry.get("root_cause", "")
 
-                if ep_fault_id == 22:
-                    configured = ep_meta.get("tcp_offset_configured")
-                    correct = ep_meta.get("correct_tcp_offset")
-                    if configured is None or correct is None:
-                        continue
-                    answer = (
-                        f"The TCP offset is misconfigured at {configured} "
-                        f"instead of the correct {correct}. "
-                        f"Update the TCP position offset in the installation settings to {correct}."
-                    )
-                elif ep_fault_id == 23:
-                    configured = ep_meta.get("payload_mass_configured")
-                    correct = ep_meta.get("correct_payload_mass")
-                    if configured is None or correct is None:
-                        continue
-                    answer = (
-                        f"The payload mass is set to {configured} kg "
-                        f"but the actual payload weighs {correct} kg. "
-                        f"Update the payload mass in the installation settings to {correct} kg."
-                    )
-                elif ep_fault_id == 28:
-                    configured = ep_meta.get("payload_cog_configured")
-                    correct = ep_meta.get("correct_payload_cog")
-                    if configured is None or correct is None:
-                        continue
-                    answer = (
-                        f"The payload center of gravity is set to {configured} "
-                        f"but the correct value is {correct}. "
-                        f"Update the CoG offset in the installation settings to {correct}."
-                    )
+                _correct = _optimization_answer(ep_fault_id, ep_meta)
+                if not _correct:
+                    continue
+                answer = _correct
+
 
             important_features = template.get("important_features")
             context_subseries = subseries
@@ -516,6 +541,13 @@ def generate_level4_questions(
                 "template_type": template["type"],
                 "hides": template.get("hides", []),
                 "question": template["template"],
+                # Level 4 is free-form throughout. Both templates were briefly
+                # rendered as lettered MCQs to make them deterministically
+                # gradeable, which fixed grading by changing what the level
+                # measures: "produce a diagnosis and a recovery procedure"
+                # became "pick a letter", answerable at 1/6 by guessing. The
+                # answer below is the reference protocol itself and the
+                # three-judge rubric grades a free-text response against it.
                 "options": {},
                 "answer": answer,
                 "root_cause": root_cause,
@@ -523,6 +555,7 @@ def generate_level4_questions(
                 "provenance": {
                     "dataset": sampled_dataset,
                     "episode": ep_path.stem,
+                    "task": ep_task,
                     "subseries_start_index": start_idx,
                     "subseries_length": context_len,
                     "relevance": relevance_report(subseries, ep_fault_id or 0, spec, ep_task, sampler_tag),
@@ -566,14 +599,12 @@ def main() -> None:
         "--datasets-dir",
         type=Path,
         default=repo_root / "data",
-        help="Root data directory (default: <repo>/data)",
-    )
+        help="Root data directory (default: <repo>/data)")
     parser.add_argument(
         "--output",
         type=Path,
         default=repo_root / "output" / "questions" / "level4",
-        help="Output directory (default: <repo>/output/questions/level4)",
-    )
+        help="Output directory (default: <repo>/output/questions/level4)")
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
@@ -584,27 +615,42 @@ def main() -> None:
              "of random sampling. -n becomes an upper cap. Combinations whose "
              "episode does not satisfy the template's preconditions are skipped. "
              "For ranking templates (t3/t4) the primary episode walks; the other "
-             "3 episodes per question are still sampled at random.",
-    )
+             "3 episodes per question are still sampled at random.")
     add_streaming_args(parser)
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
-        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
-    )
+        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}")
+    parser.add_argument(
+        "--template-ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Restrict generation to these template ids (default: all). Useful "
+             "for regenerating a single template without rerunning the rest.")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
+    if getattr(args, "template_ids", None):
+        wanted = set(args.template_ids)
+        templates = [t for t in templates if t["id"] in wanted]
+        if not templates:
+            parser.error(f"No templates match --template-ids {sorted(wanted)}")
+
     root_causes = load_root_causes(args.datasets_dir / "labelling" / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "labelling" / "events.json")
-    ur3_mapping_path = args.datasets_dir / "labelling" / "rca" / "root_cause_error_mapping.json"
+    # The file is root_cause_ur3_error_mapping.json, which is also the name
+    # load_ur3_mapping documents. Pointing at the wrong one left ur3_mapping
+    # None, and template 1 skips any anomalous item whose root cause has no
+    # remediation protocol, so every faulty item was dropped and the whole
+    # template collapsed to the canned "no anomalous behavior" answer.
+    ur3_mapping_path = args.datasets_dir / "labelling" / "rca" / "root_cause_ur3_error_mapping.json"
     ur3_mapping = load_ur3_mapping(ur3_mapping_path) if ur3_mapping_path.exists() else None
 
     relevance_specs = (
@@ -627,8 +673,7 @@ def main() -> None:
         datasets=args.datasets,
         ur3_mapping=ur3_mapping,
         enumerate_mode=args.enumerate_mode,
-        uploader=uploader,
-    )
+        uploader=uploader)
 
 
 if __name__ == "__main__":

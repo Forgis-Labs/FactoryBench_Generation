@@ -28,8 +28,7 @@ Usage:
 Required env (loaded from --env-file, default .env):
     FB_S3_BUCKET               S3 bucket for async I/O (must be in --region)
     SAGEMAKER_ROLE_ARN         IAM role per src/evaluation/aws-setup.md §2.2.
-                               NOT required when --studio-user-profile is set —
-                               the Studio domain's execution role is used instead.
+                               NOT required when --studio-user-profile is set, the Studio domain's execution role is used instead.
                                That role ships with AmazonSageMakerFullAccess
                                (incl. read on jumpstart-cache-prod-*), which is
                                what a custom factorybench-sagemaker role often
@@ -69,7 +68,7 @@ def resolve_studio_role(region: str, domain_name: str, user_profile: str) -> str
     Studio domains and user profiles each carry an execution role; the user
     profile's role takes precedence when set, otherwise the domain default
     applies. These roles ship with ``AmazonSageMakerFullAccess`` by default,
-    which already grants ``s3:GetObject`` on ``jumpstart-cache-prod-*`` — the
+    which already grants ``s3:GetObject`` on ``jumpstart-cache-prod-*``, the
     exact permission a hand-rolled ``factorybench-sagemaker`` role typically
     lacks. Using this role lets the JumpStart deploy work without waiting on
     an IAM admin to extend the custom role.
@@ -109,12 +108,12 @@ def list_qwen_models(region: str) -> None:
     --model-id before running an actual deploy."""
     from sagemaker.jumpstart.notebook_utils import list_jumpstart_models
 
-    print(f"JumpStart catalog ({region}) — qwen3 matches:")
+    print(f"JumpStart catalog ({region}), qwen3 matches:")
     matches = [m for m in list_jumpstart_models(region=region) if "qwen3" in m.lower()]
     for m in matches:
         print(f"  {m}")
     if not matches:
-        print("  (none — open JumpStart in Studio and copy the id from the model card)")
+        print("  (none, open JumpStart in Studio and copy the id from the model card)")
 
 
 def deploy(
@@ -126,8 +125,7 @@ def deploy(
     s3_bucket: str,
     role_arn: str,
     autoscale: bool,
-    max_instances: int,
-) -> str:
+    max_instances: int) -> str:
     import boto3
     from sagemaker import Session
     from sagemaker.async_inference import AsyncInferenceConfig
@@ -159,7 +157,7 @@ def deploy(
     # TP=4, MAX_MODEL_LEN=157286, MAX_NUM_BATCHED_TOKENS=314572, ROLLING_BATCH=128.
     # On ml.g5.xlarge (1×A10G, 24 GB) every one of those overcommits the GPU.
     # We rescale all four for single-GPU: TP=1, 32k context, 8k batched tokens,
-    # rolling batch of 16 — leaves headroom for the 8 GB of fp16 weights plus
+    # rolling batch of 16, leaves headroom for the 8 GB of fp16 weights plus
     # KV cache. Bump GPU_MEMORY_UTILIZATION slightly so vLLM uses the breathing
     # room it now has.
     model = JumpStartModel(
@@ -173,19 +171,16 @@ def deploy(
             "OPTION_MAX_NUM_BATCHED_TOKENS": "8192",
             "OPTION_MAX_ROLLING_BATCH_SIZE": "16",
             "OPTION_GPU_MEMORY_UTILIZATION": "0.90",
-        },
-    )
+        })
     async_cfg = AsyncInferenceConfig(
         output_path=f"s3://{s3_bucket}/factorybench/qwen3-4b/async-out/",
-        max_concurrent_invocations_per_instance=4,
-    )
+        max_concurrent_invocations_per_instance=4)
     predictor = model.deploy(
         initial_instance_count=1,
         instance_type=instance_type,
         endpoint_name=endpoint_name,
         async_inference_config=async_cfg,
-        accept_eula=True,
-    )
+        accept_eula=True)
     print(f"Endpoint live: {predictor.endpoint_name}")
 
     if autoscale:
@@ -197,7 +192,7 @@ def configure_scale_to_zero(region: str, endpoint_name: str, *, max_instances: i
     """Register MinCapacity=0 + step-scaling on HasBacklogWithoutCapacity.
 
     Async endpoints can scale to zero, but waking from zero requires an explicit
-    CloudWatch alarm wired to a step-scaling policy — target tracking alone
+    CloudWatch alarm wired to a step-scaling policy, target tracking alone
     won't trigger when there are no instances reporting metrics. We therefore
     set up two policies:
       * Step-scaling (wake-from-zero): +1 instance when the alarm fires.
@@ -215,8 +210,7 @@ def configure_scale_to_zero(region: str, endpoint_name: str, *, max_instances: i
         ResourceId=resource_id,
         ScalableDimension="sagemaker:variant:DesiredInstanceCount",
         MinCapacity=0,
-        MaxCapacity=max_instances,
-    )
+        MaxCapacity=max_instances)
 
     step_resp = asg.put_scaling_policy(
         PolicyName=f"{endpoint_name}-wake-from-zero",
@@ -229,8 +223,7 @@ def configure_scale_to_zero(region: str, endpoint_name: str, *, max_instances: i
             "Cooldown": 60,
             "MetricAggregationType": "Maximum",
             "StepAdjustments": [{"MetricIntervalLowerBound": 0, "ScalingAdjustment": 1}],
-        },
-    )
+        })
 
     cw.put_metric_alarm(
         AlarmName=f"{endpoint_name}-has-backlog-without-capacity",
@@ -244,8 +237,7 @@ def configure_scale_to_zero(region: str, endpoint_name: str, *, max_instances: i
         Threshold=1,
         ComparisonOperator="GreaterThanOrEqualToThreshold",
         TreatMissingData="missing",
-        AlarmActions=[step_resp["PolicyARN"]],
-    )
+        AlarmActions=[step_resp["PolicyARN"]])
 
     asg.put_scaling_policy(
         PolicyName=f"{endpoint_name}-target-backlog",
@@ -263,8 +255,7 @@ def configure_scale_to_zero(region: str, endpoint_name: str, *, max_instances: i
             },
             "ScaleInCooldown": 600,
             "ScaleOutCooldown": 60,
-        },
-    )
+        })
 
     print(f"Auto-scaling configured: min=0, max={max_instances} (scale-to-zero enabled)")
 
@@ -320,8 +311,7 @@ def main() -> None:
         s3_bucket=s3_bucket,
         role_arn=role_arn,
         autoscale=not args.no_autoscale,
-        max_instances=args.max_instances,
-    )
+        max_instances=args.max_instances)
 
     print()
     print("Append to .env:")

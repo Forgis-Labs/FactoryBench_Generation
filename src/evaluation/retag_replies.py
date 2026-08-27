@@ -9,8 +9,7 @@ correct exact-match scorer.
 
 This script walks ``replies_root/level{N}/<model>/*_answer.json``, resolves
 each reply against ``questions_root/level{N}/<stem>.json``, recomputes
-``answer_format`` and ``question_type`` from the full question payload, and —
-if the format changes — re-scores the existing model answer with the proper
+``answer_format`` and ``question_type`` from the full question payload, and, if the format changes, re-scores the existing model answer with the proper
 branch of ``score_prediction``. The judge is never invoked: we only ever
 transition *away* from ``"free_form"``, never towards it.
 
@@ -31,8 +30,7 @@ from typing import Any, Dict, Optional
 from src.evaluation.run_foundry_eval import (
     build_question_index,
     infer_answer_format,
-    score_prediction,
-)
+    score_prediction)
 
 
 def _q_stem(reply_stem: str) -> str:
@@ -46,8 +44,7 @@ def _q_stem(reply_stem: str) -> str:
 def retag_one(
     reply_path: Path,
     qa_payload: Dict[str, Any],
-    write: bool,
-) -> Optional[Dict[str, Any]]:
+    write: bool) -> Optional[Dict[str, Any]]:
     """Return a summary dict if anything changed, else None."""
     try:
         reply = json.loads(reply_path.read_text(encoding="utf-8"))
@@ -77,8 +74,7 @@ def retag_one(
             ground_truth=reply.get("ground_truth", qa_payload.get("answer")),
             acceptance_bounds=qa_payload.get("acceptance_bounds"),
             question_text=qa_payload.get("question", ""),
-            judge_model="",
-        )
+            judge_model="")
         new_score = score
         new_provenance = provenance
         if judge_result is None:
@@ -159,7 +155,7 @@ def main() -> None:
                 f"score={s['old_score']}->{s['new_score']}"
             )
     if not args.write and total_changed:
-        print("\nDry run — re-run with --write to apply changes in-place.")
+        print("\nDry run, re-run with --write to apply changes in-place.")
 
 
 if __name__ == "__main__":

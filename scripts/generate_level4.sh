@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FactoryBench — Generate Level 4 (Troubleshooting & Optimization) Q&A pairs.
+# FactoryBench, Generate Level 4 (Troubleshooting & Optimization) Q&A pairs.
 #
 # Usage:
 #   bash scripts/generate_level4.sh               # default: 300 questions

@@ -23,14 +23,13 @@ _DEFAULT_DURATION_RANGE = (80, 400)
 
 
 class GripperActivationFailureApplicator(BaseApplicator):
-    """Event 13: Gripper Activation Failure — gripper cannot close."""
+    """Event 13: Gripper Activation Failure, gripper cannot close."""
 
-    valid_phases = [2, 3]  # settle, close — when gripper should be closing
+    valid_phases = [2, 3]  # settle, close, when gripper should be closing
 
     def __init__(
         self,
-        duration_range: tuple = _DEFAULT_DURATION_RANGE,
-    ):
+        duration_range: tuple = _DEFAULT_DURATION_RANGE):
         self._dur_range = duration_range
         self._original_max_force: float | None = None
         self._original_stiffness: float | None = None
@@ -57,10 +56,10 @@ class GripperActivationFailureApplicator(BaseApplicator):
             drive = UsdPhysics.DriveAPI(fj_prim, "angular")
             self._original_max_force = drive.GetMaxForceAttr().Get()
             self._original_stiffness = drive.GetStiffnessAttr().Get()
-            # Kill the drive — gripper can't close
+            # Kill the drive, gripper can't close
             drive.GetMaxForceAttr().Set(0.01)
             drive.GetStiffnessAttr().Set(0.01)
-            print(f"[GripperFailure] START — finger_joint drive disabled "
+            print(f"[GripperFailure] START, finger_joint drive disabled "
                   f"(was maxForce={self._original_max_force}, "
                   f"kp={self._original_stiffness})")
         except Exception as e:
@@ -90,7 +89,7 @@ class GripperActivationFailureApplicator(BaseApplicator):
                 drive = UsdPhysics.DriveAPI(fj_prim, "angular")
                 drive.GetMaxForceAttr().Set(self._original_max_force)
                 drive.GetStiffnessAttr().Set(self._original_stiffness)
-                print(f"[GripperFailure] END — finger_joint drive restored "
+                print(f"[GripperFailure] END, finger_joint drive restored "
                       f"(maxForce={self._original_max_force}, "
                       f"kp={self._original_stiffness})")
         except Exception as e:

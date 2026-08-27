@@ -145,12 +145,16 @@ def stage_eval(
 ) -> None:
     """Dispatch evaluation to the right backend based on provider.
 
-    Foundry models -> src.evaluation.run_foundry_eval (Azure)
-    Bedrock + SageMaker models -> src.evaluation.run_aws_eval (AWS)
+    Foundry models -> src.evaluation.run_foundry_eval (Azure / OpenAI / Vertex MaaS)
+    Vertex models -> src.evaluation.run_gcp_eval (GCP)
+    Bedrock + SageMaker models -> src.evaluation.run_aws_eval (AWS, retired;
+        only reachable with FB_INFERENCE_CLOUD=aws)
     """
     eval_level_tag = args.eval_level or f"level_{level}"
     provider = get_provider(model)
-    if provider in ("bedrock", "sagemaker"):
+    if provider == "vertex":
+        eval_module = "src.evaluation.run_gcp_eval"
+    elif provider in ("bedrock", "sagemaker"):
         eval_module = "src.evaluation.run_aws_eval"
     else:
         eval_module = "src.evaluation.run_foundry_eval"

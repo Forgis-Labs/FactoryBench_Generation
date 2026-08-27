@@ -1,0 +1,19 @@
+%% Anonymised NeurIPS build (blinded authors + anonymous.4open.science).
+%% Wrapper only. All prose lives in ../paper/_content.tex, shared with the
+%% other NeurIPS build and with the ICLR build in ../iclr_tex/main_iclr.tex.
+%% Never edit content here.
+\PassOptionsToPackage{numbers,compress,sort&compress}{natbib}
+\documentclass{article}
+
+\newif\ifanon
+\anontrue
+
+%% Venue style package, loaded before the shared preamble.
+\usepackage[eandd]{neurips_2026}
+
+\input{../paper/_preamble_common}
+\input{../paper/_titleauthor}
+
+\begin{document}
+\input{../paper/_content}
+\end{document}

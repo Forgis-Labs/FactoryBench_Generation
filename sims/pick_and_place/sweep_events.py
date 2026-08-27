@@ -7,7 +7,7 @@ For each event type and parameter range, runs paired baseline/counterfactual
 episodes to measure the counterfactual failure rate: what percentage of
 baseline successes become failures after event injection.
 
-Only one event type is injected per cell — the sweep isolates each event's
+Only one event type is injected per cell, the sweep isolates each event's
 impact independently.
 
 With --workers N, launches N parallel Isaac Sim processes.
@@ -56,7 +56,7 @@ _COLLISION_OBJECTS = [
     "bolt", "pipe_section", "cardboard_box",
     "metal_plate", "gear", "bottle", "wood_block",
 ]
-# Impact impulse ranges (kg·m/s) — weakest to strongest.
+# Impact impulse ranges (kg·m/s), weakest to strongest.
 _COLLISION_IMPULSE_RANGES = [
     [6.0, 12.0],    # ~25% CF rate range
 ]
@@ -287,7 +287,7 @@ def run_launcher():
         if r["param_name"]:
             param_str = f"[{r['param_lo']:.2f}-{r['param_hi']:.2f}]"
         else:
-            param_str = "—"
+            param_str = ", "
         print(f"{event_str:>30} {param_str:>18} "
               f"{r['baseline_successes']:>10d} {r['counterfactual_failures']:>10d} "
               f"{r['counterfactual_failure_rate']:>9.1%} "
@@ -449,14 +449,12 @@ def run_worker():
         joint_opened_positions=np.array([0.0]),
         joint_closed_positions=np.array([rc.close_deg]),
         action_deltas=None,
-        use_mimic_joints=True,
-    )
+        use_mimic_joints=True)
     gripper.initialize(
         articulation_apply_action_func=robot.apply_action,
         get_joint_positions_func=robot.get_joint_positions,
         set_joint_positions_func=robot.set_joint_positions,
-        dof_names=robot.dof_names,
-    )
+        dof_names=robot.dof_names)
     fj_idx = gripper.joint_dof_indicies[0]
 
     robot._articulation_view.set_gains(
@@ -472,8 +470,7 @@ def run_worker():
         name=f"{rc.robot_name}_rmpflow",
         robot_articulation=robot,
         rmpflow_name=rc.rmpflow_name,
-        physics_dt=rc.sim_dt,
-    )
+        physics_dt=rc.sim_dt)
 
     _print(f"Ready ({time.time() - t_init:.1f}s)")
 
@@ -547,8 +544,7 @@ def run_worker():
             cspace_controller=rmp_controller,
             gripper=gripper,
             end_effector_initial_height=rc.eef_initial_height,
-            events_dt=rc.events_dt,
-        )
+            events_dt=rc.events_dt)
 
         robot.set_joint_positions(home)
         robot.set_joint_velocities(np.zeros(n_dof))
@@ -579,8 +575,7 @@ def run_worker():
                 cube_prim_path=rc.cube_prim,
                 robot_prim_path=rc.robot_prim,
                 sim_dt=rc.sim_dt,
-                extra={"robot": robot},
-            )
+                extra={"robot": robot})
             scheduler.reset(_setup_ctx)
             scheduler.schedule_episode(args.max_steps)
             scheduler.setup_episode(_setup_ctx)
@@ -622,8 +617,7 @@ def run_worker():
                 picking_position=pick_pos,
                 placing_position=place_pos,
                 current_joint_positions=current_joints,
-                end_effector_orientation=ee_orient,
-            )
+                end_effector_orientation=ee_orient)
             if action.joint_positions is not None:
                 robot.apply_action(action)
 
@@ -639,7 +633,7 @@ def run_worker():
                 np.array([[grip_target]]), joint_indices=np.array([fj_idx])
             )
 
-            # Slip detection — detect exact frame cube starts moving relative to EEF.
+            # Slip detection, detect exact frame cube starts moving relative to EEF.
             # Baseline is captured on the first frame of phase 4 (lift), after
             # the grip has fully closed and settled.
             if phase >= 3 and phase < 7 and not _slip_detected:
@@ -673,8 +667,7 @@ def run_worker():
                     sim_dt=rc.sim_dt,
                     episode_step=ep_step,
                     state_machine=PHASE_NAMES[phase],
-                    extra={"robot": robot, "action": action},
-                )
+                    extra={"robot": robot, "action": action})
                 scheduler.step(ep_step, ctx)
 
             # Success check
@@ -749,8 +742,7 @@ def run_worker():
             applicators={event_id: applicator},
             rng_seed=cell_seed + 99999,
             num_events_range=(1, 1),
-            force_event_id=event_id,
-        )
+            force_event_id=event_id)
         scheduler.set_phase_boundaries(_PHASE_BOUNDS)
 
         baseline_successes = 0
@@ -872,7 +864,7 @@ def run_visual():
         if r["param_name"]:
             param_str = f"[{r['param_lo']:.2f}-{r['param_hi']:.2f}]"
         else:
-            param_str = "—"
+            param_str = ", "
         print(f"  {event_str:>30} {param_str:>18}  "
               f"BL={r['baseline_successes']}  CF_fail={r['counterfactual_failures']}  "
               f"rate={r['counterfactual_failure_rate']:.1%}")

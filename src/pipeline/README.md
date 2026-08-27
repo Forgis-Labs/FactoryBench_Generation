@@ -13,11 +13,11 @@ evaluate against Microsoft Foundry models, and produce figures + Opik traces.
 `run_pipeline.py` executes the following stages (in order). Use `--stages` to
 run a subset:
 
-1. `generate` — Q&A generation (`src.question_generation.level{N}.level{N}`).
-2. `fetch`    — pull QA JSONs from a HF dataset repo into the local questions dir
+1. `generate`, Q&A generation (`src.question_generation.level{N}.level{N}`).
+2. `fetch`, pull QA JSONs from a HF dataset repo into the local questions dir
    (mutually exclusive with `generate`). Requires `--hf-dataset-folder`.
-3. `prompts`  — prompt building (`src.question_generation.build_prompts_from_questions`).
-4. `eval`     — LLM evaluation (`src.evaluation.run_foundry_eval`), per model.
+3. `prompts`, prompt building (`src.question_generation.build_prompts_from_questions`).
+4. `eval`, LLM evaluation (`src.evaluation.run_foundry_eval`), per model.
 
 Default stages are `generate,prompts,eval`. Swap `generate` for `fetch`
 to use Q&A pairs that are already uploaded to Hugging Face.
@@ -53,14 +53,14 @@ python -m src.pipeline.run_pipeline \
 
 ## Flags
 
-- `--levels`       — comma-separated levels to run (default `1,2,3`).
-- `--stages`       — comma-separated stages (default `generate,prompts,eval`).
-- `--models`       — comma-separated Foundry models (default: all from [src/config.py](../config.py)).
-- `--judge-model`  — LLM-as-judge for free-form scoring (default from `src/config.py`).
-- `--cost-limit`   — USD cap forwarded to each eval run.
-- `--max-output-tokens` — forwarded to eval.
-- `--dataset-repo` — HF source dataset (default `Forgis/FactoryNet_Dataset`).
-- `--seed`, `--test-mode`, `-n/--num-questions`, `-t/--questions-per-template` — forwarded to generators.
+- `--levels`, comma-separated levels to run (default `1,2,3`).
+- `--stages`, comma-separated stages (default `generate,prompts,eval`).
+- `--models`, comma-separated Foundry models (default: all from [src/config.py](../config.py)).
+- `--judge-model`, LLM-as-judge for free-form scoring (default from `src/config.py`).
+- `--cost-limit`, USD cap forwarded to each eval run.
+- `--max-output-tokens`, forwarded to eval.
+- `--dataset-repo`, HF source dataset (default `Forgis/FactoryNet_Dataset`).
+- `--seed`, `--test-mode`, `-n/--num-questions`, `-t/--questions-per-template`, forwarded to generators.
 
 The Foundry model catalog (names, endpoints, API style) is defined in [src/config.py](../config.py). Add a model there and every pipeline/eval script picks it up automatically.
 

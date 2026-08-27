@@ -24,10 +24,10 @@ from event_injection.context import SimContext
 
 _DEFAULT_FRACTION_RANGE = (0.45, 0.60)  # targets ~25% CF rate
 
-# Minimum friction after reduction — never go below this
+# Minimum friction after reduction, never go below this
 _FRICTION_FLOOR = 0.05
 
-# All surfaces that form the grip contact — modified together.
+# All surfaces that form the grip contact, modified together.
 _GRIP_COMPONENTS = [
     "cube",
     "finger_pad_left",
@@ -36,14 +36,13 @@ _GRIP_COMPONENTS = [
 
 
 class FrictionDecreaseApplicator(BaseApplicator):
-    """Event 11: Friction Decrease — lowers friction on both cube and gripper."""
+    """Event 11: Friction Decrease, lowers friction on both cube and gripper."""
 
-    valid_phases = [3, 4, 5, 6]  # close through lower — gripper is on the box
+    valid_phases = [3, 4, 5, 6]  # close through lower, gripper is on the box
 
     def __init__(
         self,
-        fraction_range: tuple = _DEFAULT_FRACTION_RANGE,
-    ):
+        fraction_range: tuple = _DEFAULT_FRACTION_RANGE):
         self._frac_range = fraction_range
         # Store originals for each component: list of (mat_path, orig_static, orig_dynamic)
         self._originals: List[Tuple[str, float, float]] = []
@@ -53,7 +52,7 @@ class FrictionDecreaseApplicator(BaseApplicator):
         return {
             "delta": fraction,              # stored as fraction for the event log
             "reduction_pct": fraction * 100, # human-readable percentage for HUD
-            "_duration": 999999,             # persistent — lasts the entire episode
+            "_duration": 999999,             # persistent, lasts the entire episode
         }
 
     @staticmethod

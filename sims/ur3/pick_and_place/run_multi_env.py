@@ -265,15 +265,13 @@ class UR3RMPFlowController(mg.MotionPolicyController):
         self._default_orientation = to_np(ori)
         self._motion_policy.set_robot_base_pose(
             robot_position=self._default_position,
-            robot_orientation=self._default_orientation,
-        )
+            robot_orientation=self._default_orientation)
 
     def reset(self):
         mg.MotionPolicyController.reset(self)
         self._motion_policy.set_robot_base_pose(
             robot_position=self._default_position,
-            robot_orientation=self._default_orientation,
-        )
+            robot_orientation=self._default_orientation)
 
 
 # ---------------------------------------------------------------------------
@@ -389,15 +387,13 @@ def safe_apply_action(robot, action):
         joint_positions=_to_tensor(action.joint_positions),
         joint_velocities=_to_tensor(action.joint_velocities),
         joint_efforts=_to_tensor(action.joint_efforts),
-        joint_indices=action.joint_indices,
-    )
+        joint_indices=action.joint_indices)
     robot.get_articulation_controller()._articulation_view.apply_action(
         ArticulationActions(
             joint_positions=clean.joint_positions.unsqueeze(0) if clean.joint_positions is not None else None,
             joint_velocities=clean.joint_velocities.unsqueeze(0) if clean.joint_velocities is not None else None,
             joint_efforts=clean.joint_efforts.unsqueeze(0) if clean.joint_efforts is not None else None,
-            joint_indices=clean.joint_indices,
-        )
+            joint_indices=clean.joint_indices)
     )
 
 
@@ -594,8 +590,7 @@ def main():
         rendering_dt=SIM_DT,
         stage_units_in_meters=1.0,
         backend="torch",
-        device="cuda:0",
-    )
+        device="cuda:0")
 
     physics_context = world.get_physics_context()
     physics_context.enable_gpu_dynamics(True)
@@ -647,8 +642,7 @@ def main():
         position=template_spawn,
         scale=template_dims,
         color=np.array([0.8, 0.2, 0.2]),
-        mass=0.5,
-    )
+        mass=0.5)
 
     # ---- Clone environments (Step 6) ----
     cloner = GridCloner(spacing=ENV_SPACING)
@@ -667,8 +661,7 @@ def main():
         # USD clone names (Env_0, Env_1) and the physics replicator lookup
         # (Env0, Env1), which crashes in Sdf_PrimPathNode destruction.
         copy_from_source=True,
-        enable_env_ids=True,
-    )
+        enable_env_ids=True)
     print(f"[Clone] Done. Env origins: {[list(np.round(p, 2)) for p in env_positions[:4]]}{'...' if num_envs > 4 else ''}")
 
     # Filter collisions: envs don't collide with each other, but all collide
@@ -677,8 +670,7 @@ def main():
         physicsscene_path="/physicsScene",
         collision_root_path="/World/collisionGroups",
         prim_paths=env_paths,
-        global_paths=["/World/defaultGroundPlane"],
-    )
+        global_paths=["/World/defaultGroundPlane"])
 
     # ---- Create per-env objects ----
     env_states = []
@@ -690,8 +682,7 @@ def main():
         # Wrap the cloned robot as a Robot (SingleArticulation) for RMPFlow
         es.robot = Robot(
             prim_path=es.robot_prim_path,
-            name=f"ur3_{i}",
-        )
+            name=f"ur3_{i}")
         world.scene.add(es.robot)
         es.robot.set_joints_default_state(
             positions=torch.tensor(HOME_JOINTS, dtype=torch.float32, device="cuda:0")
@@ -711,7 +702,7 @@ def main():
     # Step once so that GPU tensor views are fully initialised after reset
     world.step(render=True)
 
-    # ---- Post-reset setup per env (use USD API for poses — tensor views not yet stable) ----
+    # ---- Post-reset setup per env (use USD API for poses, tensor views not yet stable) ----
     _dev = "cuda:0"
 
     for es in env_states:
@@ -737,8 +728,7 @@ def main():
         es.rmp_ctrl = UR3RMPFlowController(
             name=f"rmpflow_{es.env_id}",
             robot_articulation=es.robot,
-            physics_dt=SIM_DT,
-        )
+            physics_dt=SIM_DT)
         es.art_ctrl = es.robot.get_articulation_controller()
 
     # Stabilize physics
@@ -837,8 +827,7 @@ def _step_env(es: EnvState, stage, world, logger, global_step):
         wp_pos_world = wp_pos_local + es.env_origin
         action = es.rmp_ctrl.forward(
             target_end_effector_position=wp_pos_world,
-            target_end_effector_orientation=wp_quat,
-        )
+            target_end_effector_orientation=wp_quat)
         action = enforce_wrist_down(action)
         safe_apply_action(es.robot, action)
 
@@ -860,8 +849,7 @@ def _step_env(es: EnvState, stage, world, logger, global_step):
         _, hold_pos_local, hold_quat = es.waypoints[es.wp_idx - 1]
         action = es.rmp_ctrl.forward(
             target_end_effector_position=hold_pos_local + es.env_origin,
-            target_end_effector_orientation=hold_quat,
-        )
+            target_end_effector_orientation=hold_quat)
         action = enforce_wrist_down(action)
         safe_apply_action(es.robot, action)
 
@@ -879,8 +867,7 @@ def _step_env(es: EnvState, stage, world, logger, global_step):
         _, hold_pos_local, hold_quat = es.waypoints[es.wp_idx - 1]
         action = es.rmp_ctrl.forward(
             target_end_effector_position=hold_pos_local + es.env_origin,
-            target_end_effector_orientation=hold_quat,
-        )
+            target_end_effector_orientation=hold_quat)
         action = enforce_wrist_down(action)
         safe_apply_action(es.robot, action)
 
@@ -907,7 +894,7 @@ def _reset_episode(es: EnvState, stage, world, logger, success: bool, reason: st
 
     if _args.episodes > 0 and es.episodes_done >= _args.episodes:
         print(f"[Env {es.env_id}] Reached {_args.episodes} episodes.")
-        # Don't stop the whole sim — other envs may still be running.
+        # Don't stop the whole sim, other envs may still be running.
         # Just freeze this env.
         es.state = S.DONE
         es.sim_time = -1  # sentinel: skip future steps
@@ -926,7 +913,7 @@ def _reset_episode(es: EnvState, stage, world, logger, success: bool, reason: st
         rb = UsdPhysics.RigidBodyAPI(cube_prim)
         rb.GetKinematicEnabledAttr().Set(False)
 
-    # Reset cube via USD (translate is local to env root — no env_origin needed)
+    # Reset cube via USD (translate is local to env root, no env_origin needed)
     set_cube_pose_usd(stage, es.cube_prim_path, es.cur_spawn, scale=es.cur_dims)
     # Zero velocities via USD physics attributes
     cube_prim2 = stage.GetPrimAtPath(es.cube_prim_path)

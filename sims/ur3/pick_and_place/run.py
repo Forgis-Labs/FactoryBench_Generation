@@ -91,7 +91,7 @@ CUBE_HEIGHT_RANGE      = tuple(CFG["domain_randomization"]["cube_dim_h_range"])
 PERCEPTION_NOISE_XY_STD = float(CFG["noise"]["perception_xy_std"])
 PERCEPTION_NOISE_Z_STD  = float(CFG["noise"]["perception_z_std"])
 
-SUCTION_RADIUS = 0.10  # 100mm — generous to account for RMPFlow convergence error
+SUCTION_RADIUS = 0.10  # 100mm, generous to account for RMPFlow convergence error
 LOG_DIR = str(_TASK_DIR / CFG["logging"]["log_dir"])
 
 UR3_USD = "/Isaac/Robots/UniversalRobots/ur3/ur3.usd"
@@ -402,8 +402,7 @@ def spawn_workpiece(world, rng, spawn_pos, dims, existing_cube=None) -> DynamicC
             position=spawn_pos,
             scale=dims,
             color=color,
-            mass=0.5,
-        ))
+            mass=0.5))
         return cube
     # For existing cubes: use Isaac Sim API to update scale (avoids corrupting
     # PhysX tensor views that raw USD xform-op writes cause).
@@ -461,8 +460,7 @@ class SuctionGripper:
             cube_target = ee_pos - self._offset
             self._cube_obj.set_world_pose(
                 position=cube_target,
-                orientation=np.array([1, 0, 0, 0]),
-            )
+                orientation=np.array([1, 0, 0, 0]))
 
     def detach(self):
         if self._cube_obj is not None and self.attached:
@@ -496,16 +494,14 @@ class UR3RMPFlowController(mg.MotionPolicyController):
             self._articulation_motion_policy._robot_articulation.get_world_pose()
         self._motion_policy.set_robot_base_pose(
             robot_position=self._default_position,
-            robot_orientation=self._default_orientation,
-        )
+            robot_orientation=self._default_orientation)
         print("[RMPFlow] UR3 controller initialized.")
 
     def reset(self):
         mg.MotionPolicyController.reset(self)
         self._motion_policy.set_robot_base_pose(
             robot_position=self._default_position,
-            robot_orientation=self._default_orientation,
-        )
+            robot_orientation=self._default_orientation)
 
 
 # ---------------------------------------------------------------------------
@@ -516,8 +512,7 @@ def get_eef_pos(stage) -> np.ndarray:
     for p in (
         ROBOT_PRIM + "/wrist_3_link/tool0",
         ROBOT_PRIM + "/tool0",
-        EEF_PRIM,
-    ):
+        EEF_PRIM):
         prim = stage.GetPrimAtPath(p)
         if prim.IsValid():
             mat = UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(
@@ -550,10 +545,10 @@ def build_waypoints(cube_pos, cube_dims, bin_pos):
     bin_above_z = 0.25   # safe height above bin
     bin_place_z = 0.15   # release height (above table level)
 
-    # Mid-workspace transit point — avoids RMPFlow local minima
+    # Mid-workspace transit point, avoids RMPFlow local minima
     neutral_pos = np.array([0.20, -0.17, 0.28])
 
-    # Orientation: tool pointing straight down — 180° rotation about X so tool0 Z
+    # Orientation: tool pointing straight down, 180° rotation about X so tool0 Z
     # aligns with -world Z.  Quaternion (w,x,y,z) = (0,1,0,0).
     down_quat = np.array([0.0, 1.0, 0.0, 0.0])
 
@@ -656,7 +651,7 @@ def main():
     world.reset()
 
     # Disable gravity on robot to prevent arm instability (standard practice
-    # for UR robots in Isaac Sim — their URDF has zero joint damping/friction).
+    # for UR robots in Isaac Sim, their URDF has zero joint damping/friction).
     robot.disable_gravity()
     robot.set_solver_position_iteration_count(64)
     robot.set_solver_velocity_iteration_count(64)
@@ -723,8 +718,7 @@ def main():
             cube_dims=cur_dims, cube_spawn=cur_spawn,
             sim_time=sim_time,
             plan_attempts=plan_attempts,
-            pick_attempts=pick_attempts,
-        )
+            pick_attempts=pick_attempts)
         episode       += 1
         sim_time       = 0.0
         plan_attempts  = 0
@@ -859,8 +853,7 @@ def main():
             # Command RMPFlow toward this waypoint
             action = rmp_controller.forward(
                 target_end_effector_position=wp_pos,
-                target_end_effector_orientation=wp_quat,
-            )
+                target_end_effector_orientation=wp_quat)
             action = enforce_wrist_down(action)
             articulation_controller.apply_action(action)
             _step_action = action
@@ -897,8 +890,7 @@ def main():
             _, hold_pos, hold_quat = waypoints[wp_idx - 1]
             action = rmp_controller.forward(
                 target_end_effector_position=hold_pos,
-                target_end_effector_orientation=hold_quat,
-            )
+                target_end_effector_orientation=hold_quat)
             action = enforce_wrist_down(action)
             articulation_controller.apply_action(action)
             _step_action = action
@@ -922,8 +914,7 @@ def main():
             _, hold_pos, hold_quat = waypoints[wp_idx - 1]
             action = rmp_controller.forward(
                 target_end_effector_position=hold_pos,
-                target_end_effector_orientation=hold_quat,
-            )
+                target_end_effector_orientation=hold_quat)
             action = enforce_wrist_down(action)
             articulation_controller.apply_action(action)
             _step_action = action
@@ -937,7 +928,7 @@ def main():
                 # Continue to retract waypoints
                 transition(S.MOVE_TO_WP)
 
-        # Sensor logging — record everything (after state machine so action is available)
+        # Sensor logging, record everything (after state machine so action is available)
         logger.step(collect_sensors(
             logger, episode, step, sim_time, state,
             robot, cube, stage, suction,
@@ -950,8 +941,7 @@ def main():
             planned_action=_step_action,
             task_phase=get_task_phase(state, cur_wp_name),
             ee_target_pos=_ee_target,
-            ee_target_quat=_ee_target_quat,
-        ))
+            ee_target_quat=_ee_target_quat))
 
         if state == S.DONE:
             wait_timer += 1

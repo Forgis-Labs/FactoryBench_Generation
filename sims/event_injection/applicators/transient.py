@@ -119,13 +119,12 @@ def _get_feature_family(feature: str) -> str:
 # -----------------------------------------------------------------------
 
 class TransientSpikeApplicator(BaseApplicator):
-    """Event 2: Transient Spike — adds a positive delta to a sensor feature."""
+    """Event 2: Transient Spike, adds a positive delta to a sensor feature."""
 
     def __init__(
         self,
         duration_range: tuple = _DEFAULT_DURATION_RANGE,
-        delta_ranges: Dict[str, tuple] | None = None,
-    ):
+        delta_ranges: Dict[str, tuple] | None = None):
         self._dur_range = duration_range
         self._delta_ranges = delta_ranges or _DEFAULT_DELTA_RANGES
 
@@ -167,13 +166,12 @@ class TransientSpikeApplicator(BaseApplicator):
 
 
 class TransientDipApplicator(BaseApplicator):
-    """Event 3: Transient Dip — subtracts a positive delta from a sensor feature."""
+    """Event 3: Transient Dip, subtracts a positive delta from a sensor feature."""
 
     def __init__(
         self,
         duration_range: tuple = _DEFAULT_DURATION_RANGE,
-        delta_ranges: Dict[str, tuple] | None = None,
-    ):
+        delta_ranges: Dict[str, tuple] | None = None):
         self._dur_range = duration_range
         self._delta_ranges = delta_ranges or _DEFAULT_DELTA_RANGES
 

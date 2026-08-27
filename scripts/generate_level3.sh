@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FactoryBench — Generate Level 3 (Counterfactual Reasoning) Q&A pairs.
+# FactoryBench, Generate Level 3 (Counterfactual Reasoning) Q&A pairs.
 #
 # Usage:
 #   bash scripts/generate_level3.sh               # default: 500 questions

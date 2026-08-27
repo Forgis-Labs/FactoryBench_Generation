@@ -1,0 +1,55 @@
+%% TEMPLATE workshop build. COPY to main_<venue>.tex; do not edit in place.
+%%
+%% Three edits make a new venue: the \workshoptitle below, the two
+%% <venue> paths at the bottom, and the compact switch if the page limit is
+%% under 8. Then add <venue> to WORKSHOPS in ../Makefile and run
+%%   make -C docs workshop-<venue>
+%% See ../paper/_workshop_TEMPLATE.tex for the venue content file.
+%%
+%% WORKSHOP BUILD: <VENUE NAME> (double-blind, N pages).
+%% Wrapper only. Venue framing (title block, abstract, introduction, connector
+%% sentences) lives in ../paper/_workshop_<venue>.tex; the body is shared
+%% with every other workshop build via ../paper/_workshop_core.tex. Never edit
+%% content here.
+\PassOptionsToPackage{numbers,compress,sort&compress}{natbib}
+\documentclass{article}
+
+\newif\ifanon
+\anontrue                     % workshop submissions are double-blind
+
+%% Venue style package, loaded before the shared preamble. neurips_2026.sty
+%% supports workshop tracks natively: dblblindworkshop blinds the author block
+%% and prints \workshoptitle in the footer banner.
+\usepackage[dblblindworkshop]{neurips_2026}
+\workshoptitle{<VENUE OFFICIAL NAME>}
+
+%% The shared content lives in ../paper/ but its \input{figures/...} and
+%% \includegraphics{figures/...} paths are written relative to the NeurIPS
+%% build directory, which is where the figures live. Point both resolvers
+%% there so no content file needs a venue-specific edit. (Same mechanism the
+%% ICLR wrapper uses; this directory is deliberately a sibling of
+%% ../neurips_tex/ so the relative depth matches.)
+\makeatletter
+\def\input@path{{../neurips_tex/}{../paper/}}
+\makeatother
+
+\input{../paper/_preamble_common}
+
+%% After the shared preamble: it is graphicx that defines \graphicspath.
+\graphicspath{{../neurips_tex/}{../neurips_tex/figures/}}
+
+%% Page limit. The shared body runs ~6 pages, so an 8-page limit takes the
+%% full version. For a 6-page-or-tighter venue say \workshopcompacttrue
+%% instead: it drops three optional floats and ~2 pages, and no claim or
+%% number is lost.
+\workshopcompactfalse
+
+%% No appendix in a workshop build, hence no checklist either.
+\neuripschecklistfalse
+
+\input{../paper/_titleauthor}
+
+\begin{document}
+\input{../paper/_workshop_<venue>}
+\input{../paper/_workshop_core}
+\end{document}

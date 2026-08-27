@@ -17,7 +17,7 @@ robot:
   wrist_link: "wrist_3_link"
 
   # Screwdriver tool (GrabCAD model converted to USD)
-  # Parented under the flange prim — rides with the articulation automatically
+  # Parented under the flange prim, rides with the articulation automatically
   tool:
     prim: "/World/ur5/wrist_3_link/flange/screwdriver"
     usd: "assets/screwdriver/screwdriver.usd"
@@ -25,7 +25,7 @@ robot:
     mass: 0.35                # tool mass in kg
 
 scene:
-  # Screw (dynamic rigid body — driven down by the screwdriver)
+  # Screw (dynamic rigid body, driven down by the screwdriver)
   screw_prim: "/World/screw"
   # Workplate with threaded hole (static)
   workplate_prim: "/World/cell/workplate"
@@ -92,12 +92,12 @@ scene:
   controller:
     end_effector_initial_height: 0.42
     # Phase timings for the 6-phase screwing controller:
-    #   0: approach       — move above screw head
-    #   1: descend        — lower bit onto screw head
-    #   2: engage         — settle / apply light downward force
-    #   3: screw_cw       — rotate wrist CW to drive screw
-    #   4: disengage      — lift bit off screw
-    #   5: retract        — retract to home height
+    #   0: approach, move above screw head
+    #   1: descend, lower bit onto screw head
+    #   2: engage, settle / apply light downward force
+    #   3: screw_cw, rotate wrist CW to drive screw
+    #   4: disengage, lift bit off screw
+    #   5: retract, retract to home height
     events_dt: [0.006, 0.004, 0.02, 0.002, 0.008, 0.010]
 
 physics:
@@ -119,9 +119,9 @@ control:
   screw_pitch: 0.00125          # 1.25 mm/rev (M8 coarse)
   screw_target_depth: 0.025     # 25 mm target insertion
   screw_depth_tolerance: 0.002  # ±2 mm success threshold
-  screw_max_torque: 10.0        # Nm — torque limit (cross-thread / stripped)
-  screw_angular_vel: 2.0        # rad/s — wrist rotation speed during driving
-  screw_downward_force: 5.0     # N — constant downward force during screwing
+  screw_max_torque: 10.0        # Nm, torque limit (cross-thread / stripped)
+  screw_angular_vel: 2.0        # rad/s, wrist rotation speed during driving
+  screw_downward_force: 5.0     # N, constant downward force during screwing
 
 logging:
   log_dir: "logs"

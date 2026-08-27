@@ -30,10 +30,10 @@ robot:
     eef_prim: "/World/franka/panda_rightfinger"
 
 scene:
-  # Nut (M16 — held by gripper, threaded onto bolt)
+  # Nut (M16, held by gripper, threaded onto bolt)
   nut_prim: "/World/nut"
   nut_usd: "assets/factory/factory_nut_m16.usd"
-  # Bolt (M16 — fixed on table)
+  # Bolt (M16, fixed on table)
   bolt_prim: "/World/bolt"
   bolt_usd: "assets/factory/factory_bolt_m16.usd"
 
@@ -58,12 +58,12 @@ scene:
   controller:
     end_effector_initial_height: 0.25
     # Phase timings for the nut-threading sequence:
-    #   0: approach_bolt  — move above bolt with nut in gripper
-    #   1: descend        — lower nut onto bolt shank
-    #   2: settle         — wait for contact to establish
-    #   3: thread_cw      — apply downward force + CW rotation
-    #   4: disengage      — open gripper, lift
-    #   5: retract        — retract to home height
+    #   0: approach_bolt, move above bolt with nut in gripper
+    #   1: descend, lower nut onto bolt shank
+    #   2: settle, wait for contact to establish
+    #   3: thread_cw, apply downward force + CW rotation
+    #   4: disengage, open gripper, lift
+    #   5: retract, retract to home height
     events_dt: [0.006, 0.004, 0.02, 0.001, 0.02, 0.010]
 
   workcell:
@@ -110,7 +110,7 @@ scene:
       - [0.0, 0.30]
 
 physics:
-  sim_dt: 0.008333             # 1/120 — matches Factory
+  sim_dt: 0.008333             # 1/120, matches Factory
   solver_position_iterations: 192
   solver_velocity_iterations: 1
   gpu_max_rigid_contact_count: 8388608
@@ -132,8 +132,8 @@ noise:
   joint_std: 0.0
 
 control:
-  screw_angular_vel: 1.5       # rad/s — wrist rotation during threading
-  screw_downward_force: 3.0    # N — downward force during threading
+  screw_angular_vel: 1.5       # rad/s, wrist rotation during threading
+  screw_downward_force: 3.0    # N, downward force during threading
   gripper_close_width: 0.0     # fully closed
   gripper_open_width: 0.04     # fully open
 

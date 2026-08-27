@@ -26,7 +26,7 @@ from .multiple_choice import _last_match, _strip_prompt_leak
 
 
 class RankingParser(Parser):
-    """ranking — extracts a permutation string of length len(ground_truth)."""
+    """ranking, extracts a permutation string of length len(ground_truth)."""
 
     answer_format: ClassVar[str] = "ranking"
 
@@ -49,8 +49,7 @@ class RankingParser(Parser):
         # ---- Lenient: Answer: BDCA cue ----
         cue_pat = re.compile(
             rf"(?:final\s+)?answer\s*[:=]\s*\*{{0,2}}\s*([A-Da-d]{{{n}}})\b",
-            re.IGNORECASE,
-        )
+            re.IGNORECASE)
         if (m := _last_match(cue_pat, cleaned)) is not None:
             return self._score(m.group(1).upper(), gt, "lenient")
 
@@ -73,8 +72,7 @@ class RankingParser(Parser):
         if len(parsed) != len(gt) or set(parsed) != set(gt):
             return ParseResult(
                 score=0.0, parsed=parsed, provenance=provenance,
-                reason="not a valid permutation of ground-truth letters",
-            )
+                reason="not a valid permutation of ground-truth letters")
         tau = _kendall_tau(parsed, gt)
         score = (tau + 1.0) / 2.0
         return ParseResult(score=score, parsed=parsed, provenance=provenance)

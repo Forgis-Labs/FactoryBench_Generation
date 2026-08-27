@@ -64,7 +64,7 @@ Hard requirements:
 - Flat, clean, academic style: no gradients, no 3D effects, no drop shadows
   unless explicitly requested.
 - Choose coordinates and sizes so the layout matches the description.
-- For plots, use pgfplots with inline coordinates — do not read external files.
+- For plots, use pgfplots with inline coordinates, do not read external files.
 - The document MUST compile cleanly with pdflatex.
 
 Output format:
@@ -79,7 +79,7 @@ You will receive:
 2. The relevant portion of the pdflatex error log.
 
 Fix ALL errors and return the complete corrected source. Preserve the original
-figure content and layout — change only what is needed to make it compile.
+figure content and layout, change only what is needed to make it compile.
 Keep the \documentclass[border=5pt]{standalone} structure.
 
 Output format:
@@ -213,8 +213,7 @@ def call_gpt(system: str, user_content, tracker: CostTracker, label: str) -> str
             {"role": "system", "content": system},
             {"role": "user", "content": user_content},
         ],
-        max_completion_tokens=8192,
-    )
+        max_completion_tokens=8192)
     msg = resp.choices[0].message.content or ""
     usage = resp.usage
     if usage:
@@ -238,8 +237,7 @@ def call_claude(system: str, user_content, tracker: CostTracker, label: str) -> 
             "system": system,
             "messages": [{"role": "user", "content": user_content}],
         },
-        timeout=300,
-    )
+        timeout=300)
     if not r.ok:
         raise RuntimeError(f"Claude call failed: {r.status_code} {r.text[:500]}")
     body = r.json()
@@ -252,8 +250,7 @@ def call_claude(system: str, user_content, tracker: CostTracker, label: str) -> 
         REASONING_MODEL,
         usage.get("input_tokens", 0),
         usage.get("output_tokens", 0),
-        label,
-    )
+        label)
     return msg
 
 
@@ -289,8 +286,7 @@ def compile_latex(tex_path: Path) -> tuple[bool, str, Path | None]:
             cwd=workdir,
             capture_output=True,
             text=True,
-            timeout=240,
-        )
+            timeout=240)
     except subprocess.TimeoutExpired as e:
         return False, f"latexmk timed out: {e}", None
 
@@ -350,8 +346,7 @@ def visual_review(
     tex: str,
     png_path: Path,
     agent: str,
-    tracker: CostTracker,
-) -> tuple[bool, str]:
+    tracker: CostTracker) -> tuple[bool, str]:
     """Ask the LLM whether the rendered figure matches the description.
 
     Returns (needs_fix, response_or_new_tex).
@@ -390,7 +385,7 @@ def visual_review(
 
     revised = _extract_latex(resp)
     if not revised or not revised.lstrip().startswith("\\documentclass"):
-        # Model didn't return a proper source — treat as a no-op.
+        # Model didn't return a proper source, treat as a no-op.
         return False, resp
     return True, revised
 
@@ -457,7 +452,7 @@ def run(args: argparse.Namespace) -> None:
     if args.visual_review or args.png:
         png_path = outdir / "figure.png"
         if not pdf_to_png(pdf_path, png_path):
-            print("[render] pymupdf not available — skipping PNG preview.")
+            print("[render] pymupdf not available, skipping PNG preview.")
             print("         Install it with: pip install pymupdf")
             png_path = None
 
@@ -468,7 +463,7 @@ def run(args: argparse.Namespace) -> None:
             print(f"\n[review] Visual review iteration {i}/{args.visual_iterations} ...")
             needs_fix, out = visual_review(prompt, tex, png_path, args.agent, tracker)
             if not needs_fix:
-                print("[review] LGTM — figure matches description.")
+                print("[review] LGTM, figure matches description.")
                 (outdir / f"review_iter_{i}.txt").write_text(out, encoding="utf-8")
                 break
             print("[review] Revision proposed, recompiling ...")
@@ -477,7 +472,7 @@ def run(args: argparse.Namespace) -> None:
             tex_path.write_text(candidate, encoding="utf-8")
             ok, log, pdf = compile_latex(tex_path)
             if not ok:
-                print("[review] Revised version failed to compile — keeping previous tex.")
+                print("[review] Revised version failed to compile, keeping previous tex.")
                 (outdir / f"review_iter_{i}_compile_log.txt").write_text(log, encoding="utf-8")
                 tex_path.write_text(last_good_tex, encoding="utf-8")
                 compile_latex(tex_path)  # regenerate the previous PDF
@@ -498,8 +493,7 @@ def run(args: argparse.Namespace) -> None:
     _write_metadata(
         outdir, args, prompt_path, tracker,
         compiled=True,
-        visual_reviewed=args.visual_review and png_path is not None,
-    )
+        visual_reviewed=args.visual_review and png_path is not None)
     print(tracker.summary())
 
 
@@ -509,8 +503,7 @@ def _write_metadata(
     prompt_path: Path,
     tracker: CostTracker,
     compiled: bool,
-    visual_reviewed: bool,
-) -> None:
+    visual_reviewed: bool) -> None:
     metadata = {
         "timestamp": datetime.now().isoformat(),
         "prompt_file": str(prompt_path),
@@ -534,42 +527,33 @@ def _write_metadata(
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Generate publication-quality figures by having an LLM write TikZ/LaTeX.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument(
         "--prompt", required=True,
-        help="Path to the figure description .txt file",
-    )
+        help="Path to the figure description .txt file")
     p.add_argument(
         "--outdir",
         default=str(SCRIPT_DIR / "outputs" / datetime.now().strftime("run_%Y%m%d_%H%M%S")),
-        help="Output directory for .tex, .pdf, logs, metadata",
-    )
+        help="Output directory for .tex.pdf, logs, metadata")
     p.add_argument(
         "--colors", default=None,
-        help="Optional path to a color schema JSON to inject into the prompt",
-    )
+        help="Optional path to a color schema JSON to inject into the prompt")
     p.add_argument(
         "--agent", choices=["gpt", "claude"], default="claude",
-        help="Which LLM to use (default: claude — better at TikZ)",
-    )
+        help="Which LLM to use (default: claude, better at TikZ)")
     p.add_argument(
         "--max-compile-retries", type=int, default=3,
-        help="Max LLM-driven compile-fix attempts after the first try (default: 3)",
-    )
+        help="Max LLM-driven compile-fix attempts after the first try (default: 3)")
     p.add_argument(
         "--visual-review", action="store_true",
         help="After a successful compile, render the PDF to PNG and ask the LLM "
-             "to critique the rendering. Requires pymupdf (pip install pymupdf).",
-    )
+             "to critique the rendering. Requires pymupdf (pip install pymupdf).")
     p.add_argument(
         "--visual-iterations", type=int, default=2,
-        help="Max visual-review iterations when --visual-review is set (default: 2)",
-    )
+        help="Max visual-review iterations when --visual-review is set (default: 2)")
     p.add_argument(
         "--png", action="store_true",
-        help="Always produce a PNG preview of the final figure (requires pymupdf)",
-    )
+        help="Always produce a PNG preview of the final figure (requires pymupdf)")
     return p.parse_args(argv)
 
 

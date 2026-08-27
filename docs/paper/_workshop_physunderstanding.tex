@@ -1,0 +1,84 @@
+% ============================================================
+% PER-VENUE WORKSHOP FILE: Physical Understanding workshop.
+%
+% This file holds everything specific to this venue:
+%   - the title block, resource links and teaser figure
+%   - the abstract
+%   - the introduction, framed for this workshop's theme
+%   - the two connector macros that _workshop_core.tex expands
+%
+% Everything after the introduction (related work, framework, generation,
+% evaluation, limitations, conclusion) comes from ../paper/_workshop_core.tex,
+% which every workshop build shares. Never copy body prose in here.
+%
+% APPENDIX: unlike the other workshop builds, this venue's CFP exempts the
+% appendix from the page limit, so this file is the one that appends the
+% shared ../paper/_appendix.tex. _appendix.tex starts with \appendix and must
+% follow the bibliography, and the bibliography is the last thing
+% _workshop_core.tex emits -- so BOTH inputs happen at the bottom of THIS
+% file, in that order. Consequently the wrapper (main_physunderstanding.tex)
+% inputs only this file and does NOT also input the core, or the core would be
+% typeset twice.
+%
+% CROSS-REFERENCES: because this build DOES ship the appendix, app:* labels
+% resolve here. Referencing one from this file is therefore legal, unlike in
+% the other venue files.
+%
+% MISSING BIBLIOGRAPHY ENTRIES: the fourth introduction paragraph cites three
+% sources that have no entry in ../paper/references.bib (lights-out
+% manufacturing at FANUC, the Xiaomi Changping dark factory, and the Siemens /
+% Senseye downtime-cost report). references.bib is owned centrally, so those
+
+\maketitle
+
+\begin{center}\vspace{-2.4em}\small
+    \ifanon
+    {\faGithub}\ Code: \href{https://anonymous.4open.science/r/FactoryBench/README.md}{\nolinkurl{anonymous.4open.science/r/FactoryBench}} \\[0.15em]
+    \else
+    {\faGithub}\ Code: \href{https://github.com/Forgis-Labs/Factorybench}{\nolinkurl{github.com/Forgis-Labs/Factorybench}} \\[0.15em]
+    \fi
+    \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ Dataset: \href{https://huggingface.co/datasets/FactoryBench/FactoryBench}{\nolinkurl{huggingface.co/datasets/FactoryBench/FactoryBench}}
+\end{center}
+\vspace{-0.4em}
+\input{figures/figure_pipeline}
+\vspace{-1.5em}
+
+\begin{abstract}
+    Industrial robots emit dense multivariate telemetry that determines their operating state, and acting on a fault requires both reading that state and knowing the procedure that resolves it. These are separate abilities, and they are usually measured separately: perception benchmarks stop at the reading, while control benchmarks score the resulting action without isolating which of the two failed. We introduce \textbf{FactoryBench}, a benchmark that measures both on the same episodes from real industrial robots, so that physical perception and physically grounded decision-making can be told apart. Q\&A pairs are organized along four levels, physical state estimation, intervention, counterfactual reasoning, and engineering decision-making, and span five answer formats: four are scored deterministically and free-form answers by an LLM-as-judge voting protocol. We release \textbf{FactoryWave} (a dense, multitask, multivariate sensor dataset from a UR3 cobot and a KUKA KR10 industrial arm, with counterfactual episodes recorded on hardware by re-executing a task under held-fixed conditions to approximate the do-operation) and build FactoryBench as over 70k Q\&A items grounded in roughly 15k normalized episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2023vorausad}. Evaluating six frontier models, none exceeds 50\% (chance-corrected) on the perception-side levels, and the ranking reshuffles entirely at the decision level: the leader on the first three levels falls to the bottom of the fourth. Linear probes show this is not one deficit but two, recovering fault presence from a frozen model's activations at $0.83$ where its own answer is below chance (a read-out failure), while fault type is no more decodable than from an untrained network (a representational one). Physical understanding and physically grounded decision-making are dissociable, and current models fail at both in different ways.
+\end{abstract}
+
+\section{Introduction}
+
+A model can track a physical system accurately and still be useless for acting on it. This gap is easy to state and hard to measure, because the two halves are usually evaluated separately: perception benchmarks score state estimation without asking what follows from it, and control benchmarks score task success without isolating whether failures come from misreading the physics or from mis-planning over a correct reading. For deployment the distinction is the whole question. An operator handed a diagnosis needs to know whether to trust the reading or the recommendation, and a researcher deciding where to spend the next unit of effort needs to know whether the bottleneck is representation or read-out.
+
+We build a benchmark that keeps both halves on the same items so the gap between them is directly observable. Industrial robots are a good place to do this: they are physical systems with contact, payload dynamics, and controller constraints; they emit dense telemetry that fully determines their state; and, unlike most physical-reasoning testbeds, they come with an unambiguous notion of a correct action, since manufacturers publish the recovery procedure for each fault condition. That last property is what makes the decision half gradable rather than a matter of taste. FactoryBench is grounded in FactoryWave, a dense multivariate dataset from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals; to our knowledge it is the first extensive anomaly dataset to (partly) cover an industrial robot, a class of machine normally locked behind proprietary controllers and plant confidentiality.
+
+Counterfactual reasoning gets particular attention because it is where physical understanding is usually asserted rather than measured. Simulated environments make counterfactuals free but change the dynamics being tested; real hardware makes them expensive and, strictly, impossible, since two runs never share an identical pre-injection state. We approximate the do-operation empirically instead: for each baseline episode we re-execute the task 3--5 times with every controllable condition held fixed, inject the target fault at a fixed timestep, and retain the run whose pre-injection segment minimizes signature-kernel MMD against the baseline. This yields counterfactual ground truth recorded on the physical system rather than assumed from a simulator, at the cost of being a proxy whose quality we quantify rather than hide. Existing evaluations offer no equivalent: general benchmarks \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} do not probe physical behavior, and time-series Q\&A benchmarks are typically synthetic or univariate and omit counterfactuals entirely, while neither specialized time-series models \cite{zhou2021informer,su2019omni,audibert2020usad} nor LLMs applied to dense numerical series \cite{gruver2023llmtime,jin2024timellm} have been tested across perception and decision-making jointly.
+
+Dropping the visual channel is not a difficulty we impose artificially; it is where industry is heading. Plants increasingly run lights-out to cut labour and energy costs: FANUC has operated a lights-out robot factory since 2001, producing around 50 robots per day and running unsupervised for up to 30 days, with lighting and HVAC reduced or eliminated because nobody is there who needs them~\cite{imts2026lightsout}%
+; Xiaomi's Changping facility builds on the order of 10 million smartphones a year the same way~\cite{metrologynews2024darkfactory}%
+. Most manufacturers adopt this cell by cell rather than plant-wide, but two consequences already follow. The human who would have caught a fault by sight or sound is off the floor, so the diagnostic loop must close automatically. And where cameras are deployed it is overwhelmingly for product inspection, pointed at the part rather than the machine~\cite{metrologynews2024darkfactory}%
+, while machine health lives in quantities no camera observes: joint torque, motor current, tracking error, controller mode. Controller telemetry is emitted by default by every industrial machine, is the one modality guaranteed across a heterogeneous plant, and is far less restricted than video. We therefore evaluate on telemetry alone.
+
+We evaluate LLMs and LLM-driven agents rather than the specialised classifiers that dominate industrial anomaly detection, because in an unattended plant the artefact that matters is the justification, not the label. A maintenance action (locking out a cell, dismantling a gripper, revising a payload configuration) is itself costly and safety-relevant, so an engineer must audit the reasoning before committing to it. A classifier emits a fault class with no account of which signals produced it; a language model emits a trace from the observed signal to the named root cause to the prescribed procedure, checkable step by step against the telemetry and the vendor manual, and rejectable when the reasoning is unsound even if the label happens to be right. That auditability is what makes a prediction actionable rather than merely accurate, and it is why our decision-making level asks for free-form answers. Downtime sets the stakes: unplanned downtime costs Fortune Global 500 industrial organizations almost \$1.5 trillion a year, 11\% of turnover and about \$129 million per facility, and an idle automotive line runs past \$2 million an hour~\cite{senseye2023downtime}%
+.
+
+% ------------------------------------------------------------
+% CONNECTORS. _workshop_core.tex expands these two macros at the end of its
+% Related Work and its Conclusion. One sentence each, tying FactoryBench to
+% this workshop's theme. Keep them short: the core body carries the argument.
+% ------------------------------------------------------------
+\renewcommand{\workshoprelatedworknote}{%
+    Physical reasoning is most often benchmarked in simulated or rendered environments, where dynamics are synthetic and counterfactual ground truth is generated by re-running the simulator; FactoryBench instead instantiates the association--intervention--counterfactual hierarchy on hardware-recorded telemetry from real robots under closed-loop control, and pairs it with a decision level whose ground truth comes from manufacturer recovery protocols, so physical understanding and its downstream use are measured on the same episodes.%
+}
+\renewcommand{\workshopclosingnote}{%
+    For physical understanding aimed at decision-making, the practical lesson is that the two must be measured jointly: our panel's perception-side ranking does not predict its decision-side ranking, and the probing analysis shows the decision failures decompose into a calibration problem where the physical concept is present and a representation problem where it is not, which are not addressed by the same interventions.%
+}
+
+% ------------------------------------------------------------
+% BODY + APPENDIX. The shared body ends at the bibliography; _appendix.tex
+% opens with \appendix and must follow it (the same order _content.tex uses).
+% See the header note above for why both inputs live here, not in the wrapper.
+% ------------------------------------------------------------
+\input{../paper/_workshop_core}
+\input{../paper/_appendix}

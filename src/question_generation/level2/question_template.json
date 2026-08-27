@@ -48,7 +48,9 @@
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "n_choices": 4,
-      "fixed_options": ["mc_0019"],
+      "fixed_options": [
+        "mc_0019"
+      ],
       "notes": "One correct consequence, one plausible-but-wrong distractor, one unrelated distractor, and one 'nothing extraordinary happens' option. Target ~30% of generated instances where the correct answer IS 'nothing extraordinary happens'."
     },
     "important_features": [
@@ -90,8 +92,11 @@
     "template": "The sensor stream below is from a robot exhibiting {anomaly}. Select all statements that apply in the options provided. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
-      "fixed_options": ["mc_003", "mc_004"],
-      "notes": "Always include both fixed statements (one or both may be correct depending on the scenario). Add 2 random additional statements with a 50/50 correct/incorrect split. mc_003 tests sharp speed drop, mc_004 tests stable speeds \u00e2\u20ac\u201d they are natural opposites."
+      "fixed_options": [
+        "mc_003",
+        "mc_004"
+      ],
+      "notes": "Always include both fixed statements (one or both may be correct depending on the scenario). Add 2 random additional statements with a 50/50 correct/incorrect split. mc_003 tests sharp speed drop, mc_004 tests stable speeds â€” they are natural opposites."
     },
     "important_features": [
       "feedback_speed_0",
@@ -173,7 +178,9 @@
     "template": "The sensor stream below is from a robot exhibiting {anomaly}. What are the expected values of {joint_signal} at T+{n}ms? Answer only with a list of 6 numbers (integer or decimal) formatted as a JSON array, ie. [10.2,9,2.1,1,7,0.21]. Do not return anything else.",
     "answer_format": {
       "type": "tensor",
-      "shape": [6],
+      "shape": [
+        6
+      ],
       "notes": "A 6-element vector of floats, one per joint axis (0-indexed). Format as a JSON array."
     },
     "important_features": [
@@ -299,7 +306,12 @@
     "answer_format": {
       "type": "multiple_choice_single_select",
       "n_choices": 4,
-      "fixed_options": ["mc_020", "mc_022", "mc_023", "mc_026"],
+      "fixed_options": [
+        "mc_020",
+        "mc_022",
+        "mc_023",
+        "mc_026"
+      ],
       "notes": "Same as L1 template 3 but on anomalous data. Ground truth from instance metadata."
     },
     "important_features": [
@@ -380,7 +392,10 @@
   {
     "id": 10,
     "type": "identification",
-    "hides": ["robot", "gripper"],
+    "hides": [
+      "robot",
+      "gripper"
+    ],
     "template": "Knowing that the robot suffers from {anomaly} in the given context time series, what robot does this sensor data originate from? Answer only with the letter of the correct option (ie. A), nothing else.",
     "answer_format": {
       "type": "multiple_choice_single_select",
@@ -399,30 +414,13 @@
       "feedback_pos_3",
       "feedback_pos_4",
       "feedback_pos_5",
-      "feedback_speed_0",
-      "feedback_speed_1",
-      "feedback_speed_2",
-      "feedback_speed_3",
-      "feedback_speed_4",
-      "feedback_speed_5",
-      "effort_target_torque_0",
-      "effort_target_torque_1",
-      "effort_target_torque_2",
-      "effort_target_torque_3",
-      "effort_target_torque_4",
-      "effort_target_torque_5",
       "setpoint_pos_0",
       "setpoint_pos_1",
       "setpoint_pos_2",
       "setpoint_pos_3",
       "setpoint_pos_4",
-      "setpoint_pos_5",
-      "est_contact_force_0",
-      "est_contact_force_1",
-      "est_contact_force_2",
-      "est_contact_force_3",
-      "est_contact_force_4",
-      "est_contact_force_5"
-    ]
+      "setpoint_pos_5"
+    ],
+    "important_features_note": "Restricted to the channels present in EVERY source dataset (UR3e, Yu 5, KUKA KR 10). The wider 30-channel list leaked the answer: each dataset only carries a subset of it, so the surviving channel-name set became a robot fingerprint and the item was solvable at 100% by name lookup with no access to any value. Robots stay distinguishable from these 12 channels on physical grounds (joint envelope and unit scale), which is the evidence the template is meant to test. Do not widen this list without re-checking that the rendered channel set is identical across all datasets."
   }
 ]

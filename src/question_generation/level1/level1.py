@@ -30,25 +30,26 @@ from src.data._decimation import decimate_dataframe
 from src.question_generation.utils.hf_streaming import (
     HfStreamUploader,
     add_streaming_args,
-    make_uploader_from_args,
-)
+    make_uploader_from_args)
 from src.question_generation.utils.io import load_json, load_root_causes, load_templates
+from src.question_generation.utils.phases import PHASE_NAMES as _SHARED_PHASE_NAMES
+from src.question_generation.utils.pair_balance import (
+    build_index as _build_pair_index,
+    cycle_targets as _cycle_targets,
+    sample_pair as _sample_balanced_pair)
 from src.question_generation.utils.template import (
     build_context,
     discover_episodes_by_dataset,
     encode_chunk,
-    fill,
-)
+    fill)
 from src.question_generation.utils.time_series import (
-    pick_fault_label,
-)
+    pick_fault_label)
 from src.question_generation.utils.relevance import (
     is_enabled as relevance_enabled,
     load_specs as load_relevance_specs,
     relevance_report,
     sample_with_relevance,
-    validate_relevance,
-)
+    validate_relevance)
 
 logger = logging.getLogger(__name__)
 
@@ -71,43 +72,11 @@ _NO_ANOMALY_DESC = "No anomaly is present; the machine is operating nominally."
 CONTEXT_MIN = 32
 CONTEXT_MAX = 64
 
-# Phase index → human-readable name per task
-PHASE_NAMES: Dict[str, Dict[str, str]] = {
-    "pick_and_place": {
-        "0": "approach to the object",
-        "1": "descent to the object",
-        "2": "pre-grasp pause",
-        "3": "grasp of the object",
-        "4": "lift of the object",
-        "5": "transfer to the bin",
-        "6": "descent to the bin",
-        "7": "release of the object",
-        "8": "retreat from the bin",
-        "9": "return to home",
-    },
-    "screwing": {
-        "0": "approach to the fastener",
-        "1": "descent to the fastener",
-        "2": "tightening of the fastener",
-        "3": "disengagement from the fastener",
-        "4": "retreat to a safe height",
-        "5": "re-descent to the fastener",
-        "6": "loosening of the fastener",
-        "7": "re-engagement with the fastener",
-        "8": "return to home",
-    },
-    "peg_in_hole": {
-        "0": "approach to the hole",
-        "1": "insertion of the peg",
-        "2": "release of the peg",
-        "3": "retreat from the hole",
-        "4": "return to home",
-        "5": "approach to the peg",
-        "6": "grasp of the peg",
-        "7": "lift of the peg",
-        "8": "return to home",
-    },
-}
+# Phase index → human-readable name per task. Defined in utils.phases so the
+# prompt builder can render a legend using the exact wording that lands in the
+# question text; re-exported here under its original name because the rest of
+# this module (and existing question JSON) refers to it that way.
+PHASE_NAMES = _SHARED_PHASE_NAMES
 
 # Variable name → human-readable signal name
 SIGNAL_DISPLAY_NAMES: Dict[str, str] = {}
@@ -196,8 +165,7 @@ def normalize_timestamps(rows: List[Dict[str, Any]], base: int) -> List[Dict[str
 def sample_subseries(
     rows: List[Dict[str, Any]],
     min_len: int = CONTEXT_MIN,
-    max_len: int = CONTEXT_MAX,
-) -> Optional[Tuple[List[Dict[str, Any]], int]]:
+    max_len: int = CONTEXT_MAX) -> Optional[Tuple[List[Dict[str, Any]], int]]:
     """Return (subseries, start_index) or None if the episode is too short."""
     n = len(rows)
     if n < min_len:
@@ -210,8 +178,7 @@ def sample_subseries(
 def _episode_task(
     ep_path: Path,
     dataset: str,
-    dataset_index: Dict[str, Dict[str, Any]],
-) -> str:
+    dataset_index: Dict[str, Dict[str, Any]]) -> str:
     """Resolve task for an episode: prefer per-episode metadata, fall back to dataset.json."""
     meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
     if meta_path.exists():
@@ -352,7 +319,7 @@ def build_anomaly_single_select(
     fault_label: int,
     root_causes: Dict[int, Dict[str, Any]],
     anomaly_lookup: Dict[str, str],
-) -> Tuple[Dict[str, str], str]:
+    fault_prior: Optional[Dict[int, float]] = None) -> Tuple[Dict[str, str], str]:
     """
     Build 4 single-select options + single letter answer for an
     anomaly-identification question.
@@ -362,6 +329,16 @@ def build_anomaly_single_select(
     (the root cause matching this episode's fault_label, or "No anomaly"
     for nominal episodes) is always one of the 4. ``anomaly_lookup`` is
     accepted for backward-compatible signature but no longer used.
+
+    ``fault_prior`` weights the distractor draw by how often each fault is the
+    correct answer. Without it the distractors come uniformly from the whole
+    catalogue while the answer follows the corpus, so how often an option is
+    correct given that it appears varies from 0.00 to 0.70 across anomalies.
+    That let a model score 0.608 against a chance rate of 0.250 by learning
+    which strings tend to win, without reading the time series at all. Drawing
+    distractors from the same distribution as the answers pushes every option
+    back to 0.25 and drops anomalies the corpus never exhibits, including the
+    "no anomaly" entry on levels that only use faulty episodes.
     """
     NO_ANOMALY_FID = 0
     is_normal = fault_label == 0 or fault_label not in root_causes
@@ -387,9 +364,35 @@ def build_anomaly_single_select(
         correct_desc = _desc_for(root_causes[fault_label])
 
     distractors = [(fid, d) for (fid, d) in pool if fid != correct_fid]
-    random.shuffle(distractors)
+    picked: List[Tuple[int, str]] = []
+    if fault_prior:
+        weighted = [(fid, d, float(fault_prior.get(fid, 0.0)))
+                    for (fid, d) in distractors]
+        weighted = [w for w in weighted if w[2] > 0]
+        # Weighted draw without replacement: take three, removing each as it
+        # is taken so an option cannot appear twice in one item.
+        while weighted and len(picked) < 3:
+            total = sum(w[2] for w in weighted)
+            cut = random.random() * total
+            run = 0.0
+            for i, (fid, d, wt) in enumerate(weighted):
+                run += wt
+                if run >= cut:
+                    picked.append((fid, d))
+                    weighted.pop(i)
+                    break
+            else:
+                picked.append((weighted[-1][0], weighted[-1][1]))
+                weighted.pop()
+    if len(picked) < 3:
+        # Prior too sparse to fill the item; top up uniformly rather than
+        # emitting an item with fewer than four options.
+        taken = {fid for fid, _ in picked}
+        rest = [(fid, d) for (fid, d) in distractors if fid not in taken]
+        random.shuffle(rest)
+        picked.extend(rest[: 3 - len(picked)])
     chosen: List[Tuple[str, bool]] = [(correct_desc, True)] + [
-        (d, False) for (_, d) in distractors[:3]
+        (d, False) for (_, d) in picked[:3]
     ]
     random.shuffle(chosen)
     chosen = chosen[:4]
@@ -410,13 +413,12 @@ _COMPARATIVE_OPTION_ORDER = ["mc_020", "mc_022", "mc_023", "mc_026"]
 def _uniform_window(
     rows: List[Dict[str, Any]],
     min_len: int,
-    max_len: int,
-) -> Optional[Tuple[List[Dict[str, Any]], int, str]]:
+    max_len: int) -> Optional[Tuple[List[Dict[str, Any]], int, str]]:
     """Pick a random subseries of length in ``[min_len, max_len]``.
 
     Returns (subseries, start_idx, sampler_tag) or None if the episode is
     too short. Used in L1 instead of ``sample_with_relevance`` because L1
-    operates on nominal episodes only — anomaly relevance specs are not
+    operates on nominal episodes only, anomaly relevance specs are not
     applicable, so we sample uniformly.
     """
     n = len(rows)
@@ -430,8 +432,7 @@ def _uniform_window(
 def pick_phase_isolation_candidates(
     rows: List[Dict[str, Any]],
     n: int = 3,
-    min_phase_length: int = 3,
-) -> List[Tuple[str, int, int]]:
+    min_phase_length: int = 3) -> List[Tuple[str, int, int]]:
     """Return up to ``n`` distinct phase candidates for a phase-isolation
     question.
 
@@ -492,8 +493,7 @@ def build_comparative_multi_select(
     task_id_b: str,
     rows_a: List[Dict[str, Any]],
     rows_b: List[Dict[str, Any]],
-    mc_lookup: Dict[str, str],
-) -> Optional[Tuple[Dict[str, str], str]]:
+    mc_lookup: Dict[str, str]) -> Optional[Tuple[Dict[str, str], str]]:
     """Build fixed-order options + TFFT answer for template 3.
 
     Options are always presented in the order
@@ -551,8 +551,7 @@ def build_severity_ranking(
     min_chunk: int = 5,
     max_chunk: int = 7,
     relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
-    tasks: Optional[List[str]] = None,
-) -> Optional[Tuple[Dict[str, str], str]]:
+    tasks: Optional[List[str]] = None) -> Optional[Tuple[Dict[str, str], str]]:
     """
     Build ranking options + answer string for template 5.
     Each option is a short encoded chunk from one episode filtered by important_features.
@@ -613,8 +612,7 @@ def fill_template(
     severity_segments: Optional[List[Tuple[List[Dict[str, Any]], int]]] = None,
     severity_relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     severity_tasks: Optional[List[str]] = None,
-    phase_override: Optional[Tuple[str, int, int]] = None,
-) -> Optional[Dict[str, Any]]:
+    phase_override: Optional[Tuple[str, int, int]] = None) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 1 question template.
 
@@ -673,8 +671,7 @@ def fill_template(
         fault_b = pick_fault_label(rows_b)
         result = build_comparative_multi_select(
             fault_label, fault_b, machine_id, machine_id_b,
-            task_id, task_id_b, rows, rows_b, mc_option_lookup,
-        )
+            task_id, task_id_b, rows, rows_b, mc_option_lookup)
         if result is None:
             return None
         options, answer = result
@@ -687,8 +684,7 @@ def fill_template(
         result = build_severity_ranking(
             severity_segments, root_causes, important_features=important_features,
             relevance_specs=severity_relevance_specs,
-            tasks=severity_tasks,
-        )
+            tasks=severity_tasks)
         if result is None:
             return None
         options, answer = result
@@ -727,13 +723,14 @@ def fill_template(
         if not candidate_signals:
             return None
         signal = random.choice(candidate_signals)
-        # steps_ahead: how many steps beyond the given context
+        # steps_ahead: how many rows beyond the given context we ask the model
+        # to forecast. The prompt reports the horizon in milliseconds so that
+        # it aligns with the `t=<ms>` axis of the visible time series rather
+        # than being off by a factor of the sample period; the ms offset is
+        # computed at generation time from the actual timestamps.
         steps_ahead = random.randint(1, 10)
-        # The rows passed in are the context; we need the actual future value
-        # which is stored in kwargs via the generation loop
-        # For now, store steps_ahead and signal; the generation loop provides the answer
         question = fill(tmpl_text, signal=_signal_display_name(signal), n=steps_ahead)
-        answer = None  # set by generation loop
+        answer = None  # set by generation loop (which also rewrites `n` in ms)
         acceptance_bounds = {"signal": signal, "steps_ahead": steps_ahead}
 
     else:
@@ -767,8 +764,7 @@ def generate_level1_questions(
     seed: Optional[int] = None,
     datasets: Optional[List[str]] = None,
     enumerate_mode: bool = False,
-    uploader: Optional[HfStreamUploader] = None,
-) -> None:
+    uploader: Optional[HfStreamUploader] = None) -> None:
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
@@ -858,7 +854,7 @@ def generate_level1_questions(
         return result
 
     # Level 1 operates on nominal episodes only (no faults). Filter once so every
-    # template branch — single, paired, or quadrupled — picks from the same pool.
+    # template branch, single, paired, or quadrupled, picks from the same pool.
     # The result is cached on disk because the first scan reads ~14k episode JSONs;
     # subsequent runs load the cache (a tiny file mapping path → bool) instead.
     nominal_cache_path = datasets_dir / ".level1_nominal_cache.json"
@@ -897,6 +893,91 @@ def generate_level1_questions(
             f"No nominal episodes found under {datasets_dir / 'normalized_episodes'} "
             f"for datasets: {allowed}. Level 1 requires fault-free episodes."
         )
+    # Template 3 compares two streams and asks whether their anomalous states
+    # differ. Restricting every L1 template to nominal episodes made that
+    # proposition False in all 2,407 released items, so it carried no
+    # information at all. Keep the full pool for the comparison template while
+    # the single-stream templates stay nominal-only.
+    # ---- balanced pairing support for template 3 -------------------------
+    _balance_targets = _cycle_targets(max(n * 4, 64))
+    _pair_attr_cache: Dict[str, Dict[str, Any]] = {}
+    _pair_pool: List[Dict[str, Any]] = []
+    _pair_index: Dict[Any, List[Dict[str, Any]]] = {}
+    _group_pairs_cache: Dict[Any, List[Any]] = {}
+    _used_pairs: set = set()
+    _phase_cache: Dict[str, Optional[str]] = {}
+
+    def _pair_attrs(ds: str, ep_path: Path) -> Dict[str, Any]:
+        """Cheap comparison attributes for one episode, read from metadata."""
+        key = str(ep_path)
+        cached = _pair_attr_cache.get(key)
+        if cached is not None:
+            return cached
+        fault = 0
+        robot = None
+        meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
+        if meta_path.exists():
+            try:
+                meta = load_json(meta_path) or {}
+                raw = meta.get("fault_id") or meta.get("cf_fault_id") or 0
+                fault = int(float(raw)) if raw else 0
+                # The dataset folder is not the robot: FactoryWave keeps UR and
+                # KUKA episodes side by side under one name, so keying identity
+                # off the folder made "different robots" unsatisfiable.
+                robot = meta.get("robot_type") or meta.get("machine_id")
+            except Exception:
+                fault, robot = 0, None
+        attrs = {
+            "key": key,
+            "dataset": ds,
+            "path": ep_path,
+            "robot": str(robot).lower() if robot is not None else f"ds:{DATASET_MACHINE_ID.get(ds, -1)}",
+            "task": _episode_task(ep_path, ds, dataset_index),
+            "fault": fault,
+        }
+        _pair_attr_cache[key] = attrs
+        return attrs
+
+    def _episode_modal_phase(ep_path: Path) -> Optional[str]:
+        key = str(ep_path)
+        if key in _phase_cache:
+            return _phase_cache[key]
+        phase = None
+        try:
+            rows = load_episode(ep_path)
+            if isinstance(rows, list) and rows:
+                phase = _modal_phase(rows)
+        except Exception:
+            phase = None
+        if len(_phase_cache) > 4096:
+            _phase_cache.clear()
+        _phase_cache[key] = phase
+        return phase
+
+    def _phases_differ(path_a: Path, path_b: Path) -> bool:
+        """Proposition D holds only when the two runs sit in different phases."""
+        pa, pb = _episode_modal_phase(path_a), _episode_modal_phase(path_b)
+        return pa is not None and pb is not None and pa != pb
+
+    def _machine_id_for(ds: str, ep_path: Path) -> int:
+        """Machine id for one episode.
+
+        FactoryWave records a UR3 and a KUKA under a single dataset name, so
+        deriving the machine from the dataset made "different robots" false for
+        every within-FactoryWave pair regardless of which arms were actually
+        compared. Prefer the episode's own robot_type and fall back to the
+        dataset mapping for sources that carry one robot throughout.
+        """
+        robot = str(_pair_attrs(ds, ep_path).get("robot") or "")
+        by_robot = {"ur3": 0, "ur3e": 0, "yu": 2, "kuka": 3}
+        for name, mid in by_robot.items():
+            if robot.lower().startswith(name):
+                return mid
+        return DATASET_MACHINE_ID.get(ds, -1)
+
+    comparison_episodes_by_dataset = {
+        ds: list(paths) for ds, paths in episodes_by_dataset.items() if paths
+    }
     episodes_by_dataset = nominal_episodes_by_dataset
     all_episode_paths = [
         (ds, ep) for ds, eps in episodes_by_dataset.items() for ep in eps
@@ -907,7 +988,7 @@ def generate_level1_questions(
     )
 
     # Templates 2 (anomaly detection) and 5 (severity ranking) require faulty
-    # episodes to be meaningful — disabled in the nominal-only regime.
+    # episodes to be meaningful, disabled in the nominal-only regime.
     _DISABLED_TEMPLATE_IDS: set = {2, 5}
     usable_templates = [t for t in templates if t["id"] not in _DISABLED_TEMPLATE_IDS]
     if not usable_templates:
@@ -952,8 +1033,7 @@ def generate_level1_questions(
         # ------------------------------------------------------------------
         # Templates 1, 2, 6: single episode, sampled subseries
         # (template 1 isolates a phase; the subseries must contain at least one
-        # entirely-contained phase, otherwise we reject and try another episode —
-        # see fill_template's tid==1 branch which returns None on no inner phase.)
+        # entirely-contained phase, otherwise we reject and try another episode, # see fill_template's tid==1 branch which returns None on no inner phase.)
         # ------------------------------------------------------------------
         if tid in (1, 2, 6):
             if _enum_ep is not None:
@@ -996,8 +1076,7 @@ def generate_level1_questions(
                     filled = fill_template(
                         template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
                         machine_id=DATASET_MACHINE_ID.get(ds, -1),
-                        phase_override=_phase,
-                    )
+                        phase_override=_phase)
                     if filled is None:
                         continue
                     item = {
@@ -1013,6 +1092,7 @@ def generate_level1_questions(
                         "provenance": {
                             "dataset": ds,
                             "episode": ep_path.stem,
+                            "task": ep_task,
                             "subseries_start_index": start_idx,
                             "subseries_length": len(subseries),
                             "phase_name": _phase[0],
@@ -1036,8 +1116,7 @@ def generate_level1_questions(
 
             filled = fill_template(
                 template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
-                machine_id=DATASET_MACHINE_ID.get(ds, -1),
-            )
+                machine_id=DATASET_MACHINE_ID.get(ds, -1))
             if filled is None:
                 continue
 
@@ -1054,6 +1133,7 @@ def generate_level1_questions(
                 "provenance": {
                     "dataset": ds,
                     "episode": ep_path.stem,
+                    "task": ep_task,
                     "subseries_start_index": start_idx,
                     "subseries_length": len(subseries),
                     "sampler": sampler_tag,
@@ -1062,7 +1142,7 @@ def generate_level1_questions(
             }
 
         # ------------------------------------------------------------------
-        # Template 7: prediction — sample subseries + future steps for answer
+        # Template 7: prediction, sample subseries + future steps for answer
         # ------------------------------------------------------------------
         elif tid == 7:
             if _enum_ep is not None:
@@ -1090,8 +1170,7 @@ def generate_level1_questions(
 
             filled = fill_template(
                 template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
-                machine_id=DATASET_MACHINE_ID.get(ds, -1),
-            )
+                machine_id=DATASET_MACHINE_ID.get(ds, -1))
             if filled is None:
                 continue
 
@@ -1107,6 +1186,21 @@ def generate_level1_questions(
                 continue
             filled["answer"] = round(float(future_val), 4)
             filled["acceptance_bounds"]["actual_value"] = filled["answer"]
+
+            # Rewrite the forecast horizon in real milliseconds using the source
+            # timestamps. The template originally rendered `T+{steps_ahead}ms`,
+            # which is wrong because `steps_ahead` counts rows (~100ms apart at
+            # the 10Hz resampled rate) rather than milliseconds.
+            last_ctx_ts = rows[start_idx + context_len - 1].get("timestamp_ms")
+            future_ts = rows[future_idx].get("timestamp_ms")
+            if isinstance(last_ctx_ts, (int, float)) and isinstance(future_ts, (int, float)):
+                n_ms = int(round(float(future_ts) - float(last_ctx_ts)))
+                filled["question"] = re.sub(
+                    r"T\+\d+ms",
+                    f"T+{n_ms}ms",
+                    filled.get("question", ""),
+                    count=1)
+                filled["acceptance_bounds"]["horizon_ms"] = n_ms
 
             if important_features:
                 keep = set(important_features) | {"timestamp_ms"}
@@ -1128,6 +1222,7 @@ def generate_level1_questions(
                 "provenance": {
                     "dataset": ds,
                     "episode": ep_path.stem,
+                    "task": ep_task,
                     "subseries_start_index": start_idx,
                     "subseries_length": context_len,
                     "prediction_index": future_idx,
@@ -1140,24 +1235,31 @@ def generate_level1_questions(
         # Template 3: two episodes (prefer different datasets)
         # ------------------------------------------------------------------
         elif tid == 3:
-            if _enum_ep is not None:
-                # Enumerated combo provides primary episode; secondary stays random
-                ds_a = _enum_ds
-                ep_a = _enum_ep
-                if len(available_datasets) >= 2:
-                    other_ds = [d for d in available_datasets if d != ds_a]
-                    ds_b = random.choice(other_ds)
-                else:
-                    ds_b = ds_a
-                ep_b_pool = [p for p in episodes_by_dataset[ds_b] if p != ep_a] or episodes_by_dataset[ds_b]
-                ep_b = random.choice(ep_b_pool)
-            else:
-                if len(available_datasets) >= 2:
-                    ds_a, ds_b = random.sample(available_datasets, 2)
-                else:
-                    ds_a = ds_b = available_datasets[0]
-                ep_a = random.choice(episodes_by_dataset[ds_a])
-                ep_b = random.choice(episodes_by_dataset[ds_b])
+            # Balanced pairing: aim each item at one cell of
+            # (different robot) x (different anomaly) x (different task) so no
+            # proposition is guessable from its prior. See utils.pair_balance.
+            _target = _balance_targets[generated % len(_balance_targets)]
+            # Both episodes come from the sampler: choosing the primary first
+            # and then hunting for a partner is what capped P(different robots)
+            # at 0.30, since the minority robot is 15% of the pool.
+            _cand_ds = list(comparison_episodes_by_dataset.keys()) or available_datasets
+            if not _pair_index:
+                _pair_pool.extend(
+                    _pair_attrs(d, p)
+                    for d in _cand_ds
+                    for p in comparison_episodes_by_dataset.get(d, [])
+                )
+                _pair_index.update(_build_pair_index(_pair_pool))
+            _picked = _sample_balanced_pair(
+                _pair_index, _target,
+                used=_used_pairs,
+                phases_differ=lambda x, y: _phases_differ(x["path"], y["path"]),
+                group_pairs_cache=_group_pairs_cache)
+            if _picked is None:
+                continue
+            _a, _b = _picked
+            ds_a, ep_a = _a["dataset"], _a["path"]
+            ds_b, ep_b = _b["dataset"], _b["path"]
             rows_a = load_episode(ep_a)
             rows_b_raw = load_episode(ep_b)
 
@@ -1171,8 +1273,26 @@ def generate_level1_questions(
             task_a = _episode_task(ep_a, ds_a, dataset_index)
             task_b = _episode_task(ep_b, ds_b, dataset_index)
 
-            sampled_a = _uniform_window(rows_a, CONTEXT_MIN, CONTEXT_MAX)
-            sampled_b = _uniform_window(rows_b_raw, CONTEXT_MIN, CONTEXT_MAX)
+            # Proposition D is evaluated on the displayed windows, not on the
+            # whole episodes, so a same-task pair whose episodes differ in
+            # modal phase can still yield two windows sitting in the same
+            # phase. Resample the windows until they disagree, otherwise the
+            # cell that was asked for silently becomes a different one.
+            _want_diff_phase = (tid == 3) and not _target[2]
+            sampled_a = sampled_b = None
+            for _win_try in range(24):
+                sampled_a = _uniform_window(rows_a, CONTEXT_MIN, CONTEXT_MAX)
+                sampled_b = _uniform_window(rows_b_raw, CONTEXT_MIN, CONTEXT_MAX)
+                if sampled_a is None or sampled_b is None:
+                    break
+                if not _want_diff_phase:
+                    break
+                _pa = _modal_phase(sampled_a[0])
+                _pb = _modal_phase(sampled_b[0])
+                if _pa is not None and _pb is not None and _pa != _pb:
+                    break
+            else:
+                continue
             if sampled_a is None or sampled_b is None:
                 continue
 
@@ -1184,11 +1304,10 @@ def generate_level1_questions(
             filled = fill_template(
                 template, sub_a, root_causes, anomaly_lookup, mc_option_lookup,
                 rows_b=sub_b,
-                machine_id=DATASET_MACHINE_ID.get(ds_a, -1),
-                machine_id_b=DATASET_MACHINE_ID.get(ds_b, -1),
+                machine_id=_machine_id_for(ds_a, ep_a),
+                machine_id_b=_machine_id_for(ds_b, ep_b),
                 task_id=task_a,
-                task_id_b=task_b,
-            )
+                task_id_b=task_b)
             if filled is None:
                 continue
 
@@ -1216,11 +1335,11 @@ def generate_level1_questions(
                 "acceptance_bounds": filled.get("acceptance_bounds"),
                 "provenance": {
                     "dataset_a": ds_a,
-                    "machine_id_a": DATASET_MACHINE_ID.get(ds_a, -1),
+                    "machine_id_a": _machine_id_for(ds_a, ep_a),
                     "episode_a": ep_a.stem,
                     "subseries_start_a": start_a,
                     "dataset_b": ds_b,
-                    "machine_id_b": DATASET_MACHINE_ID.get(ds_b, -1),
+                    "machine_id_b": _machine_id_for(ds_b, ep_b),
                     "episode_b": ep_b.stem,
                     "subseries_start_b": start_b,
                     "sampler_a": sampler_a,
@@ -1255,8 +1374,7 @@ def generate_level1_questions(
                 template, segments[0][0], root_causes, anomaly_lookup, mc_option_lookup,
                 severity_segments=segments,
                 severity_relevance_specs=relevance_specs,
-                severity_tasks=severity_tasks,
-            )
+                severity_tasks=severity_tasks)
             if filled is None:
                 continue
 
@@ -1325,40 +1443,48 @@ def main() -> None:
         "--datasets-dir",
         type=Path,
         default=repo_root / "data",
-        help="Root data directory (default: <repo>/data)",
-    )
+        help="Root data directory (default: <repo>/data)")
     parser.add_argument(
         "--output",
         type=Path,
         default=repo_root / "output" / "questions" / "level1",
-        help="Output directory (default: <repo>/output/questions/level1)",
-    )
+        help="Output directory (default: <repo>/output/questions/level1)")
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
-        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
-    )
+        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}")
     parser.add_argument(
         "--enumerate",
         dest="enumerate_mode",
         action="store_true",
         help="Walk every (template x episode) combination deterministically instead "
              "of random sampling. -n becomes an upper cap. Combinations whose "
-             "episode does not satisfy the template's preconditions are skipped.",
-    )
+             "episode does not satisfy the template's preconditions are skipped.")
     add_streaming_args(parser)
+    parser.add_argument(
+        "--template-ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Restrict generation to these template ids (default: all). Useful "
+             "for regenerating a single template without rerunning the rest.")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
+    if getattr(args, "template_ids", None):
+        wanted = set(args.template_ids)
+        templates = [t for t in templates if t["id"] in wanted]
+        if not templates:
+            parser.error(f"No templates match --template-ids {sorted(wanted)}")
+
     root_causes = load_root_causes(args.datasets_dir / "labelling" / "rca" / "root_causes.json")
 
     global _ANOMALY_RANKING
@@ -1371,8 +1497,7 @@ def main() -> None:
     )
     mc_option_lookup = load_mc_option_lookup(
         args.datasets_dir / "mc_options" / "mc_options.json",
-        level=1,
-    )
+        level=1)
     dataset_index = load_dataset_index(args.datasets_dir / "labelling" / "dataset.json")
 
     relevance_specs = (
@@ -1401,8 +1526,7 @@ def main() -> None:
         seed=args.seed,
         datasets=args.datasets,
         enumerate_mode=args.enumerate_mode,
-        uploader=uploader,
-    )
+        uploader=uploader)
 
 
 if __name__ == "__main__":

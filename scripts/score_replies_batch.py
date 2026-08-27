@@ -8,10 +8,10 @@ batch). Each judge submits ONE batch covering every item; results are
 joined by ``custom_id`` and median-voted to produce the final score.
 
 Per-reply writeback (in place):
-  * ``llm_judge_score``  — median across the 3 valid votes (snapped to
+  * ``llm_judge_score``, median across the 3 valid votes (snapped to
                           {0, 0.5, 1}).
-  * ``llm_judge_reason`` — short aggregation summary.
-  * ``llm_judge_votes``  — per-judge breakdown ``{model: {score, reason}}``
+  * ``llm_judge_reason``, short aggregation summary.
+  * ``llm_judge_votes``, per-judge breakdown ``{model: {score, reason}}``
                           for audit.
 
 Usage::
@@ -37,8 +37,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from src.scoring.multi_judge import (
-    DEFAULT_JUDGE_MODELS, JudgeItem, score_all,
-)
+    DEFAULT_JUDGE_MODELS, JudgeItem, score_all)
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +81,7 @@ def _collect_items(
     questions_root: Path,
     levels: List[int],
     rescore: bool,
-    judges: Optional[List[str]] = None,
-) -> Tuple[List[JudgeItem], Dict[str, Path]]:
+    judges: Optional[List[str]] = None) -> Tuple[List[JudgeItem], Dict[str, Path]]:
     """Walk the replies tree, return judge items + a {custom_id: reply_path}
     map for writeback.
 
@@ -143,8 +141,7 @@ def _collect_items(
                 cid = f"{model_slug}__{reply.get('custom_id') or reply_file.stem}"
                 # Use the question-template text only (e.g. "Given the sensor
                 # stream below, does the machine show signs of anomalous
-                # behavior? ..."). NEVER fall back to ``reply['prompt']`` —
-                # that contains the full sensor timeseries context, which is
+                # behavior? ..."). NEVER fall back to ``reply['prompt']``, # that contains the full sensor timeseries context, which is
                 # both wasteful in the judge prompt and not what we want the
                 # judge to read.
                 items.append(JudgeItem(
@@ -153,8 +150,7 @@ def _collect_items(
                     question=q.get("question") or "(question text not available)",
                     prediction=reply.get("answer") or "",
                     reference=str(reply.get("ground_truth") or q.get("answer") or ""),
-                    root_cause=q.get("root_cause"),
-                ))
+                    root_cause=q.get("root_cause")))
                 cid_to_path[cid] = reply_file
 
     logger.info(
@@ -168,8 +164,7 @@ def _collect_items(
 
 def _writeback(
     cid_to_path: Dict[str, Path],
-    results,
-) -> int:
+    results) -> int:
     """Merge llm_judge_{score,reason,votes} back into each reply file.
 
     New votes are merged into any existing ``llm_judge_votes`` dict so that a
@@ -234,8 +229,7 @@ def main() -> None:
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
+        datefmt="%H:%M:%S")
 
     from src.evaluation.test_gpt_5mini import load_dotenv_file
     load_dotenv_file(args.env_file)
@@ -245,8 +239,7 @@ def main() -> None:
         args.questions_root.resolve(),
         args.levels,
         args.rescore,
-        judges=args.judges,
-    )
+        judges=args.judges)
     if not items:
         logger.info("nothing to score")
         return
@@ -261,8 +254,7 @@ def main() -> None:
         max_output_tokens=args.max_output_tokens,
         poll_interval=args.poll_interval,
         parallel_judges=not args.no_parallel,
-        sync_concurrency=args.sync_concurrency,
-    )
+        sync_concurrency=args.sync_concurrency)
 
     n_written = _writeback(cid_to_path, results)
     n_scored = sum(1 for r in results.values() if r.final_score is not None)

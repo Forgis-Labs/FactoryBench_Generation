@@ -27,8 +27,8 @@ import numpy as np
 from src.question_generation.utils.hf_streaming import (
     HfStreamUploader,
     add_streaming_args,
-    make_uploader_from_args,
-)
+    make_uploader_from_args)
+from src.question_generation.utils.mc_availability import filter_lookup_by_availability
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates
 from src.question_generation.utils.template import (
     build_context,
@@ -38,13 +38,17 @@ from src.question_generation.utils.template import (
     fill_event_description,
     get_last_timestamp,
     pick_constrained_signal,
-    pick_scalar_signal,
-)
+    pick_scalar_signal)
 from src.question_generation.utils.time_series import (
     parse_event_id,
-    pick_fault_label,
-)
-from src.question_generation.level3.mc_truth import DEFAULT_THRESHOLDS, evaluate_mc_statement
+    pick_fault_label)
+from src.question_generation.level3.mc_truth import (
+    DEFAULT_THRESHOLDS,
+    UNCALIBRATABLE_MC_IDS,
+    complement_of,
+    evaluate_mc_statement,
+    thresholds_for)
+from src.question_generation.level2.mc_truth import robot_key
 
 
 logger = logging.getLogger(__name__)
@@ -63,7 +67,7 @@ CF_DATASET_FOLDERS = ["factorywave"]  # full list; filtered at runtime via --dat
 
 # MC option IDs that require signals absent from simulation data
 NON_SIMULATION_EXCLUDED_MC_IDS = {
-    "mc_020",  # task_success — only available in simulation metadata
+    "mc_020",  # task_success, only available in simulation metadata
 }
 
 SIMULATION_EXCLUDED_MC_IDS = {
@@ -80,7 +84,7 @@ PREDICTIVE_EXCLUDED_MC_IDS = {
     "mc_019",  # safety_mode
 }
 
-# Collision event IDs — excluded from predictive templates because collision
+# Collision event IDs, excluded from predictive templates because collision
 # effects are sharp discontinuities not predictable from the pre-event trajectory.
 COLLISION_EVENT_IDS = {16, 17, 18, 19}
 
@@ -129,8 +133,7 @@ def sample_subsequent_chunks(
     rows: List[Dict[str, Any]],
     n_chunks: int = 4,
     min_chunk: int = 5,
-    max_chunk: int = 7,
-) -> List[List[Dict[str, Any]]]:
+    max_chunk: int = 7) -> List[List[Dict[str, Any]]]:
     """
     Sample n_chunks contiguous, subsequent chunks from rows.
 
@@ -157,6 +160,53 @@ def sample_subsequent_chunks(
     return chunks
 
 
+def rows_strictly_after_context(
+    rows: List[Dict[str, Any]],
+    subseries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Rows whose timestamp is strictly greater than the last context timestamp.
+
+    The ranking template asks the model to order segments by when they appear
+    as the event manifests. That is only a question about the future if the
+    segments lie outside the window the model was already shown. Sampling from
+    ``post_event_rows`` directly does not guarantee this: the context window is
+    centred on the event onset and extends past it, and (at L3) the baseline
+    and counterfactual episodes are identical until they diverge, so early
+    post-onset chunks reproduce rows the model can already see and the ordering
+    can be recovered by matching values instead of reasoning about propagation.
+    Measured on the released benchmark, 13% of option segments appeared
+    verbatim inside their own context.
+    """
+    cutoff = get_last_timestamp(subseries)
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        ts = row.get("timestamp_ms")
+        try:
+            if ts is not None and int(float(ts)) > cutoff:
+                out.append(row)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def filter_rows_to_template_features(
+    rows: List[Dict[str, Any]],
+    template: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Restrict rows to the template's ``important_features``.
+
+    ``build_context`` applies this filter to the context but the option
+    segments were encoded from the full row, so a ranking item showed a context
+    defined over ~19 channels while asking the model to order segments carrying
+    ~98, of which 79 appeared in no acronym mapping anywhere in the item. The
+    segments and the context have to describe the same signals for the question
+    to be answerable as posed.
+    """
+    keep = template.get("important_features")
+    if not keep:
+        return rows
+    allowed = set(keep) | {"timestamp_ms"}
+    return [{k: v for k, v in row.items() if k in allowed} for row in rows]
+
+
 def encode_chunk_without_timestamps(rows: List[Dict[str, Any]]) -> str:
     """Encode a chunk after removing timestamp_ms from each row."""
     stripped_rows: List[Dict[str, Any]] = []
@@ -169,8 +219,7 @@ def encode_chunk_without_timestamps(rows: List[Dict[str, Any]]) -> str:
 
 def get_row_at_or_after_timestamp(
     rows: List[Dict[str, Any]],
-    target_timestamp_ms: int,
-) -> Optional[Dict[str, Any]]:
+    target_timestamp_ms: int) -> Optional[Dict[str, Any]]:
     """Return the first row whose timestamp_ms is >= target_timestamp_ms."""
     for row in rows:
         ts = row.get("timestamp_ms")
@@ -198,8 +247,7 @@ def _first_timestamp_ms(rows: List[Dict[str, Any]]) -> int:
 
 def normalize_timestamps(
     rows: List[Dict[str, Any]],
-    base_timestamp_ms: int,
-) -> List[Dict[str, Any]]:
+    base_timestamp_ms: int) -> List[Dict[str, Any]]:
     """Return a copy of rows with timestamp_ms shifted by base_timestamp_ms."""
     normalized: List[Dict[str, Any]] = []
     for row in rows:
@@ -217,8 +265,7 @@ def normalize_timestamps(
 
 
 def split_event_segment(
-    post_event_rows: List[Dict[str, Any]],
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    post_event_rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Split rows starting at event onset into:
     - full contiguous event segment (same non-zero event token)
@@ -330,8 +377,7 @@ def load_mc_option_lookup(path: Path, level: int) -> Dict[str, str]:
 
 def discover_cf_episode_pairs(
     datasets_dir: Path,
-    cf_dataset_folders: List[str],
-) -> List[Dict[str, Any]]:
+    cf_dataset_folders: List[str]) -> List[Dict[str, Any]]:
     """
     Discover paired episode files inside cf dataset folders.
 
@@ -423,8 +469,7 @@ def sample_window_around_index(
     center_index: int,
     min_len: int,
     max_len: int,
-    margin: int = 5,
-) -> Optional[Tuple[List[Dict[str, Any]], int, int]]:
+    margin: int = 5) -> Optional[Tuple[List[Dict[str, Any]], int, int]]:
     """
     Sample one contiguous subseries containing center_index with at least
     `margin` timesteps from the subseries borders.
@@ -461,8 +506,7 @@ def sample_window_around_index(
 
 def resolve_fixed_option(
     token: Any,
-    mc_option_lookup: Dict[str, str],
-) -> Tuple[Optional[str], str]:
+    mc_option_lookup: Dict[str, str]) -> Tuple[Optional[str], str]:
     """
     Resolve a fixed option token to (canonical_option_id, rendered_statement).
     If token is not a known MC ID, returns (None, str(token)).
@@ -476,67 +520,88 @@ def resolve_fixed_option(
     return None, str(token)
 
 
-def _sample_ratio(mean: float, rel_std: float = 0.20, min_value: float = 0.0, max_value: float = 0.99) -> float:
+def _sample_ratio(mean: float, rel_std: float = 0.20, min_value: float = 0.0,
+                  max_value: Optional[float] = None) -> float:
+    """Draw a threshold around ``mean``.
+
+    ``max_value`` defaults to no upper bound. Level 2 removed the old 0.99
+    default after finding it silently clipped any centre above 1 back to 0.99
+    and pinned the statement's truth value; level 3 kept the old default, so
+    the same clipping is still live here. Callers that genuinely need a sub-1
+    cap, the coverage and axis-ratio knobs, pass max_value explicitly.
+    """
     sampled = random.gauss(mean, max(1e-6, abs(mean) * rel_std))
-    return float(min(max(sampled, min_value), max_value))
+    sampled = max(sampled, min_value)
+    if max_value is not None:
+        sampled = min(sampled, max_value)
+    return float(sampled)
 
 
-def sample_thresholds_for_statement(statement_id: str) -> Dict[str, float]:
+def sample_thresholds_for_statement(
+    statement_id: str,
+    source: Optional[str] = None) -> Dict[str, float]:
+    """Draw this statement's thresholds around the centre fitted for ``source``.
+
+    Thresholds still vary per item; only the centre they revolve around is
+    source-specific. Passing source=None keeps the corpus-wide defaults, which
+    is what unlisted sources get. Level 2 has worked this way for a while;
+    level 3 drew every threshold from the unfitted defaults, which is what left
+    its statement families near-deterministic.
+    """
+    centres = thresholds_for(source)
     sid = _legacy_mc_option_id(str(statement_id))
-    if sid == "l2_mc_003":
-        return {"speed_drop_ratio": _sample_ratio(DEFAULT_THRESHOLDS["speed_drop_ratio"])}
-    if sid == "l2_mc_004":
-        return {"speed_stable_tol": _sample_ratio(DEFAULT_THRESHOLDS["speed_stable_tol"])}
+    if sid in {"l2_mc_003", "l2_mc_004"}:
+        # Complements on one shared ratio-of-means threshold.
+        return {"speed_drop_ratio": _sample_ratio(centres["speed_drop_ratio"])}
     if sid == "l2_mc_005":
         return {
-            "stall_current_increase": _sample_ratio(DEFAULT_THRESHOLDS["stall_current_increase"]),
-            "stall_speed_frac": _sample_ratio(DEFAULT_THRESHOLDS["stall_speed_frac"]),
+            "stall_current_increase": _sample_ratio(centres["stall_current_increase"]),
+            "stall_speed_frac": _sample_ratio(centres["stall_speed_frac"]),
         }
     if sid == "l2_mc_006":
         return {
-            "force_low_increase": _sample_ratio(DEFAULT_THRESHOLDS["force_low_increase"]),
-            "force_low_coverage": _sample_ratio(DEFAULT_THRESHOLDS["force_low_coverage"], rel_std=0.08, min_value=0.50, max_value=0.99),
+            "force_low_increase": _sample_ratio(centres["force_low_increase"]),
+            "force_low_coverage": _sample_ratio(centres["force_low_coverage"], rel_std=0.08, min_value=0.50, max_value=0.99),
         }
     if sid == "l2_mc_007":
-        return {"force_spike_increase": _sample_ratio(DEFAULT_THRESHOLDS["force_spike_increase"])}
-    if sid == "l2_mc_008":
-        return {"tracking_increase": _sample_ratio(DEFAULT_THRESHOLDS["tracking_increase"])}
-    if sid == "l2_mc_009":
-        return {"tracking_stable_increase": _sample_ratio(DEFAULT_THRESHOLDS["tracking_stable_increase"])}
+        return {"force_spike_increase": _sample_ratio(centres["force_spike_increase"])}
+    if sid in {"l2_mc_008", "l2_mc_009"}:
+        # Both gate on the same absolute tracking error, so they share one
+        # sampled threshold and are exact complements of each other.
+        return {"tracking_abs_error": _sample_ratio(centres["tracking_abs_error"])}
     if sid == "l2_mc_010":
-        return {"vibration_spike": _sample_ratio(DEFAULT_THRESHOLDS["vibration_spike"])}
+        return {"vibration_spike": _sample_ratio(centres["vibration_spike"])}
     if sid == "l2_mc_011":
         return {
-            "vibration_nominal_band": _sample_ratio(DEFAULT_THRESHOLDS["vibration_nominal_band"]),
-            "vibration_nominal_coverage": _sample_ratio(DEFAULT_THRESHOLDS["vibration_nominal_coverage"], rel_std=0.06, min_value=0.60, max_value=0.99),
+            "vibration_nominal_band": _sample_ratio(centres["vibration_nominal_band"]),
+            "vibration_nominal_coverage": _sample_ratio(centres["vibration_nominal_coverage"], rel_std=0.06, min_value=0.60, max_value=0.99),
         }
     if sid == "l2_mc_012":
-        return {
-            "current_peak_increase": _sample_ratio(DEFAULT_THRESHOLDS["current_peak_increase"]),
-            "current_relax_drop": _sample_ratio(DEFAULT_THRESHOLDS["current_relax_drop"]),
-        }
-    if sid == "l2_mc_013":
-        return {"robot_current_stable_range": _sample_ratio(DEFAULT_THRESHOLDS["robot_current_stable_range"])}
-    if sid == "l2_mc_014":
-        return {"robot_current_increase": _sample_ratio(DEFAULT_THRESHOLDS["robot_current_increase"])}
-    if sid == "l2_mc_015":
-        return {"tcp_tracking_stable_increase": _sample_ratio(DEFAULT_THRESHOLDS["tcp_tracking_stable_increase"])}
-    if sid == "l2_mc_016":
-        return {"tcp_tracking_increase": _sample_ratio(DEFAULT_THRESHOLDS["tcp_tracking_increase"])}
+        return {"current_relax_drop": _sample_ratio(centres["current_relax_drop"], max_value=0.99)}
+    if sid in {"l2_mc_013", "l2_mc_014"}:
+        return {"robot_current_abs": _sample_ratio(centres["robot_current_abs"])}
+    if sid in {"l2_mc_015", "l2_mc_016"}:
+        return {"tcp_tracking_abs_error": _sample_ratio(centres["tcp_tracking_abs_error"])}
     if sid == "l2_mc_017":
-        min_axes = int(round(random.gauss(DEFAULT_THRESHOLDS["temp_rise_min_axes"], 0.4)))
+        min_axes = int(round(random.gauss(centres["temp_rise_min_axes"], 0.4)))
         min_axes = min(max(min_axes, 1), 6)
         return {
-            "temp_rise_slope": _sample_ratio(DEFAULT_THRESHOLDS["temp_rise_slope"], rel_std=0.25, min_value=0.0005, max_value=0.02),
+            "temp_rise_slope": _sample_ratio(centres["temp_rise_slope"], rel_std=0.25, min_value=0.0005, max_value=0.02),
             "temp_rise_min_axes": float(min_axes),
         }
     if sid == "l2_mc_018":
         return {
-            "temp_stable_slope": _sample_ratio(DEFAULT_THRESHOLDS["temp_stable_slope"], rel_std=0.25, min_value=0.0002, max_value=0.01),
-            "temp_stable_axes_ratio": _sample_ratio(DEFAULT_THRESHOLDS["temp_stable_axes_ratio"], rel_std=0.08, min_value=0.50, max_value=0.99),
+            "temp_stable_slope": _sample_ratio(centres["temp_stable_slope"], rel_std=0.25, min_value=0.0002, max_value=0.01),
+            "temp_stable_axes_ratio": _sample_ratio(centres["temp_stable_axes_ratio"], rel_std=0.08, min_value=0.50, max_value=0.99),
         }
     if sid == "l2_mc_019":
-        return {"no_effect_agg_increase": _sample_ratio(DEFAULT_THRESHOLDS["no_effect_agg_increase"])}
+        return {"no_effect_agg_increase": _sample_ratio(centres["no_effect_agg_increase"])}
+    if sid == "l2_mc_030":
+        return {"joint_excursion_deg": _sample_ratio(centres["joint_excursion_deg"])}
+    if sid == "l2_mc_031":
+        return {"joint_path_deg": _sample_ratio(centres["joint_path_deg"])}
+    if sid == "l2_mc_032":
+        return {"torque_p2p_nm": _sample_ratio(centres["torque_p2p_nm"])}
     return {}
 
 
@@ -547,18 +612,17 @@ def _fmt_pct(value: float) -> str:
 def render_statement_with_thresholds(
     statement_id: str,
     default_statement: str,
-    thresholds: Dict[str, float],
-) -> str:
+    thresholds: Dict[str, float]) -> str:
     sid = _legacy_mc_option_id(str(statement_id))
     if sid == "l2_mc_003":
         return (
             "Following the event, at least one joint speed drops sharply "
-            f"(>={_fmt_pct(thresholds['speed_drop_ratio'])}% below pre-event baseline)."
+            f"(mean speed magnitude falls to <={_fmt_pct(thresholds['speed_drop_ratio'])}% of its pre-event mean)."
         )
     if sid == "l2_mc_004":
         return (
-            "Following the event, joint speeds stay close to baseline "
-            f"(within ±{_fmt_pct(thresholds['speed_stable_tol'])}% of pre-event values)."
+            "Following the event, no joint's mean speed magnitude drops sharply "
+            f"(none falls to <={_fmt_pct(thresholds['speed_drop_ratio'])}% of its pre-event mean)."
         )
     if sid == "l2_mc_005":
         return (
@@ -579,13 +643,13 @@ def render_statement_with_thresholds(
         )
     if sid == "l2_mc_008":
         return (
-            "Following the event, tracking error increases noticeably "
-            f"(>={_fmt_pct(thresholds['tracking_increase'])}% above pre-event mean)."
+            "Following the event, mean joint tracking error exceeds "
+            f"{thresholds['tracking_abs_error']:.4f} (absolute, commanded vs measured position)."
         )
     if sid == "l2_mc_009":
         return (
-            "Following the event, tracking error is stable or improved "
-            f"(increase <={_fmt_pct(thresholds['tracking_stable_increase'])}% vs pre-event mean)."
+            "Following the event, mean joint tracking error stays below "
+            f"{thresholds['tracking_abs_error']:.4f} (absolute, commanded vs measured position)."
         )
     if sid == "l2_mc_010":
         return (
@@ -601,28 +665,27 @@ def render_statement_with_thresholds(
     if sid == "l2_mc_012":
         return (
             "Following the event, at least one joint current peaks then relaxes "
-            f"(early peak >={_fmt_pct(thresholds['current_peak_increase'])}% above baseline, "
-            f"final value >={_fmt_pct(thresholds['current_relax_drop'])}% below that peak)."
+            f"(final value >={_fmt_pct(thresholds['current_relax_drop'])}% below that joint's peak)."
         )
     if sid == "l2_mc_013":
         return (
-            "Following the event, robot current remains approximately constant "
-            f"(peak-to-peak range <={_fmt_pct(thresholds['robot_current_stable_range'])}% of pre-event baseline)."
+            "Following the event, mean robot current stays below "
+            f"{thresholds['robot_current_abs']:.3f} (absolute)."
         )
     if sid == "l2_mc_014":
         return (
-            "Following the event, robot current increases markedly "
-            f"(>={_fmt_pct(thresholds['robot_current_increase'])}% above pre-event mean)."
+            "Following the event, mean robot current exceeds "
+            f"{thresholds['robot_current_abs']:.3f} (absolute)."
         )
     if sid == "l2_mc_015":
         return (
             "Following the event, command and measured TCP motion remain aligned "
-            f"(TCP tracking error increase <={_fmt_pct(thresholds['tcp_tracking_stable_increase'])}%)."
+            f"(mean TCP tracking error stays below {thresholds['tcp_tracking_abs_error']:.4f})."
         )
     if sid == "l2_mc_016":
         return (
             "Following the event, command and measured TCP motion become misaligned "
-            f"(TCP tracking error increase >={_fmt_pct(thresholds['tcp_tracking_increase'])}%)."
+            f"(mean TCP tracking error exceeds {thresholds['tcp_tracking_abs_error']:.4f})."
         )
     if sid == "l2_mc_017":
         return (
@@ -651,7 +714,7 @@ def build_multiselect_options_and_answer(
     post_event_rows: List[Dict[str, Any]],
     mc_option_lookup: Dict[str, str],
     episode_metadata: Optional[Dict[str, Any]] = None,
-) -> Tuple[Dict[str, str], str]:
+    source: Optional[str] = None) -> Tuple[Dict[str, str], str]:
     """
     Build exactly 4 multi-select options:
     1) Keep fixed options from template (if resolvable IDs).
@@ -659,38 +722,66 @@ def build_multiselect_options_and_answer(
     3) Evaluate each option truth value.
     4) Shuffle and emit A-D options plus T/F answer string.
     """
+    def _canon(option_id: str) -> str:
+        """mc_008, l2_mc_008 and mc_8 all name the same statement."""
+        return _legacy_mc_option_id(str(option_id)).replace("l2_", "")
+
     selected_ids: List[str] = []
+    used_canon: set = set()
+
+    def _admit(option_id: str) -> bool:
+        """Take this statement unless it is dead or negates one already taken."""
+        canon = _canon(option_id)
+        if canon in UNCALIBRATABLE_MC_IDS:
+            return False
+        if canon in used_canon:
+            return False
+        opposite = complement_of(canon)
+        if opposite and opposite in used_canon:
+            # Two options that are exact negations hand the model one of them
+            # for free: the pairs share a threshold, so the answer at those
+            # positions is always exactly one T whatever the episode did.
+            return False
+        selected_ids.append(option_id)
+        used_canon.add(canon)
+        return True
 
     fixed_tokens = answer_format.get("fixed_options") or answer_format.get("fixed_statements") or []
     for token in fixed_tokens:
         option_id, _statement = resolve_fixed_option(token, mc_option_lookup)
-        if option_id and option_id not in selected_ids:
-            selected_ids.append(option_id)
+        if option_id:
+            _admit(option_id)
 
-    all_ids = sorted(mc_option_lookup.keys())
-    remaining_ids = [opt_id for opt_id in all_ids if opt_id not in selected_ids]
+    remaining_ids = [opt_id for opt_id in sorted(mc_option_lookup.keys())
+                     if _canon(opt_id) not in used_canon]
     random.shuffle(remaining_ids)
-
     while len(selected_ids) < 4 and remaining_ids:
-        selected_ids.append(remaining_ids.pop())
+        _admit(remaining_ids.pop())
 
+    if len(selected_ids) < 4:
+        # Fewer than four usable statements for this episode. Emitting a
+        # short item would change the answer-string length the scorer expects,
+        # so the caller skips the item instead.
+        raise ValueError(
+            f"only {len(selected_ids)} calibratable, non-complementary options "
+            f"available for this episode"
+        )
     selected_ids = selected_ids[:4]
 
     options_data: List[Tuple[str, str, Optional[bool]]] = []
     for opt_id in selected_ids:
-        sampled_thresholds = sample_thresholds_for_statement(opt_id)
+        sampled_thresholds = sample_thresholds_for_statement(
+            opt_id, source or robot_key(episode_metadata))
         statement = render_statement_with_thresholds(
             opt_id,
             mc_option_lookup.get(opt_id, opt_id),
-            sampled_thresholds,
-        )
+            sampled_thresholds)
         truth = evaluate_mc_statement(
             opt_id,
             subseries=baseline_subseries,
             post_event_rows=post_event_rows,
             thresholds=sampled_thresholds,
-            episode_metadata=episode_metadata,
-        )
+            episode_metadata=episode_metadata)
         options_data.append((opt_id, statement, truth))
 
     random.shuffle(options_data)
@@ -724,8 +815,7 @@ def fill_template(
     steps_ahead: Optional[int] = None,
     episode_metadata: Optional[Dict[str, Any]] = None,
     dataset_name: Optional[str] = None,
-    event_description: str = "",
-) -> Optional[Dict[str, Any]]:
+    event_description: str = "") -> Optional[Dict[str, Any]]:
     """
     Fill a Level 3 question template.
 
@@ -756,7 +846,9 @@ def fill_template(
     acceptance_bounds = None
 
     if tid == 1:
-        chunks = sample_subsequent_chunks(post_event_rows, n_chunks=4, min_chunk=5, max_chunk=7)
+        ranking_pool = rows_strictly_after_context(post_event_rows, subseries)
+        ranking_pool = filter_rows_to_template_features(ranking_pool, template)
+        chunks = sample_subsequent_chunks(ranking_pool, n_chunks=4, min_chunk=5, max_chunk=7)
         if len(chunks) < 4:
             return None
 
@@ -774,23 +866,33 @@ def fill_template(
         question = fill(tmpl_text, event=event_description)
 
     elif tid == 2:
-        options, answer = build_multiselect_options_and_answer(
-            answer_format=answer_format,
-            baseline_subseries=baseline_rows,
-            post_event_rows=post_event_rows,
-            mc_option_lookup=mc_option_lookup,
-            episode_metadata=episode_metadata,
-        )
+        try:
+            options, answer = build_multiselect_options_and_answer(
+                answer_format=answer_format,
+                baseline_subseries=baseline_rows,
+                post_event_rows=post_event_rows,
+                mc_option_lookup=mc_option_lookup,
+                episode_metadata=episode_metadata,
+                source=robot_key(episode_metadata))
+        except ValueError:
+            # Not enough usable statements for this episode; skip the item
+            # rather than emit one with fewer than four options.
+            return None
         question = fill(tmpl_text, event=event_description)
 
     elif tid == 3:
-        options, answer = build_multiselect_options_and_answer(
-            answer_format=answer_format,
-            baseline_subseries=baseline_rows,
-            post_event_rows=post_event_rows,
-            mc_option_lookup=mc_option_lookup,
-            episode_metadata=episode_metadata,
-        )
+        try:
+            options, answer = build_multiselect_options_and_answer(
+                answer_format=answer_format,
+                baseline_subseries=baseline_rows,
+                post_event_rows=post_event_rows,
+                mc_option_lookup=mc_option_lookup,
+                episode_metadata=episode_metadata,
+                source=robot_key(episode_metadata))
+        except ValueError:
+            # Not enough usable statements for this episode; skip the item
+            # rather than emit one with fewer than four options.
+            return None
         question = fill(tmpl_text, event=event_description)
 
     elif tid == 6:
@@ -927,14 +1029,24 @@ def generate_level3_questions(
     mc_option_lookup: Optional[Dict[str, str]] = None,
     datasets: Optional[List[str]] = None,
     enumerate_mode: bool = False,
-    uploader: Optional[HfStreamUploader] = None,
-) -> None:
+    uploader: Optional[HfStreamUploader] = None) -> None:
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
 
     if mc_option_lookup is None:
         mc_option_lookup = {}
+
+    # Full option records (statement + required_features), needed to check an
+    # option's evidence against the episode. The id -> statement lookup above
+    # deliberately drops that metadata, so load the catalogue separately.
+    try:
+        mc_catalogue = load_json(datasets_dir / "mc_options" / "mc_options.json")
+        if not isinstance(mc_catalogue, list):
+            mc_catalogue = []
+    except Exception as exc:
+        logger.warning(f"Could not load MC option catalogue for availability filtering: {exc}")
+        mc_catalogue = []
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1030,8 +1142,7 @@ def generate_level3_questions(
             center_index=event_onset_idx,
             min_len=CONTEXT_MIN,
             max_len=CONTEXT_MAX,
-            margin=5,
-        )
+            margin=5)
         if sampled_window is None:
             continue
 
@@ -1075,6 +1186,29 @@ def generate_level3_questions(
 
         if template.get("type") == "predictive":
             effective_mc_lookup = {k: v for k, v in effective_mc_lookup.items() if k not in PREDICTIVE_EXCLUDED_MC_IDS}
+        # Drop options whose evidence this episode does not carry. Without this
+        # an item can ask about a channel the context never shows; on the
+        # released benchmark that affected 46-74% of options on these
+        # templates. Falls back to the unfiltered pool if too few survive.
+        # Check the option against what the *context* will show, not the whole
+        # episode. The context is trimmed to the template's important_features
+        # before it is written, so an episode can carry a channel the model
+        # never sees. That is how every TCP-tracking option on L2.2 and L2.3
+        # got through: those templates list 30 features and none of them is a
+        # TCP channel, yet the episode has all 24.
+        _avail_rows = list(subseries) + list(post_event_rows)
+        _imp_avail = template.get("important_features")
+        if _imp_avail:
+            _keep_avail = set(_imp_avail) | {"timestamp_ms"}
+            _avail_rows = [
+                {k: v for k, v in r.items() if k in _keep_avail} for r in _avail_rows
+            ]
+        effective_mc_lookup = filter_lookup_by_availability(
+            effective_mc_lookup,
+            mc_catalogue,
+            _avail_rows,
+            level=3)
+
 
         ep_metadata: Optional[Dict[str, Any]] = None
         ep_fault_id = None
@@ -1106,11 +1240,16 @@ def generate_level3_questions(
             _event_label = "an unspecified fault"
 
         # Include injection timestep unless the event spans the whole episode
-        # (event onset at index 0 = episode-wide fault)
+        # (event onset at index 0 = episode-wide fault).
+        # The timestep must be quoted on the same clock as the context the model
+        # sees, which was shifted to start at t=0 by normalize_timestamps above.
+        # event_time_ms is the first timestamp of the normalized post_event_rows,
+        # i.e. the onset on that shifted clock. Reading timestamp_ms straight off
+        # alt_rows here would quote the raw episode clock and point at a timestep
+        # that does not exist in the context window.
         _event_onset_idx = find_event_onset_index(alt_rows)
         if _event_onset_idx is not None and _event_onset_idx > 0:
-            _onset_ts = alt_rows[_event_onset_idx].get("timestamp_ms", _event_onset_idx)
-            _event_desc = f"{_event_label} occurs at timestep {_onset_ts} ms"
+            _event_desc = f"{_event_label} occurs at timestep {event_time_ms} ms"
         else:
             _event_desc = f"{_event_label} occurs"
 
@@ -1125,8 +1264,7 @@ def generate_level3_questions(
             steps_ahead=steps_ahead,
             episode_metadata=ep_metadata,
             dataset_name=sampled_dataset,
-            event_description=_event_desc,
-        )
+            event_description=_event_desc)
         if filled is None:
             continue
 
@@ -1196,46 +1334,53 @@ def main() -> None:
         "--datasets-dir",
         type=Path,
         default=repo_root / "data",
-        help="Root data directory (default: <repo>/data)",
-    )
+        help="Root data directory (default: <repo>/data)")
     parser.add_argument(
         "--output",
         type=Path,
         default=repo_root / "output" / "questions" / "level3",
-        help="Output directory (default: <repo>/output/questions/level3)",
-    )
+        help="Output directory (default: <repo>/output/questions/level3)")
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
-        help=f"Datasets to sample from (default: all). Choices: {CF_DATASET_FOLDERS}",
-    )
+        help=f"Datasets to sample from (default: all). Choices: {CF_DATASET_FOLDERS}")
     parser.add_argument(
         "--enumerate",
         dest="enumerate_mode",
         action="store_true",
         help="Walk every (template x cf_pair) combination deterministically instead "
              "of random sampling. -n becomes an upper cap. Combinations whose "
-             "pair does not satisfy the template's preconditions are skipped.",
-    )
+             "pair does not satisfy the template's preconditions are skipped.")
     add_streaming_args(parser)
+    parser.add_argument(
+        "--template-ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Restrict generation to these template ids (default: all). Useful "
+             "for regenerating a single template without rerunning the rest.")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
+    if getattr(args, "template_ids", None):
+        wanted = set(args.template_ids)
+        templates = [t for t in templates if t["id"] in wanted]
+        if not templates:
+            parser.error(f"No templates match --template-ids {sorted(wanted)}")
+
     root_causes = load_root_causes(args.datasets_dir / "labelling" / "rca" / "root_causes.json")
     events = load_events(args.datasets_dir / "labelling" / "events.json")
     mc_option_lookup = load_mc_option_lookup(
         args.datasets_dir / "mc_options" / "mc_options.json",
-        level=3,
-    )
+        level=3)
 
     args.output.mkdir(parents=True, exist_ok=True)
     uploader = make_uploader_from_args(args, level=3, output_dir=args.output)
@@ -1251,8 +1396,7 @@ def main() -> None:
         uploader=uploader,
         n=args.n,
         seed=args.seed,
-        datasets=args.datasets,
-    )
+        datasets=args.datasets)
 
 
 if __name__ == "__main__":

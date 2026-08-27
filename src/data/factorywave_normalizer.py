@@ -66,56 +66,56 @@ def _build_column_mapping() -> Dict[str, Optional[str]]:
     m: Dict[str, Optional[str]] = {}
 
     for i in range(6):
-        # INTENT — joint commands
+        # INTENT, joint commands
         m[f"setpoint_pos_{i}"] = f"target_joint_{i}"
         m[f"setpoint_speed_{i}"] = f"target_joint_vel_{i}"
         m[f"setpoint_acc_{i}"] = f"target_joint_accel_{i}"
 
-        # OUTCOME — joint feedback
+        # OUTCOME, joint feedback
         m[f"feedback_pos_{i}"] = f"joint_{i}"
         m[f"feedback_speed_{i}"] = f"joint_vel_{i}"
 
-        # OUTCOME — effort / current
+        # OUTCOME, effort / current
         m[f"effort_current_{i}"] = f"joint_current_{i}"
         m[f"effort_target_current_{i}"] = f"target_joint_current_{i}"
         m[f"effort_target_torque_{i}"] = None
 
-        # OUTCOME — controller output
+        # OUTCOME, controller output
         m[f"control_output_{i}"] = f"joint_control_output_{i}"
 
-        # CONTEXT — per-joint
+        # CONTEXT, per-joint
         m[f"joint_temp_{i}"] = f"joint_temp_{i}"
         m[f"joint_mode_{i}"] = f"joint_mode_{i}"
         m[f"joint_voltage_{i}"] = None
 
-    # INTENT — TCP commands
+    # INTENT, TCP commands
     for i, axis in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
         m[f"setpoint_tcp_{i}"] = f"target_tcp_{axis}"
         m[f"setpoint_tcp_speed_{i}"] = f"target_tcp_speed_{axis}"
 
-    # OUTCOME — TCP feedback
+    # OUTCOME, TCP feedback
     for i, axis in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
         m[f"feedback_tcp_{i}"] = f"tcp_{axis}"
         m[f"feedback_tcp_speed_{i}"] = f"tcp_speed_{axis}"
 
-    # OUTCOME — forces/torques
+    # OUTCOME, forces/torques
     for i, axis in enumerate(["x", "y", "z"]):
         m[f"true_force_{i}"] = f"tcp_force_{axis}"
         m[f"true_force_{i + 3}"] = f"tcp_torque_{axis}"
     for i in range(6):
         m[f"est_contact_force_{i}"] = None
 
-    # OUTCOME — vibration (tool accelerometer)
+    # OUTCOME, vibration (tool accelerometer)
     for i, axis in enumerate(["x", "y", "z"]):
         m[f"vibration_{i}"] = f"tool_accel_{axis}"
 
     m["acoustic_0"] = None
     m["protective_stop_state"] = None
 
-    # INTENT — gripper
+    # INTENT, gripper
     m["gripper_command"] = "force"  # gripper force as proxy for grip command
 
-    # CONTEXT — system-level
+    # CONTEXT, system-level
     m["robot_mode"] = "robot_mode"
     m["safety_mode"] = "safety_mode"
     m["digital_input_bits"] = "digital_inputs"
@@ -260,8 +260,7 @@ def _infer_task_from_phases(rows: List[Dict[str, Any]], fault_id: Optional[int] 
 
 def _inject_fault_flip_if_missing(
     rows: List[Dict[str, Any]],
-    fault_id: Optional[int],
-) -> bool:
+    fault_id: Optional[int]) -> bool:
     """For fault 32/34 peg-in-hole episodes the raw `fault` column stays 0.
     If no flip is present, mark every row from the first `insert` phase row
     (task_phase == "1") onward with the metadata fault_id. Mutates `rows`.
@@ -281,8 +280,7 @@ def _inject_fault_flip_if_missing(
 
 def _align_fault_flip_to_protective_stop(
     rows: List[Dict[str, Any]],
-    fault_id: Optional[int],
-) -> bool:
+    fault_id: Optional[int]) -> bool:
     """For fault 19 (joint-limit) and 37 (self-collision) episodes, force
     fault_label/event to flip from 0 to fault_id at the first safety_mode
     NORMAL(1) -> PROTECTIVE_STOP(3) transition. Mutates `rows`. Returns True
@@ -332,8 +330,7 @@ def _to_int(value) -> Optional[int]:
 def normalize_episode_df(
     ep_df: pd.DataFrame,
     first_timestamp_us: int,
-    metadata_fault_id: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+    metadata_fault_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """Convert a single episode DataFrame to list of UR3e schema dicts.
 
     Args:
@@ -514,7 +511,7 @@ def _find_fault_onset(ep_df: pd.DataFrame) -> Optional[int]:
     """
     faults = pd.to_numeric(ep_df["fault"], errors="coerce").fillna(0).values
     if faults[0] != 0:
-        # Fault present from the start — check if it was absent at any point
+        # Fault present from the start, check if it was absent at any point
         # (this means no pre-fault segment exists)
         return None
     for i in range(1, len(faults)):
@@ -529,8 +526,7 @@ def normalize_dataset(
     target_hz: int = TARGET_HZ,
     limit: Optional[int] = None,
     cf_limit: Optional[int] = None,
-    tasks: Optional[List[str]] = None,
-) -> None:
+    tasks: Optional[List[str]] = None) -> None:
     """Normalize FactoryWave ur_signals to per-episode UR3e schema JSON files.
 
     For counterfactual episodes: selects the best CF per baseline group using
@@ -576,7 +572,7 @@ def normalize_dataset(
     logger.info(f"Episode metadata loaded: {len(ep_lookup)} episodes, "
                 f"{len(cf_groups)} CF groups ({len(cf_episode_ids)} CF episodes)")
 
-    # Find signal parquet files — prefer pre-downsampled 10hz files
+    # Find signal parquet files, prefer pre-downsampled 10hz files
     signal_paths = []
     for subdir in ["ur_signals_10hz", "ur_signals_10hz_sub", "ur_screwdriver_10hz"]:
         p = input_dir / subdir / "data.parquet"
@@ -637,7 +633,7 @@ def normalize_dataset(
             cf_cache = json.load(f)
         logger.info(f"Loaded CF selection cache: {len(cf_cache)} groups")
     else:
-        logger.info("No CF selection cache found — will compute KL on the fly")
+        logger.info("No CF selection cache found, will compute KL on the fly")
 
     # ---------------------------------------------------------------
     # Narrow needed_ids using cache (only load baseline + best CF)
@@ -655,7 +651,7 @@ def normalize_dataset(
                 needed_ids.add(best_cf_id)
                 cached_cf_ids.add(best_cf_id)
             else:
-                # No cache entry — load all candidates for on-the-fly KL
+                # No cache entry, load all candidates for on-the-fly KL
                 needed_ids.add(bl_id)
                 needed_ids.update(cids)
         # Regular episodes (cap by limit)
@@ -864,7 +860,7 @@ def normalize_dataset(
             regular_processed += 1
             continue
 
-        # Normalize — use metadata fault_id for episodes where signal fault column is 0
+        # Normalize, use metadata fault_id for episodes where signal fault column is 0
         ep_row = ep_lookup[ep_id_str]
         ep_meta = ep_row.get("_meta", {})
         meta_fault_id = _to_int(ep_meta.get("fault_id")) if isinstance(ep_meta, dict) else None
@@ -983,49 +979,41 @@ def main() -> int:
         "--input",
         type=Path,
         default=repo_root / "data" / "factorywave" / "data",
-        help="Input directory containing episode.parquet and ur_signals parquet files",
-    )
+        help="Input directory containing episode.parquet and ur_signals parquet files")
     parser.add_argument(
         "--output",
         type=Path,
         default=repo_root / "data" / "normalized_episodes",
-        help="Output directory for normalized JSON files",
-    )
+        help="Output directory for normalized JSON files")
     parser.add_argument(
         "--target-hz",
         type=int,
         default=TARGET_HZ,
-        help=f"Target sampling rate after decimation (default: {TARGET_HZ})",
-    )
+        help=f"Target sampling rate after decimation (default: {TARGET_HZ})")
     parser.add_argument(
         "--limit",
         type=int,
         default=None,
-        help="Limit number of regular (non-CF) episodes to normalize",
-    )
+        help="Limit number of regular (non-CF) episodes to normalize")
     parser.add_argument(
         "--cf-limit",
         type=int,
         default=None,
-        help="Limit number of counterfactual groups to normalize",
-    )
+        help="Limit number of counterfactual groups to normalize")
     parser.add_argument(
         "--tasks",
         nargs="+",
         default=None,
-        help="Filter by task (e.g. pick_and_place peg_in_hole)",
-    )
+        help="Filter by task (e.g. pick_and_place peg_in_hole)")
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="Enable verbose logging",
-    )
+        help="Enable verbose logging")
     args = parser.parse_args()
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     try:
         normalize_dataset(
@@ -1034,8 +1022,7 @@ def main() -> int:
             target_hz=args.target_hz,
             limit=args.limit,
             cf_limit=args.cf_limit,
-            tasks=args.tasks,
-        )
+            tasks=args.tasks)
         return 0
     except Exception as e:
         logger.error(f"Normalization failed: {e}")

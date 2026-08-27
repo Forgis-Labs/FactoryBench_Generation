@@ -1,33 +1,24 @@
+# Conda shim. It creates an interpreter and hands everything else to pip, so
+# there is exactly one place where dependencies are declared (pyproject.toml).
+#
+# This file used to carry its own parallel dependency list, which drifted:
+# it still named click, fastapi, uvicorn and pydantic, all of which belonged
+# to a package that no longer exists, and named none of torch, requests,
+# huggingface-hub or the cloud SDKs the code actually imports.
+#
+#   conda env create -f environment.yaml
+#   conda activate factorybench
+#
+# Extras, if you need them:
+#   pip install -e ".[gcp]"        Vertex AI inference
+#   pip install -e ".[aws]"        retired Bedrock/SageMaker path
+#   pip install -e ".[finetune]"   Shrike DoRA training and eval
+#   pip install -e ".[dev]"        pytest, ruff, mypy
 name: factorybench
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - python>=3.11
   - pip>=23.0
-
-  # Core dependencies
-  - click>=8.1.7
-  - fastapi>=0.115.0
-  - uvicorn>=0.30.0
-  - pydantic>=2.8.0
-  - python-dotenv>=1.0.1
-  - numpy>=1.26.0
-  - matplotlib>=3.8.0
-  - seaborn>=0.13.0
-
-  # Data processing
-  - pandas>=2.1.0
-  - openpyxl>=3.1.0
-  - scipy>=1.11.0
-  - h5py>=3.10.0
-
-  # Development tools (optional)
-  - pytest>=7.4.0
-  - ruff>=0.6.0
-  - mypy>=1.11.0
-
-  # Pip-only packages
   - pip:
-      - datasets>=2.20.0
-      - openai>=1.43.0
+      - -e .

@@ -5,7 +5,7 @@ TikZ/LaTeX document, compiling it with `latexmk`, and feeding any compilation
 errors back to the model until it builds. Optionally runs a visual review
 pass against the rendered PNG.
 
-The output is a real, editable `.tex` file — not a raster image — so you get
+The output is a real, editable `.tex` file, not a raster image, so you get
 a solid starting point that you can polish by hand or drop straight into your
 paper with `\input{figure.tex}` or `\includegraphics{figure.pdf}`.
 
@@ -36,7 +36,7 @@ REASONING_MODEL="claude-opus-4-6"
 REASONING_ENDPOINT="<base_endpoint>/anthropic/v1"
 ```
 
-The image endpoint is no longer needed — figures are produced as TikZ code.
+The image endpoint is no longer needed, figures are produced as TikZ code.
 
 ### Usage
 
@@ -81,11 +81,11 @@ python scripts/neurips_image_generator.py \
 
 Each run creates a timestamped folder in `outputs/` containing:
 
-- `figure.tex` — final standalone LaTeX source (edit this by hand)
-- `figure.pdf` — compiled PDF
-- `figure.png` — PNG preview (only with `--png` or `--visual-review`)
-- `figure_attempt_N.tex` — intermediate sources from the compile-fix loop
-- `review_iter_N.tex` / `review_iter_N.txt` — visual-review iterations
-- `compile_log.txt` — full pdflatex log from the last attempt
-- `prompt.txt` — the resolved prompt (with colors injected)
-- `metadata.json` — run config and cost summary
+- `figure.tex`, final standalone LaTeX source (edit this by hand)
+- `figure.pdf`, compiled PDF
+- `figure.png`, PNG preview (only with `--png` or `--visual-review`)
+- `figure_attempt_N.tex`, intermediate sources from the compile-fix loop
+- `review_iter_N.tex` / `review_iter_N.txt`, visual-review iterations
+- `compile_log.txt`, full pdflatex log from the last attempt
+- `prompt.txt`, the resolved prompt (with colors injected)
+- `metadata.json`, run config and cost summary

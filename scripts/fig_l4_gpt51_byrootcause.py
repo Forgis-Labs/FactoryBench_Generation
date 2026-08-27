@@ -75,29 +75,31 @@ def set_style() -> None:
     })
 
 
-def load_records():
-    qmap = {}
-    for f in glob.glob(str(REPO / "output/test_eval/questions/level4/*.json")):
-        d = json.load(open(f))
-        qmap[d["id"]] = d
+def load_records(questions_dir=None, replies_dir=None):
+    """Join GPT-5.1's Level-4 replies to their questions.
 
-    prompts_dir = REPO / "output/test_eval/prompts/level4"
+    Replies are matched to questions on the file stem rather than through the
+    prompt file's ``qa_pair_id``: the Lite runs name a reply after the question
+    it came from (``q_00007_7_answer.json`` for ``q_00007.json``), so the join
+    needs no prompt directory and no id lookup.
+    """
+    qdir = pathlib.Path(questions_dir) if questions_dir else REPO / "output/test_eval/questions/level4"
+    rdir = pathlib.Path(replies_dir) if replies_dir else REPO / "output/test_eval/replies/level4/gpt-5_1-1"
+
+    qmap = {}
+    for f in glob.glob(str(qdir / "*.json")):
+        d = json.load(open(f, encoding="utf-8"))
+        qmap[pathlib.Path(f).stem] = d
 
     records = []
-    for f in sorted(glob.glob(str(
-            REPO / "output/test_eval/replies/level4/gpt-5_1-1/level4_*_answer.json"))):
-        a = json.load(open(f))
+    for f in sorted(glob.glob(str(rdir / "*_answer.json"))):
+        a = json.load(open(f, encoding="utf-8"))
         if a.get("llm_judge_score") is None:
             continue
-        pf = os.path.basename(a["prompt_file"])
-        try:
-            p = json.load(open(prompts_dir / pf))
-        except FileNotFoundError:
+        stem = "_".join(pathlib.Path(f).name.split("_")[:2])
+        q = qmap.get(stem)
+        if q is None:
             continue
-        qid = p.get("metadata", {}).get("qa_pair_id")
-        if qid is None or qid not in qmap:
-            continue
-        q = qmap[qid]
         records.append({
             "template_type": q["template_type"],
             "root_cause":    q.get("root_cause"),
@@ -170,8 +172,13 @@ def stacked_bar(ax, buckets, key_order, display_map, title, min_n=2,
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--questions-dir")
+    ap.add_argument("--replies-dir")
+    args = ap.parse_args()
     set_style()
-    records = load_records()
+    records = load_records(args.questions_dir, args.replies_dir)
     print(f"loaded {len(records)} GPT-5.1 L4 records")
 
     troubleshooting = defaultdict(list)

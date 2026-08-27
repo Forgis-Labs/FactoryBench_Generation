@@ -3,7 +3,7 @@ Gripper Release Injection (event 14) applicator.
 
 Simulates a mid-motion payload release: the gripper suddenly opens
 during a grip phase, dropping the workpiece.  The release is a
-one-shot action at the start of the event — the finger_joint target
+one-shot action at the start of the event, the finger_joint target
 is forced to 0 (open) and the drive stiffness is temporarily reduced
 so the fingers spring open.  Original values are restored on end.
 
@@ -21,20 +21,19 @@ import numpy as np
 from event_injection.applicators.base import BaseApplicator
 from event_injection.context import SimContext
 
-# Short duration — the release is a brief event, the consequence
+# Short duration, the release is a brief event, the consequence
 # (dropped cube) persists through normal sim physics.
 _DEFAULT_DURATION_RANGE = (20, 60)
 
 
 class GripperReleaseApplicator(BaseApplicator):
-    """Event 14: Gripper Release — mid-motion payload drop."""
+    """Event 14: Gripper Release, mid-motion payload drop."""
 
-    valid_phases = [4, 5, 6]  # lift, move_xy, lower — gripper is holding
+    valid_phases = [4, 5, 6]  # lift, move_xy, lower, gripper is holding
 
     def __init__(
         self,
-        duration_range: tuple = _DEFAULT_DURATION_RANGE,
-    ):
+        duration_range: tuple = _DEFAULT_DURATION_RANGE):
         self._dur_range = duration_range
         self._original_max_force: float | None = None
         self._original_stiffness: float | None = None
@@ -69,7 +68,7 @@ class GripperReleaseApplicator(BaseApplicator):
             drive.GetStiffnessAttr().Set(0.1)
             drive.GetMaxForceAttr().Set(0.1)
 
-            print(f"[GripperRelease] START — gripper forced open "
+            print(f"[GripperRelease] START, gripper forced open "
                   f"(release_time={params['release_time']:.2f})")
         except Exception as e:
             print(f"[GripperRelease] on_start failed: {e}")
@@ -99,7 +98,7 @@ class GripperReleaseApplicator(BaseApplicator):
                 drive = UsdPhysics.DriveAPI(fj_prim, "angular")
                 drive.GetMaxForceAttr().Set(self._original_max_force)
                 drive.GetStiffnessAttr().Set(self._original_stiffness)
-                print(f"[GripperRelease] END — finger_joint drive restored")
+                print(f"[GripperRelease] END, finger_joint drive restored")
         except Exception as e:
             print(f"[GripperRelease] on_end failed: {e}")
         finally:

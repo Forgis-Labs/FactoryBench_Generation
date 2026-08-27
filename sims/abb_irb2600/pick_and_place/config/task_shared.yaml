@@ -1,6 +1,6 @@
 # FactoryBench / abb_irb2600 / pick_and_place - task configuration (shared schema)
 # ABB IRB 2600-12/1.65: 6-DOF, ~1650mm reach, 12kg payload.
-# Large workspace — workcell scaled up from UR5.
+# Large workspace, workcell scaled up from UR5.
 # Joint names: joint_1..joint_6, EEF chain: link_6 -> flange -> tool0
 
 robot:

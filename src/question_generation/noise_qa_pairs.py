@@ -1,6 +1,6 @@
 """Noise the time-series numbers in generated QA pairs.
 
-Same questions, options, answers, provenance — only the numerical time-series
+Same questions, options, answers, provenance, only the numerical time-series
 values change. For each float-valued feature, the first value is preserved and
 subsequent values follow a random walk:
 
@@ -36,8 +36,8 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # Row formats:
-#   Context rows:    "t=339: fp0=58.55, fp1=-101.28, ..."
-#   Option chunks:   "fp0=58.55, fp1=-101.28, ..." (no t= prefix)
+#   Context rows:    "t=339: fp0=58.55, fp1=-101.28..."
+#   Option chunks:   "fp0=58.55, fp1=-101.28..." (no t= prefix)
 #   Multi-row chunks are joined by " | " (encode_chunk).
 _ROW_PREFIX_RE = re.compile(r"^(t=-?\d+(?:\.\d+)?\s*:\s*)(.*)$")
 _KV_RE = re.compile(r"\s*([^=,\s]+)\s*=\s*(-?[^,]+?)\s*(?:,|$)")
@@ -103,7 +103,7 @@ def _noise_rows(rows: List[Tuple[str, Dict[str, str]]], sigma: float, rng: np.ra
         # Preserve any feature with non-finite values (nan/inf) as-is.
         if any(not np.isfinite(v) for v in values):
             continue
-        # Preserve integer-formatted features as-is (phase, fault label, modes, ...)
+        # Preserve integer-formatted features as-is (phase, fault label, modes...)
         if all(_is_integer_string(rows[i][1][feat]) for i in range(len(rows))):
             continue
         # Random walk from the original first value
@@ -203,33 +203,28 @@ def main() -> None:
         "--input",
         type=Path,
         default=Path("output/questions"),
-        help="Root containing level{1,2,3,4} subdirs (default: output/questions)",
-    )
+        help="Root containing level{1,2,3,4} subdirs (default: output/questions)")
     parser.add_argument(
         "--output",
         type=Path,
         default=Path("output/questions_noised"),
-        help="Output root, mirrored to level{1,2,3,4} subdirs (default: output/questions_noised)",
-    )
+        help="Output root, mirrored to level{1,2,3,4} subdirs (default: output/questions_noised)")
     parser.add_argument(
         "--sigma",
         type=float,
         default=0.5,
-        help="Single global gaussian noise stddev added per timestep (default: 0.5)",
-    )
+        help="Single global gaussian noise stddev added per timestep (default: 0.5)")
     parser.add_argument(
         "--levels",
         nargs="+",
         type=int,
         default=[1, 2, 3, 4],
-        help="Levels to process (default: 1 2 3 4)",
-    )
+        help="Levels to process (default: 1 2 3 4)")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     total = 0
     for level in args.levels:
