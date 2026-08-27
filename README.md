@@ -117,6 +117,14 @@ See [`docs/BUILDING.md`](docs/BUILDING.md) for the paper builds and
 [`src/evaluation/gcp-setup.md`](src/evaluation/gcp-setup.md) for wiring up an
 inference provider.
 
+The three non-panel baselines in the appendices each ship their code:
+
+| Baseline | Appendix | Code |
+|---|---|---|
+| Time-series foundation models (Chronos-Bolt, TimesFM-2.5) | `app:chronos-baseline` | [`experiments/v1/`](experiments/v1/) |
+| Tool-augmented ReAct agent | `app:agent-baseline` | [`src/agentic/`](src/agentic/) |
+| Linear probing of frozen activations | `app:probing` | [`scripts/probing/`](scripts/probing/) |
+
 ## Citation
 
 ```bibtex
