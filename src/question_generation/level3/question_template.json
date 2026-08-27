@@ -2,7 +2,7 @@
   {
     "id": 1,
     "type": "predictive",
-    "template": "Given the baseline sensor stream below and the counterfactual scenario where {event}, rank the signal segments listed in the 'options' field in the order you would expect them to appear as the event manifests. Answer only with a four letter string indicating your ranking (ie. DCAB), nothing else.",
+    "template": "Given the baseline sensor stream below and the episode where {event}, rank the signal segments listed in the 'options' field in the order you would expect them to appear as the event manifests. Answer only with a four letter string indicating your ranking (ie. DCAB), nothing else.",
     "answer_format": {
       "type": "ranking",
       "n_items": 4,
@@ -44,7 +44,7 @@
   {
     "id": 2,
     "type": "intervention_outcome",
-    "template": "Given the counterfactual scenario where {event}, what would most likely happen next? Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
+    "template": "Given the episode where {event}, what would most likely happen next? Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "n_choices": 4,
@@ -57,7 +57,7 @@
   {
     "id": 3,
     "type": "trajectory_outcome_multiselect",
-    "template": "Given the counterfactual scenario where {event}, select all statements that would apply. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
+    "template": "Given the episode where {event}, select all statements that would apply. Answer only with a 4 letter string using F and T to indicate your answers (ie. TFFT to indicate True, False, False, True). Do not output anything else.",
     "answer_format": {
       "type": "multiple_choice_multi_select",
       "fixed_options": [],
@@ -67,7 +67,7 @@
   {
     "id": 4,
     "type": "predictive",
-    "template": "In the counterfactual scenario where {event}, what would be the expected value of {signal} at T+{n}ms? Answer only with an integer or decimal number, nothing else.",
+    "template": "In the episode where {event}, what would be the expected value of {signal} at T+{n}ms? Answer only with an integer or decimal number, nothing else.",
     "answer_format": {
       "type": "numerical",
       "notes": "Single float value with unit. Accept answers within a tolerance band."
@@ -108,7 +108,7 @@
   {
     "id": 5,
     "type": "predictive",
-    "template": "In the counterfactual scenario where {event}, what would be the expected values of {joint_signal} at T+{n}ms? Answer only with a list of 6 numbers (integer or decimal) formatted as a JSON array, ie. [10.2,9,2.1,1,7,0.21]. Do not return anything else.",
+    "template": "In the episode where {event}, what would be the expected values of {joint_signal} at T+{n}ms? Answer only with a list of 6 numbers (integer or decimal) formatted as a JSON array, ie. [10.2,9,2.1,1,7,0.21]. Do not return anything else.",
     "answer_format": {
       "type": "tensor",
       "shape": [

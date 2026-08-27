@@ -49,22 +49,40 @@ JUDGED_TEMPLATE_IDS = {1, 2}
 def _question_path_for(reply_file: Path, questions_root: Path) -> Optional[Path]:
     """Derive the question JSON path from a reply filename.
 
-    Handles both filename formats produced by the pipeline:
-      - numeric index:  ``level4_0042_2_answer.json``
-      - UUID (HF eval): ``level4_<uuid>_2_answer.json``
+    Handles three filename formats produced by the pipeline:
+      - numeric index:            ``level4_0042_2_answer.json``
+      - UUID (paper HF eval):     ``level4_<uuid>_2_answer.json``
+      - bare UUID (KUKA rebuttal):``<uuid>_2_answer.json``  — level is inferred
+                                  from the parent ``level<N>`` directory.
 
-    The question stem is always ``{reply_stem_without_tid}``, i.e. we strip
-    ``_answer.json``, then strip the last ``_<tid>`` token.
+    Question stem is ``custom_id`` with the trailing ``_<tid>`` stripped.
     """
     name = reply_file.name
     if not name.endswith("_answer.json"):
         return None
-    custom_id = name[: -len("_answer.json")]   # e.g. "level4_<uuid>_0"
-    question_stem = custom_id.rsplit("_", 1)[0]  # e.g. "level4_<uuid>"
-    m = re.match(r"^level(\d+)_", question_stem)
-    if not m:
+    custom_id = name[: -len("_answer.json")]
+    # UUIDs contain hyphens (no underscores), so any underscore in custom_id
+    # is either the "level<N>_" prefix separator or the trailing "_<idx>".
+    # Only strip a trailing _<digits> as the idx; without that guard we
+    # eat the level prefix on "level4_<uuid>" (no idx) and end up with just
+    # "level4" as the question stem.
+    question_stem = re.sub(r"_\d+$", "", custom_id)
+    m = re.match(r"^level(\d+)_(.+)$", question_stem)
+    if m:
+        level = m.group(1)
+        # Two variants in the wild: questions may be named "level<N>_<uuid>.json"
+        # (paper snapshot) or "<uuid>.json" (KUKA / eval_test_set unpack). Try
+        # the prefixed form first, fall back to the bare uuid.
+        prefixed = questions_root / f"level{level}" / f"{question_stem}.json"
+        if prefixed.exists():
+            return prefixed
+        return questions_root / f"level{level}" / f"{m.group(2)}.json"
+    # Bare-UUID reply → level comes from the parent path (…/level4/<model>/…)
+    parts = reply_file.parts
+    level_dir = next((p for p in parts if p.startswith("level") and p[5:].isdigit()), None)
+    if level_dir is None:
         return None
-    level = m.group(1)
+    level = level_dir[5:]
     return questions_root / f"level{level}" / f"{question_stem}.json"
 
 
@@ -110,7 +128,7 @@ def _collect_items(
             if not model_dir.is_dir():
                 continue
             model_slug = model_dir.name
-            for reply_file in sorted(model_dir.glob("level*_*_answer.json")):
+            for reply_file in sorted(model_dir.glob("*_answer.json")):
                 try:
                     reply = json.loads(reply_file.read_text(encoding="utf-8"))
                 except Exception as exc:

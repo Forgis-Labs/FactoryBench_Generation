@@ -33,7 +33,11 @@ from typing import List
 
 from dotenv import load_dotenv
 from huggingface_hub import HfApi
-from huggingface_hub.errors import HfHubHTTPError, RepositoryNotFoundError
+try:
+    from huggingface_hub.errors import HfHubHTTPError, RepositoryNotFoundError
+except ImportError:
+    # huggingface_hub <0.25 exposes these under utils._errors
+    from huggingface_hub.utils import HfHubHTTPError, RepositoryNotFoundError
 
 load_dotenv()
 

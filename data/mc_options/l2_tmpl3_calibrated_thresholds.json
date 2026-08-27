@@ -1,0 +1,7 @@
+{
+  "tracking_increase": 0.005,
+  "tracking_stable_increase": 0.002,
+  "current_peak_increase": 2.4,
+  "temp_rise_slope": 0.0001,
+  "temp_stable_slope": 0.0035
+}

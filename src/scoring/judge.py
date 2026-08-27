@@ -33,10 +33,20 @@ PREDICTION_MAX_CHARS = 8000
 _FREE_FORM_PROMPT = """You are an expert evaluator for a robotics sensor-data Q&A benchmark.
 Score a model's free-form answer against a reference answer.
 
-Scoring (per the FactoryBench paper §3.2):
-  1.0 (Correct):  semantically equivalent to the reference (correct direction, signal, magnitude, time window).
-  0.5 (Neutral):  partially correct or imprecise but on-topic.
-  0.0 (Wrong):    incorrect, irrelevant, or refuses to answer.
+Scoring:
+  1.0 (Correct):  semantically equivalent to the reference: it gives the correct
+                  root cause / misconfigured parameter AND a plausible corrective
+                  step (exact wording of the fix is NOT required).
+  0.5 (Neutral):  on-topic AND it identifies the correct root cause / misconfigured
+                  parameter, even if imprecise or without the corrective step.
+  0.0 (Wrong):    incorrect, irrelevant, names the WRONG root cause, is a generic
+                  list that MISSES the specific parameter, claims a fault when the
+                  reference says the machine is normal (or vice versa), or refuses
+                  to answer.
+
+Being merely "on-topic" is NOT enough for 0.5: the answer must identify the actual
+root cause / parameter from the reference. A generic list of tuning suggestions
+that does not single out the reference's specific cause/parameter is 0.0.
 
 Respond with ONLY a JSON object on a single line, no markdown:
 {{"score": <0.0|0.5|1.0>, "reason": "<one short sentence>"}}

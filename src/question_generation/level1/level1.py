@@ -47,6 +47,7 @@ from src.question_generation.utils.template import (
 )
 from src.question_generation.utils.time_series import (
     pick_fault_label,
+    pick_fault_label_from_meta_or_rows,
 )
 from src.question_generation.utils.relevance import (
     is_enabled as relevance_enabled,
@@ -94,7 +95,12 @@ for _i in range(6):
     SIGNAL_DISPLAY_NAMES[f"setpoint_acc_{_i}"] = f"the commanded acceleration of joint {_i}"
     SIGNAL_DISPLAY_NAMES[f"effort_current_{_i}"] = f"the motor current of joint {_i}"
     SIGNAL_DISPLAY_NAMES[f"effort_target_current_{_i}"] = f"the target current of joint {_i}"
-    SIGNAL_DISPLAY_NAMES[f"effort_target_torque_{_i}"] = f"the motor torque of joint {_i}"
+    # On KUKA this channel is measured motor current times a fixed per-joint
+    # gain (spread 1-7% across episodes), so it is an actual-side quantity
+    # wearing a model-side name. Reading it as the controller's commanded
+    # torque leads a careful solver to a confidently wrong answer, which is
+    # worse than the channel being absent.
+    SIGNAL_DISPLAY_NAMES[f"effort_target_torque_{_i}"] = f"the joint torque estimate of joint {_i}"
     SIGNAL_DISPLAY_NAMES[f"control_output_{_i}"] = f"the control output of joint {_i}"
     SIGNAL_DISPLAY_NAMES[f"joint_temp_{_i}"] = f"the temperature of joint {_i}"
     SIGNAL_DISPLAY_NAMES[f"joint_mode_{_i}"] = f"the mode of joint {_i}"
@@ -118,6 +124,30 @@ SIGNAL_DISPLAY_NAMES["robot_current"] = "the robot current"
 SIGNAL_DISPLAY_NAMES["main_voltage"] = "the main voltage"
 SIGNAL_DISPLAY_NAMES["robot_voltage"] = "the robot voltage"
 SIGNAL_DISPLAY_NAMES["tool_momentum"] = "the tool momentum"
+
+
+
+_EPISODE_META_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+def _episode_meta(ep_path: Path) -> Dict[str, Any]:
+    """This episode's metadata, cached. Empty dict when there is none."""
+    key = str(ep_path)
+    cached = _EPISODE_META_CACHE.get(key)
+    if cached is None:
+        meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
+        cached = {}
+        if meta_path.exists():
+            try:
+                loaded = load_json(meta_path)
+                if isinstance(loaded, dict):
+                    cached = loaded
+            except Exception:
+                cached = {}
+        if len(_EPISODE_META_CACHE) > 8192:
+            _EPISODE_META_CACHE.clear()
+        _EPISODE_META_CACHE[key] = cached
+    return cached
 
 
 def _phase_display_name(phase_raw: str, task: str = "pick_and_place") -> str:
@@ -351,6 +381,19 @@ def build_anomaly_single_select(
     NO_ANOMALY_FID = 0
     is_normal = fault_label == 0 or fault_label not in root_causes
 
+    def _is_placeholder(rc: Dict[str, Any]) -> bool:
+        """A catalogue entry that was never written.
+
+        Two entries (fault_id 6 and 12) read "Voraus-AD dataset anomaly class N.
+        Semantic description pending curation." On the release one of them is
+        the correct answer to 1,471 items, 17.8% of the template, and there is
+        nothing in the text to check against the sensor data. They cannot be a
+        distractor either: an option nobody can interpret is not a choice.
+        Writing real descriptions needs someone who knows what those Voraus-AD
+        classes are, so until then the fault is unusable here.
+        """
+        return "pending curation" in str((rc or {}).get("description", "")).lower()
+
     def _desc_for(rc: Dict[str, Any]) -> str:
         return rc.get("description") or rc.get("root_cause", "").replace("_", " ")
 
@@ -358,6 +401,8 @@ def build_anomaly_single_select(
     pool: List[Tuple[int, str]] = []
     for fid, rc in root_causes.items():
         if not isinstance(fid, int) or fid <= 0:
+            continue
+        if _is_placeholder(rc):
             continue
         d = _desc_for(rc)
         if d:
@@ -368,6 +413,9 @@ def build_anomaly_single_select(
         correct_fid = NO_ANOMALY_FID
         correct_desc = _NO_ANOMALY_DESC
     else:
+        if _is_placeholder(root_causes.get(fault_label)):
+            # the answer itself is unverifiable, so there is no item to build
+            return {}, ""
         correct_fid = fault_label
         correct_desc = _desc_for(root_causes[fault_label])
 
@@ -563,46 +611,85 @@ def build_severity_ranking(
     max_chunk: int = 7,
     relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     tasks: Optional[List[str]] = None,
-) -> Optional[Tuple[Dict[str, str], str]]:
-    """
-    Build ranking options + answer string for template 5.
-    Each option is a short encoded chunk from one episode filtered by important_features.
-    Answer ranks options from most to least severe.
+) -> Optional[Tuple[Dict[str, str], str, Dict[str, Any]]]:
+    """Ranking options, answer string, and the legend describing them.
 
-    When relevance_specs and tasks are provided, each chunk is anchored on the
-    episode's fault-relevance spec so the ranking compares evidence-bearing
-    segments, not arbitrary slices.
+    Four defects were fixed here together, because each one alone still left
+    the template unanswerable:
+
+    * **Ties made the answer positional.** Severity is a per-fault rank, so two
+      segments of the same fault tie, and ``sorted`` is stable, so a tie left
+      the labels in their original order. With every segment tied the answer is
+      literally "ABCD", which is why that one string covered 21.5% of released
+      items against the 4.2% chance rate: the strongest pattern in the template
+      was the sort being a no-op. Segments must now carry four distinct
+      severity ranks.
+
+    * **Labels tracked sampling order.** Even without ties, option A was always
+      the first episode sampled. Labels are now assigned by an independent
+      shuffle so position says nothing about severity.
+
+    * **The options described different signals.** Each chunk kept whatever its
+      own episode happened to record, so 78% of released items asked the model
+      to compare segments over different channel sets. The chunks are now
+      restricted to the channels all four share.
+
+    * **Nothing was labelled.** Timestamps were stripped and no legend was
+      emitted anywhere, so every item shipped bare numbers under unexplained
+      prefixes. Timestamps are kept and the acronym legend is returned for the
+      caller to attach to the item.
     """
     keep = set(important_features) if important_features else None
-    labels = ["A", "B", "C", "D"]
-    labeled: List[Tuple[str, str, int]] = []
     specs = relevance_specs or {}
     tasks = tasks or []
 
+    chunks: List[List[Dict[str, Any]]] = []
+    ranks: List[int] = []
     for i, (rows, fault_label) in enumerate(segments[:4]):
         rc = root_causes.get(fault_label, root_causes.get(0, {}))
-        srank = get_severity_rank(fault_label, rc)
-
         spec = specs.get(fault_label)
         task = tasks[i] if i < len(tasks) else ""
         chunk_result = sample_with_relevance(rows, fault_label, spec, task, min_chunk, max_chunk)
         if chunk_result is None:
             return None
-        chunk, _, _ = chunk_result
-        stripped = [
-            {k: v for k, v in r.items() if k != "timestamp_ms" and (keep is None or k in keep)}
-            for r in chunk
-        ]
-        encoded = encode_chunk(stripped)
-        labeled.append((labels[i], encoded, srank))
+        chunks.append(chunk_result[0])
+        ranks.append(get_severity_rank(fault_label, rc))
 
-    if len(labeled) < 4:
+    if len(chunks) < 4:
+        return None
+    # A tie has no defensible ordering, so the item has no single right answer.
+    if len(set(ranks)) < 4:
         return None
 
-    sorted_by_severity = sorted(labeled, key=lambda x: x[2], reverse=True)
-    answer = "".join(x[0] for x in sorted_by_severity)
-    options = {label: encoded for label, encoded, _ in labeled}
-    return options, answer
+    # Compare like with like: only channels every segment actually carries.
+    shared = None
+    for chunk in chunks:
+        present = {k for row in chunk for k, v in row.items()
+                   if v is not None and k != "fault_label"}
+        shared = present if shared is None else (shared & present)
+    if keep is not None:
+        shared = (shared or set()) & keep
+    shared = (shared or set()) | {"timestamp_ms"}
+    if len(shared) < 3:
+        return None
+
+    trimmed = [[{k: v for k, v in row.items() if k in shared} for row in chunk]
+               for chunk in chunks]
+
+    # Labels independent of severity, so position carries no signal.
+    order = list(range(4))
+    random.shuffle(order)
+    labels = ["A", "B", "C", "D"]
+    options: Dict[str, str] = {}
+    label_rank: List[Tuple[str, int]] = []
+    for label, idx in zip(labels, order):
+        options[label] = encode_chunk(trimmed[idx])
+        label_rank.append((label, ranks[idx]))
+
+    answer = "".join(l for l, _ in sorted(label_rank, key=lambda x: -x[1]))
+    legend = build_context([row for chunk in trimmed for row in chunk])
+    legend.pop("time_series", None)
+    return options, answer, legend
 
 
 # ---------------------------------------------------------------------------
@@ -667,6 +754,16 @@ def fill_template(
         t_low = int(round(float(rows[low_idx]["timestamp_ms"])))
         t_high = int(round(float(rows[high_idx]["timestamp_ms"])))
         answer = gt_t
+        # The phase lexicon is per task. Applying the pick-and-place wording to a
+        # peg_in_hole or screwing episode, or to a dataset carrying no task at
+        # all, names a step that does not occur in that motion: the review
+        # measured a 33% mismatch overall, 100% on peg_in_hole phases 3/6/7 and
+        # screwing phases 3/7. Skip rather than mislabel; the item is only
+        # answerable if the phrase means something for this episode's task.
+        if task_id not in PHASE_NAMES:
+            return None
+        if str(phase_name) not in PHASE_NAMES[task_id]:
+            return None
         _TASK_DISPLAY = {"pick_and_place": "pick-and-place", "screwing": "screwing", "peg_in_hole": "peg-in-hole"}
         task_display = _TASK_DISPLAY.get(task_id, task_id.replace("_", " ") if task_id else "manipulation")
         question = fill(tmpl_text, task=task_display, phase=_phase_display_name(phase_name, task_id), window_length=window_length)
@@ -702,7 +799,9 @@ def fill_template(
         )
         if result is None:
             return None
-        options, answer = result
+        options, answer, _legend = result
+        # the legend travels with the item so the option prefixes mean something
+        acceptance_bounds = {"legend": _legend}
         question = tmpl_text
 
     elif tid == 6:
@@ -744,9 +843,32 @@ def fill_template(
         # than being off by a factor of the sample period; the ms offset is
         # computed at generation time from the actual timestamps.
         steps_ahead = random.randint(1, 10)
+        # Answering "whatever it reads now" is correct on 77.7% of the released
+        # items, so most of the template tests nothing. Require the signal to
+        # actually be moving at the edge of the window: the tail must vary by
+        # more than a fraction of the spread it showed across the whole window.
+        tail = [row.get(signal) for row in rows[-5:]]
+        tail = [float(v) for v in tail if isinstance(v, (int, float))]
+        whole = [row.get(signal) for row in rows]
+        whole = [float(v) for v in whole if isinstance(v, (int, float))]
+        if len(tail) < 3 or len(whole) < 5:
+            return None
+        span = max(whole) - min(whole)
+        tail_span = max(tail) - min(tail)
+        if span <= 1e-9 or tail_span < 0.10 * span:
+            return None
         question = fill(tmpl_text, signal=_signal_display_name(signal), n=steps_ahead)
         answer = None  # set by generation loop (which also rewrites `n` in ms)
-        acceptance_bounds = {"signal": signal, "steps_ahead": steps_ahead}
+        # `std` and `margin` follow the level 2 extrapolation convention. The
+        # released field carried only metadata and no tolerance at all, leaving
+        # correctness undefined for anyone scoring the item.
+        _std = float(np.std(whole)) if len(whole) > 1 else 0.0
+        acceptance_bounds = {
+            "signal": signal,
+            "steps_ahead": steps_ahead,
+            "std": round(_std, 6),
+            "margin": round(_std * 0.75, 6),
+        }
 
     else:
         logger.warning(f"Unknown template id: {tid}")
@@ -1093,6 +1215,7 @@ def generate_level1_questions(
                     filled = fill_template(
                         template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
                         machine_id=DATASET_MACHINE_ID.get(ds, -1),
+                        task_id=str(_episode_meta(ep_path).get("task") or ""),
                         phase_override=_phase,
                     )
                     if filled is None:
@@ -1135,6 +1258,7 @@ def generate_level1_questions(
             filled = fill_template(
                 template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
                 machine_id=DATASET_MACHINE_ID.get(ds, -1),
+                task_id=str(_episode_meta(ep_path).get("task") or ""),
             )
             if filled is None:
                 continue
@@ -1190,6 +1314,7 @@ def generate_level1_questions(
             filled = fill_template(
                 template, subseries, root_causes, anomaly_lookup, mc_option_lookup,
                 machine_id=DATASET_MACHINE_ID.get(ds, -1),
+                task_id=str(_episode_meta(ep_path).get("task") or ""),
             )
             if filled is None:
                 continue
@@ -1290,8 +1415,15 @@ def generate_level1_questions(
             if len(rows_a) < CONTEXT_MIN or len(rows_b_raw) < CONTEXT_MIN:
                 continue
 
-            fault_a = pick_fault_label(rows_a)
-            fault_b = pick_fault_label(rows_b_raw)
+            # Resolve the fault the way the pair sampler did, from metadata
+            # with a cf_fault_id fallback. Reading the rows alone disagrees on
+            # counterfactual episodes, whose injected fault was never written
+            # back into fault_label, so proposition B could claim two streams
+            # had different anomalous states when their records show the same
+            # fault. The review found the same defect independently: 3 answers
+            # confirmed wrong against the episodes' own fault records.
+            fault_a = pick_fault_label_from_meta_or_rows(rows_a, _episode_meta(ep_a))
+            fault_b = pick_fault_label_from_meta_or_rows(rows_b_raw, _episode_meta(ep_b))
             task_a = _episode_task(ep_a, ds_a, dataset_index)
             task_b = _episode_task(ep_b, ds_b, dataset_index)
 
@@ -1300,18 +1432,23 @@ def generate_level1_questions(
             # modal phase can still yield two windows sitting in the same
             # phase. Resample the windows until they disagree, otherwise the
             # cell that was asked for silently becomes a different one.
-            _want_diff_phase = (tid == 3) and not _target[2]
+            # the cell now says explicitly whether the two windows should sit
+            # in different phases; same-task no longer implies it
+            _same_task_cell = (tid == 3) and not _target[2]
+            _want_diff_phase = _same_task_cell and bool(_target[3])
             sampled_a = sampled_b = None
             for _win_try in range(24):
                 sampled_a = _uniform_window(rows_a, CONTEXT_MIN, CONTEXT_MAX)
                 sampled_b = _uniform_window(rows_b_raw, CONTEXT_MIN, CONTEXT_MAX)
                 if sampled_a is None or sampled_b is None:
                     break
-                if not _want_diff_phase:
+                if not _same_task_cell:
                     break
                 _pa = _modal_phase(sampled_a[0])
                 _pb = _modal_phase(sampled_b[0])
-                if _pa is not None and _pb is not None and _pa != _pb:
+                if _pa is None or _pb is None:
+                    continue
+                if (_pa != _pb) == _want_diff_phase:
                     break
             else:
                 continue

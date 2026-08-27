@@ -120,15 +120,94 @@ def _parse_numerical_answer(value: Any) -> float:
     return float(matches[-1])
 
 
+_VERTEX_TOKEN_CACHE: Dict[str, Any] = {"token": None, "expires_at": 0.0}
+
+
+def _vertex_access_token() -> str:
+    """Return a short-lived OAuth access token for Vertex AI.
+
+    Tries google-auth's ADC first (metadata server on GCE / GKE / Cloud Run,
+    `gcloud auth application-default login` on a workstation). Falls back to
+    shelling out to `gcloud auth print-access-token` when ADC creds are
+    unusable (common on workstations that only ran `gcloud auth login`, not
+    the application-default variant). Caches the token for 50 minutes.
+    """
+    import time as _time
+    now = _time.time()
+    cached = _VERTEX_TOKEN_CACHE.get("token")
+    if cached and now < _VERTEX_TOKEN_CACHE.get("expires_at", 0):
+        return cached  # type: ignore[return-value]
+
+    token: Optional[str] = None
+
+    # 1. try ADC
+    try:
+        import google.auth
+        from google.auth.transport.requests import Request as _AuthRequest
+        creds, _ = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        if not creds.valid:
+            creds.refresh(_AuthRequest())
+        token = creds.token
+    except Exception as adc_exc:
+        # 2. fall back to shell-invoked gcloud
+        import shutil, subprocess, sys as _sys
+        # On Windows the executable variant is gcloud.cmd; the extension-less
+        # `gcloud` on disk is a Unix shell script and Windows can't spawn it.
+        candidates = []
+        if os.getenv("GCLOUD_BIN"):
+            candidates.append(os.getenv("GCLOUD_BIN"))
+        if _sys.platform == "win32":
+            candidates.extend([
+                shutil.which("gcloud.cmd"),
+                "C:/Users/ymerz/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud.cmd",
+                "C:/Program Files (x86)/Google/Cloud SDK/google-cloud-sdk/bin/gcloud.cmd",
+                shutil.which("gcloud"),
+            ])
+        else:
+            candidates.extend([shutil.which("gcloud"), "/usr/bin/gcloud", "/usr/local/bin/gcloud"])
+        gcloud_bin = next((c for c in candidates if c and os.path.exists(c)), None)
+        if not gcloud_bin:
+            raise RuntimeError("could not locate gcloud executable")
+        try:
+            out = subprocess.run(
+                [gcloud_bin, "auth", "print-access-token"],
+                capture_output=True, text=True, timeout=30,
+                shell=(_sys.platform == "win32"),
+            )
+            if out.returncode != 0:
+                raise RuntimeError(
+                    f"gcloud auth print-access-token failed: {out.stderr.strip()}"
+                )
+            token = out.stdout.strip()
+        except Exception as sh_exc:
+            raise RuntimeError(
+                f"Vertex OAuth failed: ADC error={adc_exc}; "
+                f"gcloud fallback error={sh_exc}"
+            )
+
+    if not token:
+        raise RuntimeError("Vertex OAuth returned empty token")
+    _VERTEX_TOKEN_CACHE["token"] = token
+    _VERTEX_TOKEN_CACHE["expires_at"] = now + 3000  # 50 min
+    return token
+
+
 def resolve_api_key(model: Optional[str] = None) -> str:
-    """Resolve the API key for ``model``.
+    """Resolve the API key (or short-lived token) for ``model``.
 
     Per-model ``api_key_env`` (e.g. ``OPENROUTER_API_KEY`` for qwen on
-    OpenRouter) wins; absent that, falls back to the Azure/OpenAI defaults so
-    existing GPT-5.x configs keep working.
+    OpenRouter) wins. For Vertex MaaS models the config sets
+    ``api_key_env`` to the sentinel ``VERTEX_OAUTH`` which triggers a fresh
+    ADC-based access-token fetch instead of an env lookup. Absent both,
+    falls back to the Azure/OpenAI defaults so existing GPT-5.x configs
+    keep working.
     """
     if model:
         env_key = get_api_key_env(model)
+        if env_key == "VERTEX_OAUTH":
+            return _vertex_access_token()
         if env_key:
             override = os.getenv(env_key)
             if override:
@@ -186,6 +265,37 @@ def call_openai_style(
     api_version: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     """Call an OpenAI-compatible endpoint (gpt-5.1, DeepSeek, Mistral)."""
+    # Vertex custom-container endpoints don't expose an OpenAI-compatible
+    # sub-route; requests must go to `<endpoint>:rawPredict` and get passed
+    # through to the container's own /v1/chat/completions handler. The vLLM
+    # `openai.api_server` container emits proper OpenAI-format JSON, so once
+    # the routing is right the response shape matches everything else here.
+    if api_style == "vertex_raw_predict":
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+        }
+        r = requests.post(
+            f"{base_url}:rawPredict",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=900,
+        )
+        if r.status_code >= 400:
+            # surface the container's error message (vLLM tends to be specific:
+            # context-length overflow, invalid params, etc.)
+            raise requests.HTTPError(
+                f"{r.status_code} {r.reason} for {base_url}:rawPredict — body: {r.text[:500]}",
+                response=r,
+            )
+        body = r.json()
+        answer = body.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
+        return answer, body
+
     client = _openai_client(base_url, api_key, api_version=api_version)
 
     # Mistral on Azure doesn't support /responses and uses `max_tokens` on chat.completions.

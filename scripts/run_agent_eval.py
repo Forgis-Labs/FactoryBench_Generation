@@ -43,7 +43,7 @@ import numpy as np
 
 from src.agentic.agent import Agent, BedrockAgent
 from src.agentic.tools import (
-    ForecastTool, ManualRAGTool, PythonSandboxTool, SignalStatsTool,
+    DynamicsTool, ForecastTool, ManualRAGTool, PythonSandboxTool, SignalStatsTool,
 )
 from src.config import MODELS, get_upstream_model_id
 from src.evaluation.run_foundry_eval import (
@@ -151,6 +151,7 @@ def _process_one(
     ts_dict = _parse_ts(question)
     tools = [
         SignalStatsTool(ts_dict),
+        DynamicsTool(ts_dict),
         ForecastTool(ts_dict),
         PythonSandboxTool(ts_dict, timeout_s=10),
         rag,
@@ -161,8 +162,30 @@ def _process_one(
     else:
         agent = Agent(client=client, model=upstream_model_id, tools=tools,
                       max_tool_calls=max_tool_calls)
+    # The structural summary is computed for every item rather than left to the
+    # driver to request. Offered as a tool it was called once in 168 items, so it
+    # could not help; the model routes to what the prompt makes salient, not to
+    # what is useful. It is derived purely from the window already in the prompt,
+    # so this changes how the evidence is presented, not what evidence exists.
+    # Levels 1 to 3 only. On Level 4 the same preamble crowded out the manual
+    # retriever (calls fell from 50 of 50 to 3) and the level lost 9 points:
+    # what L4 rewards is vendor protocol text, not a structural read of the
+    # window, and the two compete for the same attention.
+    try:
+        if int(question.get("level") or 0) == 4:
+            raise ValueError("skip preamble on L4")
+        summary = DynamicsTool(ts_dict)()
+        preamble = (
+            "Precomputed structural summary of the window below (derived from the same "
+            "series you are shown, exact rather than eyeballed). Use it as evidence:\n"
+            + json.dumps(summary, separators=(",", ":"))[:4000]
+            + "\n\n"
+        )
+    except Exception:
+        preamble = ""
+
     t0 = time.time()
-    result = agent.answer(prompt_text)
+    result = agent.answer(preamble + prompt_text)
     elapsed = time.time() - t0
 
     answer_text = result["answer"]

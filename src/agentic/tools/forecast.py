@@ -66,13 +66,13 @@ class ForecastTool:
                 "description": (
                     "Forecast the value of a channel N steps ahead using Chronos-Bolt "
                     "(pretrained 200M-parameter time-series foundation model). "
-                    "USE THIS for any question of the form 'expected value of "
-                    "<signal> at T+N ms/steps' — the tool predicts more accurately "
-                    "than you can extrapolate from text. Do NOT try the arithmetic "
-                    "yourself. The response contains `predicted_value_at_horizon` "
-                    "(a single float, the value AT T+horizon) — that is the number "
-                    "to return as the final answer. Optional `q10_at_horizon` and "
-                    "`q90_at_horizon` give the 80% prediction interval at the same step."
+                    "Useful for questions of the form 'expected value of <signal> at "
+                    "T+N ms/steps', but it is a small general-purpose model and is "
+                    "not reliably better than your own reading of the trend. The "
+                    "response contains `predicted_value_at_horizon`, its `q10`/`q90` "
+                    "band, a `linear_trend_estimate` from the same channel, and a "
+                    "`reliability` verdict. Read `reliability` first and only use the "
+                    "point estimate when it says CONSISTENT."
                 ),
                 "parameters": {
                     "type": "object",
@@ -109,13 +109,56 @@ class ForecastTool:
             med  = quantiles[0, :, 1].tolist()   # q50
             q90  = quantiles[0, :, 2].tolist()
             idx = int(horizon) - 1
+            point = float(med[idx])
+            lo, hi = float(q10[idx]), float(q90[idx])
+
+            # A competing estimate the driver gets for free: least-squares slope
+            # over the tail of the observed channel, extrapolated to the same
+            # step. This is what "read the trend yourself" amounts to, and on
+            # this benchmark it is frequently closer than the forecaster.
+            tail = v[-min(len(v), 32):]
+            naive = float(tail[-1])
+            if tail.size >= 4:
+                x = np.arange(tail.size, dtype=float)
+                slope, intercept = np.polyfit(x, tail, 1)
+                naive = float(slope * (tail.size - 1 + int(horizon)) + intercept)
+
+            # Is the forecaster worth trusting here? Compare its own 10-90 band
+            # against the channel's observed spread.
+            spread = float(np.nanpercentile(v, 95) - np.nanpercentile(v, 5)) or 1.0
+            band_ratio = abs(hi - lo) / abs(spread)
+            disagreement = abs(point - naive) / (abs(spread) or 1.0)
+            # Horizon relative to the evidence the forecaster was given. Asking a
+            # 200M model for step 300 from a 60-row window is extrapolation far
+            # past its context, and is where it is least trustworthy.
+            reach = float(int(horizon)) / max(1.0, float(v.size))
+            if reach > 2.0:
+                verdict = (f"OUT OF RANGE: horizon {int(horizon)} is {reach:.0f}x the "
+                           f"{v.size}-step window this forecast was conditioned on. The "
+                           "estimate is an extrapolation far past its evidence. Use your own "
+                           "reading of the trend, or `linear_trend_estimate`, and treat this "
+                           "number as a weak prior at best.")
+            elif band_ratio > 0.5:
+                verdict = ("LOW CONFIDENCE: the 10-90 band spans "
+                           f"{band_ratio:.0%} of this channel's own range. Prefer your own "
+                           "reading of the trend over this point estimate.")
+            elif disagreement > 0.5:
+                verdict = ("DISAGREEMENT: this estimate differs from a linear extrapolation "
+                           f"of the same channel by {disagreement:.0%} of its range. Decide "
+                           "which is better supported before answering; do not copy either blindly.")
+            else:
+                verdict = ("CONSISTENT: narrow band and agrees with a linear extrapolation "
+                           "of the same channel.")
+
             return {
                 "channel": channel,
                 "horizon": int(horizon),
-                # Primary field — a single scalar. Answer with THIS number.
-                "predicted_value_at_horizon": round(float(med[idx]), 4),
-                "q10_at_horizon":             round(float(q10[idx]), 4),
-                "q90_at_horizon":             round(float(q90[idx]), 4),
+                # One estimate among several. Read `reliability` before using it.
+                "predicted_value_at_horizon": round(point, 4),
+                "q10_at_horizon":             round(lo, 4),
+                "q90_at_horizon":             round(hi, 4),
+                "linear_trend_estimate":      round(naive, 4),
+                "reliability":                verdict,
                 # Full trajectory kept for cases where the agent needs a
                 # different step; don't average or reduce this list to answer.
                 "full_median_series":         [round(x, 4) for x in med],

@@ -15,16 +15,19 @@ first stream faulty so they almost always do. The rest is pool shape, with
 scored 0.723 and 0.744 against a chance of 0.500, and emitting one fixed string
 scored 35.5% and 32.8% against 6.25%.
 
-This module picks pairs by target cell instead. Callers cycle through the eight
-cells of A x B x (C,D) so every proposition lands near 50/50.
+This module picks pairs by target cell instead, so no proposition is guessable
+from its prior.
 
-D is not free: it can only hold when the tasks match, so P(D) <= P(not C) and
-the two can never both be 0.5 unless every same-task pair also differs in
-phase. That is the constraint encoded here: cells ask for either "different
-tasks" (C true, D false) or "same task, different phase" (C false, D true),
-never same task and same phase. Eight cells, all four marginals at 0.5, and
-only eight of the sixteen answer strings reachable, so a fixed-string guess
-caps at 12.5%.
+D is not free. It can only hold when the tasks match, so P(D) <= P(not C).
+Pinning both C and D at 0.5 therefore forces every same-task pair to differ in
+phase, which makes D exactly "not C": a solver that answers C gets D for free.
+An earlier version of this module did precisely that, and D was the negation of
+C in 98.8% of L1.3 items and 98.3% of L2.8 items.
+
+D now gives up its even marginal to stay a real question. C holds at 0.5, and
+the same-task half splits evenly between differing and matching phases, so
+P(D) is 0.25 and D still has to be read off the windows. A, B and C remain at
+0.5. Twelve of the sixteen answer strings are reachable.
 
 Supply is not a limit. Over the 8,855-episode pool the tightest cell still has
 684,308 distinct ordered pairs, against the few hundred per cell a balanced
@@ -35,17 +38,34 @@ from __future__ import annotations
 import random
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-# (different_robot, different_anomaly, different_task); D is implied by C:
-# C true -> D false, C false -> D true (same task, different phase required).
-CELLS: Tuple[Tuple[bool, bool, bool], ...] = (
-    (False, False, False),
-    (False, False, True),
-    (False, True, False),
-    (False, True, True),
-    (True, False, False),
-    (True, False, True),
-    (True, True, False),
-    (True, True, True),
+# (different_robot, different_anomaly, different_task, different_phase).
+#
+# D can only hold when the tasks match, so (C true, D true) is impossible and
+# three (C, D) combinations remain. Asking for C and D both at 0.5 forces the
+# third out: every C-false item then has to carry D true, which makes D exactly
+# "not C" and hands a solver that letter for free. Measured on the release, D
+# was the negation of C in 98.8% of L1.3 items and 98.3% of L2.8 items.
+#
+# So D gives up its even marginal to stay informative. C keeps 0.5, and the
+# C-false half splits evenly between D true and D false, leaving P(D) at 0.25
+# but making D a real question: given C is false, D is still a coin flip that
+# has to be read off the phases.
+CELLS: Tuple[Tuple[bool, bool, bool, bool], ...] = (
+    # C true -> D false, weighted twice so P(C) stays at 0.5
+    (False, False, True, False), (False, False, True, False),
+    (False, True, True, False), (False, True, True, False),
+    (True, False, True, False), (True, False, True, False),
+    (True, True, True, False), (True, True, True, False),
+    # C false, D true: same task, different phase
+    (False, False, False, True),
+    (False, True, False, True),
+    (True, False, False, True),
+    (True, True, False, True),
+    # C false, D false: same task, same phase
+    (False, False, False, False),
+    (False, True, False, False),
+    (True, False, False, False),
+    (True, True, False, False),
 )
 
 
@@ -152,7 +172,12 @@ def build_index(episodes: Sequence[Dict[str, Any]]) -> Dict[Tuple[Any, Any, Any]
 
 
 def _group_pairs_for(index, target) -> List[Tuple[Tuple, Tuple]]:
-    """Every pair of groups whose attributes land in ``target``."""
+    """Every pair of groups whose attributes land in ``target``.
+
+    Only the first three entries of ``target`` are decided by group attributes.
+    The fourth, whether the displayed windows sit in different phases, needs
+    the rows and is checked by the caller.
+    """
     keys = list(index)
     out = []
     for ka in keys:
@@ -187,15 +212,20 @@ def sample_pair(
     """
     rng = rng or random
     if group_pairs_cache is not None:
-        pairs = group_pairs_cache.get(target)
+        attr_key = tuple(target[:3])
+        pairs = group_pairs_cache.get(attr_key)
         if pairs is None:
             pairs = _group_pairs_for(index, target)
-            group_pairs_cache[target] = pairs
+            group_pairs_cache[attr_key] = pairs
     else:
         pairs = _group_pairs_for(index, target)
     if not pairs:
         return None
     want_same_task = not target[2]
+    # target[3] says whether the two displayed windows must sit in different
+    # phases. It is only meaningful for same-task pairs; a different-task pair
+    # is never asked for a phase difference.
+    want_diff_phase = bool(target[3]) if len(target) > 3 else want_same_task
     for _ in range(max_tries):
         ka, kb = pairs[rng.randrange(len(pairs))]
         ga, gb = index[ka], index[kb]
@@ -207,8 +237,9 @@ def sample_pair(
             token = frozenset((a.get("key"), b.get("key")))
             if token in used:
                 continue
-        if want_same_task and phases_differ is not None and not phases_differ(a, b):
-            continue
+        if want_same_task and phases_differ is not None:
+            if phases_differ(a, b) != want_diff_phase:
+                continue
         if used is not None:
             used.add(frozenset((a.get("key"), b.get("key"))))
         return a, b

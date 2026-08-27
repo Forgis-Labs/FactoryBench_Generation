@@ -64,10 +64,20 @@ _STATUS_FILE: Optional[Path] = None
 
 
 def _status(msg: str) -> None:
-    """Timestamped one-line status to stdout + run.log (thread-safe)."""
+    """Timestamped one-line status to stdout + run.log (thread-safe).
+
+    Writes stdout via ``sys.stdout.buffer`` with an explicit UTF-8 encode so
+    non-ASCII glyphs (checkmarks, arrows) don't hit the platform default
+    codepage (cp1252 on Windows) when stdout is redirected to a file.
+    """
     line = f"[{datetime.now().strftime('%H:%M:%S')}] {msg}"
     with _STATUS_LOCK:
-        print(line, flush=True)
+        try:
+            sys.stdout.buffer.write((line + "\n").encode("utf-8"))
+            sys.stdout.flush()
+        except Exception:
+            # last-resort: strip non-ASCII if the buffer path is unavailable
+            print(line.encode("ascii", errors="replace").decode("ascii"), flush=True)
         if _STATUS_FILE is not None:
             with _STATUS_FILE.open("a", encoding="utf-8") as fh:
                 fh.write(line + "\n")
@@ -293,8 +303,18 @@ def _eval_one(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--repo-id", type=str, default=DEFAULT_REPO_ID)
-    parser.add_argument("--hf-dataset-folder", type=str, required=True,
-                        help="e.g. factorynet_qa_150k")
+    parser.add_argument("--hf-dataset-folder", type=str, default=None,
+                        help="e.g. factorynet_qa_150k. Required unless "
+                             "--local-questions-root is given.")
+    parser.add_argument(
+        "--local-questions-root",
+        type=Path,
+        default=None,
+        help="Skip the HF-pull phase and use a locally-staged questions tree "
+             "already at <local-questions-root>/level<N>/*.json (per-item JSONs). "
+             "Used for the KUKA industrial-eval rebuttal run where we filter "
+             "provenance.dataset locally before evaluating.",
+    )
     parser.add_argument("--levels", nargs="+", type=int, default=[1, 2, 3, 4])
     parser.add_argument("--models", nargs="+", default=list(MODEL_NAMES))
     parser.add_argument("--output-root", type=Path, default=Path("output/test_eval"))
@@ -342,19 +362,33 @@ def main() -> None:
             f"levels={args.levels} models={args.models} cost_limit={args.cost_limit}")
     _status(f"   out={out}  cell_logs={logs_dir}")
 
-    # ---- Phase 1: pull test.jsonl + unpack -------------------------------
-    _status("PHASE 1: pull test.jsonl from HF + unpack to per-item JSON")
+    # ---- Phase 1: pull test.jsonl + unpack, OR use local questions -------
     level_to_q_dir: Dict[int, Path] = {}
-    for lvl in args.levels:
-        jsonl = _download_test_jsonl(args.repo_id, args.hf_dataset_folder, lvl)
-        if jsonl is None:
-            _status(f"  L{lvl}: skipped (no test.jsonl)")
-            continue
-        q_dir = q_root / f"level{lvl}"
-        n = _unpack_jsonl_to_json_dir(jsonl, q_dir)
-        _status(f"  L{lvl}: unpacked {n} test items")
-        if n > 0:
-            level_to_q_dir[lvl] = q_dir
+    if args.local_questions_root is not None:
+        _status(f"PHASE 1: use local questions from {args.local_questions_root}")
+        for lvl in args.levels:
+            q_dir = args.local_questions_root / f"level{lvl}"
+            if not q_dir.exists():
+                _status(f"  L{lvl}: skipped ({q_dir} not found)")
+                continue
+            n = len(list(q_dir.glob("*.json")))
+            _status(f"  L{lvl}: {n} local questions at {q_dir}")
+            if n > 0:
+                level_to_q_dir[lvl] = q_dir
+    else:
+        if not args.hf_dataset_folder:
+            raise SystemExit("Provide --hf-dataset-folder or --local-questions-root")
+        _status("PHASE 1: pull test.jsonl from HF + unpack to per-item JSON")
+        for lvl in args.levels:
+            jsonl = _download_test_jsonl(args.repo_id, args.hf_dataset_folder, lvl)
+            if jsonl is None:
+                _status(f"  L{lvl}: skipped (no test.jsonl)")
+                continue
+            q_dir = q_root / f"level{lvl}"
+            n = _unpack_jsonl_to_json_dir(jsonl, q_dir)
+            _status(f"  L{lvl}: unpacked {n} test items")
+            if n > 0:
+                level_to_q_dir[lvl] = q_dir
 
     if not level_to_q_dir:
         raise SystemExit("No test items found. Aborting.")

@@ -169,6 +169,38 @@ def _create_feature_acronyms(feature_names: List[str]) -> Dict[str, str]:
     return acronyms
 
 
+
+def _render_value(value: float, places: int = 2, min_sig: int = 3, max_places: int = 6):
+    """Format a reading, keeping small magnitudes readable.
+
+    Everything printed at 2 decimals is fine for joint angles and currents, but
+    it destroys any channel whose whole range sits below the display quantum.
+    TCP tracking error is the case that surfaced it: the fitted threshold is
+    0.0025, smaller than one quantum of 0.01, so the option asked whether a
+    value exceeded a number the page could not show. Every reading rendered as
+    0 and the statement was unverifiable from the item alone.
+
+    Values of magnitude >= 1 keep the original 2 decimals, so the vast majority
+    of the corpus renders byte-identically to before. Smaller ones get enough
+    decimals for ``min_sig`` significant figures, capped at ``max_places``.
+    """
+    if value == 0 or not math.isfinite(value):
+        return 0
+    magnitude = abs(value)
+    if magnitude < 1:
+        # first significant digit sits at this decimal place
+        first_sig = int(math.floor(-math.log10(magnitude))) + 1
+        places = min(max_places, max(places, first_sig + min_sig - 1))
+    rounded = round(value, places)
+    if float(rounded).is_integer():
+        return int(rounded)
+    # Fixed notation throughout. Left to repr, anything below ~1e-4 comes out
+    # as "3.1e-05" and the encoded row would carry two different number
+    # formats for anything parsing it to read values back.
+    text = f"{rounded:.{places}f}".rstrip("0").rstrip(".")
+    return text if text else 0
+
+
 def _encode_timestep(row: Dict[str, Any], acronyms: Dict[str, str]) -> str:
     timestamp_part = ""
     parts = []
@@ -187,9 +219,7 @@ def _encode_timestep(row: Dict[str, Any], acronyms: Dict[str, str]) -> str:
             continue
         acro = acronyms.get(feature_name, feature_name)
         if isinstance(value, (int, float, np.floating)):
-            rounded = round(float(value), 2)
-            if rounded.is_integer():
-                rounded = int(rounded)
+            rounded = _render_value(float(value))
             parts.append(f"{acro}={rounded}")
         elif isinstance(value, str):
             parts.append(f"{acro}={value}")

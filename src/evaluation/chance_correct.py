@@ -1,12 +1,26 @@
 """Chance-correction for FactoryBench raw scores.
 
-Maps a raw item score $s \\in [0,1]$ to a chance-corrected score
-$\\tilde{s} = \\max(0, (s - E) / (1 - E))$, where $E$ is the expected
-score under random guessing for that item's answer format.
+Maps a raw item score ``s`` in [0, 1] to a signed chance-corrected score
+``s_tilde = (s - E) / (1 - E)`` where ``E`` is the expected raw score
+under uniform random guessing for that item's answer format.
 
-After correction, $\\tilde{s} = 0$ corresponds to pure-chance performance
-and $\\tilde{s} = 1$ to perfect performance for every format, so per-level
-and cross-format averages are directly comparable.
+By linearity of expectation, ``E[s_tilde] = 0`` under uniform random
+guessing for every format by construction; ``s_tilde = 1`` corresponds
+to a perfect answer. The transform is signed: below-chance items produce
+negative values, so a model that is worse than random is visibly
+penalised in the aggregate mean rather than clipped to zero. The
+per-format floor is ``s_tilde_min = -E / (1 - E)``, which ranges from
+``-1`` for multi-select (``E = 1/2``) to ``-1/3`` for tensor / ranking /
+four-way MCQ (``E = 1/4``).
+
+An optional ``clip=True`` flag on ``chance_correct(...)`` restores the
+historical max-clipped behaviour used in earlier drafts of the paper
+(``max(0, (s - E) / (1 - E))``). That variant does not preserve the
+random-baseline-equals-zero property once averaged, because it clips
+below-chance mass to zero before averaging; it is kept only for
+back-compatibility with older aggregators. New callers should leave
+``clip=False`` (the module default), matching the metric the paper
+describes.
 
 Per-format chance levels:
 
@@ -87,11 +101,24 @@ def chance_correct(
     raw_score: Optional[float],
     answer_format: str,
     question: Optional[Dict[str, Any]] = None,
+    clip: bool = False,
 ) -> Optional[float]:
     """Map a raw item score to its chance-corrected counterpart.
 
-    Returns None if ``raw_score`` is None (ungraded item). Returns the raw
-    score unchanged for ``free_form`` (which has E = 0 by construction).
+    Two modes controlled by ``clip``:
+      * ``clip=True``  (default): the historical FactoryBench metric,
+        ``s_tilde = max(0, (s - E) / (1 - E))``, upper-clipped at 1. Because
+        below-chance mass is floored to 0, the *expected* value of this metric
+        under uniform random guessing is strictly greater than 0 for MCQ,
+        ranking and tensor formats (e.g. ~0.25 for single-select MCQ with k=4).
+      * ``clip=False`` (signed): ``s_tilde = (s - E) / (1 - E)`` with only the
+        upper clip at 1. Below-chance items produce negative values, and by
+        linearity the expected value under uniform random guessing is exactly
+        0 for every format. This is the correct chance correction if you want
+        the "random baseline = 0" property to hold.
+
+    Returns ``None`` if ``raw_score`` is ``None`` (ungraded item). Returns the
+    raw score unchanged for ``free_form`` (which has E = 0 by construction).
     """
     if raw_score is None:
         return None
@@ -103,7 +130,7 @@ def chance_correct(
         return 1.0 if float(raw_score) >= 1.0 else 0.0
     s = float(raw_score)
     corrected = (s - E) / (1.0 - E)
-    if corrected < 0.0:
+    if clip and corrected < 0.0:
         return 0.0
     if corrected > 1.0:
         return 1.0

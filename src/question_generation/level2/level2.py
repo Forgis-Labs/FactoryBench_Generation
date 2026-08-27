@@ -143,6 +143,12 @@ def _anomaly_inline_name(fault_id: int, root_cause: Dict[str, Any], capitalize: 
         name = str(raw).replace("_", " ").strip()
         if not name:
             return ""
+        # Some catalogue keys are named after the dataset they came from
+        # ("voraus_ad_class_0_undocumented"). Rendered into the prompt that
+        # spells out the source, and on the robot-identity template the source
+        # determines the answer. No phrase, no item.
+        if re.search(r"voraus|aursad|factorywave|kuka|ur3", name, re.I):
+            return ""
         # Add article if missing
         if not name.startswith(("a ", "an ")):
             name = f"a {name}"
@@ -187,6 +193,9 @@ SIMULATION_EXCLUDED_MC_IDS = {
 
 # MC option IDs that use mode signals (safety_mode, joint_mode, robot_mode),
 # excluded from predictive templates where mode state is not being predicted.
+# Templates whose answer lies in post_event_rows, so none of it may be shown.
+_EXTRAPOLATION_TEMPLATE_IDS = {4, 5}
+
 PREDICTIVE_EXCLUDED_MC_IDS = {
     "mc_019",  # safety_mode
 }
@@ -266,22 +275,23 @@ def sample_subsequent_chunks(
 
 def rows_strictly_after_context(
     rows: List[Dict[str, Any]],
-    subseries: List[Dict[str, Any]],
+    shown: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Rows whose timestamp is strictly greater than the last context timestamp.
+    """Rows whose timestamp is strictly greater than the last row shown.
 
     The ranking template asks the model to order segments by when they appear
     as the event manifests. That is only a question about the future if the
-    segments lie outside the window the model was already shown. Sampling from
-    ``post_event_rows`` directly does not guarantee this: the context window is
-    centred on the event onset and extends past it, and (at L3) the baseline
-    and counterfactual episodes are identical until they diverge, so early
-    post-onset chunks reproduce rows the model can already see and the ordering
-    can be recovered by matching values instead of reasoning about propagation.
-    Measured on the released benchmark, 13% of option segments appeared
-    verbatim inside their own context.
+    segments lie outside the window the model was already shown.
+
+    ``shown`` must be everything the context renders, not just the sampled
+    subseries. The rendered context is ``subseries + event_segment_rows``, so
+    cutting off at the end of the subseries alone left the event segment
+    inside the pool: its rows are printed above the question and could still
+    be drawn as options. Measured on the release that leaked a segment into
+    9.3% of L2.1 items and 6.4% of L3.1 items, where the ordering can be read
+    off by matching values instead of reasoning about propagation.
     """
-    cutoff = get_last_timestamp(subseries)
+    cutoff = get_last_timestamp(shown)
     out: List[Dict[str, Any]] = []
     for row in rows:
         ts = row.get("timestamp_ms")
@@ -596,10 +606,9 @@ def sample_thresholds_for_statement(
     """
     centres = thresholds_for_robot(robot)
     sid = _legacy_mc_option_id(str(statement_id))
-    if sid == "l2_mc_003":
-        return {"speed_drop_ratio": _sample_ratio(centres["speed_drop_ratio"])}
-    if sid == "l2_mc_004":
-        return {"speed_stable_tol": _sample_ratio(centres["speed_stable_tol"])}
+    if sid in {"l2_mc_003", "l2_mc_004"}:
+        # complements on one shared ratio-of-means threshold
+        return {"speed_drop_ratio": _sample_ratio(centres["speed_drop_ratio"], max_value=0.99)}
     if sid == "l2_mc_005":
         return {
             "stall_current_increase": _sample_ratio(centres["stall_current_increase"]),
@@ -635,10 +644,8 @@ def sample_thresholds_for_statement(
         return {"robot_current_stable_range": _sample_ratio(centres["robot_current_stable_range"])}
     if sid == "l2_mc_014":
         return {"robot_current_increase": _sample_ratio(centres["robot_current_increase"])}
-    if sid == "l2_mc_015":
-        return {"tcp_tracking_stable_increase": _sample_ratio(centres["tcp_tracking_stable_increase"])}
-    if sid == "l2_mc_016":
-        return {"tcp_tracking_increase": _sample_ratio(centres["tcp_tracking_increase"])}
+    if sid in {"l2_mc_015", "l2_mc_016"}:
+        return {"tcp_tracking_abs_error": _sample_ratio(centres["tcp_tracking_abs_error"])}
     if sid == "l2_mc_017":
         min_axes = int(round(random.gauss(centres["temp_rise_min_axes"], 0.4)))
         min_axes = min(max(min_axes, 1), 6)
@@ -690,12 +697,12 @@ def render_statement_with_thresholds(
     if sid == "l2_mc_003":
         return (
             "Following the event, at least one joint speed drops sharply "
-            f"(>={_fmt_pct(thresholds['speed_drop_ratio'])}% below pre-event baseline)."
+            f"(mean speed magnitude falls to <={_fmt_pct(thresholds['speed_drop_ratio'])}% of its pre-event mean)."
         )
     if sid == "l2_mc_004":
         return (
-            "Following the event, joint speeds stay close to baseline "
-            f"(within ±{_fmt_pct(thresholds['speed_stable_tol'])}% of pre-event values)."
+            "Following the event, no joint's mean speed magnitude drops sharply "
+            f"(none falls to <={_fmt_pct(thresholds['speed_drop_ratio'])}% of its pre-event mean)."
         )
     if sid == "l2_mc_005":
         return (
@@ -714,15 +721,20 @@ def render_statement_with_thresholds(
             "Following the event, contact force shows a significant spike "
             f"(>={_fmt_pct(thresholds['force_spike_increase'])}% above baseline norm)."
         )
+    # The statistic is |commanded - measured| position PLUS |commanded -
+    # measured| speed, summed per axis. Calling it "position" misdescribes it:
+    # measured on this corpus the speed term is a median 91% of the total and
+    # dominates in 97 of 120 sampled rows, so anyone reasoning about position
+    # tracking, exactly as the text asked, computes the wrong quantity.
     if sid == "l2_mc_008":
         return (
             "Following the event, mean joint tracking error exceeds "
-            f"{thresholds['tracking_abs_error']:.4f} (absolute, commanded vs measured position)."
+            f"{thresholds['tracking_abs_error']:.4f} (absolute, summed commanded-vs-measured position and speed deviation)."
         )
     if sid == "l2_mc_009":
         return (
             "Following the event, mean joint tracking error stays below "
-            f"{thresholds['tracking_abs_error']:.4f} (absolute, commanded vs measured position)."
+            f"{thresholds['tracking_abs_error']:.4f} (absolute, summed commanded-vs-measured position and speed deviation)."
         )
     if sid == "l2_mc_010":
         return (
@@ -754,12 +766,12 @@ def render_statement_with_thresholds(
     if sid == "l2_mc_015":
         return (
             "Following the event, command and measured TCP motion remain aligned "
-            f"(TCP tracking error increase <={_fmt_pct(thresholds['tcp_tracking_stable_increase'])}%)."
+            f"(mean TCP tracking error stays below {thresholds['tcp_tracking_abs_error']:.4f})."
         )
     if sid == "l2_mc_016":
         return (
             "Following the event, command and measured TCP motion become misaligned "
-            f"(TCP tracking error increase >={_fmt_pct(thresholds['tcp_tracking_increase'])}%)."
+            f"(mean TCP tracking error exceeds {thresholds['tcp_tracking_abs_error']:.4f})."
         )
     if sid == "l2_mc_017":
         return (
@@ -957,7 +969,12 @@ def fill_template(
     acceptance_bounds = None
 
     if tid == 1:
-        ranking_pool = rows_strictly_after_context(post_event_rows, subseries)
+        # everything the context prints, so the event segment is excluded too
+        # The context prints subseries + the event segment, so the cutoff has
+        # to be the end of that, not the end of the subseries.
+        _shown_event, _ = split_event_segment(post_event_rows)
+        ranking_pool = rows_strictly_after_context(
+            post_event_rows, list(subseries) + list(_shown_event))
         ranking_pool = filter_rows_to_template_features(ranking_pool, template)
         chunks = sample_subsequent_chunks(ranking_pool, n_chunks=4, min_chunk=5, max_chunk=7)
         if len(chunks) < 4:
@@ -1230,6 +1247,7 @@ def generate_level2_questions(
     # and picking the historically strongest option scored 0.608 against a
     # chance rate of 0.250. Weighting the distractor draw by the same
     # distribution the answers follow removes that.
+    _severity_index: Dict[int, List[Tuple[str, Path]]] = {}
     _fault_prior: Dict[int, float] = {}
     for _ds_p, _p_path in anomalous_episodes:
         try:
@@ -1415,7 +1433,12 @@ def generate_level2_questions(
                 # template that mentions the anomaly. Skip rather than emit a
                 # sentence with a hole in it.
                 continue
-            _machine_id = DATASET_MACHINE_ID.get(_ds, -1)
+            # factorywave stores UR3 and KUKA episodes under one dataset name,
+            # so deriving the machine from the folder labels every one of them
+            # UR3e. On the release that makes KUKA the correct answer to zero
+            # of the 8,272 robot-identity items while still being offered as an
+            # option, which is eliminable without reading the data at all.
+            _machine_id = _machine_id_for(_ds, _ep_path)
 
             _meta_path = _ep_path.with_name(_ep_path.stem + "_metadata.json")
             _ep_task = ""
@@ -1481,6 +1504,17 @@ def generate_level2_questions(
                     if generated >= n:
                         break
                     _pn, _pi, _pl = _ph
+                    # The lexicon is per task. Naming a pick-and-place step on an
+                    # episode recording another task, or none at all, describes a
+                    # motion that does not occur there. And a phrase shared by two
+                    # phase ids of the same task (peg_in_hole renders 'return to
+                    # home' for both 4 and 8) cannot identify a unique window, so
+                    # the question has no single right answer.
+                    _lex = PHASE_NAMES.get(_ep_task) or {}
+                    if str(_pn) not in _lex:
+                        continue
+                    if list(_lex.values()).count(_lex[str(_pn)]) > 1:
+                        continue
                     _gt_t = int(round(float(_sub[_pi]["timestamp_ms"])))
                     _low_idx = max(0, _pi - 3)
                     _high_idx = min(len(_sub) - 1, _pi + 3)
@@ -1491,7 +1525,10 @@ def generate_level2_questions(
                     _tmpl_filled_local = fill(
                         _tmpl, anomaly=_anomaly,
                         phase=_phase_display_name(_pn, _ep_task),
-                        window_length=_pl + 5,
+                        # the graded window is the phase itself; the old
+                        # +5 stated a window five steps longer than what
+                        # the answer is checked against
+                        window_length=_pl,
                     )
                     item = {
                         "id": str(uuid.uuid4()),
@@ -1533,6 +1570,10 @@ def generate_level2_questions(
             elif _tid == 7:
                 _opts, _ans = l1_build_anomaly_single_select(
                     _fl, root_causes, anomaly_lookup, fault_prior=_fault_prior)
+                if not _opts or not _ans:
+                    # the fault's catalogue entry is a placeholder, so neither
+                    # the answer nor a distractor built from it is checkable
+                    continue
                 _tmpl_filled = _tmpl  # no {anomaly} placeholder — the model must identify it
 
             elif _tid == 10:
@@ -1571,7 +1612,8 @@ def generate_level2_questions(
                 # windows in different phases. Dropping those items is what
                 # pushed the same-task cells under their quota, so an exhausted
                 # pair is replaced by another from the same cell instead.
-                _want_diff_phase = not _target[2]
+                _same_task_cell = not _target[2]
+                _want_diff_phase = _same_task_cell and bool(_target[3])
                 _ds_a = _ep_path_a = _fl_a = _ep_task_a = _sub_a = None
                 _ds_b = _ep_path_b = _fl_b = _ep_task_b = _sub_b = None
                 for _pair_try in range(12):
@@ -1623,9 +1665,11 @@ def generate_level2_questions(
                             continue
                         if not _validate_relevance(_cb, _spec_b, _ep_task_b):
                             continue
-                        if _want_diff_phase:
+                        if _same_task_cell:
                             _pha, _phb = _modal_phase(_ca), _modal_phase(_cb)
-                            if _pha is None or _phb is None or _pha == _phb:
+                            if _pha is None or _phb is None:
+                                continue
+                            if (_pha != _phb) != _want_diff_phase:
                                 continue
                         _sub_a, _sub_b = _ca, _cb
                         break
@@ -1694,10 +1738,29 @@ def generate_level2_questions(
                 # Severity ranking on 4 anomalous segments (mirror of L1 t5).
                 if len(anomalous_episodes) < 4:
                     continue
-                _other_pool = [(d, p) for (d, p) in anomalous_episodes if p != _ep_path]
-                if len(_other_pool) < 3:
+                # Pick one episode from each of four distinct severity ranks
+                # rather than drawing four at random and hoping. Severity is a
+                # per-fault rank and many faults share one, so rejection
+                # sampling almost always drew a tie: it produced 2.5 items a
+                # minute against roughly 20 for the neighbouring templates.
+                # Indexing by rank turns the search into a direct construction.
+                if not _severity_index:
+                    for _d, _p in anomalous_episodes:
+                        _f = pick_fault_label_from_meta_or_rows([], load_meta(_p))
+                        if not _f:
+                            continue
+                        _r = l1_get_severity_rank(_f, root_causes.get(_f, {}))
+                        _severity_index.setdefault(_r, []).append((_d, _p))
+                    logger.info(
+                        f"Severity ranks available for template 9: {len(_severity_index)} "
+                        f"({sorted(_severity_index)})"
+                    )
+                if len(_severity_index) < 4:
                     continue
-                _sampled_eps = [(_ds, _ep_path)] + random.sample(_other_pool, 3)
+                _ranks = random.sample(sorted(_severity_index), 4)
+                _sampled_eps = [random.choice(_severity_index[_r]) for _r in _ranks]
+                if len({p for _, p in _sampled_eps}) < 4:
+                    continue
                 _segments: List[Tuple[List[Dict[str, Any]], int]] = []
                 _seg_tasks: List[str] = []
                 _bad = False
@@ -1730,7 +1793,7 @@ def generate_level2_questions(
                 )
                 if _result is None:
                     continue
-                _opts, _ans = _result
+                _opts, _ans, _legend = _result
                 _tmpl_filled = _tmpl  # ranking prompt has no placeholders
                 item = {
                     "id": str(uuid.uuid4()),
@@ -1748,7 +1811,10 @@ def generate_level2_questions(
                             for (d, p) in _sampled_eps
                         ],
                     },
-                    "context": {},
+                    # The context was empty, so every one of the 1,858 released
+                    # items shipped bare numbers under unexplained prefixes with
+                    # no legend, no units and no sample rate anywhere.
+                    "context": _legend,
                 }
                 if not _require_anomaly_phrase(item.get("question", "")):
                     continue
@@ -1876,7 +1942,18 @@ def generate_level2_questions(
         if filled is None:
             continue
 
-        subseries_with_event = subseries + event_segment_rows
+        # The extrapolation templates take their answer from
+        # post_event_rows[steps_ahead], and event_segment_rows is the front of
+        # that same list, so appending it prints the answer row inside the
+        # context. It also carries the raw episode clock while the subseries is
+        # rebased to t=0, which is the visible timestamp jump: read the row at
+        # the asked-for offset past the jump and the answer is simply there.
+        # Measured on the release that affected 89.8% of L2.4 and 86.0% of
+        # L2.5. Those templates get the shown window only.
+        if template["id"] in _EXTRAPOLATION_TEMPLATE_IDS:
+            subseries_with_event = list(subseries)
+        else:
+            subseries_with_event = subseries + event_segment_rows
         important_features = template.get("important_features")
         if important_features:
             keep = set(important_features) | {"timestamp_ms"}

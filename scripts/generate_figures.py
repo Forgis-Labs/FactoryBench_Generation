@@ -116,11 +116,19 @@ def _effective_score(reply: dict) -> Optional[float]:
     return None if s is None else float(s)
 
 
+CLIP_CHANCE_CORRECT = False  # paper's canonical metric is signed; module-level toggle, flipped by main() when --clipped is passed for legacy comparisons
+
+
 def _chance_correct(score: float, af: str) -> float:
     E = CHANCE_E.get(af, 0.0)
     if E >= 1.0:
         return 1.0 if score >= 1.0 else 0.0
-    return max(0.0, min(1.0, (score - E) / (1.0 - E)))
+    corrected = (score - E) / (1.0 - E)
+    if CLIP_CHANCE_CORRECT and corrected < 0.0:
+        corrected = 0.0
+    if corrected > 1.0:
+        corrected = 1.0
+    return corrected
 
 
 def load_data(replies_root: pathlib.Path) -> pd.DataFrame:
@@ -185,19 +193,34 @@ def fig_main_heatmap(df: pd.DataFrame, model_order: List[str], out_dir: pathlib.
                 annot[i][j] = f"{v:.1f}%"
 
     fig, ax = plt.subplots(figsize=(7, 4))
+    cmap = FORGIS_CMAP
+    if CLIP_CHANCE_CORRECT:
+        vmin, vmax = 0, 100
+        cbar_label = "Chance-Corrected Accuracy (%)"
+        title = "FactoryBench Results: Model × Level (Chance-Corrected)"
+    else:
+        # signed metric: negative floor is format-dependent (worst is -100% for
+        # multi-select). Keep the Forgis palette; extend the low end so below-
+        # chance cells still land in a distinguishable off-white region.
+        floor = float(np.nanmin(matrix))
+        vmin = min(-10.0, floor)  # never brighter than -10% so 0 sits near white
+        vmax = 100.0
+        cbar_label = "Chance-Corrected Accuracy, signed (%)"
+        title = "FactoryBench Results: Model × Level (Signed Chance-Corrected)"
     sns.heatmap(
         matrix, annot=np.array(annot), fmt="",
-        cmap=FORGIS_CMAP, vmin=0, vmax=100,
+        cmap=cmap, vmin=vmin, vmax=vmax,
         linewidths=1.5, linecolor="white",
-        cbar_kws={"label": "Chance-Corrected Accuracy (%)", "shrink": 0.8},
+        cbar_kws={"label": cbar_label, "shrink": 0.8},
         ax=ax, mask=np.isnan(matrix),
     )
     level_qa = agg.groupby("level")["count"].max()
     ax.set_yticklabels(model_order, rotation=0)
     ax.set_xticklabels([f"Level {l}\n(N={level_qa.get(l, 0):,})" for l in levels], rotation=0)
-    ax.set_title("FactoryBench Results: Model × Level (Chance-Corrected)", fontweight="bold", pad=12)
+    ax.set_title(title, fontweight="bold", pad=12)
     fig.tight_layout()
-    _save(fig, out_dir / "fig_main_heatmap.pdf")
+    suffix = "_clipped" if CLIP_CHANCE_CORRECT else ""
+    _save(fig, out_dir / f"fig_main_heatmap{suffix}.pdf")
 
 
 # ── Figure 2: Difficulty curve ─────────────────────────────────────────
@@ -224,7 +247,8 @@ def fig_difficulty_curve(df: pd.DataFrame, model_order: List[str], out_dir: path
 
     ax.axhline(0, color=STEEL, linestyle=":", linewidth=1.0, alpha=0.6, label="Random baseline")
     ax.set_xlabel("Benchmark Level")
-    ax.set_ylabel("Chance-Corrected Accuracy (%)")
+    ylabel = "Chance-Corrected Accuracy, signed (%)" if not CLIP_CHANCE_CORRECT else "Chance-Corrected Accuracy (%)"
+    ax.set_ylabel(ylabel)
     ax.set_title("Performance Across Levels", fontweight="bold")
     ax.set_xticks([1, 2, 3, 4])
     ax.set_xticklabels([LEVEL_LABELS[l] for l in [1, 2, 3, 4]])
@@ -232,7 +256,8 @@ def fig_difficulty_curve(df: pd.DataFrame, model_order: List[str], out_dir: path
     ax.set_axisbelow(True)
     ax.legend(loc="upper right", framealpha=0.9, edgecolor="none", ncol=2)
     fig.tight_layout()
-    _save(fig, out_dir / "fig_difficulty_curve.pdf")
+    suffix = "_clipped" if CLIP_CHANCE_CORRECT else ""
+    _save(fig, out_dir / f"fig_difficulty_curve{suffix}.pdf")
 
 
 # ── Figure 3: Question-type breakdown ─────────────────────────────────
@@ -432,7 +457,19 @@ def main() -> None:
                         default=pathlib.Path("output/test_eval/replies"))
     parser.add_argument("--out-dir", type=pathlib.Path,
                         default=pathlib.Path("output/figures"))
+    parser.add_argument(
+        "--clipped",
+        action="store_true",
+        help="Use the historical max-clipped chance correction "
+             "s_tilde = max(0, (s-E)/(1-E)). Only for regenerating "
+             "legacy plots; the paper's canonical metric is signed.",
+    )
     args = parser.parse_args()
+
+    global CLIP_CHANCE_CORRECT
+    if args.clipped:
+        CLIP_CHANCE_CORRECT = True
+        print("[clipped] chance correction is CLIPPED (legacy pre-rebuttal metric)")
 
     set_style()
     args.out_dir.mkdir(parents=True, exist_ok=True)

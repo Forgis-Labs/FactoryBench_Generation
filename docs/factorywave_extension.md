@@ -1,0 +1,468 @@
+# FactoryWave Vision Extension
+
+## Overview
+
+This document specifies an extension to the **FactoryWave** dataset that adds a **2D + 3D vision modality** alongside the existing proprioceptive telemetry stream. The robots, tasks, faults, phase labelling, and telemetry schema all carry over from the base FactoryWave protocol unchanged.
+
+The extension covers the following configurations:
+
+- **UR3** — pick-and-place
+- **KUKA KR10** — pick-and-place, peg-in-hole
+
+**Goal**: record data (time series sensoric + vision + metadata). 2 robots × 1–2 tasks × 3 experiment types → about 4 160 episodes, ~15 seconds each on average.
+
+**Robots:** UR3 (125 Hz telemetry), KUKA KR10 (83 Hz telemetry)
+**Tasks:** Pick-and-Place (both robots), Peg-in-Hole (KUKA only)
+**Faults:** subset of the base FactoryWave catalogue — pick-and-place IDs 8–11, 13–15, 29–31, 38; peg-in-hole IDs 32–36, 39; general/software IDs 19, 37
+**Experiments:** 3 different experiment types (anomaly injection, optimization, counterfactual)
+**Vision:** 2D RGB + 3D / depth, configuration TBD
+
+---
+
+## General Principles
+
+- **Policies are intentionally simple.** The policy quality is not the subject of research; the state understanding is. The tasks are quite simple and we just want the policy to succeed the task a majority of the times without abnormal behaviour (around 95% of times). A naive scripted policy that reliably completes the task (under the noisy environment) is sufficient.
+- **Phases must be recorded.** Every logged step must carry a `task_phase` label so downstream models can condition on or segment over task structure. You can code up the "skills" around those phases, or use a different granularity, but the phases of the tasks must be recorded each timestep.
+- **Record everything.** All available sensor signals should be logged. Feature selection and pruning will be done at the analysis stage, not here.
+- **Vision must be paired and time-synced.** Every episode that is recorded under v2 must produce a paired vision bundle; episodes with missing or unsynced vision should be tagged and treated as v1-style telemetry-only.
+- **Early data is useful even if trivial.** A static robot or a trivially successful episode is still valuable for pipeline validation, schema testing, and anomaly injection debugging.
+
+---
+
+## Before You Start: Checklist
+
+- [ ] Recording laptop is powered on and connected to the robot's network
+- [ ] Recording script is tested and receiving telemetry data (run a 10-second test recording)
+- [ ] Vision recording pipeline is tested and receiving frames from every configured camera (TBD: which cameras)
+- [ ] Time-sync check between telemetry and vision streams passes
+- [ ] 3 objects of known weights are on the table (pick-and-place only), each labeled with its weight in kg
+  - **Light:** **\_** kg
+  - **Medium:** **\_** kg
+  - **Heavy:** **\_** kg
+- [ ] Pick position is marked with tape on the table (pick-and-place)
+- [ ] Place position is marked with tape on the table (pick-and-place)
+- [ ] Peg-in-Hole fixture/slot is in place (peg-in-hole)
+- [ ] Tool flange wrench is nearby (correct size for this robot)
+- [ ] Electrical tape (for gripper wear faults) is nearby
+- [ ] Robot programs are loaded and tested:
+  - [ ] Pick-and-place program works
+  - [ ] Peg-in-Hole program works (KUKA only)
+
+---
+
+## Safety Rules
+
+1. **NEVER leave the robot unattended during fault blocks.** Faults can cause unexpected behavior.
+2. **Use reduced speed (50% or lower) during ALL fault injection blocks.**
+3. **Keep the emergency stop button within reach at all times.**
+4. **If any fault causes the robot to behave unpredictably, hit E-stop immediately and tighten/fix the fault before continuing.**
+5. **The loose flange fault should be 1/4 turn MAXIMUM.** More than that risks the tool falling off.
+6. **Verify the robot is back to normal operation after fixing each fault before starting the next block.**
+7. **Never block the cameras with body or tooling during a fault block** — losing visual coverage of a fault event makes the episode unusable.
+
+---
+
+## Modalities
+
+| Modality | What | Sampling rate |
+| --- | --- | --- |
+| Proprioceptive telemetry | Joint pos/vel/current/torque, TCP pose, F/T, controller status, etc. (per UR3 signal list below; KUKA equivalents TBD) | **125 Hz** (UR3), **83 Hz** (KUKA) |
+| 2D vision | RGB camera(s) | **TBD** |
+| 3D vision | Depth / RGB-D | **TBD** |
+
+Each episode produces one synchronised bundle: telemetry stream + the vision streams + the episode metadata block.
+
+---
+
+## Vision Setup
+
+**TBD.** Number of cameras, sensor models (2D RGB, RGB-D, structured-light 3D, etc.), mounting locations (wrist / global / top-down / other), resolution, lens, framerate, recording PC spec, codec, and time synchronisation between vision and telemetry are all to be decided.
+
+---
+
+## The 2 Tasks
+
+### Task 1: Pick-and-Place
+
+1. Robot starts at home position
+2. Moves to pick position, grips object
+3. Moves to place position, releases object
+4. Returns to home position
+
+Note: To enable automatic data collection, robot arm should also return object to pick position, record that part as a separate pick-and-place episode to double data generation.
+
+#### Phases
+
+| Phase index | Phase name   | Description                                       |
+| ----------- | ------------ | ------------------------------------------------- |
+| 0           | `above_pick` | EEF moves to a waypoint directly above the object |
+| 1           | `descend`    | EEF lowers toward the object                      |
+| 2           | `settle`     | Brief hold to let physics settle before grasping  |
+| 3           | `close`      | Gripper closes around the object                  |
+| 4           | `lift`       | EEF lifts the grasped object off the surface      |
+| 5           | `move_xy`    | Lateral transfer toward the bin                   |
+| 6           | `lower`      | EEF lowers into the bin                           |
+| 7           | `open`       | Gripper opens, object released                    |
+| 8           | `retract`    | EEF moves away from the bin                       |
+| 9           | `return`     | EEF returns to home configuration                 |
+
+### Task 2: Peg-in-Hole (KUKA only)
+
+1. Robot starts at home position with object gripped
+2. Moves to fixture/slot, inserts object precisely
+3. Drops the object and rises back to above-hole position
+4. Returns to home position
+5. Moves to above-object position, then descends to object
+6. Retrieves object from fixture
+7. Rises back to above-object position
+8. Returns to home position
+
+#### Phases
+
+| Phase index | Phase name     | Description                                       |
+| ----------- | -------------- | ------------------------------------------------- |
+| 0           | `above_hole`   | EEF moves above the hole and aligns               |
+| 1           | `insert`       | EEF pushes peg downward into the hole             |
+| 2           | `disengage`    | Gripper opens                                     |
+| 3           | `above_hole`   | EEF rises back to the waypoint above the hole     |
+| 4           | `retract`      | EEF returns to home position                      |
+| 5           | `above_object` | EEF moves above the object and aligns with object |
+| 6           | `engage`       | Gripper closes                                    |
+| 7           | `above_object` | EEF rises back to the waypoint above the object   |
+| 8           | `retract`      | EEF returns to home position                      |
+
+---
+
+## Fault Types
+
+This extension uses a subset of the base FactoryWave fault catalogue — only faults relevant to pick-and-place and peg-in-hole are recorded. Screwing-task faults are out of scope.
+
+**CRITICAL RULE:** After EVERY fault block, FIX the fault completely before moving to the next block. Verify the robot is back to normal operation before starting the next block.
+
+### Default metadata per episode
+
+Every episode (regardless of condition) logs the following default metadata fields alongside the signal stream:
+
+| Field                        | Description                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------- |
+| `episode_id`                 | Unique identifier for the episode                                               |
+| `robot_model`                | Robot model name (e.g. UR3, KUKA KR10)                                          |
+| `task`                       | Task name (pick-and-place, peg-in-hole)                                         |
+| `condition`                  | Episode condition (normal, fault, optimization, counterfactual)                 |
+| `fault_id`                   | Fault ID injected, or null for normal/optimization episodes                     |
+| `weight_of_box`              | Mass of the transported object in kg (pick-and-place only)                      |
+| `shape_of_box`               | Shape/dimensions of the transported object (pick-and-place only)                |
+| `position_of_box`            | Initial XYZ position of the object on the table, if measurable                  |
+| `gripper_model`              | Gripper model and type (e.g. vacuum, two-finger)                                |
+| `payload_mass_configured`    | Payload mass value set in the controller (kg)                                   |
+| `payload_cog_configured`     | Payload CoG offset set in the controller (x, y, z in mm)                        |
+| `tcp_offset_configured`      | TCP position offset set in the controller (x, y, z in mm)                       |
+| `tcp_orientation_configured` | TCP orientation set in the controller (rx, ry, rz in radians)                   |
+
+Fault-specific metadata fields are listed in the **Metadata** column of each fault table below.
+
+### Vision-specific metadata per episode
+
+In addition to the default metadata, every v2 episode logs:
+
+- Identifier and model of each camera used in the episode (e.g. wrist, global, top-down)
+- Calibration reference: pointer to the camera intrinsics, distortion coefficients, and camera-to-robot extrinsics in use
+- Time-synchronisation reference between the vision stream(s) and the telemetry stream
+- Per-stream framerate actually achieved
+- Per-stream dropped-frame count
+- Per-stream file path / handle
+- Per-stream timestamp file path / handle
+- Vision recording start and end timestamps (relative to telemetry start)
+- Lighting condition at recording time (if measured)
+- Camera placement reference (pointer to the active vision setup)
+
+---
+
+### Pick-and-Place Task Faults (IDs 8–11, 13–15, 29–31, 38)
+
+#### Mechanical / Hardware Faults
+
+| ID  | root_cause                             | Explanation                                                                                                                                             | How to Inject                                                                                                                                 | Automation                                                                                                   | Metadata                                    | Event Timing              |
+| --- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------- | ------------------------- |
+| 10  | `additional_axis_payload` (CF ANOMALY) | A physical weight attached to one robot link increases its effective inertia and gravity loading across all joints.                                     | Attach a calibrated dead weight (e.g. 0.5–2 kg) directly to one of the robot links using a mechanical fixture, then run the standard program. | Medium (requires manual attachment of dead weight, but then multiple episodes can be recorded automatically) | link_affected, added_mass, picture_of_robot | Physically injected fault |
+| 15  | `unstable_mounting_platform`           | The robot's base is unstable due to released wheel brakes or uneven foam beneath it, introducing low-frequency vibrations during motion.                | Release the wheel brakes of the robot trolley, or place calibrated foam pads of varying thickness under the base mounting plate.              | High (set up once, then record multiple episodes)                                                            | picture_of_robot, description_of_experiment | Physically injected fault |
+
+#### Gripper Faults
+
+| ID  | root_cause                                        | Explanation                                                                                                                              | How to Inject                                                                                                                                                                         | Automation                                                       | Metadata            | Event Timing                                                                      |
+| --- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------- |
+| 8   | `gripper_activation_failure`                      | The vacuum gripper fails to activate and never picks up the box. The robot completes the motion but carries no payload.                  | Disconnect the vacuum line or disable the solenoid valve command in the gripper control I/O, then run a pick-and-place cycle. Pick random time (amongst relevant phases) for failure. | High (disable solenoid via I/O command in script)                | time_of_malfunction | Start: gripper activation command issued. End: end of episode.                    |
+| 9   | `gripper_release_during_motion` (RECORD TIMESTEP) | The vacuum gripper releases the can mid-trajectory at a random point during transport, causing an abrupt payload loss.                   | Inject a timed solenoid OFF pulse into the gripper control line mid-trajectory via a programmable relay or script-triggered digital output.                                           | High (timed digital output pulse fully scriptable)               | time_of_malfunction | Start: solenoid OFF pulse fires. End: end of gripper opening motion.              |
+| 14  | `invalid_gripping_position` (RECORD TIMESTEP)     | The can is gripped at an unusual or offset position due to a timing error in the pick sequence, causing asymmetric payload distribution. | Introduce a `sleep()` call in the robot program before the gripper activation command, so the gripper closes after the arm has begun lifting, gripping the can off-center.            | High (sleep() injection is a pure software change in the script) | -                   | Start: delayed gripper closure command fires. End: end of gripper closure motion. |
+| 38  | `missing_box`                                     | The robot executes the full pick-and-place cycle but no box is present at the pick position, so the gripper closes on empty air and the arm transports no payload. | Remove the box from the pick position before the episode starts. The robot runs the standard program unmodified. | High (just remove the box, then run all episodes) | - | Fault present throughout episode — recording exact timestep not useful. |
+
+#### Payload / Configuration Faults
+
+| ID  | root_cause                               | Explanation                                                                                                                                              | How to Inject                                                                                                                                                       | Automation                                                                             | Metadata | Event Timing                                                            |
+| --- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------- |
+| 22  | `tcp_frame_misconfiguration`             | The Tool Center Point (TCP) frame or mounting orientation is configured incorrectly, causing the robot to detect unexpected gravitational torques.       | Enter an incorrect TCP offset (e.g. shift X by 100 mm) or wrong mounting angle in the controller's installation/TCP panel, then run the program.                    | High (pure software parameter change in the controller)                                | offset   | Fault present throughout episode — recording exact timestep not useful. |
+| 23  | `payload_weight_misconfiguration`        | The payload mass is misconfigured while a tool or workpiece is physically attached.                                                                      | Ensure the payload is set to 0 kg in the controller while a tool (e.g. gripper, ~300 g) is physically mounted, then run a pick-and-place cycle.                     | High (pure software parameter change)                                                  | -        | Fault present throughout episode — recording exact timestep not useful. |
+| 28  | `mild_payload_cog_misconfiguration`      | The payload center of gravity is specified at an incorrect offset from the tool flange, causing wrong gravity compensation torques and protective stops. | Set the CoG offset in the payload configuration at an offset from the actual tool CoG, then execute a multi-pose trajectory. Offset mild to not trigger safety stop | High (pure software parameter change)                                                  | offset   | Fault present throughout episode — recording exact timestep not useful. |
+
+#### Collision Faults
+
+| ID  | root_cause                                     | Explanation                                                                                                                                                              | How to Inject                                                                                                                                                                                                 | Automation                                                                                                                                                         | Metadata                                       | Event Timing              |
+| --- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------- |
+| 11  | `collision_foam_object` (RECORD TIMESTEP)      | The robot contacts a soft foam block in the workspace, producing a brief TCP force spike without triggering a protective stop.                                           | Place a foam cube directly in the programmed TCP trajectory. The robot will push through it with only a brief force spike.                                                                                    | Low-medium (requires manually placing foam block in trajectory, depending on trajectory and displacement in an episode)                                            | picture_of_setup (once per set up not episode) | Physically injected fault |
+| 29  | `collision_hanging_cable` (RECORD TIMESTEP)    | A cable or wire hanging across the workspace contacts the arm during motion, producing a sustained asymmetric drag force rather than a sharp impact.                     | Suspend a loose cable across the robot trajectory at arm height so it drags along the robot link or tool flange during the motion cycle. We can use lamps as high ground and tape to put the cables in place. | Low (requires manually suspending cable in workspace, depending on trajectory and displacement in an episode)                                                      | picture_of_setup (once per set up not episode) | Physically injected fault |
+| 30  | `collision_cardboard_object` (RECORD TIMESTEP) | The robot strikes a cardboard carton placed in its path. Cardboard provides moderate resistance: the robot may displace it or trigger a protective stop if it is braced. | Place a cardboard box (free-standing or lightly braced) in the robot trajectory. Brace the box against a wall to increase resistance and provoke a protective stop.                                           | Low (requires manually placing cardboard box in trajectory, depending on trajectory and displacement in an episode)                                                | picture_of_setup (once per set up not episode) | Physically injected fault |
+| 31  | `collision_rigid_object` (RECORD TIMESTEP)     | The robot collides with a hard, immovable object such as a metal fixture, invariably triggering an immediate protective stop.                                            | Place a rigid metal block or clamp a solid fixture in the programmed TCP path. The collision will trigger an immediate protective stop.                                                                       | High (requires manually placing rigid obstacle in trajectory, but robot should perform safety stop = no displacement. Then all episodes can be ran on this set up) | picture_of_setup (once per set up not episode) | Physically injected fault |
+
+#### External Disturbance Faults
+
+| ID  | root_cause                                   | Explanation                                                                                                                                                          | How to Inject                                                                                                                                                                   | Automation                                               | Metadata                                       | Event Timing              |
+| --- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------- | ------------------------- |
+| 25  | `external_arm_disturbance` (RECORD TIMESTEP) | A continuous external force pulls or pushes the robot arm at the TCP during motion (e.g. a spring anchored to the bench frame), causing persistent torque anomalies. | Anchor a spring or elastic band between a fixed point in the workspace (e.g. bench frame) and the tool flange (no contact along the arm links) and run the standard trajectory. | Low (requires manual rig setup with spring/elastic band) | picture_of_setup (once per set up not episode) | Physically injected fault |
+
+---
+
+### Peg-in-Hole Task Faults (IDs 32–36, 39)
+
+| ID  | root_cause                   | Explanation                                                                                                                                                                                | How to Inject                                                                                                                                                       | Automation                                                                                                          | Metadata                           | Event Timing                                  |
+| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------------------- |
+| 32  | `peg_insertion_misalignment` | The peg approaches the hole at an angular or lateral offset, causing the tip to jam against the hole rim rather than enter cleanly, producing elevated contact forces and tracking errors. | Introduce a small angular offset (2–5°) or lateral offset (3–8 mm) in the insertion approach waypoint so the peg contacts the hole rim instead of entering cleanly. | High (pure waypoint offset change in robot program)                                                                 | offset                             | The insertion phase. Not useful to record it. |
+| 33  | `hole_obstruction`           | A foreign object or debris is lodged inside the insertion hole, preventing full peg insertion and generating abnormal force buildup as the peg contacts the obstruction.                   | Place a small object (e.g. a metal chip, rubber disc, or folded paper) inside the hole before the insertion cycle.                                                  | Medium/High (requires manually placing object in hole per block, but should be a one time set up)                   | object_description, object_picture | Physically injected fault                     |
+| 34  | `incorrect_insertion_depth`  | The insertion motion terminates at an incorrect Z depth due to a misconfigured waypoint, leaving the peg partially inserted or causing it to over-push against the hole bottom.            | Modify the insertion endpoint waypoint Z offset by +/- 10–20 mm from the nominal value in the robot program.                                                        | High (pure waypoint Z offset change in robot program)                                                               | offset                             | Not useful to record it.                      |
+| 35  | `peg_surface_contamination`  | Contamination or increased surface roughness on the peg raises insertion friction, producing stick-slip force patterns and higher-than-nominal contact force throughout the stroke.        | Apply a thin layer of dry chalk powder, fine abrasive paste, or low-tack adhesive to the peg surface before the insertion cycle.                                    | Medium/High (requires manual physical contamination of peg per block, but might be able to do in a one time set up) | material_description               | Physically injected fault                     |
+| 36  | `fixture_displacement`       | The insertion fixture has shifted laterally from its nominal position due to vibration or improper clamping, creating a mismatch between the programmed approach and the actual hole.      | Deliberately shift the hole fixture by a controlled lateral offset (5–15 mm) from its nominal position without updating the robot program waypoints.                | Low/Medium (requires manually shifting fixture per block of episodes)                                               | offset                             | Physically injected fault                     |
+| 39  | `missing_peg`                | The robot executes the full peg-in-hole cycle but no peg is gripped, so the arm descends into the hole empty-handed and the insertion phase produces no contact force.                     | Remove the peg from the gripper or skip the peg pick-up step before the episode starts. The robot runs the standard insertion program unmodified.                   | High (just remove the peg, then run all episodes)                                                                   | -                                  | Fault present throughout episode — recording exact timestep not useful. |
+
+---
+
+### General / Software Faults (IDs 19, 37)
+
+These faults are not task-specific and can be injected during any motion cycle.
+
+| ID  | root_cause                                       | Explanation                                                                                                                                            | How to Inject                                                                                                                                                | Automation                                                          | Metadata                                                            | Event Timing             |
+| --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------ |
+| 19  | `joint_position_limit_violation` (CF ANOMALY by changing slightly the goal position, we trigger it on counterfactual) | A robot joint moves outside its configured soft or hard position limits, triggering a safety stop. | Program a waypoint slightly beyond the configured soft joint limit, or shift a joint limit in the safety configuration to encroach on the normal trajectory. | High (pure software waypoint or safety config change)               | experiment_description                                              | Not useful to record it. |
+| 37  | `self_collision_link_interference` (CF ANOMALY)  | The robot trajectory passes through a configuration where an arm link collides with the robot's own body or mounting fixture, triggering an immediate protective stop. | Program a waypoint that requires the arm to fold into a self-colliding configuration, or deliberately offset the mounting fixture so the standard trajectory causes a link to contact it. | High (pure software waypoint change in robot program)               | data on trajectory and collision configuration (format is flexible) | Not useful to record it. |
+
+---
+
+## Counterfactual Experiment
+
+### Fault Selection
+
+Select **5–6 faults** for which the injection moment can be precisely timed and logged: i.e. faults that are injected at a controllable instant during the episode rather than being present from the start.
+
+### Protocol
+
+For each selected fault:
+
+1. **Recreate initial conditions as exactly as possible.** For pick-and-place: use the exact same object placed at the exact same marked position. For peg-in-hole: reset the fixture and peg to the same starting pose. Log all initial condition metadata (object ID, position, orientation, payload weight).
+
+2. **Record one clean baseline run**: the full episode with no fault or event injected, under those initial conditions. This is the counterfactual reference.
+
+3. **Record 3–5 fault runs** — each is the same episode repeated under the same initial conditions, but with the fault event injected at a **randomly sampled timestep** (same for each of the 3–5 runs) within the episode.
+
+4. **Select the best run.** For each fault run, compute the KL divergence between the signal distribution of the pre-event segment and the corresponding segment of the baseline run. The run with the **lowest KL divergence** pre-event (i.e. the one whose pre-fault trajectory most closely matched the baseline) is kept as the counterfactual ground truth pair. Discard the others.
+
+### Metadata to Record per Episode
+
+In addition to the standard signal stream, log the following episode-level fields:
+
+- **`cf_fault_id`** — fault ID injected (null for the baseline run)
+- **`cf_injection_timestep`** — sample index at which the event was injected (null for baseline)
+- **`cf_injection_time_s`** — wall-clock time of injection relative to episode start (null for baseline)
+- **`cf_baseline_episode_id`** — ID of the paired baseline episode
+
+### Output
+
+Each selected counterfactual pair consists of:
+
+- one baseline episode (full clean run)
+- one fault episode (same initial conditions, fault injected at a logged timestep, pre-event segment closely matching the baseline)
+
+---
+
+## Recording Schedule
+
+Robot: \***\*\_\_\*\*** - Start time: **\_\_** - End time: **\_\_**
+
+Payload weights for this robot - Light: \_\_ kg | Medium: \_\_ kg | Heavy: \_\_ kg
+
+Fix and verify normal operation before moving to the next block. This schedule is per robot, if possible (enough people working on it) handle robots in parallel.
+
+### UR3 — Pick-and-Place
+
+| Block | Condition       | Fault IDs                              | Payload            | Episodes       | Total | Done? |
+| ----- | --------------- | -------------------------------------- | ------------------ | -------------- | ----- | ----- |
+| 1     | Normal          | -                                      | Light/Medium/Heavy | 200 each       | 600   | [ ]   |
+| 2     | Optimization    | 22, 28                                 | Light/Medium/Heavy | 20 each        | 120   | [ ]   |
+| 3     | Counterfactual† | TBD (5–6 selected)                     | Medium             | 60 pairs total | 120   | [ ]   |
+| 4     | Fault           | 8, 9, 12, 14, 38                       | Light/Medium/Heavy | 20 each        | 300   | [ ]   |
+| 5     | Fault           | 10, 11, 15, 19, 23, 25, 37             | Light/Medium/Heavy | 20 each        | 420   | [ ]   |
+| 6     | Fault           | 29, 30, 31                             | Light/Medium/Heavy | 20 each        | 180   | [ ]   |
+
+**UR3 pick-and-place subtotal: 600 normal + 120 optimization + 900 fault + 120 counterfactual = 1 740 episodes**
+
+---
+
+### KUKA KR10 — Pick-and-Place
+
+| Block | Condition       | Fault IDs                              | Payload            | Episodes       | Total | Done? |
+| ----- | --------------- | -------------------------------------- | ------------------ | -------------- | ----- | ----- |
+| 7     | Normal          | -                                      | Light/Medium/Heavy | 200 each       | 600   | [ ]   |
+| 8     | Optimization    | 22, 28                                 | Light/Medium/Heavy | 20 each        | 120   | [ ]   |
+| 9     | Counterfactual† | TBD (5–6 selected)                     | Medium             | 60 pairs total | 120   | [ ]   |
+| 10    | Fault           | 8, 9, 12, 14, 38                       | Light/Medium/Heavy | 20 each        | 300   | [ ]   |
+| 11    | Fault           | 10, 11, 15, 19, 23, 25, 37             | Light/Medium/Heavy | 20 each        | 420   | [ ]   |
+| 12    | Fault           | 29, 30, 31                             | Light/Medium/Heavy | 20 each        | 180   | [ ]   |
+
+**KUKA pick-and-place subtotal: 600 normal + 120 optimization + 900 fault + 120 counterfactual = 1 740 episodes**
+
+---
+
+### KUKA KR10 — Peg-in-Hole
+
+| Block | Condition       | Fault IDs                                 | Payload | Episodes       | Total | Done? |
+| ----- | --------------- | ----------------------------------------- | ------- | -------------- | ----- | ----- |
+| 13    | Normal          | -                                         | -       | 200            | 200   | [ ]   |
+| 14    | Optimization    | 22, 28                                    | -       | 20 each        | 40    | [ ]   |
+| 15    | Counterfactual† | TBD (5–6 selected)                        | -       | 60 pairs total | 120   | [ ]   |
+| 16    | Fault           | 10, 11, 15, 19, 23, 25, 37                | -       | 20 each        | 140   | [ ]   |
+| 17    | Fault           | 29, 30, 31                                | -       | 20 each        | 60    | [ ]   |
+| 18    | Fault           | 32, 33, 34, 35, 36, 39                    | -       | 20 each        | 120   | [ ]   |
+
+**KUKA peg-in-hole subtotal: 200 normal + 40 optimization + 320 fault + 120 counterfactual = 680 episodes**
+
+---
+
+† **Counterfactual pairs** — 60 pairs = 60 baseline episodes + 60 best-selected fault episodes. See the [Counterfactual Experiment](#counterfactual-experiment) section above for the selection protocol. Recording effort is ~180–300 additional candidate runs per task (discarded, not counted in totals).
+
+**Vision-extension grand total: 4 160 episodes** (UR3 pick-and-place + KUKA pick-and-place + KUKA peg-in-hole)
+
+---
+
+## UR3: Complete Signal List (137 columns)
+
+The recording script captures ALL of these signals at **125 Hz** (the native ur_rtde control loop rate). You do not need to configure anything — the script handles this automatically.
+
+### Setpoint (Intent) — What the controller commands
+
+| #   | ur_rtde Method        | Count  | FactoryNet Column Names                                                                                                                           |
+| --- | --------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `getTargetQ()`        | 6      | `setpoint_pos_0`, `setpoint_pos_1`, `setpoint_pos_2`, `setpoint_pos_3`, `setpoint_pos_4`, `setpoint_pos_5`                                        |
+| 2   | `getTargetQd()`       | 6      | `setpoint_vel_0`, `setpoint_vel_1`, `setpoint_vel_2`, `setpoint_vel_3`, `setpoint_vel_4`, `setpoint_vel_5`                                        |
+| 3   | `getTargetQdd()`      | 6      | `setpoint_acc_0`, `setpoint_acc_1`, `setpoint_acc_2`, `setpoint_acc_3`, `setpoint_acc_4`, `setpoint_acc_5`                                        |
+| 4   | `getTargetCurrent()`  | 6      | `setpoint_current_0` ... `setpoint_current_5`                                                                                                     |
+| 5   | `getTargetMoment()`   | 6      | `setpoint_torque_0` ... `setpoint_torque_5`                                                                                                       |
+| 6   | `getTargetTCPPose()`  | 6      | `setpoint_tcp_x`, `setpoint_tcp_y`, `setpoint_tcp_z`, `setpoint_tcp_rx`, `setpoint_tcp_ry`, `setpoint_tcp_rz`                                     |
+| 7   | `getTargetTCPSpeed()` | 6      | `setpoint_tcp_speed_x`, `setpoint_tcp_speed_y`, `setpoint_tcp_speed_z`, `setpoint_tcp_speed_rx`, `setpoint_tcp_speed_ry`, `setpoint_tcp_speed_rz` |
+|     |                       | **42** |                                                                                                                                                   |
+
+### Effort / Feedback (Outcome) — What the robot actually does
+
+| #   | ur_rtde Method               | Count  | FactoryNet Column Names                                                                                                               |
+| --- | ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 8   | `getActualQ()`               | 6      | `actual_pos_0` ... `actual_pos_5`                                                                                                     |
+| 9   | `getActualQd()`              | 6      | `actual_vel_0` ... `actual_vel_5`                                                                                                     |
+| 10  | `getActualCurrent()`         | 6      | `effort_current_0` ... `effort_current_5`                                                                                             |
+| 11  | `getActualCurrentAsTorque()` | 6      | `effort_torque_0` ... `effort_torque_5`                                                                                               |
+| 12  | `getJointControlOutput()`    | 6      | `effort_control_output_0` ... `effort_control_output_5`                                                                               |
+| 13  | `getActualTCPPose()`         | 6      | `actual_tcp_x`, `actual_tcp_y`, `actual_tcp_z`, `actual_tcp_rx`, `actual_tcp_ry`, `actual_tcp_rz`                                     |
+| 14  | `getActualTCPSpeed()`        | 6      | `actual_tcp_speed_x` ... `actual_tcp_speed_rz`                                                                                        |
+| 15  | `getActualTCPForce()`        | 6      | `actual_tcp_force_x`, `actual_tcp_force_y`, `actual_tcp_force_z`, `actual_tcp_force_rx`, `actual_tcp_force_ry`, `actual_tcp_force_rz` |
+|     |                              | **48** |                                                                                                                                       |
+
+### Context / Health — Machine state and environment
+
+| #   | ur_rtde Method                 | Count  | FactoryNet Column Names                                                                              |
+| --- | ------------------------------ | ------ | ---------------------------------------------------------------------------------------------------- |
+| 16  | `getJointTemperatures()`       | 6      | `ctx_joint_temp_0` ... `ctx_joint_temp_5`                                                            |
+| 17  | `getActualJointVoltage()`      | 6      | `ctx_joint_voltage_0` ... `ctx_joint_voltage_5`                                                      |
+| 18  | `getJointMode()`               | 6      | `ctx_joint_mode_0` ... `ctx_joint_mode_5`                                                            |
+| 19  | `getActualToolAccelerometer()` | 3      | `ctx_tool_accel_x`, `ctx_tool_accel_y`, `ctx_tool_accel_z`                                           |
+| 20  | `getFtRawWrench()`             | 6      | `ctx_ft_raw_fx`, `ctx_ft_raw_fy`, `ctx_ft_raw_fz`, `ctx_ft_raw_tx`, `ctx_ft_raw_ty`, `ctx_ft_raw_tz` |
+| 21  | `getActualMainVoltage()`       | 1      | `ctx_main_voltage`                                                                                   |
+| 22  | `getActualRobotVoltage()`      | 1      | `ctx_robot_voltage`                                                                                  |
+| 23  | `getActualRobotCurrent()`      | 1      | `ctx_robot_current`                                                                                  |
+| 24  | `getActualMomentum()`          | 1      | `ctx_momentum`                                                                                       |
+| 25  | `getSpeedScaling()`            | 1      | `ctx_speed_scaling`                                                                                  |
+| 26  | `getSpeedScalingCombined()`    | 1      | `ctx_speed_scaling_combined`                                                                         |
+| 27  | `getActualExecutionTime()`     | 1      | `ctx_execution_time`                                                                                 |
+|     |                                | **33** |                                                                                                      |
+
+### Status / Mode
+
+| #   | ur_rtde Method          | Count | FactoryNet Column Names  |
+| --- | ----------------------- | ----- | ------------------------ |
+| 28  | `getTimestamp()`        | 1     | `timestamp`              |
+| 29  | `getRobotMode()`        | 1     | `ctx_robot_mode`         |
+| 30  | `getRobotStatus()`      | 1     | `ctx_robot_status`       |
+| 31  | `getSafetyMode()`       | 1     | `ctx_safety_mode`        |
+| 32  | `getSafetyStatusBits()` | 1     | `ctx_safety_status_bits` |
+| 33  | `getRuntimeState()`     | 1     | `ctx_runtime_state`      |
+| 34  | `getPayload()`          | 1     | `ctx_payload_mass`       |
+|     |                         | **7** |                          |
+
+### I/O
+
+| #   | ur_rtde Method                 | Count | FactoryNet Column Names |
+| --- | ------------------------------ | ----- | ----------------------- |
+| 35  | `getActualDigitalInputBits()`  | 1     | `io_digital_inputs`     |
+| 36  | `getActualDigitalOutputBits()` | 1     | `io_digital_outputs`    |
+| 37  | `getStandardAnalogInput0()`    | 1     | `io_analog_input_0`     |
+| 38  | `getStandardAnalogInput1()`    | 1     | `io_analog_input_1`     |
+| 39  | `getStandardAnalogOutput0()`   | 1     | `io_analog_output_0`    |
+| 40  | `getStandardAnalogOutput1()`   | 1     | `io_analog_output_1`    |
+|     |                                | **6** |                         |
+
+### Episode Metadata (added by the recording script, constant per episode)
+
+| Column Name          | Source                 | Example                               |
+| -------------------- | ---------------------- | ------------------------------------- |
+| `episode_id`         | Auto-generated         | `ur3_pick_and_place_normal_0.5kg_042` |
+| `ctx_robot_type`     | `--robot` flag         | `ur3`                                 |
+| `ctx_task`           | `--task` flag          | `pick_and_place`                      |
+| `ctx_fault_label`    | `--condition` flag     | `normal`                              |
+| `ctx_payload_kg`     | `--payload_kg` flag    | `0.5`                                 |
+| `ctx_recording_date` | Auto from system clock | `2026-02-20`                          |
+
+### UR3 Grand Total: 137 sensor columns + 6 metadata columns = 143 columns per timestep at 125 Hz
+
+---
+
+## KUKA KR10: Signal List
+
+**STATUS: WAITING FOR JONAS**
+
+The KUKA KRC4 controller streams system variables over RSI / EthernetKRL at **83 Hz** (12 ms IPO cycle). The recording script samples at the native RSI rate; no extra configuration is required.
+
+**Signals we need to confirm:**
+
+| Signal Category               | What we need | KUKA system variable (to be confirmed)    |
+| ----------------------------- | ------------ | ----------------------------------------- |
+| Commanded joint positions     | 6 values     | `$AXIS_CMD[1..6]` or `$AXIS_ACT_CMD`      |
+| Commanded joint velocities    | 6 values     | `$VEL_AXIS_CMD[1..6]` or similar          |
+| Commanded joint accelerations | 6 values     | TBD (may need to compute)                 |
+| Commanded TCP pose            | 6 values     | `$POS_ACT_CMD` or similar                 |
+| Actual joint positions        | 6 values     | `$AXIS_ACT[1..6]`                         |
+| Actual joint velocities       | 6 values     | `$VEL_AXIS_ACT[1..6]`                     |
+| Gear torque per axis          | 6 values     | `$TORQUE_ACT[1..6]` or `$TORQUE_AXIS_ACT` |
+| Motor current per axis        | 6 values     | `$MOT_CUR[1..6]` or `$CURR_ACT`           |
+| Motor temperature per axis    | 6 values     | `$TEMPERATURE_MOTOR[1..6]`                |
+| TCP force/torque              | 6 values     | Only if force sensor installed            |
+| Supply voltage                | 1 value      | TBD                                       |
+| Robot mode / status           | varies       | `$MODE_OP`, `$PRO_STATE`                  |
+
+---
+
+## End of Day Checklist
+
+- [ ] All fault conditions have been reversed (flange tight, TCP reset, tape removed, correct object, centered grip)
+- [ ] All recording files are saved and backed up (telemetry AND vision)
+- [ ] Episode counts match the schedule above
+- [ ] Per-episode vision artifacts (frames, depth, timestamps) are present and align with the telemetry stream
+- [ ] Start/end times are recorded on this sheet
+- [ ] Any anomalies or issues are noted below
+
+**Notes:**
+
+---

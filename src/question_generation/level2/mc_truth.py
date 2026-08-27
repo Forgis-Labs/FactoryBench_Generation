@@ -45,6 +45,7 @@ DEFAULT_THRESHOLDS: Dict[str, float] = {
     # no constant can split the population. The absolute post-event error has
     # real spread and its median splits exactly 50/50. Centre fitted by
     # scripts/calibrate_l2_tmpl3_thresholds.py.
+    "tcp_tracking_abs_error": 0.0025,
     "tracking_abs_error": 0.0630,
     # All centres below are fitted so the true-rate averages 50% over the
     # THRESHOLD DISTRIBUTION the generator samples (Gaussian, 20% relative sd),
@@ -365,39 +366,28 @@ def evaluate_mc_statement(
         speed_keys = _indexed_keys("feedback_speed", [baseline])
         current_keys = _indexed_keys("effort_current", [baseline])
 
-    if sid == "l2_mc_003":
+    if sid in {"l2_mc_003", "l2_mc_004"}:
+        # Ratio of window means against one shared threshold, the same form
+        # level 3 uses. The old pair compared the post-event extreme against a
+        # single baseline row: mc_003 took min(post) <= (1-r)*pre, which is
+        # satisfied on nearly every window because speeds cross zero, and
+        # mc_004 took max|post-pre| <= tol*|pre|, whose fitted tol landed near
+        # 16.7 and rendered as "within +/-1674% of baseline" -- trivially true
+        # as worded, yet labelled False much of the time, because the label was
+        # never reading the threshold the way the sentence stated it.
         drop_ratio = _get_threshold(thresholds, "speed_drop_ratio")
-        evaluated = 0
+        ratios = []
         for speed_key in speed_keys:
-            pre = _to_float(baseline.get(speed_key))
-            series = _series(post_event_rows, speed_key)
-            if pre is None or not series:
+            pre = _mean([abs(v) for v in _series(subseries, speed_key)])
+            post = _mean([abs(v) for v in _series(post_event_rows, speed_key)])
+            if not pre or post is None:
                 continue
-            evaluated += 1
-            if min(series) <= (1.0 - drop_ratio) * pre:
-                return True
-        # No speed channel carried data (KUKA records none), so whether a
-        # speed drop occurred is unknown. Returning False here would assert
-        # "no drop" on every such episode regardless of the threshold.
-        if evaluated == 0:
+            ratios.append(post / pre)
+        if not ratios:
             return None
-        return False
-
-    if sid == "l2_mc_004":
-        stable_tol = _get_threshold(thresholds, "speed_stable_tol")
-        evaluated = 0
-        for speed_key in speed_keys:
-            pre = _to_float(baseline.get(speed_key))
-            series = _series(post_event_rows, speed_key)
-            if pre is None or not series:
-                continue
-            evaluated += 1
-            max_abs_diff = max(abs(v - pre) for v in series)
-            if max_abs_diff > stable_tol * max(EPS, abs(pre)):
-                return False
-        if evaluated == 0:
-            return None
-        return True
+        if sid == "l2_mc_003":
+            return min(ratios) <= drop_ratio
+        return min(ratios) > drop_ratio
 
     if sid == "l2_mc_005":
         current_increase = _get_threshold(thresholds, "stall_current_increase")
@@ -489,15 +479,17 @@ def evaluate_mc_statement(
         return mean_series >= (1.0 + current_increase) * pre
 
     if sid in {"l2_mc_015", "l2_mc_016"}:
-        tcp_stable = _get_threshold(thresholds, "tcp_tracking_stable_increase")
-        tcp_increase = _get_threshold(thresholds, "tcp_tracking_increase")
-        pre_err = _tracking_error_row(baseline, tcp=True)
+        # Absolute post-event TCP tracking error, not a ratio to one baseline
+        # row. The ratio form is what level 2 already abandoned for the joint
+        # tracking pair; the TCP pair kept it and stayed pinned. Shared
+        # threshold, exact complements.
+        abs_error = _get_threshold(thresholds, "tcp_tracking_abs_error")
         post_err = _mean(_tracking_errors(post_event_rows, tcp=True))
-        if pre_err is None or post_err is None:
+        if post_err is None:
             return None
-        if sid == "l2_mc_015":
-            return post_err <= (1.0 + tcp_stable) * pre_err
-        return post_err >= (1.0 + tcp_increase) * pre_err
+        if sid == "l2_mc_016":
+            return post_err >= abs_error
+        return post_err < abs_error
 
     if sid in {"l2_mc_017", "l2_mc_018"}:
         temp_rise_slope = _get_threshold(thresholds, "temp_rise_slope")

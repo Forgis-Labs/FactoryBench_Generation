@@ -93,6 +93,49 @@ PREDICTIVE_EXCLUDED_MC_IDS = {
 COLLISION_EVENT_IDS = {16, 17, 18, 19}
 
 
+
+# Templates whose answer lies beyond the window, so the window must stop short.
+_EXTRAPOLATION_TEMPLATE_IDS = {4, 5}
+# How far before the queried timestep the shown window ends, in rows. At 10 Hz
+# three rows is ~300ms, the lead the review verified still leaves the task
+# solvable by a physics-informed predictor rather than by copying.
+_EXTRAPOLATION_LEAD_ROWS = 3
+
+
+def _truncate_before_target(
+    rows: List[Dict[str, Any]],
+    bounds: Optional[Dict[str, Any]],
+) -> Optional[List[Dict[str, Any]]]:
+    """Drop the tail of the window so the queried row is not printed.
+
+    Returns None when truncation would leave too little context to reason from,
+    which the caller treats as "skip this item" rather than shipping a window
+    that already contains its own answer.
+    """
+    target = None
+    if isinstance(bounds, dict):
+        target = bounds.get("target_ts_ms")
+    if target is None:
+        return None
+    # T is measured from the event onset and the window is centred on that
+    # onset, so the queried row sits inside the printed window by
+    # construction. Keep only rows a fixed lead before it.
+    period = 100
+    stamps = [r.get("timestamp_ms") for r in rows]
+    stamps = [float(t) for t in stamps if isinstance(t, (int, float))]
+    if len(stamps) > 1:
+        deltas = [b - a for a, b in zip(stamps, stamps[1:]) if b > a]
+        if deltas:
+            period = sorted(deltas)[len(deltas) // 2]
+    cutoff = float(target) - _EXTRAPOLATION_LEAD_ROWS * period
+    kept = [r for r in rows
+            if isinstance(r.get("timestamp_ms"), (int, float))
+            and float(r["timestamp_ms"]) <= cutoff]
+    if len(kept) < CONTEXT_MIN // 2:
+        return None
+    return kept
+
+
 def pick_joint_indexed_signal_base(subseries: List[Dict[str, Any]], allowed_bases: Optional[set] = None) -> Optional[str]:
     """
     Pick a base signal name that has indexed variants for all joints 0..5.
@@ -167,22 +210,23 @@ def sample_subsequent_chunks(
 
 def rows_strictly_after_context(
     rows: List[Dict[str, Any]],
-    subseries: List[Dict[str, Any]],
+    shown: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Rows whose timestamp is strictly greater than the last context timestamp.
+    """Rows whose timestamp is strictly greater than the last row shown.
 
     The ranking template asks the model to order segments by when they appear
     as the event manifests. That is only a question about the future if the
-    segments lie outside the window the model was already shown. Sampling from
-    ``post_event_rows`` directly does not guarantee this: the context window is
-    centred on the event onset and extends past it, and (at L3) the baseline
-    and counterfactual episodes are identical until they diverge, so early
-    post-onset chunks reproduce rows the model can already see and the ordering
-    can be recovered by matching values instead of reasoning about propagation.
-    Measured on the released benchmark, 13% of option segments appeared
-    verbatim inside their own context.
+    segments lie outside the window the model was already shown.
+
+    ``shown`` must be everything the context renders, not just the sampled
+    subseries. The rendered context is ``subseries + event_segment_rows``, so
+    cutting off at the end of the subseries alone left the event segment
+    inside the pool: its rows are printed above the question and could still
+    be drawn as options. Measured on the release that leaked a segment into
+    9.3% of L2.1 items and 6.4% of L3.1 items, where the ordering can be read
+    off by matching values instead of reasoning about propagation.
     """
-    cutoff = get_last_timestamp(subseries)
+    cutoff = get_last_timestamp(shown)
     out: List[Dict[str, Any]] = []
     for row in rows:
         ts = row.get("timestamp_ms")
@@ -212,6 +256,39 @@ def filter_rows_to_template_features(
         return rows
     allowed = set(keep) | {"timestamp_ms"}
     return [{k: v for k, v in row.items() if k in allowed} for row in rows]
+
+
+
+def _ordering_is_unique(encoded: List[str]) -> bool:
+    """True when exactly one chronological ordering fits the rendered values.
+
+    The task is answerable from endpoint continuity: the last row of one
+    segment continues into the first row of the next. That only identifies a
+    single ordering if those rows are distinguishable *as rendered*. Values
+    print at 2 decimals, and across long static stretches adjacent segments
+    become identical at that precision, so several orderings score equally and
+    the stored answer is only one of them. Measured on the release, 14.9% of
+    items had an endpoint matching more than one candidate start and 2.6% had
+    two options that were byte-identical.
+
+    Raising the printed precision would fix it too, but the rounding is shared
+    by every level and template, so it would rewrite every item in the
+    benchmark. Rejecting the ambiguous minority is the contained option.
+    """
+    rows = []
+    for enc in encoded:
+        parts = [p.strip() for p in str(enc).split("|") if p.strip()]
+        if len(parts) < 2:
+            return False
+        rows.append((parts[0], parts[-1]))
+    if len({e for e in encoded}) < len(encoded):
+        return False          # two segments render identically
+    starts = [s for s, _ in rows]
+    ends = [e for _, e in rows]
+    for end in ends:
+        if sum(1 for s in starts if s == end) > 1:
+            return False      # an endpoint continues into more than one segment
+    return True
 
 
 def encode_chunk_without_timestamps(rows: List[Dict[str, Any]]) -> str:
@@ -656,15 +733,20 @@ def render_statement_with_thresholds(
             "Following the event, contact force shows a significant spike "
             f"(>={_fmt_pct(thresholds['force_spike_increase'])}% above baseline norm)."
         )
+    # The statistic is |commanded - measured| position PLUS |commanded -
+    # measured| speed, summed per axis. Calling it "position" misdescribes it:
+    # measured on this corpus the speed term is a median 91% of the total and
+    # dominates in 97 of 120 sampled rows, so anyone reasoning about position
+    # tracking, exactly as the text asked, computes the wrong quantity.
     if sid == "l2_mc_008":
         return (
             "Following the event, mean joint tracking error exceeds "
-            f"{thresholds['tracking_abs_error']:.4f} (absolute, commanded vs measured position)."
+            f"{thresholds['tracking_abs_error']:.4f} (absolute, summed commanded-vs-measured position and speed deviation)."
         )
     if sid == "l2_mc_009":
         return (
             "Following the event, mean joint tracking error stays below "
-            f"{thresholds['tracking_abs_error']:.4f} (absolute, commanded vs measured position)."
+            f"{thresholds['tracking_abs_error']:.4f} (absolute, summed commanded-vs-measured position and speed deviation)."
         )
     if sid == "l2_mc_010":
         return (
@@ -865,7 +947,12 @@ def fill_template(
     acceptance_bounds = None
 
     if tid == 1:
-        ranking_pool = rows_strictly_after_context(post_event_rows, subseries)
+        # everything the context prints, so the event segment is excluded too
+        # The context prints subseries + the event segment, so the cutoff has
+        # to be the end of that, not the end of the subseries.
+        _shown_event, _ = split_event_segment(post_event_rows)
+        ranking_pool = rows_strictly_after_context(
+            post_event_rows, list(subseries) + list(_shown_event))
         ranking_pool = filter_rows_to_template_features(ranking_pool, template)
         chunks = sample_subsequent_chunks(ranking_pool, n_chunks=4, min_chunk=5, max_chunk=7)
         if len(chunks) < 4:
@@ -878,6 +965,8 @@ def fill_template(
             label: encode_chunk_without_timestamps(chunks[i])
             for i, label in enumerate(labels)
         }
+        if not _ordering_is_unique(list(options.values())):
+            return None
 
         chunk_to_label = {id(chunks[i]): labels[i] for i in range(len(chunks))}
         answer = "".join(chunk_to_label[id(chunk)] for chunk in ordered_chunks)
@@ -970,7 +1059,8 @@ def fill_template(
         question = fill(tmpl_text, event=event_description, signal=_signal_display_name(signal), n=n_ms)
         vals = [float(r[signal]) for r in subseries if isinstance(r.get(signal), (int, float, np.floating))]
         std = float(np.std(vals)) if vals else 0.0
-        acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std * 0.75, 6)}
+        acceptance_bounds = {"signal": signal, "std": round(std, 6), "margin": round(std * 0.75, 6),
+                             "target_ts_ms": int(float(target_row.get("timestamp_ms", 0)))}
 
     elif tid == 5:
         important_features = template.get("important_features")
@@ -1019,6 +1109,7 @@ def fill_template(
         joint_signal_display = _JOINT_SIGNAL_DISPLAY.get(joint_signal, joint_signal.replace("_", " "))
         question = fill(tmpl_text, event=event_description, joint_signal=joint_signal_display, n=n_ms)
         acceptance_bounds = {"signal": joint_signal, "std": tensor_stds, "margin": [round(s * 0.75, 6) for s in tensor_stds]}
+        acceptance_bounds["target_ts_ms"] = int(float(target_row.get("timestamp_ms", 0)))
 
     else:
         logger.warning(f"Unknown template id: {tid}")
@@ -1295,9 +1386,31 @@ def generate_level3_questions(
 
         important_features = template.get("important_features")
         context_subseries = subseries
+        if template["id"] in _EXTRAPOLATION_TEMPLATE_IDS:
+            # The queried timestamp fell inside the printed window on 100% of
+            # released L3.4 and L3.5 items, so the "prediction" was the cell at
+            # that row, copyable verbatim. The window now stops a fixed lead
+            # before the target, which is the smallest change that makes the
+            # question about the future at all.
+            context_subseries = _truncate_before_target(
+                context_subseries, filled.get("acceptance_bounds"))
+            if context_subseries is None:
+                continue
+            # T now means the last row shown, so the stated horizon has to be
+            # measured from there rather than from the event onset.
+            _bounds = filled.get("acceptance_bounds") or {}
+            _target_ts = _bounds.get("target_ts_ms")
+            _last_ts = context_subseries[-1].get("timestamp_ms")
+            if isinstance(_target_ts, (int, float)) and isinstance(_last_ts, (int, float)):
+                _horizon = int(round(float(_target_ts) - float(_last_ts)))
+                if _horizon <= 0:
+                    continue
+                filled["question"] = re.sub(
+                    r"T\+\d+ms", f"T+{_horizon}ms", filled.get("question", ""), count=1)
+                _bounds["horizon_ms"] = _horizon
         if important_features:
             keep = set(important_features) | {"timestamp_ms"}
-            context_subseries = [{k: v for k, v in row.items() if k in keep} for row in subseries]
+            context_subseries = [{k: v for k, v in row.items() if k in keep} for row in context_subseries]
         context = build_context(context_subseries)
 
         item = {

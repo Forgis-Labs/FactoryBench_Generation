@@ -52,6 +52,14 @@ def decimate_dataframe(
 
     if continuous_cols is None:
         continuous_cols = set(df.select_dtypes(include=[np.floating]).columns)
+    # Never treat boolean columns as continuous — pandas nullable Boolean can't be
+    # interpolated. Subsample them instead.
+    bool_cols = set()
+    for c in df.columns:
+        dt = df[c].dtype
+        if str(dt).lower() in ("bool", "boolean") or pd.api.types.is_bool_dtype(dt):
+            bool_cols.add(c)
+    continuous_cols = set(continuous_cols) - bool_cols
 
     n_out = len(df) // q
     if n_out == 0:
