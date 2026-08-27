@@ -18,7 +18,7 @@ Two modes:
      DoRA into the base weights with `merge_and_unload`, then attaches a
      FRESH DoRA on top for FactoryBench finetuning.
 
-The dataset / loss path is identical to the plain mode — FactoryBench
+The dataset / loss path is identical to the plain mode, FactoryBench
 prompts are text-only, the extra <ts_*> tokens in the vocabulary are
 unused at train time and just ride along in the embedding table.
 
@@ -58,7 +58,7 @@ class FactoryBenchDataset(Dataset):
                  max_samples: int = 0, wrapper=None, max_channels: int = 64):
         """If ``wrapper`` is a Shrike or BearingModel instance, each sample's
         time-series rows are pushed through ``wrapper.tokenize_ts`` and encoded
-        as ``<ts_start> <ts_*> <ts_end>`` blocks per channel — the canonical
+        as ``<ts_start> <ts_*> <ts_end>`` blocks per channel, the canonical
         Shrike wire format. Otherwise we fall back to dumping the raw text
         rows in the prompt (the vanilla-Qwen3 path).
         """
@@ -81,7 +81,7 @@ class FactoryBenchDataset(Dataset):
                 for line in f:
                     self.samples.append(json.loads(line))
 
-        # Smoke-test knob — cap dataset BEFORE pre-tokenization so we don't
+        # Smoke-test knob, cap dataset BEFORE pre-tokenization so we don't
         # pay the tokenization cost on 40k+ samples just to do a 20-step run.
         if max_samples and max_samples > 0:
             self.samples = self.samples[:max_samples]
@@ -126,11 +126,11 @@ class FactoryBenchDataset(Dataset):
         """Format a FactoryBench sample as ChatML prompt + answer.
 
         MUST stay byte-identical to ``build_prompt`` in
-        ``finetuning/eval_factorybench.py`` — any drift retrains the model on
+        ``finetuning/eval_factorybench.py``, any drift retrains the model on
         a distribution that diverges from inference. The exact wire format is:
 
             <|im_start|>user
-            Feature mapping: <first-10-acronyms>, ... (N total)
+            Feature mapping: <first-10-acronyms>... (N total)
 
             Time series data:
             <rows>
@@ -161,7 +161,7 @@ class FactoryBenchDataset(Dataset):
                 f"{k}={v}" for k, v in list(acronym_map.items())[:10]
             )
             if len(acronym_map) > 10:
-                mapping_str += f", ... ({len(acronym_map)} total)"
+                mapping_str += f"... ({len(acronym_map)} total)"
             parts.append(f"Feature mapping: {mapping_str}")
 
         if isinstance(ts_rows, list) and ts_rows:
@@ -171,7 +171,7 @@ class FactoryBenchDataset(Dataset):
             parts.append(f"Time series data:\n{ts_str}")
 
         if options:
-            # NB: do NOT sort or truncate — eval iterates raw dict order with
+            # NB: do NOT sort or truncate, eval iterates raw dict order with
             # full values, and divergence here is a silent train/eval skew.
             opts_str = "\n".join(f"  {k}: {v}" for k, v in options.items())
             question = f"{question}\n\nOptions:\n{opts_str}"
@@ -211,8 +211,8 @@ def compute_loss(batch, model, tokenizer, device, max_length):
         seq_len = len(ids)
         pl = sample["prompt_length"]
 
-        input_ids[i, :seq_len] = torch.tensor(ids, dtype=torch.long)
-        attn_mask[i, :seq_len] = 1
+        input_ids[i:seq_len] = torch.tensor(ids, dtype=torch.long)
+        attn_mask[i:seq_len] = 1
         if pl < seq_len:
             labels[i, pl:seq_len] = input_ids[i, pl:seq_len]
 
@@ -229,14 +229,13 @@ def _load_base_with_shrike_loader(
     llm_id: str,
     tokenizer_type: str,
     totem_ckpt: str | None,
-    fsq_ckpt: str | None,
-):
+    fsq_ckpt: str | None):
     """Load a Shrike/BearingModel checkpoint and return (llm, tokenizer).
 
     The returned ``llm`` is a HF Qwen3ForCausalLM with the original DoRA
     already MERGED into the base weights (so a fresh DoRA can be stacked
     on top by the caller). The returned ``tokenizer`` is the LLM's text
-    tokenizer extended with <ts_*> special tokens — kept so the embedding
+    tokenizer extended with <ts_*> special tokens, kept so the embedding
     table sizes match the loaded weights. FactoryBench prompts never emit
     those token IDs, so the extra rows just ride along unused.
     """
@@ -275,13 +274,13 @@ def _load_base_with_shrike_loader(
 
     # Merge the original DoRA into the base so we can stack a fresh adapter
     # on top. merge_and_unload returns the plain Qwen3ForCausalLM (no PEFT
-    # wrapper) with adapter deltas folded into the base weights — the
+    # wrapper) with adapter deltas folded into the base weights, the
     # standard PEFT pattern for "use this finetune as the new base".
     print("  Merging existing DoRA into base LLM weights...")
     merged_llm = wrapper.llm.merge_and_unload()
     tokenizer = wrapper.tokenizer
 
-    # KEEP the wrapper around — its ts_tokenizer (TOTEM / FSQ-Transformer)
+    # KEEP the wrapper around, its ts_tokenizer (TOTEM / FSQ-Transformer)
     # is what FactoryBenchDataset uses to encode signals as <ts_*> codes.
     # Free the now-redundant LLM inside the wrapper; merged_llm replaces it.
     wrapper.llm = None
@@ -365,7 +364,7 @@ def main():
     args.fsq_ckpt = args.fsq_ckpt or _env_opt("FSQ_CKPT") \
         or os.environ.get("SM_CHANNEL_FSQ_CKPT")
 
-    # SageMaker channels mount a directory, not a file — if these point to a
+    # SageMaker channels mount a directory, not a file, if these point to a
     # directory, pick the .pt inside (preferring filenames containing "best").
     def _resolve_pt(path: str | None) -> str | None:
         if not path:
@@ -440,8 +439,7 @@ def main():
             llm_id=args.llm_id,
             tokenizer_type=args.tokenizer_type,
             totem_ckpt=args.totem_ckpt,
-            fsq_ckpt=args.fsq_ckpt,
-        )
+            fsq_ckpt=args.fsq_ckpt)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
     else:
@@ -455,8 +453,7 @@ def main():
             args.llm_id,
             torch_dtype=torch.bfloat16,
             trust_remote_code=True,
-            attn_implementation="flash_attention_2",
-        )
+            attn_implementation="flash_attention_2")
 
     # alpha defaults to 2*r if the caller didn't pass one explicitly (the
     # standard LoRA convention) but a CLI/env override now actually wins.
@@ -467,8 +464,7 @@ def main():
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
                          "gate_proj", "up_proj", "down_proj"],
         lora_dropout=0.05,
-        use_dora=args.use_dora,
-    )
+        use_dora=args.use_dora)
     print(f"  LoRA: r={args.lora_r} alpha={effective_alpha} use_dora={args.use_dora}")
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
@@ -496,18 +492,15 @@ def main():
     from accelerate import Accelerator
     accelerator = Accelerator(
         gradient_accumulation_steps=args.grad_accum,
-        mixed_precision="bf16",
-    )
+        mixed_precision="bf16")
     device = accelerator.device
 
     train_loader = DataLoader(
         train_ds, batch_size=args.batch_size, shuffle=True,
-        collate_fn=lambda b: b, num_workers=4, pin_memory=True,
-    )
+        collate_fn=lambda b: b, num_workers=4, pin_memory=True)
     val_loader = DataLoader(
         val_ds, batch_size=args.batch_size, shuffle=False,
-        collate_fn=lambda b: b, num_workers=4, pin_memory=True,
-    )
+        collate_fn=lambda b: b, num_workers=4, pin_memory=True)
 
     optimizer = AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
 
@@ -516,16 +509,14 @@ def main():
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda s: min(1.0, s / warmup_steps) if s < warmup_steps
-                            else max(0.1, 1.0 - (s - warmup_steps) / max(1, total_steps - warmup_steps)),
-    )
+                            else max(0.1, 1.0 - (s - warmup_steps) / max(1, total_steps - warmup_steps)))
 
     model, optimizer, train_loader, scheduler = accelerator.prepare(
-        model, optimizer, train_loader, scheduler,
-    )
+        model, optimizer, train_loader, scheduler)
     val_loader = accelerator.prepare(val_loader)
 
     is_main = accelerator.is_main_process
-    # Used only for state_dict() saves and final reporting — NEVER call its
+    # Used only for state_dict() saves and final reporting, NEVER call its
     # forward directly inside the training loop, that bypasses DDP/FSDP and
     # mixed-precision wrappers. Use ``model`` (the prepared one) for forward.
     raw_model = accelerator.unwrap_model(model)
@@ -550,7 +541,7 @@ def main():
             # DDP correctness: every rank MUST execute the same NCCL collectives
             # in the same order on every iteration. A `continue` here (e.g. on
             # OOM or NaN) would skip an all-reduce on one rank while the others
-            # block on it — that's the NCCL watchdog timeout you'll see in the
+            # block on it, that's the NCCL watchdog timeout you'll see in the
             # logs ("WorkNCCL ... ran for 600099 ms before timing out").
             #
             # So instead of skipping the iteration, we let it run with a zero
@@ -643,7 +634,7 @@ def main():
                 "val_loss": avg_val,
             }
 
-            # last_model.pt — overwritten each epoch (lightweight resume target,
+            # last_model.pt, overwritten each epoch (lightweight resume target,
             # reflects most recent weights, used for crash recovery).
             torch.save(epoch_state, output_dir / "last_model.pt")
 
@@ -664,14 +655,14 @@ def main():
                 patience_left = args.patience
                 torch.save(epoch_state, output_dir / "best_model.pt")
                 torch.save(epoch_state, ckpt_job_dir / "best_model.pt")
-                # PEFT-style adapter dump — saved to BOTH the model output dir
+                # PEFT-style adapter dump, saved to BOTH the model output dir
                 # (gets tarred into model.tar.gz) AND the checkpoint dir
                 # (synced to S3 as raw files, so eval can mount it as a
                 # SageMaker channel without having to untar anything).
                 try:
                     raw_model.save_pretrained(str(output_dir / "adapter"))
                     raw_model.save_pretrained(str(ckpt_job_dir / "adapter"))
-                    # Tokenizer too — eval needs the extended <ts_*> vocab.
+                    # Tokenizer too, eval needs the extended <ts_*> vocab.
                     tokenizer.save_pretrained(str(ckpt_job_dir / "tokenizer"))
                 except Exception as e:
                     print(f"  [warn] save_pretrained(adapter) failed: {e}", flush=True)

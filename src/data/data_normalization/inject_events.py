@@ -69,8 +69,7 @@ def build_event_label(
     onset_row: Dict[str, Any],
     end_of_event_row: Dict[str, Any],
     run_len: int,
-    prev_row: Optional[Dict[str, Any]] = None,
-) -> str:
+    prev_row: Optional[Dict[str, Any]] = None) -> str:
     event_id = int(event_obj["id"])
     variables: Dict[str, str] = event_obj.get("variables", {})
     feature_key = _pick_feature_key(onset_row)
@@ -124,8 +123,7 @@ def make_event_sequence(
     event_ids: List[int],
     p_start: float,
     min_duration: int,
-    max_duration: int,
-) -> List[int]:
+    max_duration: int) -> List[int]:
     """
     Generate a sequence of length n where each element is either 0 or an
     event ID.  Events are contiguous runs of a single ID; between events the
@@ -161,13 +159,12 @@ def process_episode(
     events_by_id: Dict[int, Dict[str, Any]],
     p_start: float,
     min_duration: int,
-    max_duration: int,
-) -> None:
+    max_duration: int) -> None:
     with src.open("r", encoding="utf-8") as f:
         rows: Any = json.load(f)
 
     if not isinstance(rows, list) or not rows:
-        # unexpected format — copy verbatim
+        # unexpected format, copy verbatim
         shutil.copy2(src, dst)
         return
 
@@ -218,8 +215,7 @@ def inject_events(
     p_start: float,
     min_duration: int,
     max_duration: int,
-    seed: int | None,
-) -> None:
+    seed: int | None) -> None:
     if seed is not None:
         random.seed(seed)
 
@@ -255,8 +251,7 @@ def inject_events(
                     events_by_id,
                     p_start,
                     min_duration,
-                    max_duration,
-                )
+                    max_duration)
                 logger.debug(f"  injected events:   {src_file.name}")
 
         logger.info(f"  Done: {ds}")
@@ -265,8 +260,7 @@ def inject_events(
 def reformat_existing_test_events(
     normalized_dir: Path,
     events_path: Path,
-    test_datasets: List[str],
-) -> None:
+    test_datasets: List[str]) -> None:
     with events_path.open("r", encoding="utf-8") as f:
         events = json.load(f)
     events_by_id = {int(e["id"]): e for e in events}
@@ -338,38 +332,32 @@ def main() -> None:
         "--normalized-dir",
         type=Path,
         default=repo_root / "data" / "normalized_episodes",
-        help="Root normalized episodes directory (default: <repo>/data/normalized_episodes)",
-    )
+        help="Root normalized episodes directory (default: <repo>/data/normalized_episodes)")
     parser.add_argument(
         "--events",
         type=Path,
         default=repo_root / "data" / "events" / "events.json",
-        help="Path to events.json (default: <repo>/data/events/events.json)",
-    )
+        help="Path to events.json (default: <repo>/data/events/events.json)")
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=["aursad", "vorausad"],
-        help="Source dataset names to process (default: aursad vorausad)",
-    )
+        help="Source dataset names to process (default: aursad vorausad)")
     parser.add_argument(
         "--p-start",
         type=float,
         default=0.02,
-        help="Probability per idle timestep of starting a new event (default: 0.02)",
-    )
+        help="Probability per idle timestep of starting a new event (default: 0.02)")
     parser.add_argument(
         "--min-duration",
         type=int,
         default=5,
-        help="Minimum event run length in timesteps (default: 5)",
-    )
+        help="Minimum event run length in timesteps (default: 5)")
     parser.add_argument(
         "--max-duration",
         type=int,
         default=30,
-        help="Maximum event run length in timesteps (default: 30)",
-    )
+        help="Maximum event run length in timesteps (default: 30)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
         "--reformat-existing-test-events",
@@ -377,28 +365,24 @@ def main() -> None:
         help=(
             "Reformat existing event values in test_* datasets to i_v1_v2_... "
             "without regenerating event placement"
-        ),
-    )
+        ))
     parser.add_argument(
         "--test-datasets",
         nargs="+",
         default=["test_aursad", "test_vorausad"],
-        help="Test dataset names used with --reformat-existing-test-events",
-    )
+        help="Test dataset names used with --reformat-existing-test-events")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     if args.reformat_existing_test_events:
         reformat_existing_test_events(
             normalized_dir=args.normalized_dir,
             events_path=args.events,
-            test_datasets=args.test_datasets,
-        )
+            test_datasets=args.test_datasets)
     else:
         inject_events(
             normalized_dir=args.normalized_dir,
@@ -407,8 +391,7 @@ def main() -> None:
             p_start=args.p_start,
             min_duration=args.min_duration,
             max_duration=args.max_duration,
-            seed=args.seed,
-        )
+            seed=args.seed)
 
 
 if __name__ == "__main__":

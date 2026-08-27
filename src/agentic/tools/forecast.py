@@ -1,4 +1,4 @@
-"""forecast — Chronos-Bolt point/quantile forecaster.
+"""forecast, Chronos-Bolt point/quantile forecaster.
 
 Wraps ``amazon/chronos-bolt-small`` (~200 M params, CPU-fast) so the agent
 can delegate any "predict future value" subtask. Model is loaded lazily
@@ -40,8 +40,7 @@ def _load_pipeline():
         # device_map, then move.
         _PIPELINE = ChronosBoltPipeline.from_pretrained(
             "amazon/chronos-bolt-small",
-            torch_dtype=torch.float32,
-        )
+            torch_dtype=torch.float32)
         # Move to CPU explicitly to guarantee no meta tensors survive.
         try:
             _PIPELINE.model = _PIPELINE.model.to("cpu")
@@ -103,11 +102,10 @@ class ForecastTool:
             quantiles, mean = pipe.predict_quantiles(
                 inputs=inputs,
                 prediction_length=int(horizon),
-                quantile_levels=[0.1, 0.5, 0.9],
-            )
-            q10  = quantiles[0, :, 0].tolist()
-            med  = quantiles[0, :, 1].tolist()   # q50
-            q90  = quantiles[0, :, 2].tolist()
+                quantile_levels=[0.1, 0.5, 0.9])
+            q10  = quantiles[0:, 0].tolist()
+            med  = quantiles[0:, 1].tolist()   # q50
+            q90  = quantiles[0:, 2].tolist()
             idx = int(horizon) - 1
             point = float(med[idx])
             lo, hi = float(q10[idx]), float(q90[idx])

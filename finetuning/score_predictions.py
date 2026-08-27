@@ -2,7 +2,7 @@
 FactoryBench scoring cascade.
 
 Exact-match (what eval_factorybench.py logs live) is the wrong metric for most
-templates — rankings want Kendall-tau, T/F wants per-bit agreement, numerics
+templates, rankings want Kendall-tau, T/F wants per-bit agreement, numerics
 want tolerance bands, and L4 free-form needs an LLM judge. This script wraps
 the existing ``src.scoring.cascade`` so the numbers match what the rest of the
 repo reports.
@@ -21,7 +21,7 @@ Usage:
 
 Outputs:
     <input>_scored.jsonl     ─ per-sample row + {score, provenance, reason}
-    <input>_summary.json     ─ aggregate stats (mean, format breakdown, ...)
+    <input>_summary.json     ─ aggregate stats (mean, format breakdown...)
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ from src.scoring.types import ParseResult  # noqa: E402
 
 
 # -----------------------------------------------------------------------------
-# answer_format inference — inlined from src.evaluation.run_foundry_eval so we
+# answer_format inference, inlined from src.evaluation.run_foundry_eval so we
 # don't drag in the full Foundry/Bedrock imports just to dispatch on format.
 # -----------------------------------------------------------------------------
 
@@ -126,8 +126,7 @@ def score_file(path: Path, judge=None) -> dict:
                         ground_truth=gt,
                         question=r.get("question"),
                         acceptance_bounds=ab,
-                        judge=judge,
-                    )
+                        judge=judge)
             else:
                 # Deterministic first; escalate via judge only if available.
                 if judge is None:
@@ -135,8 +134,7 @@ def score_file(path: Path, judge=None) -> dict:
                         answer_format=af,
                         prediction=pred,
                         ground_truth=gt,
-                        acceptance_bounds=ab,
-                    )
+                        acceptance_bounds=ab)
                 else:
                     res = cascade_score(
                         answer_format=af,
@@ -144,8 +142,7 @@ def score_file(path: Path, judge=None) -> dict:
                         ground_truth=gt,
                         question=r.get("question"),
                         acceptance_bounds=ab,
-                        judge=judge,
-                    )
+                        judge=judge)
 
             n += 1
             by_provenance[res.provenance] += 1

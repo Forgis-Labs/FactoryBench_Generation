@@ -1,5 +1,5 @@
 """
-CounterfactualRunner — orchestrates paired baseline/counterfactual episodes.
+CounterfactualRunner, orchestrates paired baseline/counterfactual episodes.
 
 This is the core of the counterfactual data generation pipeline.  It is
 simulation-agnostic: the caller provides callback functions that handle
@@ -12,8 +12,7 @@ Usage sketch (from a task-specific script)::
         events_json_path="events.json",
         task_name="pick_and_place",
         applicators=BUILTIN_APPLICATORS,
-        seed=42,
-    )
+        seed=42)
 
     # The runner calls these callbacks:
     runner.run(
@@ -22,8 +21,7 @@ Usage sketch (from a task-specific script)::
         step_fn=my_step,          # () → dict (sensor_row)
         is_done_fn=my_is_done,    # () → (bool, bool, str)  (done, success, reason)
         get_state_fn=my_state,    # () → EpisodeState
-        max_steps=1500,
-    )
+        max_steps=1500)
 """
 
 from __future__ import annotations
@@ -66,8 +64,7 @@ class CounterfactualRunner:
         task_name: str,
         applicators: Dict[int, BaseApplicator],
         seed: int = 0,
-        phase_boundaries: Optional[List[int]] = None,
-    ):
+        phase_boundaries: Optional[List[int]] = None):
         self._output_dir = Path(output_dir)
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -96,8 +93,7 @@ class CounterfactualRunner:
         is_done_fn: Callable[[], Tuple[bool, bool, str]],
         get_state_fn: Callable[[], EpisodeState],
         event_step_fn: Optional[Callable[[int, dict], Optional[List]]] = None,
-        max_steps: int = 1500,
-    ):
+        max_steps: int = 1500):
         """Run the counterfactual generation loop.
 
         Parameters
@@ -130,7 +126,7 @@ class CounterfactualRunner:
             # ----------------------------------------------------------
             # Phase 1: Baseline (no events)
             # ----------------------------------------------------------
-            print(f"\n[Counterfactual] Episode {ep_idx} — BASELINE")
+            print(f"\n[Counterfactual] Episode {ep_idx}, BASELINE")
             reset_fn(None, False)  # None = fresh random state
             state = get_state_fn()
 
@@ -152,7 +148,7 @@ class CounterfactualRunner:
             # ----------------------------------------------------------
             # Phase 2: Counterfactual (replay with event injection)
             # ----------------------------------------------------------
-            print(f"[Counterfactual] Episode {ep_idx} — COUNTERFACTUAL")
+            print(f"[Counterfactual] Episode {ep_idx}, COUNTERFACTUAL")
             reset_fn(state, True)  # replay same initial conditions
 
             self._scheduler.reset()
@@ -210,7 +206,7 @@ class CounterfactualRunner:
             with open(cf_dir / "event.json", "w") as f:
                 json.dump(event_meta, f, indent=2)
 
-            print(f"[Counterfactual] Episode {ep_idx} done — "
+            print(f"[Counterfactual] Episode {ep_idx} done, "
                   f"baseline: {len(baseline_rows)} steps, "
                   f"counterfactual: {len(cf_rows)} steps")
 

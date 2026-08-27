@@ -26,8 +26,7 @@ import pyarrow.parquet as pq
 from src.data.factorywave_normalizer import (
     compute_kl_divergence,
     _find_fault_onset,
-    _KL_SIGNAL_COLS,
-)
+    _KL_SIGNAL_COLS)
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +37,7 @@ def precompute_cf_selection(
     input_dir: Path,
     output_path: Path,
     limit: Optional[int] = None,
-    tasks: Optional[List[str]] = None,
-) -> None:
+    tasks: Optional[List[str]] = None) -> None:
     """Precompute best CF per baseline and save to JSON cache."""
 
     # Load episode table
@@ -147,12 +145,12 @@ def precompute_cf_selection(
                     onset = max(1, int(float(raw_timestep) / (500.0 / TARGET_HZ)))
 
             if onset is not None and onset >= 5 and onset < len(cf_df):
-                # Has a pre-fault segment — compare pre-fault only
+                # Has a pre-fault segment, compare pre-fault only
                 n_rows = min(onset, len(baseline_df))
                 kl = compute_kl_divergence(baseline_df, cf_df, n_rows)
                 candidates.append((cf_id, kl, onset))
             else:
-                # Fault present from start (config faults) — compare full episodes
+                # Fault present from start (config faults), compare full episodes
                 n_rows = min(len(baseline_df), len(cf_df))
                 if n_rows >= 5:
                     kl = compute_kl_divergence(baseline_df, cf_df, n_rows)
@@ -199,8 +197,7 @@ def main() -> int:
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     try:
         precompute_cf_selection(args.input, args.output, args.limit, args.tasks)

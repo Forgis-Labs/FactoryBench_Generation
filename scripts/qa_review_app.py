@@ -4,7 +4,7 @@ Loads a sample JSONL produced by ``scripts.sample_qa_for_review`` and walks
 through one item at a time. Reviewer marks each item as good / minor /
 bad / unverifiable, optionally tags issues, and writes a free-text comment.
 Verdicts are appended to a JSONL (one verdict per line) so the app survives
-crashes and can be resumed — already-reviewed ids are skipped on next launch.
+crashes and can be resumed, already-reviewed ids are skipped on next launch.
 
 Run::
 
@@ -83,7 +83,7 @@ def _load_done_ids(verdicts_path: Path) -> Dict[str, Dict[str, Any]]:
 
 
 def _parse_time_series(rows: List[str]) -> pd.DataFrame:
-    """Turn ['t=0: a=1, b=2', ...] into a long DataFrame."""
+    """Turn ['t=0: a=1, b=2'...] into a long DataFrame."""
     records = []
     for row in rows or []:
         m = _TS_ROW_RE.match(row.strip())
@@ -136,14 +136,12 @@ def main() -> None:
         "Reviewer name",
         value=st.session_state.get("reviewer", ""),
         key="reviewer",
-        help="Goes into each verdict record.",
-    )
+        help="Goes into each verdict record.")
 
     # Stratum filter
     strata = sorted({it.get("stratum", "") for it in items})
     stratum_filter = st.sidebar.multiselect(
-        "Filter strata", options=strata, default=strata,
-    )
+        "Filter strata", options=strata, default=strata)
     filtered = [it for it in items if it.get("stratum") in stratum_filter]
 
     # Skip-already-reviewed toggle
@@ -231,8 +229,7 @@ def main() -> None:
         chosen = st.multiselect(
             "Feature groups to plot",
             options=sorted(groups),
-            default=[g for g in ("ett", "ecf", "fp", "sp") if g in groups][:3],
-        )
+            default=[g for g in ("ett", "ecf", "fp", "sp") if g in groups][:3])
         for group in chosen:
             feats = groups[group]
             sub = df[df["feature"].isin(feats)]
@@ -269,8 +266,7 @@ def main() -> None:
         options=["good", "minor", "bad", "unverifiable"],
         index=["good", "minor", "bad", "unverifiable"].index(default_verdict)
             if default_verdict in ("good", "minor", "bad", "unverifiable") else 0,
-        horizontal=True,
-    )
+        horizontal=True)
     issues = st.multiselect(
         "Issue tags (multi-select)",
         options=[
@@ -283,13 +279,11 @@ def main() -> None:
             "leak_in_question",
             "other",
         ],
-        default=default_issues,
-    )
+        default=default_issues)
     comment = st.text_area("Comment", value=default_comment, height=120)
     corrected = st.text_input(
         "Corrected ground truth (optional)", value=default_corrected,
-        help="If you'd change the ground truth, paste the proposed value here.",
-    )
+        help="If you'd change the ground truth, paste the proposed value here.")
 
     submit_disabled = not reviewer.strip()
     if st.button("Save verdict & next", disabled=submit_disabled, type="primary"):

@@ -155,8 +155,7 @@ class Shrike(nn.Module):
         self.llm = AutoModelForCausalLM.from_pretrained(
             config.llm_id,
             torch_dtype=torch.bfloat16,
-            attn_implementation=attn_impl,
-        )
+            attn_implementation=attn_impl)
         self.llm.resize_token_embeddings(len(self.tokenizer))
 
         # --- Init TS embeddings ---
@@ -172,8 +171,7 @@ class Shrike(nn.Module):
             lora_dropout=config.lora_dropout,
             target_modules=config.lora_target_modules,
             bias="none",
-            **({"use_dora": True} if config.use_dora else {}),
-        )
+            **({"use_dora": True} if config.use_dora else {}))
         self.llm = get_peft_model(self.llm, lora_cfg)
 
         # --- Gradient mask: only TS embeddings are trainable ---
@@ -232,7 +230,7 @@ class Shrike(nn.Module):
         return grad * mask
 
     def freeze_lora(self) -> int:
-        """Freeze DoRA/LoRA adapters — only TS embeddings remain trainable.
+        """Freeze DoRA/LoRA adapters, only TS embeddings remain trainable.
 
         Used during embedding alignment stage (stage0_align) to force all
         gradient signal into the 627 TS token embeddings.
@@ -291,7 +289,7 @@ class Shrike(nn.Module):
     def codes_to_text(codes: list[int]) -> str:
         """Convert code IDs to text tokens: [42, 88] → '<ts_42> <ts_88>'.
 
-        Mask sentinels (-1) are skipped — use codes_to_text_with_masks()
+        Mask sentinels (-1) are skipped, use codes_to_text_with_masks()
         for imputation tasks.
         """
         return " ".join(f"<ts_{c}>" for c in codes if c >= 0)
@@ -433,8 +431,7 @@ class Shrike(nn.Module):
         self,
         batch: list[dict],
         mode: str = "loss",
-        pack_length: int = 2048,
-    ) -> torch.Tensor:
+        pack_length: int = 2048) -> torch.Tensor:
         """DDP-compatible forward pass.
 
         Must be called through the wrapped model (not raw_model) so that
@@ -469,8 +466,7 @@ class Shrike(nn.Module):
 
         tok = self.tokenizer(
             texts, padding="longest", return_tensors="pt",
-            truncation=True, max_length=self.config.max_length,
-        )
+            truncation=True, max_length=self.config.max_length)
         input_ids = tok.input_ids.to(self._device)
         attn_mask = tok.attention_mask.to(self._device)
 
@@ -504,8 +500,8 @@ class Shrike(nn.Module):
             seq_len = len(ids)
             pl = sample["prompt_length"]
 
-            input_ids[i, :seq_len] = torch.tensor(ids, dtype=torch.long)
-            attn_mask[i, :seq_len] = 1
+            input_ids[i:seq_len] = torch.tensor(ids, dtype=torch.long)
+            attn_mask[i:seq_len] = 1
             # Only supervise answer tokens (after prompt)
             if pl < seq_len:
                 labels[i, pl:seq_len] = input_ids[i, pl:seq_len]
@@ -517,7 +513,7 @@ class Shrike(nn.Module):
         return self.llm(input_ids=input_ids, attention_mask=attn_mask, labels=labels).loss
 
     def compute_loss_packed(self, batch: list[dict], pack_length: int = 2048) -> torch.Tensor:
-        """Causal LM loss with sequence packing — no wasted padding tokens.
+        """Causal LM loss with sequence packing, no wasted padding tokens.
 
         Packs multiple samples into sequences of pack_length using
         length-sorted first-fit-decreasing bin packing for minimal waste.
@@ -609,8 +605,7 @@ class Shrike(nn.Module):
             input_ids=input_ids,
             attention_mask=attn_mask,
             position_ids=position_ids,
-            labels=labels,
-        ).loss
+            labels=labels).loss
 
     # ==============================================================
     # Inference
@@ -626,12 +621,11 @@ class Shrike(nn.Module):
         texts = [self.build_text(s) for s in batch]
         tok = self.tokenizer(
             texts, padding="longest", return_tensors="pt",
-            truncation=True, max_length=self.config.max_length,
-        )
+            truncation=True, max_length=self.config.max_length)
         ids = tok.input_ids.to(self._device)
         mask = tok.attention_mask.to(self._device)
 
-        # Stop on <|im_end|> — this is the ChatML turn delimiter
+        # Stop on <|im_end|>, this is the ChatML turn delimiter
         im_end_id = self.tokenizer.convert_tokens_to_ids("<|im_end|>")
         eos_ids = [im_end_id, self.tokenizer.eos_token_id]
 
@@ -640,8 +634,7 @@ class Shrike(nn.Module):
             max_new_tokens=max_new_tokens,
             eos_token_id=eos_ids,
             pad_token_id=self.tokenizer.pad_token_id,
-            do_sample=False,
-        )
+            do_sample=False)
         return self.tokenizer.batch_decode(gen[:, ids.shape[1]:], skip_special_tokens=True)
 
     def analyze(
@@ -650,8 +643,7 @@ class Shrike(nn.Module):
         question: str,
         signal_label: str = "Signal:",
         context: str = "",
-        max_new_tokens: int = 400,
-    ) -> str:
+        max_new_tokens: int = 400) -> str:
         """Analyze a time series and answer a question about it.
 
         This is the main inference entry point. One signal, one question,
@@ -684,8 +676,7 @@ class Shrike(nn.Module):
         self,
         signal: torch.Tensor | list[float],
         context_label: str = "Historical signal:",
-        max_codes: int = 64,
-    ) -> dict[str, Any]:
+        max_codes: int = 64) -> dict[str, Any]:
         """Forecast future values (Chameleon-style code generation).
 
         Generates future TOTEM codes, then decodes them to values
@@ -757,8 +748,7 @@ class Shrike(nn.Module):
         device: str = "cpu",
         tokenizer_type: str | None = None,
         fsq_ckpt: str | None = None,
-        **config_overrides,
-    ) -> "Shrike":
+        **config_overrides) -> "Shrike":
         """Load a trained Shrike model from a checkpoint.
 
         Args:
@@ -795,8 +785,7 @@ class Shrike(nn.Module):
             tokenizer_type=tok_type,
             totem_ckpt=_resolve(totem_ckpt, "totem_ckpt", None),
             fsq_ckpt=_resolve(fsq_ckpt, "fsq_ckpt", None),
-            **{k: v for k, v in config_overrides.items() if hasattr(ShrikeConfig, k)},
-        )
+            **{k: v for k, v in config_overrides.items() if hasattr(ShrikeConfig, k)})
 
         model = cls(config, device=device)
         model.load_state_dict(ckpt["model_state"])

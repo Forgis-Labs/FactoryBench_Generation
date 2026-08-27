@@ -1,5 +1,5 @@
 """
-EpisodeState — captures everything needed to reproduce an episode.
+EpisodeState, captures everything needed to reproduce an episode.
 
 This is the bridge between the simulation and the counterfactual runner.
 The simulation fills in an EpisodeState at the start of each episode,
@@ -46,7 +46,7 @@ class EpisodeState:
     def copy(self) -> "EpisodeState":
         """Deep-enough copy for replay."""
         return EpisodeState(
-            rng_state=self.rng_state,  # tuple — immutable
+            rng_state=self.rng_state,  # tuple, immutable
             cube_dims=self.cube_dims.copy() if self.cube_dims is not None else None,
             cube_spawn=self.cube_spawn.copy() if self.cube_spawn is not None else None,
             cube_yaw=self.cube_yaw,
@@ -55,5 +55,4 @@ class EpisodeState:
             cube_restitution=self.cube_restitution,
             cube_color=self.cube_color.copy() if self.cube_color is not None else None,
             pad_friction=self.pad_friction,
-            extra={k: v for k, v in self.extra.items()},
-        )
+            extra={k: v for k, v in self.extra.items()})

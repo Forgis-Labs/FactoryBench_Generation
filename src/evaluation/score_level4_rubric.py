@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Stopwords kept short — the goal is to drop words that carry no protocol meaning
+# Stopwords kept short, the goal is to drop words that carry no protocol meaning
 # (the / a / and / etc.) without over-pruning. Anything else with length >= 3 is
 # treated as content.
 STOPWORDS: Set[str] = {
@@ -187,8 +187,7 @@ def process_replies_root(
     replies_root: Path,
     questions: Dict[str, Dict[str, Any]],
     overwrite: bool,
-    dry_run: bool,
-) -> Tuple[int, int, int]:
+    dry_run: bool) -> Tuple[int, int, int]:
     n_scored = 0
     n_skipped = 0
     n_lookup_fail = 0
@@ -248,8 +247,7 @@ def main() -> None:
             logger.warning(f"Skipping {root}: does not exist")
             continue
         scored, skipped, lookup_fail = process_replies_root(
-            root, questions, args.overwrite, args.dry_run,
-        )
+            root, questions, args.overwrite, args.dry_run)
         logger.info(f"{root}: scored {scored}, skipped {skipped}, lookup-failed {lookup_fail}")
         grand += scored
     logger.info(f"Done. Total rubric scores written: {grand}")

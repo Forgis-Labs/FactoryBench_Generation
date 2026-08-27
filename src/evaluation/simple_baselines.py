@@ -8,7 +8,7 @@ Two strategies, picked per-item from the answer format:
     - uniform random     : all MCQ (A/B/C/D), TFFT multi-select, A-B-C-D ranking
                            permutations, and the L1 t1 phase-window numeric.
 
-Free-form templates (L4 t1, t2) are skipped — no traditional baseline maps cleanly
+Free-form templates (L4 t1, t2) are skipped, no traditional baseline maps cleanly
 to "produce a remediation protocol".
 
 Outputs reply JSONs in the same shape as model replies so they slot into
@@ -133,7 +133,7 @@ def regression_answer(item: Dict[str, Any]) -> Any:
     rows = context.get("time_series") or []
     gold = item.get("answer")
 
-    # Vector answer (predictive list of joint values) — handles both real lists
+    # Vector answer (predictive list of joint values), handles both real lists
     # and JSON-string-encoded lists (which is how L2/L3 t5 actually store them).
     gold_list = _coerce_list_answer(gold)
     if gold_list is not None:
@@ -246,11 +246,11 @@ def classify(item: Dict[str, Any]) -> str:
         # Catch-all: pick a key at random
         return "mcq"
 
-    # Numeric (no options) — phase-window question and friends
+    # Numeric (no options), phase-window question and friends
     if isinstance(ans, (int, float)):
         return "numeric"
 
-    # Free-form text — out of scope for these baselines
+    # Free-form text, out of scope for these baselines
     return "skip"
 
 

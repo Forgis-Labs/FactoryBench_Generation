@@ -7,15 +7,15 @@ tens of thousands of QA pairs and would otherwise fill the disk.
 
 Output formats:
 
-  * ``jsonl`` (default, recommended) — bundle each batch into a single
+  * ``jsonl`` (default, recommended), bundle each batch into a single
     line-delimited JSON shard ``level<N>_shard_<idx>.jsonl``. This is the
     canonical HF format for variable-schema QA datasets and renders nicely
     in the HF dataset viewer.
-  * ``parquet`` — same shard layout but in Apache Parquet. Smaller on disk,
+  * ``parquet``, same shard layout but in Apache Parquet. Smaller on disk,
     columnar, fastest for ``datasets.load_dataset`` consumption. Nested
     fields are preserved as JSON strings to avoid schema-mismatch errors
     across templates.
-  * ``json`` — legacy per-file layout (one ``.json`` per QA pair).
+  * ``json``, legacy per-file layout (one ``.json`` per QA pair).
 """
 from __future__ import annotations
 
@@ -30,8 +30,7 @@ from huggingface_hub import HfApi, hf_hub_download
 from src.pipeline.upload_qa_pairs import (
     DEFAULT_REPO_ID,
     resolve_hf_token,
-    upload_qa_pairs,
-)
+    upload_qa_pairs)
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +105,7 @@ class HfStreamUploader:
         repo_id: str = DEFAULT_REPO_ID,
         private: bool = False,
         output_format: str = "jsonl",
-        start_batch_index: Optional[int] = None,
-    ) -> None:
+        start_batch_index: Optional[int] = None) -> None:
         if output_format not in _VALID_FORMATS:
             raise ValueError(
                 f"output_format must be one of {_VALID_FORMATS}, got {output_format!r}"
@@ -178,8 +176,7 @@ class HfStreamUploader:
             level=self.level,
             private=self.private,
             commit_message=commit_msg,
-            local_root=None,
-        )
+            local_root=None)
 
     def _flush_shard(self, files: List[Path]) -> None:
         ext = "jsonl" if self.output_format == "jsonl" else "parquet"
@@ -207,15 +204,13 @@ class HfStreamUploader:
                 repo_type="dataset",
                 commit_message=(
                     f"L{self.level} shard {self.batch_index} ({len(items)} items, {ext})"
-                ),
-            )
+                ))
 
 
 def list_completed_combos(
     repo_id: str,
     dataset_folder: str,
-    level: int,
-) -> Tuple[set, int]:
+    level: int) -> Tuple[set, int]:
     """Return ``(completed_combos, max_shard_index)``.
 
     ``completed_combos`` is the set of ``(template_id, episode_stem)`` pairs
@@ -289,7 +284,7 @@ def list_completed_combos(
         except Exception as exc:
             logger.warning(f"[resume] parse failed for {shard_path}: {exc}")
 
-    logger.info(f"[resume] {len(completed)} (template, episode) combos already on HF — will be skipped")
+    logger.info(f"[resume] {len(completed)} (template, episode) combos already on HF, will be skipped")
     return completed, max_shard_idx
 
 
@@ -301,8 +296,7 @@ def add_streaming_args(parser, default_repo: str = DEFAULT_REPO_ID) -> None:
         default=0,
         help="Upload to HF every N produced items, then delete local copies. "
              "0 disables streaming (keep all items locally). Useful for "
-             "large-scale jobs that would otherwise fill the disk.",
-    )
+             "large-scale jobs that would otherwise fill the disk.")
     parser.add_argument(
         "--upload-format",
         type=str,
@@ -311,35 +305,30 @@ def add_streaming_args(parser, default_repo: str = DEFAULT_REPO_ID) -> None:
         help="HF shard format. 'jsonl' (default) bundles each batch into a "
              "single line-delimited JSON shard (HF-canonical for QA datasets). "
              "'parquet' is columnar and more efficient. 'json' keeps the "
-             "legacy per-file layout (slow to load, many tiny files).",
-    )
+             "legacy per-file layout (slow to load, many tiny files).")
     parser.add_argument(
         "--hf-repo",
         type=str,
         default=default_repo,
         help=f"HF dataset repo to upload to (default: {default_repo}). "
-             f"Requires --upload-batch-size > 0 and --hf-dataset-folder.",
-    )
+             f"Requires --upload-batch-size > 0 and --hf-dataset-folder.")
     parser.add_argument(
         "--hf-dataset-folder",
         type=str,
         default=None,
         help="Folder name inside the HF repo (e.g. factorynet_qa_150k). "
-             "Required when --upload-batch-size > 0.",
-    )
+             "Required when --upload-batch-size > 0.")
     parser.add_argument(
         "--hf-private",
         action="store_true",
-        help="Create the HF dataset repo as private if it doesn't exist yet.",
-    )
+        help="Create the HF dataset repo as private if it doesn't exist yet.")
     parser.add_argument(
         "--resume-from-hf",
         action="store_true",
         help="Before generating, query the HF dataset folder for already-"
              "uploaded shards and skip every (template, episode) combo "
              "already represented in them. Lets you resume an interrupted "
-             "run without redoing work.",
-    )
+             "run without redoing work.")
 
 
 def make_uploader_from_args(args, level: int, output_dir: Path) -> Optional[HfStreamUploader]:
@@ -359,5 +348,4 @@ def make_uploader_from_args(args, level: int, output_dir: Path) -> Optional[HfSt
         dataset_folder=folder,
         repo_id=getattr(args, "hf_repo", DEFAULT_REPO_ID),
         private=bool(getattr(args, "hf_private", False)),
-        output_format=getattr(args, "upload_format", "jsonl"),
-    )
+        output_format=getattr(args, "upload_format", "jsonl"))

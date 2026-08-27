@@ -30,21 +30,18 @@ from src.data._decimation import decimate_dataframe
 from src.question_generation.utils.hf_streaming import (
     HfStreamUploader,
     add_streaming_args,
-    make_uploader_from_args,
-)
+    make_uploader_from_args)
 from src.question_generation.utils.io import load_json, load_root_causes, load_templates
 from src.question_generation.utils.phases import PHASE_NAMES as _SHARED_PHASE_NAMES
 from src.question_generation.utils.pair_balance import (
     build_index as _build_pair_index,
     cycle_targets as _cycle_targets,
-    sample_pair as _sample_balanced_pair,
-)
+    sample_pair as _sample_balanced_pair)
 from src.question_generation.utils.template import (
     build_context,
     discover_episodes_by_dataset,
     encode_chunk,
-    fill,
-)
+    fill)
 from src.question_generation.utils.time_series import (
     pick_fault_label,
     pick_fault_label_from_meta_or_rows,
@@ -54,8 +51,7 @@ from src.question_generation.utils.relevance import (
     load_specs as load_relevance_specs,
     relevance_report,
     sample_with_relevance,
-    validate_relevance,
-)
+    validate_relevance)
 
 logger = logging.getLogger(__name__)
 
@@ -200,8 +196,7 @@ def normalize_timestamps(rows: List[Dict[str, Any]], base: int) -> List[Dict[str
 def sample_subseries(
     rows: List[Dict[str, Any]],
     min_len: int = CONTEXT_MIN,
-    max_len: int = CONTEXT_MAX,
-) -> Optional[Tuple[List[Dict[str, Any]], int]]:
+    max_len: int = CONTEXT_MAX) -> Optional[Tuple[List[Dict[str, Any]], int]]:
     """Return (subseries, start_index) or None if the episode is too short."""
     n = len(rows)
     if n < min_len:
@@ -214,8 +209,7 @@ def sample_subseries(
 def _episode_task(
     ep_path: Path,
     dataset: str,
-    dataset_index: Dict[str, Dict[str, Any]],
-) -> str:
+    dataset_index: Dict[str, Dict[str, Any]]) -> str:
     """Resolve task for an episode: prefer per-episode metadata, fall back to dataset.json."""
     meta_path = ep_path.with_name(ep_path.stem + "_metadata.json")
     if meta_path.exists():
@@ -356,8 +350,7 @@ def build_anomaly_single_select(
     fault_label: int,
     root_causes: Dict[int, Dict[str, Any]],
     anomaly_lookup: Dict[str, str],
-    fault_prior: Optional[Dict[int, float]] = None,
-) -> Tuple[Dict[str, str], str]:
+    fault_prior: Optional[Dict[int, float]] = None) -> Tuple[Dict[str, str], str]:
     """
     Build 4 single-select options + single letter answer for an
     anomaly-identification question.
@@ -469,13 +462,12 @@ _COMPARATIVE_OPTION_ORDER = ["mc_020", "mc_022", "mc_023", "mc_026"]
 def _uniform_window(
     rows: List[Dict[str, Any]],
     min_len: int,
-    max_len: int,
-) -> Optional[Tuple[List[Dict[str, Any]], int, str]]:
+    max_len: int) -> Optional[Tuple[List[Dict[str, Any]], int, str]]:
     """Pick a random subseries of length in ``[min_len, max_len]``.
 
     Returns (subseries, start_idx, sampler_tag) or None if the episode is
     too short. Used in L1 instead of ``sample_with_relevance`` because L1
-    operates on nominal episodes only — anomaly relevance specs are not
+    operates on nominal episodes only, anomaly relevance specs are not
     applicable, so we sample uniformly.
     """
     n = len(rows)
@@ -489,8 +481,7 @@ def _uniform_window(
 def pick_phase_isolation_candidates(
     rows: List[Dict[str, Any]],
     n: int = 3,
-    min_phase_length: int = 3,
-) -> List[Tuple[str, int, int]]:
+    min_phase_length: int = 3) -> List[Tuple[str, int, int]]:
     """Return up to ``n`` distinct phase candidates for a phase-isolation
     question.
 
@@ -551,8 +542,7 @@ def build_comparative_multi_select(
     task_id_b: str,
     rows_a: List[Dict[str, Any]],
     rows_b: List[Dict[str, Any]],
-    mc_lookup: Dict[str, str],
-) -> Optional[Tuple[Dict[str, str], str]]:
+    mc_lookup: Dict[str, str]) -> Optional[Tuple[Dict[str, str], str]]:
     """Build fixed-order options + TFFT answer for template 3.
 
     Options are always presented in the order
@@ -711,8 +701,7 @@ def fill_template(
     severity_segments: Optional[List[Tuple[List[Dict[str, Any]], int]]] = None,
     severity_relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     severity_tasks: Optional[List[str]] = None,
-    phase_override: Optional[Tuple[str, int, int]] = None,
-) -> Optional[Dict[str, Any]]:
+    phase_override: Optional[Tuple[str, int, int]] = None) -> Optional[Dict[str, Any]]:
     """
     Fill a Level 1 question template.
 
@@ -781,8 +770,7 @@ def fill_template(
         fault_b = pick_fault_label(rows_b)
         result = build_comparative_multi_select(
             fault_label, fault_b, machine_id, machine_id_b,
-            task_id, task_id_b, rows, rows_b, mc_option_lookup,
-        )
+            task_id, task_id_b, rows, rows_b, mc_option_lookup)
         if result is None:
             return None
         options, answer = result
@@ -795,8 +783,7 @@ def fill_template(
         result = build_severity_ranking(
             severity_segments, root_causes, important_features=important_features,
             relevance_specs=severity_relevance_specs,
-            tasks=severity_tasks,
-        )
+            tasks=severity_tasks)
         if result is None:
             return None
         options, answer, _legend = result
@@ -901,8 +888,7 @@ def generate_level1_questions(
     seed: Optional[int] = None,
     datasets: Optional[List[str]] = None,
     enumerate_mode: bool = False,
-    uploader: Optional[HfStreamUploader] = None,
-) -> None:
+    uploader: Optional[HfStreamUploader] = None) -> None:
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
@@ -992,7 +978,7 @@ def generate_level1_questions(
         return result
 
     # Level 1 operates on nominal episodes only (no faults). Filter once so every
-    # template branch — single, paired, or quadrupled — picks from the same pool.
+    # template branch, single, paired, or quadrupled, picks from the same pool.
     # The result is cached on disk because the first scan reads ~14k episode JSONs;
     # subsequent runs load the cache (a tiny file mapping path → bool) instead.
     nominal_cache_path = datasets_dir / ".level1_nominal_cache.json"
@@ -1126,7 +1112,7 @@ def generate_level1_questions(
     )
 
     # Templates 2 (anomaly detection) and 5 (severity ranking) require faulty
-    # episodes to be meaningful — disabled in the nominal-only regime.
+    # episodes to be meaningful, disabled in the nominal-only regime.
     _DISABLED_TEMPLATE_IDS: set = {2, 5}
     usable_templates = [t for t in templates if t["id"] not in _DISABLED_TEMPLATE_IDS]
     if not usable_templates:
@@ -1171,8 +1157,7 @@ def generate_level1_questions(
         # ------------------------------------------------------------------
         # Templates 1, 2, 6: single episode, sampled subseries
         # (template 1 isolates a phase; the subseries must contain at least one
-        # entirely-contained phase, otherwise we reject and try another episode —
-        # see fill_template's tid==1 branch which returns None on no inner phase.)
+        # entirely-contained phase, otherwise we reject and try another episode, # see fill_template's tid==1 branch which returns None on no inner phase.)
         # ------------------------------------------------------------------
         if tid in (1, 2, 6):
             if _enum_ep is not None:
@@ -1285,7 +1270,7 @@ def generate_level1_questions(
             }
 
         # ------------------------------------------------------------------
-        # Template 7: prediction — sample subseries + future steps for answer
+        # Template 7: prediction, sample subseries + future steps for answer
         # ------------------------------------------------------------------
         elif tid == 7:
             if _enum_ep is not None:
@@ -1344,8 +1329,7 @@ def generate_level1_questions(
                     r"T\+\d+ms",
                     f"T+{n_ms}ms",
                     filled.get("question", ""),
-                    count=1,
-                )
+                    count=1)
                 filled["acceptance_bounds"]["horizon_ms"] = n_ms
 
             if important_features:
@@ -1400,8 +1384,7 @@ def generate_level1_questions(
                 _pair_index, _target,
                 used=_used_pairs,
                 phases_differ=lambda x, y: _phases_differ(x["path"], y["path"]),
-                group_pairs_cache=_group_pairs_cache,
-            )
+                group_pairs_cache=_group_pairs_cache)
             if _picked is None:
                 continue
             _a, _b = _picked
@@ -1466,8 +1449,7 @@ def generate_level1_questions(
                 machine_id=_machine_id_for(ds_a, ep_a),
                 machine_id_b=_machine_id_for(ds_b, ep_b),
                 task_id=task_a,
-                task_id_b=task_b,
-            )
+                task_id_b=task_b)
             if filled is None:
                 continue
 
@@ -1534,8 +1516,7 @@ def generate_level1_questions(
                 template, segments[0][0], root_causes, anomaly_lookup, mc_option_lookup,
                 severity_segments=segments,
                 severity_relevance_specs=relevance_specs,
-                severity_tasks=severity_tasks,
-            )
+                severity_tasks=severity_tasks)
             if filled is None:
                 continue
 
@@ -1604,30 +1585,26 @@ def main() -> None:
         "--datasets-dir",
         type=Path,
         default=repo_root / "data",
-        help="Root data directory (default: <repo>/data)",
-    )
+        help="Root data directory (default: <repo>/data)")
     parser.add_argument(
         "--output",
         type=Path,
         default=repo_root / "output" / "questions" / "level1",
-        help="Output directory (default: <repo>/output/questions/level1)",
-    )
+        help="Output directory (default: <repo>/output/questions/level1)")
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
-        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
-    )
+        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}")
     parser.add_argument(
         "--enumerate",
         dest="enumerate_mode",
         action="store_true",
         help="Walk every (template x episode) combination deterministically instead "
              "of random sampling. -n becomes an upper cap. Combinations whose "
-             "episode does not satisfy the template's preconditions are skipped.",
-    )
+             "episode does not satisfy the template's preconditions are skipped.")
     add_streaming_args(parser)
     parser.add_argument(
         "--template-ids",
@@ -1635,15 +1612,13 @@ def main() -> None:
         nargs="+",
         default=None,
         help="Restrict generation to these template ids (default: all). Useful "
-             "for regenerating a single template without rerunning the rest.",
-    )
+             "for regenerating a single template without rerunning the rest.")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
     if getattr(args, "template_ids", None):
@@ -1664,8 +1639,7 @@ def main() -> None:
     )
     mc_option_lookup = load_mc_option_lookup(
         args.datasets_dir / "mc_options" / "mc_options.json",
-        level=1,
-    )
+        level=1)
     dataset_index = load_dataset_index(args.datasets_dir / "labelling" / "dataset.json")
 
     relevance_specs = (
@@ -1694,8 +1668,7 @@ def main() -> None:
         seed=args.seed,
         datasets=args.datasets,
         enumerate_mode=args.enumerate_mode,
-        uploader=uploader,
-    )
+        uploader=uploader)
 
 
 if __name__ == "__main__":

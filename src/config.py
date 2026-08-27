@@ -6,19 +6,19 @@ here and every pipeline/evaluation script picks it up automatically.
 
 Providers:
 
-  * ``foundry``   — OpenAI-compatible HTTP endpoints (Azure AI Foundry for
+  * ``foundry``, OpenAI-compatible HTTP endpoints (Azure AI Foundry for
                     GPT-5.x; direct OpenAI for the agentic baseline; Vertex
                     MaaS for the two Qwen models). The foundry path handles
                     per-model overrides for the base URL, API key env var, and
                     the upstream model id sent to ``chat.completions.create``.
-  * ``vertex``    — Google Cloud Vertex AI. Serves the three models that used
+  * ``vertex``, Google Cloud Vertex AI. Serves the three models that used
                     to run on AWS Bedrock. Native batch prediction (GCS-in /
                     GCS-out) for Anthropic; sync for the rest. Auth is ADC
                     OAuth, no long-lived key.
-  * ``bedrock``   — AWS Bedrock. Pre-migration routing, retained in
+  * ``bedrock``, AWS Bedrock. Pre-migration routing, retained in
                     ``LEGACY_AWS_MODELS`` only. Reachable by setting
                     FB_INFERENCE_CLOUD=aws.
-  * ``sagemaker`` — AWS SageMaker Async Inference. Unused; the JumpStart Qwen
+  * ``sagemaker``, AWS SageMaker Async Inference. Unused; the JumpStart Qwen
                     deploy was flaky and Qwen now runs on Vertex.
 
 Each model declares its own region because availability differs per model. On
@@ -29,7 +29,7 @@ verified id / region table and ``src/evaluation/aws-setup.md`` for the retired
 Bedrock one.
 
 Model ids, regions and endpoints are resolved at runtime from environment
-variables — the catalog ships without baking in values that change per cloud
+variables, the catalog ships without baking in values that change per cloud
 project.
 """
 from __future__ import annotations
@@ -41,7 +41,7 @@ MODELS: Dict[str, Dict[str, Any]] = {
     # --- Azure Foundry (kept for OpenAI proxy; AWS does not host GPT-5.x) ---
     # Routed to OpenAI direct, not Azure Foundry. The ETH Foundry deployment
     # `gpt-5.1-1` still exists but rejects every inference call with
-    # `400 The current operation is not allowed in this deployment` — on
+    # `400 The current operation is not allowed in this deployment`, on
     # chat/completions and /responses alike, streaming or not, with either auth
     # header. Parameter validation still fires (`max_tokens` is rejected in
     # favour of `max_completion_tokens`), which proves routing reaches the
@@ -84,7 +84,7 @@ MODELS: Dict[str, Dict[str, Any]] = {
     # --- Google Cloud Vertex AI (migrated off AWS Bedrock, Aug 2026) ------
     # Same three checkpoints the paper evaluated on Bedrock, re-pointed at
     # Vertex. Publisher model ids verified against the live Model Garden
-    # catalog for project `forgisprova` — see src/evaluation/gcp-setup.md for
+    # catalog for project `forgisprova`, see src/evaluation/gcp-setup.md for
     # the listing command and the per-model serving notes.
     #
     # The three do NOT share one serving surface, which is the main structural
@@ -125,9 +125,8 @@ MODELS: Dict[str, Dict[str, Any]] = {
     # it only as a self-deploy vLLM container on 8xH200 / 8xB200, which bills
     # per GPU-hour whether or not it is serving. The Foundry resource already
     # has a `Mistral-Large-3` deployment on the same endpoint as GPT-5.x, so
-    # this is per-token and needs no new infrastructure.
-    # scripts/gcp/deploy_mistral_large_3.py still stands the Vertex endpoint up
-    # if full GCP parity is ever wanted; see gcp-setup.md section 6.
+    # this is per-token and needs no new infrastructure. Full GCP parity would
+    # mean standing that vLLM container up by hand; see gcp-setup.md section 6.
     "mistral-large-3": {
         "provider": "foundry",
         "endpoint_env": "CHAT_ENDPOINT",
@@ -144,7 +143,7 @@ MODELS: Dict[str, Dict[str, Any]] = {
     # --- Together AI (sync-only; OpenAI-compatible) ----------------------
     # Routed through the foundry path because Together exposes the same
     # /chat/completions API surface as Azure / OpenAI. Tried OpenRouter and
-    # smaller Together variants first — none host qwen3 below 235B
+    # smaller Together variants first, none host qwen3 below 235B
     # serverless. Qwen/Qwen3-235B-A22B-Instruct-2507-tput is a 235B MoE
     # with 22B active per token; the `-tput` suffix is Together's reliable
     # serverless / throughput-tier marker.
@@ -188,7 +187,7 @@ MODELS: Dict[str, Dict[str, Any]] = {
 # The pre-migration Bedrock routing for the same three slugs. Kept so
 # ``src.evaluation.run_aws_eval`` still imports and can reproduce the
 # published numbers, and so the migration is reversible without a git revert.
-# NOT part of ``MODELS`` — the live pipeline routes these slugs to Vertex.
+# NOT part of ``MODELS``, the live pipeline routes these slugs to Vertex.
 # To fall back to AWS for a run, set FB_INFERENCE_CLOUD=aws (see
 # ``resolve_provider`` below).
 LEGACY_AWS_MODELS: Dict[str, Dict[str, Any]] = {
@@ -259,7 +258,7 @@ def get_provider(model_name: str) -> "str | None":
 
 
 def get_vertex_publisher(model_name: str) -> "str | None":
-    """Model Garden publisher namespace (``anthropic``, ``deepseek-ai``, ...)."""
+    """Model Garden publisher namespace (``anthropic``, ``deepseek-ai``...)."""
     cfg = get_model_config(model_name) or {}
     return cfg.get("vertex_publisher")
 
@@ -289,8 +288,7 @@ def get_region(model_name: str) -> "str | None":
 def get_upstream_model_id(model_name: str) -> str:
     """Upstream model id to send to the API.
 
-    Lets the FactoryBench-side name diverge from the provider's model id —
-    e.g. ``qwen-3-4b`` (FactoryBench) -> ``qwen/qwen3-4b`` (OpenRouter). When
+    Lets the FactoryBench-side name diverge from the provider's model id, e.g. ``qwen-3-4b`` (FactoryBench) -> ``qwen/qwen3-4b`` (OpenRouter). When
     ``model_id_env`` is set and populated it wins; otherwise falls back to
     ``model_id_default``; otherwise the FactoryBench name itself.
     """
@@ -309,7 +307,7 @@ def get_api_key_env(model_name: str) -> "str | None":
 
     When a foundry-style model declares ``api_key_env``, that env var is
     checked before falling back to the default Azure/OpenAI keys. Lets
-    multiple OpenAI-compatible providers (Azure, OpenRouter, ...) coexist
+    multiple OpenAI-compatible providers (Azure, OpenRouter...) coexist
     without sharing one key.
     """
     cfg = get_model_config(model_name) or {}
@@ -344,7 +342,7 @@ AWS_REGION_DEFAULT: str = "eu-central-1"  # Frankfurt
 # GCP_PROJECT / GCP_REGION override these; per-model region_env wins over both.
 GCP_PROJECT_DEFAULT: str = "forgisprova"
 GCP_REGION_DEFAULT: str = "us-central1"
-# Bucket for Vertex batch-prediction I/O — the GCS analogue of FB_S3_BUCKET.
+# Bucket for Vertex batch-prediction I/O, the GCS analogue of FB_S3_BUCKET.
 # Must live in the same region as the batch job. Set via GCS_BUCKET.
 GCS_BUCKET_DEFAULT: str = "factorybench-batch-io"
 GCS_PREFIX_DEFAULT: str = "factorybench/"

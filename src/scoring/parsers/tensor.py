@@ -23,8 +23,7 @@ from .numerical import _strip_emphasis_and_unit, _try_float
 # like "aat0="). The regex is greedy on length to capture maximal tensors.
 _TENSOR_CHUNK_RE = re.compile(
     r"(?:[A-Za-z_][A-Za-z0-9_]*=)?-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"
-    r"(?:_(?:[A-Za-z_][A-Za-z0-9_]*=)?-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)+",
-)
+    r"(?:_(?:[A-Za-z_][A-Za-z0-9_]*=)?-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)+")
 
 # JSON-array-shaped tensor: `[1, 2.5, 3]`
 _TENSOR_BRACKET_RE = re.compile(r"\[\s*[^\[\]]*?-?\d[^\[\]]*?\]")
@@ -78,7 +77,7 @@ def _extract_bracket_tensor(text: str, n: int) -> list[float] | None:
 
 
 class TensorParser(Parser):
-    """tensor — extracts a list of floats separated by `_` or in `[...]` form."""
+    """tensor, extracts a list of floats separated by `_` or in `[...]` form."""
 
     answer_format: ClassVar[str] = "tensor"
 
@@ -133,8 +132,7 @@ class TensorParser(Parser):
         # ---- Lenient: last tensor-shaped chunk in the LAST non-empty line ----
         last_line = next(
             (ln for ln in reversed(cleaned.splitlines()) if ln.strip()),
-            "",
-        )
+            "")
         last_line_stripped = _strip_emphasis_and_unit(last_line)
         chunks = _TENSOR_CHUNK_RE.findall(last_line_stripped)
         for chunk in reversed(chunks):

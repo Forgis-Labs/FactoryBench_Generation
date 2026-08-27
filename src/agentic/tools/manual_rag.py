@@ -1,9 +1,9 @@
-"""manual_rag — retrieval over vendor manuals.
+"""manual_rag - retrieval over vendor manuals.
 
 Loads a FAISS index built by ``src.agentic.build_manual_index`` from
 ``data/manuals/index.faiss`` + ``data/manuals/chunks.jsonl``. If the
 index does not exist, the tool returns a stub telling the agent no
-manuals are available (which is a valid signal — the agent then falls
+manuals are available (which is a valid signal - the agent then falls
 back to its own priors).
 
 The index is per-machine at the chunk level (each chunk carries a
@@ -96,7 +96,7 @@ class ManualRAGTool:
         if not self._index or not self._chunks:
             return {"error": "index empty", "hits": []}
         # Embed the query with the same OpenAI SDK used for chat, so we
-        # inherit the runner's auth path (Azure Foundry or otherwise).
+        # inherit the runner's auth path.
         try:
             vec = _embed_one(query, model=self.embed_model)
         except Exception as exc:
@@ -130,8 +130,8 @@ def _embed_one(text: str, model: str) -> List[float]:
     """Fetch one embedding via OpenAI direct.
 
     Uses the OpenAI direct API (openai.com) with OPENAI_API_KEY, matching
-    the agentic driver route. ETH's Azure Foundry deployment doesn't
-    expose an embeddings model to us, so we bypass it here.
+    the agentic driver route (some managed endpoints do not expose an
+    embeddings model, so we use the direct API here).
     """
     # Late import + late load so this works whether called from a runner
     # (which loads .env early) or standalone (which may not).
@@ -143,7 +143,7 @@ def _embed_one(text: str, model: str) -> List[float]:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError(
-            "OPENAI_API_KEY not set — cannot embed. Add it to .env or export it."
+            "OPENAI_API_KEY not set - cannot embed. Add it to .env or export it."
         )
     base_url = os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1"
     from openai import OpenAI

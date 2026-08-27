@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Publication figures for the FactoryBench linear-probing rebuttal (NeurIPS 2026).
+"""Publication figures for the FactoryBench linear-probing experiment.
 
 Reads output/probing/qwen3_4b_rerun/results.json and emits two vector PDFs to
 output/figures/:
@@ -11,15 +11,15 @@ output/figures/:
   fig_probe_layerwise.pdf   -- per-layer probe accuracy across depth (0..36, `last`
                                read-out) for anomaly and fault_family, with the
                                behavioural floor a=0.37 drawn across every depth;
+                               inset panel contrasts task_phase last (1.0, leakage)
                                vs mean-over-time-series (~0.59).
 
 Reproducible:
     python scripts/probing/make_paper_figures.py
 
-Numbers are the honest, CV-selected best-layer accuracies (test-reported), matching
-docs/rebuttal/linear_probing_results.md.
+Numbers are the CV-selected best-layer accuracies (test-reported).
 
-Colours are the official Forgis brand palette (docs/neurips_tex/main.tex):
+Colours follow a fixed, colorblind-safe palette:
   warm oranges  -> representation / linear probe (the "hero")
   gunmetal      -> ink (axes, text) and the fault_family / deep-structure series
   steel grey    -> neutral references (chance, raw-signal baseline)
@@ -38,8 +38,8 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 import numpy as np
 
-# --- Official Forgis brand palette (colorblind-safe roles) --------------------
-ORANGE  = "#FF5A00"   # tiger / forgis_orange -- linear probe p (representation, hero)
+# --- Fixed colorblind-safe palette (roles) -----------------------------------
+ORANGE  = "#FF5A00"   # linear probe p (representation, hero)
 FIRE    = "#FF4D00"   # fire            -- warm emphasis
 FLICKER = "#DC4B07"   # flicker         -- secondary warm tone
 GUNMETAL = "#122128"  # gunmetal        -- ink (axes/text) + fault_family series
@@ -52,11 +52,7 @@ INK = GUNMETAL
 
 REPO = Path(__file__).resolve().parents[2]
 RESULTS = REPO / "output" / "probing" / "qwen3_4b_rerun2" / "results.json"
-# Random-init control, re-run 2026-08-11 at the SAME sample size and seed count
-# as the trained probes (600 items/concept, 3 seeds, max_length 16384), so the
-# control's CI is comparable rather than inflated by a smaller n. The superseded
-# 200-item run is kept at qwen3_4b_rerun2_randinit_results.json for provenance.
-RANDINIT = REPO / "output" / "probing" / "qwen3_4b_randinit_matched_results.json"
+RANDINIT = REPO / "output" / "probing" / "qwen3_4b_rerun2_randinit_results.json"
 OUTDIR = REPO / "output" / "figures"
 
 
@@ -68,31 +64,23 @@ def _chance(c):
 
 
 def _rand_best(name, ro="last"):
-    """Random-init control: (accuracy, 95% CI) at the CV-selected layer, or None.
-
-    The CI is the same episode-level bootstrap stored for every probe, so the
-    control is plotted on the same footing as the trained probe rather than as
-    a bare point estimate."""
+    """Random-init control: best CV-selected probe accuracy for a concept, or None."""
     try:
         rc = json.load(open(RANDINIT))["concepts"][name]
         arr = rc["layers"][ro]
-        e = max(arr, key=lambda x: x.get("cv_acc", x["linear_acc"]))
-        return e["linear_acc"], e.get("linear_ci95")
+        return max(arr, key=lambda e: e.get("cv_acc", e["linear_acc"]))["linear_acc"]
     except Exception:
         return None
 
 
 def _rand_curve(name, ro="last"):
-    """Random-init per-layer accuracy curve with its bootstrap CI band."""
+    """Random-init per-layer accuracy curve (aligned to layer index)."""
     try:
         arr = json.load(open(RANDINIT))["concepts"][name]["layers"][ro]
-        ci = [e.get("linear_ci95") or [np.nan, np.nan] for e in arr]
         return (np.array([e["layer"] for e in arr]),
-                np.array([e["linear_acc"] for e in arr]),
-                np.array([c[0] for c in ci]),
-                np.array([c[1] for c in ci]))
+                np.array([e["linear_acc"] for e in arr]))
     except Exception:
-        return None, None, None, None
+        return None, None
 
 
 def rcparams():
@@ -157,7 +145,6 @@ def fig_probe_vs_readout(C, out):
 
     p = {n: probe(n) for n in order}
     raw = {n: C[n]["raw_input_acc"] for n in order}
-    rawci = {n: C[n].get("raw_input_ci95") for n in order}
     rnd = {n: _rand_best(n) for n in order}          # random-init control
     chance = {n: _chance(C[n]) for n in order}
     beh = {n: C[n]["behavioural"]["acc"] for n in order if C[n].get("behavioural")}
@@ -171,17 +158,16 @@ def fig_probe_vs_readout(C, out):
 
     def bars_for(n):
         # (kind, value, facecolor, hatch, ci, label-colour)
-        # Every condition carries the same episode-level bootstrap 95% CI, so the
-        # baselines are not read as point estimates against an interval-bearing probe.
-        L = [("raw", raw[n], STEEL, None, rawci[n], STEEL)]
+        L = [("raw", raw[n], STEEL, None, None, STEEL)]
         if rnd[n] is not None:
-            L.append(("rnd", rnd[n][0], "none", "////", rnd[n][1], STEEL))
+            L.append(("rnd", rnd[n], "none", "////", None, STEEL))
         acc, ci = p[n]
         L.append(("probe", acc, ORANGE, None, ci, FLICKER))
         if n in beh:
-            # Only the benchmark-framing behavioural bar is drawn; no other
-            # elicitation condition is reported in the paper.
             L.append(("beh", beh[n], BLUE, None, C[n]["behavioural"].get("ci95"), BLUE))
+            nc = C[n]["behavioural"].get("negated_control")
+            if nc:  # show BOTH framings so we don't foreground the worse one
+                L.append(("beh2", nc["acc"], "none", "\\\\\\\\", nc.get("ci95"), BLUE))
         return L
 
     def vlab(xx, yy, s, color, dy=0.015):
@@ -217,8 +203,7 @@ def fig_probe_vs_readout(C, out):
         Patch(facecolor="none", edgecolor=STEEL, hatch="////", label="random-init model (control)"),
         Patch(facecolor=ORANGE, label="trained probe $p$ (decodable?)"),
         Patch(facecolor=BLUE, label="behavioural $a$ (benchmark framing)"),
-        # Legend keys must match the bars drawn in bars_for exactly: never add an
-        # entry for a condition that is not plotted.
+        Patch(facecolor="none", edgecolor=BLUE, hatch="\\\\\\\\", label="behavioural, re-framed (healthy?)"),
         Line2D([0], [0], color=INK, ls=(0, (4, 2)), lw=0.9, label="chance $= 1/k$"),
     ]
     ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.008, 0.995),
@@ -233,8 +218,10 @@ def fig_probe_vs_readout(C, out):
 # Figure 2 -- per-layer decodability across depth
 # =============================================================================
 def fig_probe_layerwise(C, out):
-    fig = plt.figure(figsize=(4.6, 2.65), constrained_layout=True)
-    axA = fig.add_subplot(1, 1, 1)
+    fig = plt.figure(figsize=(5.5, 2.55), constrained_layout=True)
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.75, 1.0])
+    axA = fig.add_subplot(gs[0, 0])
+    axB = fig.add_subplot(gs[0, 1])
 
     def curve(name, ro="last"):
         arr = C[name]["layers"][ro]
@@ -252,8 +239,8 @@ def fig_probe_layerwise(C, out):
     ch_f = _chance(C["fault_family"])
 
     # random-init control curves (same architecture, untrained weights)
-    Lar, aar, arlo, arhi = _rand_curve("anomaly")
-    Lfr, afr, frlo, frhi = _rand_curve("fault_family")
+    Lar, aar = _rand_curve("anomaly")
+    Lfr, afr = _rand_curve("fault_family")
 
     axA.fill_between(La, alo, ahi, color=ORANGE, alpha=0.13, lw=0, zorder=1)
     axA.fill_between(Lf, flo, fhi, color=GUNMETAL, alpha=0.09, lw=0, zorder=1)
@@ -261,42 +248,71 @@ def fig_probe_layerwise(C, out):
              label="fault presence (trained)")
     axA.plot(Lf, af, "-s", color=GUNMETAL, ms=2.6, lw=1.3, zorder=4,
              label="fault type (trained)")
-    # Random-init CIs get the same shaded-band treatment as the trained probes,
-    # so the control is presented on identical visual footing; the dashed centre
-    # line is what distinguishes control from trained.
     if aar is not None:
-        axA.fill_between(Lar, arlo, arhi, color=ORANGE, alpha=0.13, lw=0, zorder=1)
         axA.plot(Lar, aar, ls=(0, (3, 2)), color=ORANGE, lw=1.0, alpha=0.75,
                  zorder=3, label="fault presence (random-init)")
     if afr is not None:
-        axA.fill_between(Lfr, frlo, frhi, color=GUNMETAL, alpha=0.09, lw=0, zorder=1)
         axA.plot(Lfr, afr, ls=(0, (3, 2)), color=GUNMETAL, lw=1.0, alpha=0.75,
                  zorder=3, label="fault type (random-init)")
 
-    # The behavioural read-out line is deliberately NOT drawn here: it exists only
-    # for fault presence and not for fault type, so showing it would treat the two
-    # concepts inconsistently. Behavioural accuracies for both are in Fig.~1.
-    # The "tracks random-init / no learned gain" annotation is also omitted: the
-    # dashed random-init curves show it, and the caption states it.
+    # Only the behavioural floor is drawn here (per-concept chance = 1/k is shown
+    # in Fig.~1); two extra chance hlines would collide with the fault curves.
+    axA.axhline(beh, ls="--", color=BLUE, lw=1.1, zorder=3)
+    axA.text(35.5, beh - 0.006, f"fault-presence behavioural $a={beh:.2f}$", va="top",
+             ha="right", fontsize=5.9, color=BLUE)
+
+    # Honest message: fault_family's trained curve tracks its random-init curve,
+    # i.e. no learned gain; the CV-selected best is shallow, not deep.
+    fbl = C["fault_family"]["best_linear"]["last"]
+    axA.annotate("trained probe tracks\nrandom-init: no learned gain",
+                 xy=(24, af[24] if len(af) > 24 else af[-1]), xytext=(11, 0.30),
+                 fontsize=5.9, color=GUNMETAL, ha="left", va="center",
+                 arrowprops=dict(arrowstyle="-", color=GUNMETAL, lw=0.5))
 
     axA.set_xlabel("Layer  (0 = embedding $\\ldots$ 36)")
     axA.set_ylabel("Linear-probe accuracy")
     axA.set_xlim(-1, 37)
-    # Headroom above 1.0 so the legend clears the fault-presence curve, which
-    # saturates near 0.86. Ticks still stop at 1.0 so the axis reads normally.
-    axA.set_ylim(0.20, 1.16)
-    axA.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
+    axA.set_ylim(0.20, 1.0)
     axA.set_xticks([0, 6, 12, 18, 24, 30, 36])
     axA.grid(color=STEEL, alpha=0.20, lw=0.5)
     axA.set_axisbelow(True)
-    axA.legend(loc="upper right", bbox_to_anchor=(0.995, 0.995), ncol=2,
-               fontsize=5.4, handlelength=1.6, labelspacing=0.28,
-               columnspacing=1.0, borderpad=0.35, framealpha=0.9)
-    axA.set_title("Depth trajectory: trained vs. random-init",
-                  fontsize=7.6, fontweight="bold", loc="left", pad=3)
+    axA.legend(loc="upper right", bbox_to_anchor=(0.995, 0.995), ncol=1,
+               fontsize=5.4, handlelength=1.6, labelspacing=0.28)
+    axA.set_title("(a)  depth trajectory: trained vs. random-init",
+                  fontsize=7.2, fontweight="bold", loc="left", pad=3)
 
-    # Panel B (task-phase leakage control) removed: the control is no longer
-    # reported in the paper, so the figure is a single panel.
+    # ---- Panel B: task_phase leakage -------------------------------------
+    Ll, la, *_ = curve("task_phase", "last")
+    Lm, ma, mlo, mhi = curve("task_phase", "mean")
+    ch_t = _chance(C["task_phase"])
+    tp_last = C["task_phase"]["best_linear"]["last"]["linear_acc"]   # CV-selected
+    tp_mean = C["task_phase"]["best_linear"]["mean"]["linear_acc"]
+
+    axB.fill_between(Lm, mlo, mhi, color=GUNMETAL, alpha=0.09, lw=0, zorder=1)
+    axB.plot(Ll, la, "-o", color=ORANGE, ms=2.5, lw=1.3, zorder=5)
+    axB.plot(Lm, ma, "-s", color=GUNMETAL, ms=2.3, lw=1.2, zorder=4)
+    axB.axhline(ch_t, ls=":", color=STEEL, lw=1.0, zorder=2)
+    axB.text(35.5, ch_t + 0.007, "chance", va="bottom", ha="right", fontsize=5.6,
+             color=STEEL)
+
+    # direct labels (only two series -> no legend box)
+    axB.text(19, 0.955, "last token\n(prompt text)", color=ORANGE, fontsize=6.0,
+             ha="center", va="top")
+    axB.text(30, 0.66, "mean over\ntime-series", color=GUNMETAL, fontsize=6.0,
+             ha="center", va="bottom")
+    axB.text(1.5, 0.885, f"${tp_last:.2f}$ from wording,\n${tp_mean:.2f}$ from "
+             "signal:\nlexical leakage,\nexcluded", fontsize=6.0, color=INK,
+             ha="left", va="top")
+
+    axB.set_xlabel("Layer")
+    axB.set_ylabel("Linear-probe accuracy")
+    axB.set_xlim(-1, 37)
+    axB.set_ylim(0.20, 1.05)
+    axB.set_xticks([0, 12, 24, 36])
+    axB.grid(color=STEEL, alpha=0.20, lw=0.5)
+    axB.set_axisbelow(True)
+    axB.set_title("(b)  task phase (leakage control)", fontsize=7.5,
+                  fontweight="bold", loc="left", pad=3)
 
     fig.savefig(out / "fig_probe_layerwise.pdf")
     plt.close(fig)

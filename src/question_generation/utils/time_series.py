@@ -92,8 +92,7 @@ def quantize_value_for_context(value: float, decimals: int = CONTEXT_NUMERIC_DEC
 
 
 def remove_constant_features(
-    rows: List[Dict[str, Any]],
-) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Separate constant features from varying ones.
     timestamp_ms is never treated as constant.
@@ -234,8 +233,7 @@ def _encode_timestep(row: Dict[str, Any], acronyms: Dict[str, str]) -> str:
 
 
 def encode_time_series(
-    rows: List[Dict[str, Any]],
-) -> Tuple[List[str], Dict[str, str]]:
+    rows: List[Dict[str, Any]]) -> Tuple[List[str], Dict[str, str]]:
     """
     Encode a list of row dicts as compact strings.
     Returns (encoded_rows, reverse_acronym_mapping).
@@ -255,8 +253,7 @@ def encode_time_series(
 
 
 def _normalize_timestamps(
-    rows: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Shift timestamps so the first row starts at 0."""
     if not rows or "timestamp_ms" not in rows[0]:
         return rows
@@ -325,8 +322,7 @@ def sample_subseries_before_event(
     min_len: int,
     max_len: int,
     min_post_event_after: int = 0,
-    return_metadata: bool = False,
-) -> Union[
+    return_metadata: bool = False) -> Union[
     Tuple[List[Dict[str, Any]], List[Dict[str, Any]]],
     Tuple[List[Dict[str, Any]], List[Dict[str, Any]], int, int],
 ]:
@@ -368,8 +364,7 @@ def sample_subseries_before_event(
         return subseries, post_event_rows, start_idx, length
     return (
         subseries,
-        post_event_rows,
-    )
+        post_event_rows)
 
 
 # ---------------------------------------------------------------------------
@@ -402,8 +397,7 @@ def downsample_peak_preserving(
     min_keep: int = DEFAULT_MIN_KEEP,
     max_keep: int = DEFAULT_MAX_KEEP,
     important_features: Optional[List[str]] = None,
-    anchor_timestamps: Optional[set[float]] = None,
-) -> List[Dict[str, Any]]:
+    anchor_timestamps: Optional[set[float]] = None) -> List[Dict[str, Any]]:
     """Downsample *rows* to a target between *min_keep* and *max_keep*,
     preserving the rows where the sharpest signal changes occur.
 
@@ -478,8 +472,7 @@ def downsample_peak_preserving(
 
 def is_inactive_subseries(
     rows: List[Dict[str, Any]],
-    threshold: int = INACTIVE_CONSTANT_THRESHOLD,
-) -> bool:
+    threshold: int = INACTIVE_CONSTANT_THRESHOLD) -> bool:
     if not rows:
         return True
     trimmed = (
@@ -516,11 +509,10 @@ def pick_fault_label(rows: List[Dict[str, Any]]) -> int:
 
 def pick_fault_label_from_meta_or_rows(
     rows: List[Dict[str, Any]],
-    meta: Optional[Dict[str, Any]] = None,
-) -> int:
+    meta: Optional[Dict[str, Any]] = None) -> int:
     """Determine the dominant fault for an episode.
 
-    Priority order (per benchmark spec — "fault should be determined by
+    Priority order (per benchmark spec, "fault should be determined by
     metadata, unless it isn't specified"):
 
     1. ``meta['fault_id']`` if present and non-None.
@@ -535,7 +527,7 @@ def pick_fault_label_from_meta_or_rows(
        sparse-anomaly episodes (e.g. factorywave's ~12% with mostly nominal
        rows + a short anomaly burst) which the plain ``pick_fault_label``
        wrongly picks as 0 because zeros outnumber the actual anomaly.
-    4. ``0`` (genuinely nominal — no fault id anywhere, no non-zero
+    4. ``0`` (genuinely nominal, no fault id anywhere, no non-zero
        fault_label anywhere).
     """
     if meta is not None:

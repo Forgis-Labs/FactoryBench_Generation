@@ -80,7 +80,7 @@
   (t2.east) -- (t3.west);
 
 % ============================================================
-%  NODE 1 — INPUT DATA  (wider panel: width 9, smaller TS chart)
+%  NODE 1, INPUT DATA  (wider panel: width 9, smaller TS chart)
 % ============================================================
 \begin{scope}
   \fill[panelbg, rounded corners=8pt] (-4.5, -7.6) rectangle (4.5, 9.0);
@@ -154,7 +154,7 @@
 
   \begin{scope}
     \clip[rounded corners=4pt] (-4.2, -7.40) rectangle (4.2, -3.70);
-    \foreach \y in {-7.2,-6.9,...,-3.8} {
+    \foreach \y in {-7.2,-6.9...,-3.8} {
       \draw[gray!18, line width=0.2pt] (-4.2, \y) -- (4.2, \y);
     }
   \end{scope}
@@ -199,7 +199,7 @@
 \end{scope}
 
 % ============================================================
-%  NODE 2 — REASONING LADDER (stretched to fill the panel)
+%  NODE 2, REASONING LADDER (stretched to fill the panel)
 % ============================================================
 \begin{scope}[xshift=8.5cm]
   \fill[panelbg, rounded corners=8pt] (-3.0, -7.6) rectangle (3.0, 9.0);
@@ -216,7 +216,7 @@
   \fill[gunmetal!85] (-2.78, -6.65) rectangle (-2.32, -6.50);
   \fill[gunmetal!85] ( 2.32, -6.65) rectangle ( 2.78, -6.50);
 
-  % --- Rung 4 (Decision) — top ---
+  % --- Rung 4 (Decision), top ---
   \node[font=\LARGE, text=forgis_orange] at (-1.6, 6.20) {\faWrench};
   \node[font=\sffamily\bfseries\scriptsize, text=forgis_orange, anchor=west]
     at (-0.85, 6.65) {Rung 4 (Decision)};
@@ -243,7 +243,7 @@
     at (-0.85, -0.95) {`What if I change the force now?'};
   \fill[gunmetal!85] (-2.55, -2.80) rectangle (2.55, -2.65);
 
-  % --- Rung 1 (State) — bottom ---
+  % --- Rung 1 (State), bottom ---
   \node[font=\LARGE, text=forgis_orange] at (-1.6, -4.55) {\faEye};
   \node[font=\sffamily\bfseries\scriptsize, text=forgis_orange, anchor=west]
     at (-0.85, -4.10) {Rung 1 (State)};
@@ -265,7 +265,7 @@
 \end{scope}
 
 % ============================================================
-%  NODE 3 — THE BENCHMARK GAP
+%  NODE 3, THE BENCHMARK GAP
 % ============================================================
 \begin{scope}[xshift=17cm]
   \fill[panelbg, rounded corners=8pt] (-3.5, -7.6) rectangle (3.5, 9.0);

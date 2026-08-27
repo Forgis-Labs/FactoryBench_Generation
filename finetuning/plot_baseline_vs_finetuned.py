@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-# Forgis palette — pulled from docs/neurips_tex/main.tex
+# Forgis palette, pulled from docs/neurips_tex/main.tex
 FORGIS = {
     "orange":    "#FF5A00",   # tiger / forgis_orange
     "fire":      "#FF4D00",
@@ -165,7 +165,7 @@ def plot_per_format(base: dict[int, dict], fine: dict[int, dict],
     ax.set_ylim(0, max(ymax * 1.25, 0.05))
     ax.set_title("FactoryBench performance by answer format" + title_suffix,
                  color=FORGIS["navy"], pad=10)
-    # Legend ABOVE the plot — ranking bar can be tall enough to clash with
+    # Legend ABOVE the plot, ranking bar can be tall enough to clash with
     # an in-plot legend at the right or top corners.
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.22),
               ncol=2, frameon=False)
@@ -186,7 +186,7 @@ def main() -> None:
                    help="Folder with finetuned level_*_predictions_summary.json")
     p.add_argument("--out-dir", default="docs/neurips_tex/figures",
                    help="Where to write the PNG+PDF outputs")
-    p.add_argument("--suffix", default=" — bearing_mixed_r32, L1–L3",
+    p.add_argument("--suffix", default=", bearing_mixed_r32, L1–L3",
                    help="Appended to plot titles")
     args = p.parse_args()
 
@@ -200,9 +200,9 @@ def main() -> None:
     base = _load_summaries(base_dir)
     fine = _load_summaries(fine_dir)
     if not base:
-        raise SystemExit(f"No *_summary.json in {base_dir} — run score_predictions.py first")
+        raise SystemExit(f"No *_summary.json in {base_dir}, run score_predictions.py first")
     if not fine:
-        raise SystemExit(f"No *_summary.json in {fine_dir} — run score_predictions.py first")
+        raise SystemExit(f"No *_summary.json in {fine_dir}, run score_predictions.py first")
 
     print(f"Baseline levels:  {sorted(base.keys())}")
     print(f"Finetuned levels: {sorted(fine.keys())}")

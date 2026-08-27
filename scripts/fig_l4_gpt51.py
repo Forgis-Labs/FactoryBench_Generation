@@ -25,8 +25,7 @@ STEEL    = "#878f92"
 GUNMETAL = "#122128"
 
 FORGIS_CMAP = mcolors.LinearSegmentedColormap.from_list(
-    "forgis_l4", ["#FFFFFF", "#FFE2CC", "#FFB888", TIGER, FLICKER],
-)
+    "forgis_l4", ["#FFFFFF", "#FFE2CC", "#FFB888", TIGER, FLICKER])
 
 DATASET_DISPLAY = {
     "aursad":      "AURSAD",
@@ -160,7 +159,7 @@ def panel_b(ax, records):
     for i in range(len(rows)):
         for j in range(len(cols)):
             if np.isnan(mat[i, j]):
-                ax.text(j, i, "—", ha="center", va="center",
+                ax.text(j, i, ", ", ha="center", va="center",
                         color=STEEL, fontsize=11)
             else:
                 col = "white" if mat[i, j] >= 0.45 else GUNMETAL

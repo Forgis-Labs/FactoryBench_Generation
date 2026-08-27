@@ -12,8 +12,8 @@ Usage:
         --label-col phase_index \\
         --out output/probing/qwen3_4b/level1_phase_probes.json
 
-The mapping from FactoryBench level to concept label is defined in
-`docs/rebuttal/linear_probing_design.md` (Section "Concepts probed").
+The mapping from FactoryBench level to concept label is defined by the
+concept definitions used by the probing pipeline.
 """
 from __future__ import annotations
 

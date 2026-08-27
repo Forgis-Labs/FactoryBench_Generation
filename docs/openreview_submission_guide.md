@@ -1,4 +1,10 @@
-# FactoryBench — OpenReview Submission Guide
+# FactoryBench: OpenReview Submission Guide
+
+> **Scope: the NeurIPS 2026 main conference (Evaluations and Datasets track),
+> submitted May 2026 and under review.** Kept as the record of that
+> submission. The three non-archival workshop submissions are a separate
+> matter, documented in `OPENREVIEW_SUBMISSIONS.md`, and the build system is
+> documented in `BUILDING.md`.
 
 NeurIPS 2026 Evaluations and Datasets Track.
 
@@ -48,7 +54,7 @@ We introduce FactoryBench, a benchmark for evaluating time-series models and LLM
 | **Primary Area** | `Datasets and Benchmarks` |
 | **Contribution Type** | `Datasets and Benchmarks` |
 | **Reviewer Nomination** | `~Philipp_Christian_Petersen1` |
-| **License** | MIT |
+| **License** | non-commercial two-track licence |
 | **Author Acknowledgements** | All 5 boxes checked |
 | **LLM Usage** | Select all that apply (confidential, not shared with reviewers) |
 | **LLM Experiment** | Opt in or leave unchecked |
@@ -63,7 +69,7 @@ The paper uses `\usepackage[eandd]{neurips_2026}`, which automatically:
 - Adds the "Submitted to NeurIPS 2026. Do not distribute." footer
 
 **What is already handled (do NOT manually remove):**
-- Author names, affiliations, email — suppressed by the `eandd` option
+- Author names, affiliations, email, suppressed by the `eandd` option
 - Code link uses `anonymous.4open.science`
 - HuggingFace link uses a throwaway `FactoryBench` account (no author info)
 - No acknowledgments section present
@@ -88,11 +94,11 @@ The paper uses `\usepackage[eandd]{neurips_2026}`, which automatically:
 - [x] Figure margins checked (all figures within `\linewidth`)
 - [x] Stale TODO comments and commented-out sections removed from source
 - [x] Anonymized public repo reference in Appendix L
-- [ ] **Compile final PDF** — recompile after latest fixes
+- [ ] **Compile final PDF**, recompile after latest fixes
 - [ ] **Upload PDF** to OpenReview
 - [ ] Provide Dataset URL
 - [ ] Provide Code URL
-- [ ] Select License (MIT)
+- [ ] Select License (non-commercial two-track licence)
 - [ ] Check all 5 Author Acknowledgement boxes
 - [ ] Double-check rendered PDF: no author names, no institution names, footer reads "Submitted to..."
 

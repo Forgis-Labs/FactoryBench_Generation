@@ -2,8 +2,7 @@
 
 Runs a frozen open-weight LLM over each prompt in a directory of question JSONs
 and saves the last-token residual-stream activation from every transformer
-layer to a Parquet file. The result feeds the linear-probing pipeline
-described in `docs/rebuttal/linear_probing_design.md`.
+layer to a Parquet file. The result feeds the linear-probing pipeline.
 
 Usage:
     python scripts/probing/dump_activations.py \\

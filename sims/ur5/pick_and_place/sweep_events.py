@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-sweep_events.py — sweep event variable ranges via counterfactual runs.
+sweep_events.py, sweep event variable ranges via counterfactual runs.
 
 For each event type and parameter range, runs paired baseline/counterfactual
 episodes to measure the counterfactual failure rate: what percentage of
 baseline successes become failures after event injection.
 
-Only one event type is injected per cell — the sweep isolates each event's
+Only one event type is injected per cell, the sweep isolates each event's
 impact independently.
 
 With --workers N, launches N parallel Isaac Sim processes.
@@ -60,7 +60,7 @@ _COLLISION_OBJECTS = [
     "bolt", "pipe_section", "cardboard_box",
     "metal_plate", "gear", "bottle", "wood_block",
 ]
-# Impact impulse ranges (kg·m/s) — weakest to strongest.
+# Impact impulse ranges (kg·m/s), weakest to strongest.
 _COLLISION_IMPULSE_RANGES = [
     [6.0, 12.0],    # ~25% CF rate range
 ]
@@ -279,7 +279,7 @@ def run_launcher():
         if r["param_name"]:
             param_str = f"[{r['param_lo']:.2f}-{r['param_hi']:.2f}]"
         else:
-            param_str = "—"
+            param_str = ", "
         print(f"{event_str:>30} {param_str:>18} "
               f"{r['baseline_successes']:>10d} {r['counterfactual_failures']:>10d} "
               f"{r['counterfactual_failure_rate']:>9.1%} "
@@ -453,14 +453,12 @@ def run_worker():
         joint_opened_positions=np.array([0.0]),
         joint_closed_positions=np.array([_CLOSE_RAD]),
         action_deltas=None,
-        use_mimic_joints=True,
-    )
+        use_mimic_joints=True)
     gripper.initialize(
         articulation_apply_action_func=robot.apply_action,
         get_joint_positions_func=robot.get_joint_positions,
         set_joint_positions_func=robot.set_joint_positions,
-        dof_names=robot.dof_names,
-    )
+        dof_names=robot.dof_names)
     fj_idx = gripper.joint_dof_indicies[0]
 
     _GRIP_INDICES = np.array([6, 7, 8, 9, 10, 11])
@@ -558,8 +556,7 @@ def run_worker():
             cspace_controller=rmp_controller,
             gripper=gripper,
             end_effector_initial_height=EEF_INITIAL_HEIGHT,
-            events_dt=_EVENTS_DT,
-        )
+            events_dt=_EVENTS_DT)
 
         robot.set_joint_positions(home)
         robot.set_joint_velocities(np.zeros(n_dof))
@@ -586,8 +583,7 @@ def run_worker():
                 cube_prim_path=CUBE_PRIM,
                 robot_prim_path=ROBOT_PRIM,
                 sim_dt=SIM_DT,
-                extra={"robot": robot},
-            )
+                extra={"robot": robot})
             scheduler.reset(_setup_ctx)
             scheduler.schedule_episode(args.max_steps)
             scheduler.setup_episode(_setup_ctx)
@@ -599,7 +595,7 @@ def run_worker():
         _slip_prev_eef_pos = None
         _slip_rel_vel_window = []
         _SLIP_WINDOW = 40
-        _SLIP_VEL_THRESHOLD = 0.03    # m/s — sustained relative Z velocity = slip
+        _SLIP_VEL_THRESHOLD = 0.03    # m/s, sustained relative Z velocity = slip
 
         while simulation_app.is_running():
             world.step(render=not _headless)
@@ -613,7 +609,7 @@ def run_worker():
             if np.any(np.abs(cube_pos) > 10.0):
                 cube_pos = cur_spawn.copy()
 
-            # Drop detection — immediate, same as run.py
+            # Drop detection, immediate, same as run.py
             if cube_pos[2] < -0.15:
                 if inject_event and scheduler is not None:
                     scheduler.reset(_setup_ctx)
@@ -626,14 +622,13 @@ def run_worker():
                 cube_final = np.asarray(cube.get_world_pose()[0])
                 return (False, "timeout", cube_final, ep_meta)
 
-            # PickPlaceController — identical to run.py
+            # PickPlaceController, identical to run.py
             current_joints = robot.get_joint_positions()
             action = pick_place.forward(
                 picking_position=pick_pos,
                 placing_position=place_pos,
                 current_joint_positions=current_joints,
-                end_effector_orientation=ee_orient,
-            )
+                end_effector_orientation=ee_orient)
             robot.apply_action(action)
 
             phase = min(pick_place.get_current_event(), 9)
@@ -647,7 +642,7 @@ def run_worker():
                 np.array([[grip_target]]), joint_indices=np.array([fj_idx])
             )
 
-            # Slip detection — compare cube and EEF velocities via finite
+            # Slip detection, compare cube and EEF velocities via finite
             # difference so both have identical lag characteristics.
             # A real slip produces sustained negative relative Z velocity.
             if phase >= 3 and phase < 7 and not _slip_detected:
@@ -694,8 +689,7 @@ def run_worker():
                     sim_dt=SIM_DT,
                     episode_step=ep_step,
                     state_machine=PHASE_NAMES[phase],
-                    extra={"robot": robot, "action": action},
-                )
+                    extra={"robot": robot, "action": action})
                 active_events = scheduler.step(ep_step, ctx) or []
                 if not _headless:
                     _run_module.update_event_indicator(active_events)
@@ -713,7 +707,7 @@ def run_worker():
                     _run_module._evt_rect.set_style({"background_color": 0xFFCC6600,
                                                      "border_radius": 4})
 
-            # Success check — identical to run.py
+            # Success check, identical to run.py
             if pick_place.is_done():
                 if inject_event and scheduler is not None:
                     scheduler.reset(_setup_ctx)
@@ -789,8 +783,7 @@ def run_worker():
             applicators={event_id: applicator},
             rng_seed=cell_seed + 99999,
             num_events_range=(1, 1),
-            force_event_id=event_id,
-        )
+            force_event_id=event_id)
         scheduler.set_phase_boundaries(_PHASE_BOUNDS)
 
         baseline_successes = 0
@@ -912,7 +905,7 @@ def run_visual():
         if r["param_name"]:
             param_str = f"[{r['param_lo']:.2f}-{r['param_hi']:.2f}]"
         else:
-            param_str = "—"
+            param_str = ", "
         print(f"  {event_str:>30} {param_str:>18}  "
               f"BL={r['baseline_successes']}  CF_fail={r['counterfactual_failures']}  "
               f"rate={r['counterfactual_failure_rate']:.1%}")

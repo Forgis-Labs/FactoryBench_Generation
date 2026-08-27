@@ -7,7 +7,7 @@ Reply JSON shape, ground-truth lookup, scoring and cost accounting are reused
 verbatim from ``run_aws_eval`` / ``run_foundry_eval``, so this module is
 drop-in compatible with ``run_pipeline.py``.
 
-The three models do not share a serving surface — this is the one structural
+The three models do not share a serving surface, this is the one structural
 thing that did not survive the migration intact:
 
   ``claude-sonnet-4.6``  MaaS. Anthropic Messages API over ``:rawPredict``.
@@ -15,15 +15,18 @@ thing that did not survive the migration intact:
                          the analogue of Bedrock ``CreateModelInvocationJob``.
   ``deepseek-v3.2``      MaaS. OpenAI-compatible ``/endpoints/openapi`` route,
                          identical in shape to the qwen-3-235b path already in
-                         ``run_foundry_eval``. Sync only — Vertex exposes no
+                         ``run_foundry_eval``. Sync only, Vertex exposes no
                          batch surface for MaaS partner models.
-  ``mistral-large-3``    NOT available as MaaS on Vertex. Model Garden ships it
-                         as a self-deploy vLLM container (8xH200 or 8xB200).
-                         Requires ``scripts/gcp/deploy_mistral_large_3.py`` to
-                         have been run, and bills per GPU-hour while the
-                         endpoint is up. Sync only.
+  ``mistral-large-3``    NOT available as MaaS on Vertex, so it is not routed
+                         here at all: ``src/config.py`` sends it to Azure AI
+                         Foundry. Model Garden ships it only as a self-deploy
+                         vLLM container (8xH200 or 8xB200) billing per
+                         GPU-hour. If you do stand one up, set
+                         ``MISTRAL_LARGE_3_VERTEX_ENDPOINT`` and give the model
+                         ``provider: "vertex"`` with ``self_deployed: True``;
+                         the ``vertex_raw_predict`` path below handles it.
 
-Auth is Application Default Credentials — no long-lived API key. On a
+Auth is Application Default Credentials, no long-lived API key. On a
 workstation run ``gcloud auth application-default login``; on GCE / GKE /
 Cloud Run / Batch the metadata server supplies it. The token helper is shared
 with the Vertex path in ``run_foundry_eval`` so there is one refresh cache.
@@ -71,8 +74,7 @@ from src.config import (
     get_provider,
     get_region,
     get_upstream_model_id,
-    get_vertex_publisher,
-)
+    get_vertex_publisher)
 
 # Shared helpers. run_aws_eval owns the reply writer, the pre-flight cost gate
 # and the OpenAI/Anthropic response extractors; all are provider-agnostic and
@@ -84,17 +86,14 @@ from src.evaluation.run_aws_eval import (
     _extract_chat,
     _write_failure,
     _write_reply,
-    estimate_batch_cost,
-)
+    estimate_batch_cost)
 from src.evaluation.run_foundry_eval import (
     _vertex_access_token,
-    build_question_index,
-)
+    build_question_index)
 from src.evaluation.test_gpt_5mini import (
     load_dotenv_file,
     load_prompt_entries,
-    save_json,
-)
+    save_json)
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +101,7 @@ logger = logging.getLogger(__name__)
 # Vertex batch prediction has no published blanket discount the way Bedrock
 # batch does (50% off on-demand), so the pre-flight estimator charges batch at
 # on-demand rates. That makes the GCP estimate conservative relative to the
-# AWS one rather than optimistic — a cost gate should never under-predict.
+# AWS one rather than optimistic, a cost gate should never under-predict.
 VERTEX_BATCH_PRICE_MULTIPLIER: float = 1.0
 VERTEX_SYNC_PRICE_MULTIPLIER: float = 1.0
 
@@ -182,9 +181,9 @@ def _self_deployed_endpoint(model: str) -> str:
     if not value:
         raise RuntimeError(
             f"{model} is self-deployed on Vertex and has no endpoint yet. "
-            f"Run `python scripts/gcp/deploy_mistral_large_3.py --create` and put the "
-            f"resulting endpoint id in {env}. Note this stands up an 8-GPU node that "
-            f"bills per hour until you tear it down."
+            f"Deploy it from Model Garden and put the resulting endpoint id in "
+            f"{env}. Note this stands up a multi-GPU node that bills per hour "
+            f"until you tear it down."
         )
     # Accept either a bare numeric id or a full resource path.
     return value.rstrip("/").split("/")[-1]
@@ -267,12 +266,11 @@ _RETRY_BASE_SLEEP = 4.0
 def _post_with_retry(
     url: str,
     body: Dict[str, Any],
-    timeout_s: int,
-) -> "requests.Response":
+    timeout_s: int) -> "requests.Response":
     """POST with exponential backoff on throttling and transient 5xx.
 
     Honours Retry-After when the server sends it, otherwise backs off
-    4s, 8s, 16s, ... Returns the final response; the caller still checks
+    4s, 8s, 16s... Returns the final response; the caller still checks
     status, so a request that exhausts its retries surfaces the real error.
     """
     delay = _RETRY_BASE_SLEEP
@@ -359,8 +357,7 @@ def run_vertex_batch(
     ground_truth_index: Dict[str, Any],
     judge_model: str,
     poll_interval: int = 30,
-    cost_limit: Optional[float] = None,
-) -> Tuple[int, int, int]:
+    cost_limit: Optional[float] = None) -> Tuple[int, int, int]:
     """Submit a Vertex batch prediction job, wait, write replies.
 
     Returns (completed, failed, skipped). Raises on non-recoverable submission
@@ -375,8 +372,7 @@ def run_vertex_batch(
         )
 
     est_cost, in_tok, out_tok = estimate_batch_cost(
-        entries, model, max_output_tokens, VERTEX_BATCH_PRICE_MULTIPLIER,
-    )
+        entries, model, max_output_tokens, VERTEX_BATCH_PRICE_MULTIPLIER)
     _enforce_cost_limit(cost_limit, est_cost, in_tok, out_tok, model, "vertex-batch")
 
     location = _batch_region(model)
@@ -501,8 +497,7 @@ def run_vertex_batch(
             answer, usage = extract_output(api_style, model_out)
             _write_reply(
                 entry, answer, model_out, usage,
-                model, output_dir, ground_truth_index, judge_model,
-            )
+                model, output_dir, ground_truth_index, judge_model)
             completed += 1
         except Exception as exc:
             _write_failure(entry, f"reply parse error: {exc}", output_dir)
@@ -522,14 +517,12 @@ def run_vertex_sync(
     ground_truth_index: Dict[str, Any],
     judge_model: str,
     cost_limit: Optional[float] = None,
-    timeout_s: int = 900,
-) -> Tuple[int, int, int]:
+    timeout_s: int = 900) -> Tuple[int, int, int]:
     cfg = VERTEX_MODELS[model]
     api_style = cfg["api_style"]
 
     est_cost, in_tok, out_tok = estimate_batch_cost(
-        entries, model, max_output_tokens, VERTEX_SYNC_PRICE_MULTIPLIER,
-    )
+        entries, model, max_output_tokens, VERTEX_SYNC_PRICE_MULTIPLIER)
     _enforce_cost_limit(cost_limit, est_cost, in_tok, out_tok, model, "vertex-sync")
 
     url = _sync_url(model)
@@ -550,14 +543,13 @@ def run_vertex_sync(
             resp = _post_with_retry(url, body, timeout_s)
             if resp.status_code >= 400:
                 raise requests.HTTPError(
-                    f"{resp.status_code} {resp.reason} for {url} — body: {resp.text[:500]}"
+                    f"{resp.status_code} {resp.reason} for {url}, body: {resp.text[:500]}"
                 )
             raw = resp.json()
             answer, usage = extract_output(api_style, raw)
             est = _write_reply(
                 entry, answer, raw, usage,
-                model, output_dir, ground_truth_index, judge_model,
-            )[0]
+                model, output_dir, ground_truth_index, judge_model)[0]
             cumulative_cost += est
             completed += 1
             logger.info(
@@ -591,8 +583,7 @@ def run_gcp_eval(
     use_batch: bool = True,
     poll_interval: int = 30,
     cost_limit: Optional[float] = None,
-    strict_batch: bool = False,
-) -> Tuple[int, int, int]:
+    strict_batch: bool = False) -> Tuple[int, int, int]:
     """Dispatch to the right Vertex flow for ``model``.
 
     Returns (completed, failed, skipped). Signature mirrors ``run_aws_eval``
@@ -632,8 +623,7 @@ def run_gcp_eval(
             done, fail, _ = run_vertex_batch(
                 pending, model, output_dir, max_output_tokens,
                 ground_truth_index, judge_model,
-                poll_interval=poll_interval, cost_limit=cost_limit,
-            )
+                poll_interval=poll_interval, cost_limit=cost_limit)
             return done, fail, skipped
         except Exception as exc:
             if strict_batch:
@@ -648,8 +638,7 @@ def run_gcp_eval(
 
     done, fail, _ = run_vertex_sync(
         pending, model, output_dir, max_output_tokens,
-        ground_truth_index, judge_model, cost_limit=cost_limit,
-    )
+        ground_truth_index, judge_model, cost_limit=cost_limit)
     return done, fail, skipped
 
 
@@ -666,8 +655,7 @@ def main() -> None:
         type=str,
         required=True,
         choices=list(VERTEX_MODELS.keys()),
-        help="Vertex-served model to evaluate",
-    )
+        help="Vertex-served model to evaluate")
     parser.add_argument("--judge-model", type=str, default=DEFAULT_JUDGE_MODEL)
     parser.add_argument("--no-judge", action="store_true",
                         help="Disable LLM-as-judge entirely. Free-form items get score=None.")
@@ -704,8 +692,7 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     if args.env_file and args.env_file.exists():
         load_dotenv_file(args.env_file)
@@ -715,8 +702,7 @@ def main() -> None:
     entries = load_prompt_entries(
         args.input,
         batch_number=args.batch_number,
-        batch_size=args.batch_size,
-    )
+        batch_size=args.batch_size)
     if args.limit is not None and args.limit > 0:
         entries = entries[: args.limit]
         logger.info(f"Limited to first {len(entries)} prompts (--limit {args.limit})")
@@ -734,8 +720,7 @@ def main() -> None:
         use_batch=args.use_batch,
         poll_interval=args.poll_interval,
         cost_limit=cost_limit,
-        strict_batch=args.strict_batch,
-    )
+        strict_batch=args.strict_batch)
     logger.info(f"Done. completed={completed} failed={failed} skipped={skipped}")
 
     if args.summary_file:

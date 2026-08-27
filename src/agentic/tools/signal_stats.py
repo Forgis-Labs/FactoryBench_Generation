@@ -1,9 +1,9 @@
-"""signal_stats — per-channel summary of the item's time series.
+"""signal_stats - per-channel summary of the item's time series.
 
 Input: list of channel names (subset of what the item exposes), plus
 optional [t_start, t_end] index bounds. Returns per-channel mean, std,
 min, max, p05/p50/p95, monotonic-trend sign, first-derivative extrema.
-Also a ``residual(a, b)`` helper for the paper's SCE schema.
+Also a ``residual(a, b)`` helper for the SCE schema.
 
 Tool interface: the agent-loop constructs one instance per question,
 seeding it with the parsed time-series dict (channel -> np.ndarray).

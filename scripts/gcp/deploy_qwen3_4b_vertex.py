@@ -8,7 +8,7 @@ one-click `:deploy` path. It has to be stood up as a custom container: the
 Model Garden vLLM image pulling `Qwen/Qwen3-4B-Instruct-2507` straight from
 Hugging Face, fronted by an OpenAI-compatible route.
 
-That is what `src/config.py` already expects — `qwen-3-4b` is declared with
+That is what `src/config.py` already expects, `qwen-3-4b` is declared with
 `api_style: vertex_raw_predict`, which POSTs an OpenAI chat-completions payload
 to `<endpoint>:rawPredict` and lets the container's own handler answer. The
 previous endpoint (4739621343144706048) was deleted at some point; this script
@@ -73,7 +73,7 @@ MACHINE_SHAPES = {
 COST_WARNING = """
   COST: a T4 or L4 node is roughly $0.35-0.85 per hour and an A100 40GB is
   roughly $3.70; all bill from deployment until deletion regardless of traffic.
-  Cheap next to an 8-GPU node, but not free — run --delete when the eval
+  Cheap next to an 8-GPU node, but not free, run --delete when the eval
   finishes.
 """
 
@@ -121,8 +121,7 @@ def _wait_lro(region: str, op_name: str, what: str, timeout_s: int = 3600) -> di
 def cmd_status(project: str, region: str) -> int:
     r = requests.get(
         f"https://{_host(region)}/v1/projects/{project}/locations/{region}/endpoints",
-        headers=_headers(), timeout=120,
-    )
+        headers=_headers(), timeout=120)
     if r.status_code >= 400:
         print(f"endpoints.list failed: {r.status_code} {r.text[:300]}")
         return 1
@@ -172,7 +171,7 @@ def cmd_redeploy(project: str, region: str, shape: str, apply: bool) -> int:
     already = endpoint.get("deployedModels", [])
     if already:
         print(f"Endpoint {endpoint_id} already has {len(already)} deployed model(s). "
-              f"Nothing to do — it is live (and billing).")
+              f"Nothing to do, it is live (and billing).")
         return 0
 
     machine = MACHINE_SHAPES[shape]

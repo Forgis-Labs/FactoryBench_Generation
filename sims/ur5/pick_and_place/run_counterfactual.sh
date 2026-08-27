@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_counterfactual.sh — Run paired baseline + event-injection episodes
+# run_counterfactual.sh, Run paired baseline + event-injection episodes
 # with full sensor logging, using multiple workers.
 #
 # Runs baselines first, then counterfactuals, to avoid GPU memory contention.
@@ -105,6 +105,6 @@ fi
 echo ""
 echo "Done. Output: $LOG_BASE/"
 for (( w=0; w<WORKERS; w++ )); do
-    echo "  worker_${w}/baseline/       — steps.csv, episodes.csv"
-    echo "  worker_${w}/counterfactual/ — steps.csv, episodes.csv"
+    echo "  worker_${w}/baseline/, steps.csv, episodes.csv"
+    echo "  worker_${w}/counterfactual/, steps.csv, episodes.csv"
 done

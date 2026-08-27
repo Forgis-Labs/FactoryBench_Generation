@@ -35,8 +35,7 @@ class _Residual(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv1d(in_channels, num_residual_hiddens, kernel_size=3, stride=1, padding=1, bias=False),
             nn.ReLU(inplace=True),
-            nn.Conv1d(num_residual_hiddens, num_hiddens, kernel_size=1, stride=1, bias=False),
-        )
+            nn.Conv1d(num_residual_hiddens, num_hiddens, kernel_size=1, stride=1, bias=False))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x + self._block(x)
@@ -45,8 +44,7 @@ class _Residual(nn.Module):
 class _ResidualStack(nn.Module):
     def __init__(
         self, in_channels: int, num_hiddens: int,
-        num_residual_layers: int, num_residual_hiddens: int,
-    ) -> None:
+        num_residual_layers: int, num_residual_hiddens: int) -> None:
         super().__init__()
         self._layers = nn.ModuleList([
             _Residual(in_channels, num_hiddens, num_residual_hiddens)
@@ -74,15 +72,13 @@ class _TOTEMEncoder(nn.Module):
         num_hiddens: int = 64,
         num_residual_layers: int = 2,
         num_residual_hiddens: int = 128,
-        embedding_dim: int = 64,
-    ) -> None:
+        embedding_dim: int = 64) -> None:
         super().__init__()
         self._conv_1 = nn.Conv1d(1, num_hiddens // 2, kernel_size=4, stride=2, padding=1)
         self._conv_2 = nn.Conv1d(num_hiddens // 2, num_hiddens, kernel_size=4, stride=2, padding=1)
         self._conv_3 = nn.Conv1d(num_hiddens, num_hiddens, kernel_size=3, stride=1, padding=1)
         self._residual_stack = _ResidualStack(
-            num_hiddens, num_hiddens, num_residual_layers, num_residual_hiddens,
-        )
+            num_hiddens, num_hiddens, num_residual_layers, num_residual_hiddens)
         self._pre_vq_conv = nn.Conv1d(num_hiddens, embedding_dim, kernel_size=1, stride=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -94,7 +90,7 @@ class _TOTEMEncoder(nn.Module):
 
 
 class _VectorQuantizer(nn.Module):
-    """Vector quantizer — snaps encoder outputs to nearest codebook entry."""
+    """Vector quantizer, snaps encoder outputs to nearest codebook entry."""
 
     def __init__(self, num_embeddings: int = 256, embedding_dim: int = 64) -> None:
         super().__init__()
@@ -135,7 +131,7 @@ class _VectorQuantizer(nn.Module):
 # Public API
 # ---------------------------------------------------------------------------
 class _TOTEMDecoder(nn.Module):
-    """TOTEM 1D CNN decoder — mirrors the encoder with transposed convolutions.
+    """TOTEM 1D CNN decoder, mirrors the encoder with transposed convolutions.
 
     Architecture:
         (batch, embedding_dim, seq_len/4) → Conv1d(64→64, k=3) → ResidualStack
@@ -149,19 +145,15 @@ class _TOTEMDecoder(nn.Module):
         num_hiddens: int = 64,
         num_residual_layers: int = 2,
         num_residual_hiddens: int = 128,
-        embedding_dim: int = 64,
-    ) -> None:
+        embedding_dim: int = 64) -> None:
         super().__init__()
         self._conv_1 = nn.Conv1d(embedding_dim, num_hiddens, kernel_size=3, stride=1, padding=1)
         self._residual_stack = _ResidualStack(
-            num_hiddens, num_hiddens, num_residual_layers, num_residual_hiddens,
-        )
+            num_hiddens, num_hiddens, num_residual_layers, num_residual_hiddens)
         self._conv_trans_1 = nn.ConvTranspose1d(
-            num_hiddens, num_hiddens // 2, kernel_size=4, stride=2, padding=1,
-        )
+            num_hiddens, num_hiddens // 2, kernel_size=4, stride=2, padding=1)
         self._conv_trans_2 = nn.ConvTranspose1d(
-            num_hiddens // 2, 1, kernel_size=4, stride=2, padding=1,
-        )
+            num_hiddens // 2, 1, kernel_size=4, stride=2, padding=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self._conv_1(x)
@@ -194,22 +186,19 @@ class TOTEMTokenizer(nn.Module):
         num_residual_layers: int = 2,
         num_residual_hiddens: int = 128,
         embedding_dim: int = 64,
-        num_embeddings: int = 256,
-    ) -> None:
+        num_embeddings: int = 256) -> None:
         super().__init__()
         self.encoder = _TOTEMEncoder(
-            num_hiddens, num_residual_layers, num_residual_hiddens, embedding_dim,
-        )
+            num_hiddens, num_residual_layers, num_residual_hiddens, embedding_dim)
         self.quantizer = _VectorQuantizer(num_embeddings, embedding_dim)
         self.decoder = _TOTEMDecoder(
-            num_hiddens, num_residual_layers, num_residual_hiddens, embedding_dim,
-        )
+            num_hiddens, num_residual_layers, num_residual_hiddens, embedding_dim)
 
     def tokenize(self, ts: torch.Tensor) -> torch.Tensor:
         """Convert raw time series to discrete token IDs.
 
         Args:
-            ts: Raw time series values, shape (batch, seq_len) or (seq_len,).
+            ts: Raw time series values, shape (batch, seq_len) or (seq_len).
 
         Returns:
             Integer token IDs in [0, num_embeddings), shape (batch, seq_len // 4).
@@ -236,11 +225,11 @@ class TOTEMTokenizer(nn.Module):
         ``<ts_*>`` tokens and we need numerical predictions.
 
         Args:
-            token_ids: Integer code IDs, shape (batch, n_codes) or (n_codes,).
+            token_ids: Integer code IDs, shape (batch, n_codes) or (n_codes).
 
         Returns:
             Reconstructed values, shape (batch, n_codes * 4).
-            Values are in normalized space — caller must de-normalize
+            Values are in normalized space, caller must de-normalize
             using the original signal's mean and std.
         """
         if token_ids.dim() == 1:
@@ -288,10 +277,9 @@ class TOTEMTokenizer(nn.Module):
             num_residual_layers=config.get("num_residual_layers", 2),
             num_residual_hiddens=config.get("res_hidden_size", config.get("res_hid", 128)),
             embedding_dim=config.get("embedding_dim", 64),
-            num_embeddings=config.get("num_embeddings", 256),
-        )
+            num_embeddings=config.get("num_embeddings", 256))
 
-        # Load weights — handle different checkpoint formats
+        # Load weights, handle different checkpoint formats
         state_dict = ckpt.get("model_state_dict", ckpt.get("model_state", ckpt.get("state_dict", ckpt)))
         if isinstance(state_dict, dict) and not any(k.startswith("encoder") for k in state_dict):
             state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
@@ -344,8 +332,7 @@ class TOTEMTokenizer(nn.Module):
             warnings.warn(
                 f"No matching weights found in {checkpoint_path}. "
                 f"Checkpoint keys: {list(state_dict.keys())[:5]}",
-                stacklevel=2,
-            )
+                stacklevel=2)
 
         model.eval()
         model.requires_grad_(False)

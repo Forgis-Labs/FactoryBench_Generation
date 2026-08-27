@@ -20,8 +20,44 @@ in the paper and in the reviewer comment. The commitment made in
 | **total** | **60** | **100** | **+52** |
 
 Current scores (raw, benchmark grader): overall 0.917, L1 0.962, L2 0.980,
-L3 0.625. Per-item data in `output/final50_gcp/expert_scored_benchmark_scoring.json`
-and `output/final50_gcp/expert_l3_scored.json`.
+L3 0.625.
+
+> **The per-item data is not in this repository and is not on any machine we
+> control.** It was written to `output/final50_gcp/expert_scored_benchmark_scoring.json`
+> and `output/final50_gcp/expert_l3_scored.json`, both under the gitignored
+> `output/` tree, on the departed author's workstation. What survives is the
+> aggregate: the four scores above and the 13/37/10 composition, as reported in
+> `app:human_baseline`. Recovering the artifact means retrieving those two files,
+> or re-running the baseline with the expert who produced it.
+>
+> This matters because the paper and the reviewer comment both **commit to
+> releasing it** ("for every item, the expert's answer, its score, and the method
+> used to reach it"). That commitment cannot currently be met from this run.
+
+**A second, independent expert pass now exists: [`human_baseline.md`](human_baseline.md).**
+It is a *different* baseline, not a recovery of the one above. An expert answered
+21 items, one per active question template, sampled at `seed=42` from the released
+`FactoryBench/FactoryBench`, and wrote out the reasoning for each: 4 L1, 10 L2,
+5 L3, and **2 L4**. Every item carries the full prompt, the expert's answer, the
+reasoning that produced it, and the expected answer.
+
+What it changes:
+
+- **L4 is no longer at zero.** Two free-form items are answered and reasoned
+  through, where the 60-item run had none.
+- **The per-item release commitment is partly discharged.** The artifact the
+  paper promised now exists in this repository for 21 items, even though the
+  60-item run behind the `app:human_baseline` aggregates is still unrecoverable.
+
+What it does **not** change:
+
+- The scores in `app:human_baseline` still come from the 60-item run. Do not
+  merge the two counts; the item selections differ and this pass was not put
+  through the benchmark grader, so it carries expected answers rather than
+  scores. Two items are flagged `TO-CHECK` where the expert judged the answer
+  family derivable from the context but the exact value not.
+- The 100-item, 25-per-level target is still open. Read the gap table above as
+  covering the 60-item run only.
 
 ## Work items
 
@@ -29,13 +65,19 @@ and `output/final50_gcp/expert_l3_scored.json`.
    and the one with no human number at all. L4 is free-form, so answers need the
    three-judge ensemble in `scripts/score_replies_batch.py`, not the deterministic
    grader used for L1--L3. Budget for that being slower per item than L1--L3.
-2. **Broaden L1 (+12) and L3 (+15).** Sample from the released test split so the
-   ceiling is measured on the same items the panel is scored on.
+2. **Broaden L1 (+12) and L3 (+15).** Sample from FactoryBench-Lite, which is what
+   the panel is scored on. (This item used to say "the released test split";
+   there is no longer a split, and the panel moved to Lite.)
 3. **Score with the benchmark's own grader.** Same acceptance bounds, exact-match
    and per-position partial credit the panel receives. No separate human rubric.
-4. **Update the paper.** `tab:human_baseline` and the main-text paragraph in
-   `_paper_body.tex` (`\subsection{Signal comprehension across Levels 1--3}`).
-   Both currently say 60 items across L1--L3.
+4. **Update the papers, plural.** `tab:human_baseline` and the surrounding prose
+   in `docs/paper/_appendix.tex`, the main-text paragraph in
+   `docs/paper/_content.tex` (`\subsection{Signal comprehension across Levels
+   1--3}`), **and the same paragraph in `docs/paper/_workshop_core.tex`**, which
+   is a separate hand-maintained body driving every workshop build and does not
+   inherit edits to `_content.tex`. All three currently say 60 items across
+   L1--L3. (This item used to name `_paper_body.tex`, which has not existed
+   since the content was split into `docs/paper/`.)
 5. **Release the artifact.** Per item: expert answer, score, and solution method.
 
 ## Things to keep straight
@@ -55,3 +97,10 @@ and `output/final50_gcp/expert_l3_scored.json`.
   repaired after this baseline was collected. Any newly sampled items will come
   from the corrected release, so note the version split if the old and new
   samples are pooled.
+
+## Provenance
+
+Collected before the v1.0.0 dataset repairs and tracked by the author who has
+since left. Nothing here is reproducible from the repository alone: the scores
+are reported, the underlying answers are not held. Treat the aggregate numbers
+as the record and do not restate them as if the artifact were available.

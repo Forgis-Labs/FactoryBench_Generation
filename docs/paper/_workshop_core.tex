@@ -17,7 +17,7 @@
 % fallbacks so this file never hard-errors if used un-forked) and then
 % \input this file after its own \maketitle / abstract / Introduction.
 %
-% NO APPENDIX HERE: this file ends at \bibliography{references}, because most
+% NO APPENDIX HERE: this file ends at the bibliography, because most
 % workshop CFPs cap pages "excluding references" with no appendix exemption.
 % A venue whose CFP DOES exempt the appendix appends the shared
 % ../paper/_appendix.tex in its own _workshop_<venue>.tex after inputting
@@ -31,8 +31,10 @@
 % the illustrative table/figure treatments are cut.
 % ============================================================
 
-\providecommand{\workshoprelatedworknote}{}
-\providecommand{\workshopclosingnote}{}
+% The two connector macros are declared in _preamble_common.tex, not here:
+% a venue file is \input BEFORE this one, so a \providecommand at this point
+% would run after the venue file had already renewed them, and be too late
+% to define them.
 
 \section{Related work}
 
@@ -144,7 +146,7 @@ Scalable ground-truth generation is the central challenge of any Q\&A benchmark 
 \ifworkshopcompact\else
 \begin{figure}[!h]
     \centering
-    \includegraphics[width=0.9\linewidth]{figures/factorybench-collage.pdf}
+    \includegraphics[width=\collagefrac\linewidth]{figures/factorybench-collage.pdf}
     \caption{FactoryWave tasks and fault catalogue. Photographs of the robotic platforms (UR3, KUKA KR10) executing the three tasks (pick-and-place, peg-in-hole, screwdriving) and a representative subset of the 27 systematically injected fault conditions.}
     \label{fig:factorywave_collage}
 \end{figure}
@@ -164,7 +166,7 @@ Reliable ground truth for Level~4 troubleshooting requires machine-specific reco
 \subsection{Zero-shot evaluation}
 \label{sec:zero-shot}
 
-We evaluate a cross-vendor panel of frontier LLMs available at submission time (April 2026): Claude Sonnet 4.6 \cite{anthropic2025sonnet46} and GPT-5.1 \cite{openai2025gpt51} on the closed-weight side, and DeepSeek V3.2 \cite{deepseek2025v32}, Mistral Large 3 \cite{mistral2025large3}, and Qwen3-235B \cite{qwen2025qwen3} on the open-weight side, plus Qwen3-4B \cite{qwen2025qwen3} as a lightweight reference. For calibration we report a non-LLM baseline that dispatches per item by answer format: linear regression on the target signal for scalar and tensor templates, and uniform random over the option set for single- and multi-select MCQ and ranking templates (free-form Level~4 templates are excluded, as no traditional method maps cleanly to producing a remediation protocol). Figure~\ref{fig:results} reports chance-corrected accuracy for the full panel.
+We evaluate a cross-vendor panel of frontier LLMs available at submission time (April 2026): Claude Sonnet 4.6 \cite{anthropic2025sonnet46} and GPT-5.1 \cite{openai2025gpt51} on the closed-weight side, and DeepSeek V3.2 \cite{deepseek2025v32}, Mistral Large 3 \cite{mistral2025large3}, and Qwen3-235B \cite{qwen2025qwen3} on the open-weight side, plus Qwen3-4B \cite{qwen2025qwen3} as a lightweight reference. For calibration we report a non-LLM baseline that dispatches per item by answer format: linear regression on the target signal for scalar and tensor templates, and uniform random over the option set for single- and multi-select MCQ and ranking templates (free-form Level~4 templates are excluded, as no traditional method maps cleanly to producing a remediation protocol). The panel is evaluated on FactoryBench-Lite, the balanced $3{,}000$-item subset described above, so that each level aggregate weights its templates equally instead of inheriting the episode pool's template mass; every model answers the identical items. Figure~\ref{fig:results} reports chance-corrected accuracy for the full panel.
 
 \ifworkshopcompact
 \begin{figure}[htbp]
@@ -178,13 +180,13 @@ We evaluate a cross-vendor panel of frontier LLMs available at submission time (
     \centering
     \begin{subfigure}[t]{\linewidth}
         \centering
-        \includegraphics[width=0.85\linewidth]{../../output/figures/fig_main_heatmap.pdf}
+        \includegraphics[width=\resultsafrac\linewidth]{../../output/figures/fig_main_heatmap.pdf}
         \caption{Chance-corrected accuracy (\%) on FactoryBench's four reasoning levels.}
         \label{fig:results-heatmap}
     \end{subfigure}\\[0.5em]
     \begin{subfigure}[t]{\linewidth}
         \centering
-        \makebox[\linewidth][c]{\includegraphics[width=0.95\linewidth]{figures/fig_l4_gpt51_byrootcause.pdf}}
+        \makebox[\linewidth][c]{\includegraphics[width=\resultsbfrac\linewidth]{figures/fig_l4_gpt51_byrootcause.pdf}}
         \caption{GPT-5.1 L4 score distribution by ground-truth root cause (left, troubleshooting) and misconfigured parameter (right, optimization). Each bar shows the proportion of items scored 0/0.5/1; the right-edge value is the per-category mean accuracy.}
         \label{fig:results-gpt51-l4}
     \end{subfigure}
@@ -199,7 +201,7 @@ We evaluate a cross-vendor panel of frontier LLMs available at submission time (
 Under the signed chance correction the non-LLM baseline lands at $+4.3\%$ on L1. Four of six LLMs fail to clear it: Qwen3-4B ($-1.8\%$) and DeepSeek V3.2 ($-0.3\%$) score below chance outright, and GPT-5.1 ($+3.2\%$) and Qwen3-235B ($+3.6\%$) sit below the baseline despite being the largest models in the panel. Only Mistral Large 3 ($+5.9\%$) and Claude Sonnet 4.6 ($+11.8\%$) clear it, and Mistral only barely. Raw scale does not reliably confer the ability to extract precise state from dense industrial signals.
 
 \paragraph{Models that struggle on Level~1 still outperform the baseline on Levels~2 and~3, and rank order is stable across the three.}
-DeepSeek V3.2 ($+5.8\%$, $+17.1\%$) and GPT-5.1 ($+6.9\%$, $+27.5\%$) both lift clear of the L2/L3 baseline values ($-0.2\%$, $+6.2\%$) despite trailing it on L1, yet the model rank order is nearly identical across L1--L3: Claude Sonnet 4.6 leads at L2 and L3 ($+14.6\%$, $+45.7\%$), Qwen3-235B is the strongest open-weight model ($+20.6\%$ on L3), and Mistral Large 3 follows ($+5.3\%$, $+19.7\%$). This points toward state comprehension propagating into intervention and counterfactual reasoning rather than being substituted by it.
+DeepSeek V3.2 ($+5.8\%$, $+17.1\%$) and GPT-5.1 ($+6.9\%$, $+27.5\%$) both lift clear of the L2/L3 baseline values ($-0.2\%$, $+6.2\%$) despite trailing it on L1, yet the model rank order is nearly identical across L1--L3: Claude Sonnet 4.6 leads at L2 and L3 ($+14.6\%$, $+45.7\%$), Qwen3-235B is the strongest open-weight model ($+20.6\%$ on L3), and Mistral Large 3 follows ($+5.3\%$, $+19.7\%$). This points toward state comprehension propagating into intervention and counterfactual reasoning rather than being substituted by it. The L3 margins carry one caveat: the trajectory-prediction template L3.5 awards the non-LLM baseline $+37.2\%$, which is not possible if that template's assumed chance level were correct, so part of every model's L3 figure reflects its scoring margin rather than counterfactual competence. We report L3 as measured rather than recalibrating, since changing the margin would redefine the metric and break comparability with the numbers released alongside the dataset.
 
 \paragraph{A human expert reaches near-ceiling on Levels~1--2, but not on Level~3.}
 \ifworkshopcompact
@@ -242,5 +244,10 @@ We introduced FactoryBench, a four-level benchmark for machine understanding ove
 We introduced FactoryBench, a four-level benchmark for machine understanding over industrial robotic telemetry, grounded in FactoryWave and structured around Pearl's causal hierarchy. Zero-shot evaluation of six frontier LLMs shows that signal comprehension and protocol-grounded decision-making are distinct capabilities that do not co-develop: the panel ordering on Levels~1--3 reshuffles on Level~4, with GPT-5.1 taking the L4 lead despite being mediocre on the structured levels while the L1--L3 leader ranks near the bottom on L4. Structured-level scores remain well below 50\% (chance-corrected) and no model approaches saturation on any level. \workshopclosingnote{} Full dataset details, extended per-format and per-robot breakdowns, the human-baseline protocol, and the full probing methodology are available in the extended paper and released alongside the dataset and code (links above).
 \fi
 
-\bibliographystyle{unsrt}
-\bibliography{references}
+% References begin on a fresh page. Every workshop build sits exactly at its
+% CFP page limit, so letting the bibliography start halfway down the last body
+% page makes it ambiguous whether that page counts as a main page. A clean
+% break removes the question and reads better.
+\clearpage
+\bibliographystyle{\paperbibstyle}
+\bibliography{../paper/references}

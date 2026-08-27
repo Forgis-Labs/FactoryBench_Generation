@@ -5,10 +5,10 @@ is observable, per a declarative spec in
 data/labelling/rca/relevance_specs.json.
 
 Four localities:
-  - global       — uniform sampling (nominal or fault present throughout).
-  - event        — enforce min window length so the transient is likely captured.
-  - phase_gated  — window must overlap one of the target task_phase runs.
-  - cumulative   — enforce min window length, optional start-phase gate.
+  - global, uniform sampling (nominal or fault present throughout).
+  - event, enforce min window length so the transient is likely captured.
+  - phase_gated, window must overlap one of the target task_phase runs.
+  - cumulative, enforce min window length, optional start-phase gate.
 
 Kill switch: set FB_RELEVANCE=0 to restore uniform sampling everywhere.
 """
@@ -129,7 +129,7 @@ def _sample_event(rows: List[Row], spec: Spec, min_len: int, max_len: int) -> Op
     Anchors on a randomly chosen row whose ``event`` token resolves to a
     non-zero, non-1 id (a real event, not the implicit "no event" / "task
     started" placeholder). Window length and exact start are still
-    randomized — the constraint is only that the event row is inside the
+    randomized, the constraint is only that the event row is inside the
     window.
     """
     from src.question_generation.utils.time_series import parse_event_id
@@ -167,8 +167,7 @@ def _sample_event(rows: List[Row], spec: Spec, min_len: int, max_len: int) -> Op
 
 
 def _sample_cumulative(
-    rows: List[Row], spec: Spec, task: Optional[str], min_len: int, max_len: int,
-) -> Optional[Window]:
+    rows: List[Row], spec: Spec, task: Optional[str], min_len: int, max_len: int) -> Optional[Window]:
     n = len(rows)
     min_required = max(int(spec.get("min_window_length", min_len)), min_len)
     min_required = min(min_required, max_len)
@@ -195,8 +194,7 @@ def _sample_cumulative(
 
 
 def _sample_phase_gated(
-    rows: List[Row], spec: Spec, task: Optional[str], min_len: int, max_len: int,
-) -> Optional[Window]:
+    rows: List[Row], spec: Spec, task: Optional[str], min_len: int, max_len: int) -> Optional[Window]:
     phase_ids = _phase_ids_for_task(spec, task, "phases_by_task")
     if not phase_ids:
         return None
@@ -244,8 +242,7 @@ def sample_with_relevance(
     task: Optional[str],
     min_len: int,
     max_len: int,
-    fallback_to_uniform: bool = False,
-) -> Optional[SampleResult]:
+    fallback_to_uniform: bool = False) -> Optional[SampleResult]:
     """Sample a window honoring the fault's relevance spec.
 
     Returns (subseries, start_index, sampler_tag) or None if no valid window fits.
@@ -297,8 +294,7 @@ def sample_with_relevance(
 def validate_relevance(
     sub_rows: List[Row],
     spec: Optional[Spec],
-    task: Optional[str],
-) -> bool:
+    task: Optional[str]) -> bool:
     """Post-hoc check that a subseries satisfies the spec. Cheap safety net."""
     if not spec:
         return True
@@ -324,8 +320,7 @@ def relevance_report(
     fault_id: int,
     spec: Optional[Spec],
     task: Optional[str],
-    sampler: str,
-) -> Dict[str, Any]:
+    sampler: str) -> Dict[str, Any]:
     """Provenance-friendly summary of relevance state for a generated item."""
     report: Dict[str, Any] = {"fault_id": fault_id, "sampler": sampler}
     if not spec:

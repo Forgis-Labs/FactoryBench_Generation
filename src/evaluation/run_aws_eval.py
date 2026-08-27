@@ -56,16 +56,14 @@ from src.config import (
     BEDROCK_MODELS,
     DEFAULT_JUDGE_MODEL,
     SAGEMAKER_MODELS,
-    get_provider,
-)
+    get_provider)
 
 # Reuse existing helpers (scoring / GT index / IO / reply finalisation)
 from src.evaluation.run_foundry_eval import (
     _estimate_cost,
     build_question_index,
     infer_answer_format,
-    score_prediction,
-)
+    score_prediction)
 
 # Bedrock batch is 50% cheaper than on-demand inference. We apply this to the
 # pre-flight estimator so the cost-limit gate compares apples-to-apples with
@@ -82,8 +80,7 @@ from src.evaluation.test_gpt_5mini import (
     load_dotenv_file,
     load_json,
     load_prompt_entries,
-    save_json,
-)
+    save_json)
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +125,7 @@ def _bucket_for_region(region: str) -> str:
     """Resolve the S3 bucket for batch I/O in a specific region.
 
     Bedrock batch (CreateModelInvocationJob) requires the input/output bucket
-    to be in the SAME region as the Bedrock job — Mistral runs in us-west-2
+    to be in the SAME region as the Bedrock job, Mistral runs in us-west-2
     and DeepSeek in eu-west-2, so a single eu-central-1 bucket can't serve all
     three Bedrock models for batch.
 
@@ -168,8 +165,7 @@ def estimate_batch_cost(
     entries: List[Tuple[Path, str, int, str]],
     model: str,
     max_output_tokens: int,
-    price_multiplier: float,
-) -> Tuple[float, int, int]:
+    price_multiplier: float) -> Tuple[float, int, int]:
     """Pre-flight worst-case cost in USD (sum over entries) plus token totals.
 
     Worst case = each entry uses its full prompt as input and produces
@@ -189,8 +185,7 @@ def _enforce_cost_limit(
     in_tokens: int,
     out_tokens: int,
     model: str,
-    flow: str,
-) -> None:
+    flow: str) -> None:
     """Raise RuntimeError if the pre-flight estimate exceeds ``cost_limit``."""
     logger.info(
         f"[{flow}] {model}: pre-flight estimate "
@@ -332,8 +327,7 @@ def _write_reply(
     model: str,
     output_dir: Path,
     ground_truth_index: Dict[str, Any],
-    judge_model: str,
-) -> Tuple[float, Optional[float]]:
+    judge_model: str) -> Tuple[float, Optional[float]]:
     prompt_path, prompt_text, prompt_idx, custom_id = entry
     out_path = output_dir / f"{custom_id}_answer.json"
 
@@ -352,8 +346,7 @@ def _write_reply(
         ground_truth=gt,
         acceptance_bounds=acceptance_bounds,
         question_text=qa_payload.get("question", ""),
-        judge_model=judge_model,
-    )
+        judge_model=judge_model)
 
     prompt_tokens = int(usage.get("prompt_tokens") or 0)
     completion_tokens = int(usage.get("completion_tokens") or 0)
@@ -435,8 +428,7 @@ def run_bedrock_batch(
     ground_truth_index: Dict[str, Any],
     judge_model: str,
     poll_interval: int = 30,
-    cost_limit: Optional[float] = None,
-) -> Tuple[int, int, int]:
+    cost_limit: Optional[float] = None) -> Tuple[int, int, int]:
     """Submit a Bedrock batch job, wait for completion, write replies.
 
     Returns (completed, failed, skipped). Raises on non-recoverable submission
@@ -448,7 +440,7 @@ def run_bedrock_batch(
     region = _model_region(cfg)
     bucket = _bucket_for_region(region)
 
-    # AWS-side hard minimum on batch job size — fail fast instead of uploading
+    # AWS-side hard minimum on batch job size, fail fast instead of uploading
     # to S3, submitting, and waiting for "status=Failed".
     if len(entries) < BEDROCK_BATCH_MIN_RECORDS:
         raise RuntimeError(
@@ -459,8 +451,7 @@ def run_bedrock_batch(
 
     # Cost gate (pre-flight).
     est_cost, in_tok, out_tok = estimate_batch_cost(
-        entries, model, max_output_tokens, BEDROCK_BATCH_PRICE_MULTIPLIER,
-    )
+        entries, model, max_output_tokens, BEDROCK_BATCH_PRICE_MULTIPLIER)
     _enforce_cost_limit(cost_limit, est_cost, in_tok, out_tok, model, "bedrock-batch")
 
     boto3 = _boto3()
@@ -470,7 +461,7 @@ def run_bedrock_batch(
         f"[bedrock-batch] {model}: region={region} model_id={model_id} bucket={bucket}"
     )
 
-    # 1. Build input JSONL — one record per entry, recordId = custom_id.
+    # 1. Build input JSONL, one record per entry, recordId = custom_id.
     job_uid = uuid.uuid4().hex[:8]
     input_key = f"{_s3_prefix()}{model}/{job_uid}/input.jsonl"
     output_prefix = f"{_s3_prefix()}{model}/{job_uid}/output/"
@@ -492,8 +483,7 @@ def run_bedrock_batch(
         roleArn=_bedrock_role_arn(),
         modelId=model_id,
         inputDataConfig={"s3InputDataConfig": {"s3Uri": input_uri}},
-        outputDataConfig={"s3OutputDataConfig": {"s3Uri": output_uri}},
-    )
+        outputDataConfig={"s3OutputDataConfig": {"s3Uri": output_uri}})
     job_arn = job_resp["jobArn"]
     logger.info(f"[bedrock-batch] {model}: submitted job {job_arn}")
 
@@ -556,8 +546,7 @@ def run_bedrock_batch(
             answer, usage = _extract_output(api_style, model_out)
             _write_reply(
                 entry, answer, model_out, usage,
-                model, output_dir, ground_truth_index, judge_model,
-            )
+                model, output_dir, ground_truth_index, judge_model)
             completed += 1
         except Exception as exc:
             _write_failure(entry, f"reply parse error: {exc}", output_dir)
@@ -576,8 +565,7 @@ def run_bedrock_sync(
     max_output_tokens: int,
     ground_truth_index: Dict[str, Any],
     judge_model: str,
-    cost_limit: Optional[float] = None,
-) -> Tuple[int, int, int]:
+    cost_limit: Optional[float] = None) -> Tuple[int, int, int]:
     cfg = BEDROCK_MODELS[model]
     api_style = cfg["api_style"]
     model_id = _resolve_bedrock_model_id(model)
@@ -585,8 +573,7 @@ def run_bedrock_sync(
 
     # Pre-flight at on-demand rates so users see what the worst case would be.
     est_cost, in_tok, out_tok = estimate_batch_cost(
-        entries, model, max_output_tokens, BEDROCK_SYNC_PRICE_MULTIPLIER,
-    )
+        entries, model, max_output_tokens, BEDROCK_SYNC_PRICE_MULTIPLIER)
     _enforce_cost_limit(cost_limit, est_cost, in_tok, out_tok, model, "bedrock-sync")
 
     boto3 = _boto3()
@@ -599,7 +586,7 @@ def run_bedrock_sync(
     stopped = False
     for i, entry in enumerate(entries, 1):
         if stopped:
-            failed += 1  # remaining entries unwritten — count as failed for accounting
+            failed += 1  # remaining entries unwritten, count as failed for accounting
             _write_failure(entry, f"cost limit ${cost_limit:.2f} reached", output_dir)
             continue
         _prompt_path, prompt_text, _idx, custom_id = entry
@@ -609,8 +596,7 @@ def run_bedrock_sync(
                 modelId=model_id,
                 body=json.dumps(body),
                 contentType="application/json",
-                accept="application/json",
-            )
+                accept="application/json")
             raw = json.loads(resp["body"].read())
             answer, usage = _extract_output(api_style, raw)
             est = _write_reply(entry, answer, raw, usage, model, output_dir, ground_truth_index, judge_model)[0]
@@ -686,8 +672,7 @@ def run_sagemaker_async(
     judge_model: str,
     poll_interval: int = 30,
     cost_limit: Optional[float] = None,
-    per_request_timeout_s: int = 1800,
-) -> Tuple[int, int, int]:
+    per_request_timeout_s: int = 1800) -> Tuple[int, int, int]:
     """Submit Async Inference requests against a pre-deployed JumpStart endpoint.
 
     Each entry: upload one JSON input to S3 → call InvokeEndpointAsync →
@@ -703,8 +688,7 @@ def run_sagemaker_async(
     # bound (it understates the fixed instance cost when run-time is short)
     # but it does flag pathologically large jobs for free.
     est_cost, in_tok, out_tok = estimate_batch_cost(
-        entries, model, max_output_tokens, BEDROCK_SYNC_PRICE_MULTIPLIER,
-    )
+        entries, model, max_output_tokens, BEDROCK_SYNC_PRICE_MULTIPLIER)
     _enforce_cost_limit(cost_limit, est_cost, in_tok, out_tok, model, "sagemaker-async")
 
     boto3 = _boto3()
@@ -727,14 +711,12 @@ def run_sagemaker_async(
             s3.put_object(
                 Bucket=bucket, Key=in_key,
                 Body=json.dumps(body).encode("utf-8"),
-                ContentType="application/json",
-            )
+                ContentType="application/json")
             resp = sm_runtime.invoke_endpoint_async(
                 EndpointName=endpoint_name,
                 InputLocation=f"s3://{bucket}/{in_key}",
                 ContentType="application/json",
-                Accept="application/json",
-            )
+                Accept="application/json")
             out_uri = resp["OutputLocation"]
             pending.append((entry, out_uri))
         except Exception as exc:
@@ -787,8 +769,7 @@ def run_aws_eval(
     use_batch: bool = True,
     poll_interval: int = 30,
     cost_limit: Optional[float] = None,
-    strict_batch: bool = False,
-) -> Tuple[int, int, int]:
+    strict_batch: bool = False) -> Tuple[int, int, int]:
     """Dispatch to the right AWS pipeline for ``model``.
 
     Returns (completed, failed, skipped). Mirrors run_foundry_eval's signature
@@ -822,8 +803,7 @@ def run_aws_eval(
                 done, fail, _ = run_bedrock_batch(
                     pending, model, output_dir, max_output_tokens,
                     ground_truth_index, judge_model,
-                    poll_interval=poll_interval, cost_limit=cost_limit,
-                )
+                    poll_interval=poll_interval, cost_limit=cost_limit)
                 return done, fail, skipped
             except Exception as exc:
                 if strict_batch:
@@ -834,8 +814,7 @@ def run_aws_eval(
                 )
         done, fail, _ = run_bedrock_sync(
             pending, model, output_dir, max_output_tokens,
-            ground_truth_index, judge_model, cost_limit=cost_limit,
-        )
+            ground_truth_index, judge_model, cost_limit=cost_limit)
         return done, fail, skipped
 
     if provider == "sagemaker":
@@ -844,8 +823,7 @@ def run_aws_eval(
         done, fail, _ = run_sagemaker_async(
             pending, model, output_dir, max_output_tokens,
             ground_truth_index, judge_model,
-            poll_interval=poll_interval, cost_limit=cost_limit,
-        )
+            poll_interval=poll_interval, cost_limit=cost_limit)
         return done, fail, skipped
 
     raise ValueError(
@@ -867,8 +845,7 @@ def main() -> None:
         type=str,
         required=True,
         choices=list(BEDROCK_MODELS.keys()) + list(SAGEMAKER_MODELS.keys()),
-        help="AWS-served model to evaluate",
-    )
+        help="AWS-served model to evaluate")
     parser.add_argument("--judge-model", type=str, default=DEFAULT_JUDGE_MODEL)
     parser.add_argument("--no-judge", action="store_true",
                         help="Disable LLM-as-judge entirely. Free-form items get score=None.")
@@ -906,8 +883,7 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     # Load .env so AWS_*, FB_S3_*, BEDROCK_BATCH_ROLE_ARN etc. are visible.
     if args.env_file and args.env_file.exists():
@@ -918,8 +894,7 @@ def main() -> None:
     entries = load_prompt_entries(
         args.input,
         batch_number=args.batch_number,
-        batch_size=args.batch_size,
-    )
+        batch_size=args.batch_size)
     if args.limit is not None and args.limit > 0:
         entries = entries[: args.limit]
         logger.info(f"Limited to first {len(entries)} prompts (--limit {args.limit})")
@@ -937,8 +912,7 @@ def main() -> None:
         use_batch=args.use_batch,
         poll_interval=args.poll_interval,
         cost_limit=cost_limit,
-        strict_batch=args.strict_batch,
-    )
+        strict_batch=args.strict_batch)
     logger.info(f"Done. completed={completed} failed={failed} skipped={skipped}")
 
     if args.summary_file:

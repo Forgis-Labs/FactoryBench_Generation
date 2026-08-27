@@ -33,21 +33,18 @@ import numpy as np
 from src.question_generation.utils.hf_streaming import (
     HfStreamUploader,
     add_streaming_args,
-    make_uploader_from_args,
-)
+    make_uploader_from_args)
 from src.question_generation.utils.io import load_events, load_json, load_root_causes, load_templates, load_ur3_mapping
 from src.question_generation.utils.template import (
     build_context,
-    discover_episodes_by_dataset,
-)
+    discover_episodes_by_dataset)
 from src.question_generation.utils.time_series import parse_event_id
 from src.question_generation.utils.relevance import (
     is_enabled as relevance_enabled,
     load_specs as load_relevance_specs,
     relevance_report,
     sample_with_relevance,
-    validate_relevance,
-)
+    validate_relevance)
 
 logger = logging.getLogger(__name__)
 
@@ -66,100 +63,10 @@ CONTEXT_MAX = 64
 
 
 
-# The three configuration faults are physically indistinguishable from the
-# rendered telemetry: a held-out classifier scored 1/13 on the family, which is
-# chance. Offering them as separate options asks the model to pick between
-# alternatives the data cannot separate, so they are merged into one category
-# with one combined remediation.
-MERGED_CONFIG_CATEGORY = "config_misconfiguration"
-MERGED_CONFIG_SOURCES = {
-    "tcp_frame_misconfiguration",
-    "payload_cog_misconfiguration",
-    "payload_misconfiguration",
-}
-MERGED_CONFIG_TEXT = (
-    "Payload / centre-of-gravity / TCP-frame misconfiguration: the installed payload mass, "
-    "centre of gravity or TCP frame does not match the actual mounted tool and load. Verify "
-    "all three in the installation settings, correct any mismatch, and re-run a verification "
-    "cycle before resuming normal operation."
-)
 NO_ANOMALY_TEXT = (
     "No anomalous behavior detected in the sensor stream. "
     "The machine is operating normally; no remediation is required."
 )
-
-
-def _diagnosis_category(root_cause: str) -> str:
-    """The answer category a root cause maps to, after the merge."""
-    return MERGED_CONFIG_CATEGORY if root_cause in MERGED_CONFIG_SOURCES else str(root_cause)
-
-
-def build_diagnosis_options(
-    correct_root_cause: Optional[str],
-    ur3_mapping: Dict[str, Any],
-    n_options: int = 6,
-) -> Optional[Tuple[Dict[str, str], str]]:
-    """Lettered options for the troubleshooting template, plus the answer letter.
-
-    The prompt asked for free text while ``answer`` was always one of exactly 27
-    byte-identical canned paragraphs, one per root cause, with ``options`` empty
-    and no acceptance bounds. A correct diagnosis worded differently had no
-    defined way to be graded, so the item was only gradeable by accident.
-
-    Rendering the categories as options makes the task the one actually being
-    scored. Distractors are drawn per item and the letter order is shuffled, so
-    neither the category nor the position is guessable.
-    """
-    categories: Dict[str, str] = {}
-    for rc, entry in (ur3_mapping or {}).items():
-        protocol = (entry or {}).get("ur3_protocol")
-        if not protocol:
-            continue
-        category = _diagnosis_category(rc)
-        if category == MERGED_CONFIG_CATEGORY:
-            categories[category] = MERGED_CONFIG_TEXT
-        else:
-            categories.setdefault(category, protocol)
-    categories["no_anomaly"] = NO_ANOMALY_TEXT
-
-    correct = "no_anomaly" if not correct_root_cause else _diagnosis_category(correct_root_cause)
-    if correct not in categories:
-        return None
-    distractors = [c for c in categories if c != correct]
-    if len(distractors) < n_options - 1:
-        return None
-    chosen = [correct] + random.sample(distractors, n_options - 1)
-    random.shuffle(chosen)
-    labels = [chr(ord("A") + i) for i in range(len(chosen))]
-    options = {labels[i]: categories[c] for i, c in enumerate(chosen)}
-    answer = labels[chosen.index(correct)]
-    return options, answer
-
-
-
-def collect_optimization_variants(
-    episodes: List[Tuple[str, Path]],
-    load_meta_fn,
-) -> List[str]:
-    """Every distinct configuration-correction string the corpus can produce.
-
-    Template 2 asked for free text while ``answer`` was always one of a fixed
-    set of canned strings, one per misconfiguration variant, so it was a
-    classification task in disguise with no way to grade a differently worded
-    but correct response.
-
-    The option set is derived from the episodes themselves rather than written
-    by hand, so it cannot drift from what the generator actually emits. Only
-    variants that occur in the admitted pool appear, which is why dropping the
-    KUKA slice also drops the KUKA-only mass and CoG variants.
-    """
-    seen: List[str] = []
-    for _ds, ep in episodes:
-        fault_id, meta = load_meta_fn(ep)
-        text = _optimization_answer(fault_id, meta)
-        if text and text not in seen:
-            seen.append(text)
-    return sorted(seen)
 
 
 def _optimization_answer(fault_id: Optional[int], meta: Dict[str, Any]) -> Optional[str]:
@@ -193,8 +100,7 @@ def get_root_cause_for_subseries(
     root_causes: Dict[int, Dict[str, Any]],
     events: List[Dict[str, Any]],
     all_rows: Optional[List[Dict[str, Any]]] = None,
-    start_idx: int = 0,
-) -> Dict[str, Any]:
+    start_idx: int = 0) -> Dict[str, Any]:
     """
     Determine the anomaly status and root cause for a subseries.
 
@@ -254,7 +160,7 @@ def get_root_cause_for_subseries(
             "anomaly_present": False,
             "fault_label": 0,
             "root_cause": "normal",
-            "description": "Normal operation — no anomaly present.",
+            "description": "Normal operation, no anomaly present.",
             "event_id": None,
             "event_name": None,
             "event_context": None,
@@ -267,7 +173,7 @@ def get_root_cause_for_subseries(
             "anomaly_present": False,
             "fault_label": 0,
             "root_cause": "normal",
-            "description": "Normal operation — no anomaly present.",
+            "description": "Normal operation, no anomaly present.",
             "event_id": None,
             "event_name": None,
             "event_context": None,
@@ -296,14 +202,13 @@ def _extract_episode_meta(raw: Any) -> Dict[str, Any]:
 
 def _build_ranking_context(
     labeled_rows: List[Tuple[str, List[Dict[str, Any]]]],
-    important_features: Optional[List[str]],
-) -> Dict[str, Any]:
+    important_features: Optional[List[str]]) -> Dict[str, Any]:
     """
     Build a multi-stream context for ranking questions.
 
     Each episode is padded to the common maximum length (repeating the last row)
     then encoded independently with build_context.  The result is a dict
-    {"streams": {"A": <context>, "B": <context>, ...}}.
+    {"streams": {"A": <context>, "B": <context>...}}.
     """
     max_len = max((len(rows) for _, rows in labeled_rows), default=0)
     keep = (set(important_features) | {"timestamp_ms"}) if important_features else None
@@ -324,8 +229,7 @@ def _try_generate_ranking_question(
     template: Dict[str, Any],
     episodes_by_dataset: Dict[str, List[Path]],
     available_datasets: List[str],
-    raw_cache: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    raw_cache: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Attempt to build a ranking question (templates 3 and 4).
 
@@ -405,8 +309,7 @@ def generate_level4_questions(
     ur3_mapping: Optional[Dict[str, Dict[str, Any]]] = None,
     relevance_specs: Optional[Dict[int, Dict[str, Any]]] = None,
     enumerate_mode: bool = False,
-    uploader: Optional[HfStreamUploader] = None,
-) -> None:
+    uploader: Optional[HfStreamUploader] = None) -> None:
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
@@ -483,30 +386,6 @@ def generate_level4_questions(
     all_episodes: List[Tuple[str, Path]] = [
         (ds, p) for ds, paths in episodes_by_dataset.items() for p in paths
     ]
-    _TORQUE_KEYS = tuple(f"effort_target_torque_{i}" for i in range(6))
-
-    def _has_torque(ep_path: Path) -> bool:
-        """Whether this episode records joint torque at all.
-
-        The optimization template asks which parameter to change, and the three
-        optimization faults are a TCP frame offset, a wrong payload mass and a
-        wrong centre of gravity. Mass and CoG errors are read off joint torque;
-        without it the question is not answerable from the data. Only KUKA
-        records torque on this corpus, 1,302 episodes against 7,553 UR3 that
-        record none, so this restriction is what makes the template honest
-        rather than a cosmetic feature-list change.
-        """
-        try:
-            rows = load_episode(ep_path)
-        except Exception:
-            return False
-        if not isinstance(rows, list):
-            return False
-        for row in rows[:32]:
-            if isinstance(row, dict) and any(row.get(k) is not None for k in _TORQUE_KEYS):
-                return True
-        return False
-
     # Torque is not the discriminating channel and requiring it was wrong.
     # effort_target_torque exists only on KUKA, where it turns out to be
     # measured current times a fixed per-joint gain rather than anything the
@@ -521,12 +400,6 @@ def generate_level4_questions(
     troubleshooting_episodes = [
         (ds, p) for ds, p in all_episodes if load_meta(p)[0] not in _OPTIMIZATION_FAULTS
     ]
-
-    # Derived from the admitted pool, so the option set matches what the
-    # generator can actually emit and shrinks automatically when a slice
-    # (such as KUKA) is excluded.
-    _optimization_variants = collect_optimization_variants(optimization_episodes, load_meta)
-    logger.info(f"L4 optimization answer variants: {len(_optimization_variants)}")
 
     # Hoisted out of the main loop so we can build the deterministic combo
     # list for --enumerate; previously these were recomputed per iteration.
@@ -615,19 +488,17 @@ def generate_level4_questions(
 
             answer = None
             root_cause = None
-            _options: Dict[str, str] = {}
 
             if template["id"] == 1:
                 rc_info = get_root_cause_for_subseries(
                     subseries, root_causes, events,
-                    all_rows=rows, start_idx=start_idx,
-                )
+                    all_rows=rows, start_idx=start_idx)
                 root_cause = rc_info.get("root_cause")
                 if rc_info.get("anomaly_present"):
                     ur3_entry = (ur3_mapping or {}).get(root_cause, {})
                     if not ur3_entry.get("ur3_protocol"):
                         # No remediation protocol for this root cause (typically
-                        # placeholder/undocumented faults like fault 6, 12) — skip
+                        # placeholder/undocumented faults like fault 6, 12), skip
                         # rather than ship an item with answer=null.
                         continue
                     answer = ur3_entry["ur3_protocol"]
@@ -728,14 +599,12 @@ def main() -> None:
         "--datasets-dir",
         type=Path,
         default=repo_root / "data",
-        help="Root data directory (default: <repo>/data)",
-    )
+        help="Root data directory (default: <repo>/data)")
     parser.add_argument(
         "--output",
         type=Path,
         default=repo_root / "output" / "questions" / "level4",
-        help="Output directory (default: <repo>/output/questions/level4)",
-    )
+        help="Output directory (default: <repo>/output/questions/level4)")
     parser.add_argument("-n", type=int, default=100, help="Number of questions to generate (cap; in --enumerate mode this is an upper bound, not a target)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument(
@@ -746,30 +615,26 @@ def main() -> None:
              "of random sampling. -n becomes an upper cap. Combinations whose "
              "episode does not satisfy the template's preconditions are skipped. "
              "For ranking templates (t3/t4) the primary episode walks; the other "
-             "3 episodes per question are still sampled at random.",
-    )
+             "3 episodes per question are still sampled at random.")
     add_streaming_args(parser)
     parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
-        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}",
-    )
+        help=f"Datasets to sample from (default: all). Choices: {VALID_DATASETS}")
     parser.add_argument(
         "--template-ids",
         type=int,
         nargs="+",
         default=None,
         help="Restrict generation to these template ids (default: all). Useful "
-             "for regenerating a single template without rerunning the rest.",
-    )
+             "for regenerating a single template without rerunning the rest.")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     templates = load_templates(Path(__file__).with_name("question_template.json"))
     if getattr(args, "template_ids", None):
@@ -808,8 +673,7 @@ def main() -> None:
         datasets=args.datasets,
         ur3_mapping=ur3_mapping,
         enumerate_mode=args.enumerate_mode,
-        uploader=uploader,
-    )
+        uploader=uploader)
 
 
 if __name__ == "__main__":

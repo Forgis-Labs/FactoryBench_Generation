@@ -5,7 +5,7 @@ provider-specific helpers in ``src/evaluation/run_foundry_eval.py`` /
 ``run_aws_eval.py``: build the JSONL body in the provider's native shape,
 submit, poll until terminal, parse results into ``{custom_id: response_text}``.
 
-Sync is intentionally NOT supported here — the caller is expected to size
+Sync is intentionally NOT supported here, the caller is expected to size
 batches above each provider's minimum (Bedrock's hard 100-record floor).
 """
 from __future__ import annotations
@@ -25,8 +25,7 @@ from src.config import (
     FOUNDRY_MODELS,
     get_provider,
     get_upstream_model_id,
-    get_batch_deployment,
-)
+    get_batch_deployment)
 
 logger = logging.getLogger(__name__)
 
@@ -48,17 +47,15 @@ def _submit_foundry_batch(
     model: str,
     requests_: List[JudgeRequest],
     max_output_tokens: int,
-    poll_interval: int,
-) -> Dict[str, str]:
+    poll_interval: int) -> Dict[str, str]:
     import httpx as _httpx
     from src.evaluation.run_foundry_eval import (
-        resolve_api_key, resolve_endpoint, _openai_client,
-    )
+        resolve_api_key, resolve_endpoint, _openai_client)
     from openai import OpenAI as _OpenAI
 
     base_url, _api_style, api_version = resolve_endpoint(model)
     api_key = resolve_api_key(model)
-    # Use a generous connect timeout (30s) — Azure AI Foundry batch endpoint
+    # Use a generous connect timeout (30s), Azure AI Foundry batch endpoint
     # can be slow to accept connections; the SDK default of 5s is too tight.
     _timeout = _httpx.Timeout(timeout=600.0, connect=30.0)
     _kwargs: dict = {"api_key": api_key, "base_url": base_url, "timeout": _timeout}
@@ -93,8 +90,7 @@ def _submit_foundry_batch(
         batch = client.batches.create(
             input_file_id=file_obj.id,
             endpoint="/chat/completions",
-            completion_window="24h",
-        )
+            completion_window="24h")
         logger.info(
             f"[judge-batch][foundry] {model}: submitted batch={batch.id} "
             f"with {len(requests_)} requests"
@@ -166,8 +162,7 @@ def _submit_bedrock_batch(
     model: str,
     requests_: List[JudgeRequest],
     max_output_tokens: int,
-    poll_interval: int,
-) -> Dict[str, str]:
+    poll_interval: int) -> Dict[str, str]:
     if len(requests_) < BEDROCK_BATCH_MIN_RECORDS:
         raise RuntimeError(
             f"Bedrock batch requires ≥{BEDROCK_BATCH_MIN_RECORDS} records "
@@ -178,8 +173,7 @@ def _submit_bedrock_batch(
     from src.evaluation.run_aws_eval import (
         _boto3, _model_region, _bucket_for_region, _s3_prefix,
         _resolve_bedrock_model_id, _build_bedrock_body, _extract_output,
-        _bedrock_role_arn, _upload_jsonl, _list_s3_keys, _download_s3_text,
-    )
+        _bedrock_role_arn, _upload_jsonl, _list_s3_keys, _download_s3_text)
 
     cfg = BEDROCK_MODELS[model]
     api_style = cfg["api_style"]
@@ -217,8 +211,7 @@ def _submit_bedrock_batch(
         roleArn=_bedrock_role_arn(),
         modelId=model_id,
         inputDataConfig={"s3InputDataConfig": {"s3Uri": input_uri}},
-        outputDataConfig={"s3OutputDataConfig": {"s3Uri": output_uri}},
-    )
+        outputDataConfig={"s3OutputDataConfig": {"s3Uri": output_uri}})
     job_arn = job_resp["jobArn"]
     logger.info(f"[judge-batch][bedrock] {model}: submitted job {job_arn}")
 
@@ -273,14 +266,13 @@ def _submit_bedrock_batch(
 
 
 # ---------------------------------------------------------------------------
-# Foundry sync (concurrent /chat/completions — fallback when batch is broken)
+# Foundry sync (concurrent /chat/completions, fallback when batch is broken)
 # ---------------------------------------------------------------------------
 def _submit_foundry_sync(
     model: str,
     requests_: List[JudgeRequest],
     max_output_tokens: int,
-    concurrency: int = 20,
-) -> Dict[str, str]:
+    concurrency: int = 20) -> Dict[str, str]:
     """Call /chat/completions synchronously for each request, with thread-pool
     concurrency. Avoids the /files batch upload endpoint entirely."""
     import httpx as _httpx
@@ -308,8 +300,7 @@ def _submit_foundry_sync(
             resp = client.responses.create(
                 model=deployment,
                 input=req.prompt,
-                max_output_tokens=max_output_tokens,
-            )
+                max_output_tokens=max_output_tokens)
             from src.evaluation.run_foundry_eval import _extract_output_text_from_responses_body, _to_dict
             text = _extract_output_text_from_responses_body(_to_dict(resp)) or ""
             if text:
@@ -321,8 +312,7 @@ def _submit_foundry_sync(
             resp = client.chat.completions.create(
                 model=deployment,
                 messages=[{"role": "user", "content": req.prompt}],
-                max_completion_tokens=max_output_tokens,
-            )
+                max_completion_tokens=max_output_tokens)
             text = resp.choices[0].message.content or ""
             return req.custom_id, text
         except Exception as exc:
@@ -352,8 +342,7 @@ def submit_judge_batch(
     requests_: List[JudgeRequest],
     max_output_tokens: int = 256,
     poll_interval: int = 30,
-    sync_concurrency: int = 0,
-) -> Dict[str, str]:
+    sync_concurrency: int = 0) -> Dict[str, str]:
     """Submit ``requests_`` to ``model`` as a single batch and return
     ``{custom_id: response_text}`` once the job completes.
 

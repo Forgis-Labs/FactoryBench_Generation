@@ -1,11 +1,11 @@
 """Generate publication-quality figures for the FactoryBench paper.
 
 Five figures:
-  1. fig_main_heatmap     — Model × Level chance-corrected accuracy
-  2. fig_difficulty_curve — Accuracy vs level per model (line plot)
-  3. fig_qtype_heatmap    — Model × question-type per level (2×2 grid)
-  4. fig_l4_score_dist    — L4 free-form score distribution {0, 0.5, 1} per model
-  5. fig_judge_agreement  — L4 pairwise judge agreement + score distributions
+  1. fig_main_heatmap, Model × Level chance-corrected accuracy
+  2. fig_difficulty_curve, Accuracy vs level per model (line plot)
+  3. fig_qtype_heatmap, Model × question-type per level (2×2 grid)
+  4. fig_l4_score_dist, L4 free-form score distribution {0, 0.5, 1} per model
+  5. fig_judge_agreement, L4 pairwise judge agreement + score distributions
 
 Usage::
 
@@ -32,8 +32,7 @@ STEEL    = "#878f92"
 GUNMETAL = "#122128"
 
 FORGIS_CMAP = mcolors.LinearSegmentedColormap.from_list(
-    "forgis", ["#FFFFFF", "#FFD6B8", TIGER, FLICKER, GUNMETAL],
-)
+    "forgis", ["#FFFFFF", "#FFD6B8", TIGER, FLICKER, GUNMETAL])
 
 MODEL_DISPLAY: Dict[str, str] = {
     "gpt-5_1-1":         "GPT-5.1",
@@ -242,8 +241,7 @@ def fig_difficulty_curve(df: pd.DataFrame, model_order: List[str], out_dir: path
             marker="o", linewidth=1.8, markersize=6,
             color=MODEL_LINE_COLORS.get(m_slug, STEEL),
             linestyle="-" if rank < 3 else "--",
-            label=name,
-        )
+            label=name)
 
     ax.axhline(0, color=STEEL, linestyle=":", linewidth=1.0, alpha=0.6, label="Random baseline")
     ax.set_xlabel("Benchmark Level")
@@ -291,8 +289,7 @@ def fig_qtype_heatmap(df: pd.DataFrame, model_order: List[str], out_dir: pathlib
             cbar=is_last,
             cbar_kws={"label": "Acc. (%)", "shrink": 0.8} if is_last else {},
             ax=ax, mask=np.isnan(matrix),
-            xticklabels=qtypes, yticklabels=mnames if lv == levels[0] else [],
-        )
+            xticklabels=qtypes, yticklabels=mnames if lv == levels[0] else [])
         ax.set_title(f"Level {lv}", fontweight="bold")
         ax.set_xticklabels(qtypes, rotation=35, ha="right")
 
@@ -319,7 +316,7 @@ def fig_l4_score_dist(df: pd.DataFrame, model_order: List[str], out_dir: pathlib
 
     score_vals = [0.0, 0.5, 1.0]
     colors     = [GUNMETAL, STEEL, TIGER]
-    labels     = ["0.0 — Wrong", "0.5 — Partial", "1.0 — Correct"]
+    labels     = ["0.0, Wrong", "0.5, Partial", "1.0, Correct"]
 
     fig, ax = plt.subplots(figsize=(8, max(3.5, len(mnames) * 0.75)))
     y    = np.arange(len(mnames))
@@ -348,8 +345,7 @@ def fig_l4_score_dist(df: pd.DataFrame, model_order: List[str], out_dir: pathlib
     n_total = len(sub) // max(1, len(mnames))
     ax.set_title(
         f"L4 Free-Form Score Distribution  (≈{n_total:,} items/model)",
-        fontweight="bold",
-    )
+        fontweight="bold")
     fig.tight_layout()
     _save(fig, out_dir / "fig_l4_score_dist.pdf")
 
@@ -400,8 +396,7 @@ def fig_judge_agreement(df: pd.DataFrame, out_dir: pathlib.Path) -> None:
         linewidths=1.5, linecolor="white",
         cbar_kws={"label": "Exact Agreement (%)", "shrink": 0.8},
         ax=ax, xticklabels=judge_names, yticklabels=judge_names,
-        mask=np.isnan(agree),
-    )
+        mask=np.isnan(agree))
     ax.set_title("Pairwise Judge Agreement", fontweight="bold")
 
     # Right: score distribution per judge (over items with a valid score for that judge)
@@ -426,8 +421,7 @@ def fig_judge_agreement(df: pd.DataFrame, out_dir: pathlib.Path) -> None:
             ax.text(
                 bar.get_x() + bar.get_width() / 2,
                 bar.get_height() + 0.6,
-                f"{v:.0f}%", ha="center", va="bottom", fontsize=8,
-            )
+                f"{v:.0f}%", ha="center", va="bottom", fontsize=8)
 
     xlabels = [f"{n}\n(n={ns[i]:,})" for i, n in enumerate(judge_names)]
     ax.set_xticks(x)

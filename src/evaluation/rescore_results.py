@@ -28,8 +28,7 @@ from typing import Any, Dict, Optional
 from src.evaluation.run_foundry_eval import (
     infer_answer_format,
     score_prediction,
-    build_question_index,
-)
+    build_question_index)
 from src.evaluation.test_gpt_5mini import load_json, save_json
 
 logger = logging.getLogger(__name__)
@@ -65,8 +64,7 @@ def rescore_reply(
     question_indices: Dict[int, Dict[str, Dict[str, Any]]],
     judge_model: str,
     dry_run: bool = False,
-    rerun_judge: bool = False,
-) -> Optional[Dict[str, Any]]:
+    rerun_judge: bool = False) -> Optional[Dict[str, Any]]:
     """Load reply, rescore, save back. Returns the updated record (or None)."""
     try:
         record = load_json(reply_path)
@@ -93,8 +91,7 @@ def rescore_reply(
     acceptance_bounds = q.get("acceptance_bounds")
     question_text = q.get("question") or ""
 
-    # Free-form scoring requires the judge LLM. By default we NEVER call it —
-    # only recompute if there's already a saved judge score, or the user
+    # Free-form scoring requires the judge LLM. By default we NEVER call it, # only recompute if there's already a saved judge score, or the user
     # explicitly passed --rerun-judge. Otherwise leave score as None.
     new_provenance: Optional[str] = None
     if new_format == "free_form":
@@ -105,15 +102,13 @@ def rescore_reply(
             new_provenance = "judge"
         elif rerun_judge:
             new_score, new_judge, new_provenance = score_prediction(
-                new_format, pred, gt, acceptance_bounds, question_text, judge_model,
-            )
+                new_format, pred, gt, acceptance_bounds, question_text, judge_model)
         else:
             new_score = None
             new_judge = None
     else:
         new_score, new_judge, new_provenance = score_prediction(
-            new_format, pred, gt, acceptance_bounds, question_text, judge_model,
-        )
+            new_format, pred, gt, acceptance_bounds, question_text, judge_model)
 
     record["answer_format"] = new_format
     record["question_type"] = str(q.get("template_type") or record.get("question_type") or "unknown")
@@ -146,8 +141,7 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     question_indices: Dict[int, Dict[str, Dict[str, Any]]] = {}
     for lvl_dir in sorted(args.questions_root.glob("level*")):
@@ -178,8 +172,7 @@ def main() -> None:
             reply_path, question_indices,
             judge_model=args.judge_model,
             dry_run=args.dry_run,
-            rerun_judge=args.rerun_judge,
-        )
+            rerun_judge=args.rerun_judge)
         if record is None:
             skipped += 1
             continue
@@ -193,7 +186,7 @@ def main() -> None:
     logger.info(f"Files updated: {updated} | unchanged: {unchanged} | skipped: {skipped}")
     logger.info(f"Inferred format distribution: {dict(sorted(format_counts.items()))}")
     if args.dry_run:
-        logger.info("(dry run — no files written)")
+        logger.info("(dry run, no files written)")
 
 
 if __name__ == "__main__":

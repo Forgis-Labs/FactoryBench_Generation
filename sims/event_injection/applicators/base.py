@@ -1,5 +1,5 @@
 """
-BaseApplicator — abstract base class for all event applicators.
+BaseApplicator, abstract base class for all event applicators.
 
 Subclass this to add new event types. Each applicator must implement:
   - sample_params(): randomly sample the event's variables
@@ -33,8 +33,7 @@ class BaseApplicator(ABC):
     def sample_params(
         self,
         event_def: dict,
-        rng: np.random.Generator,
-    ) -> Dict[str, Any]:
+        rng: np.random.Generator) -> Dict[str, Any]:
         """Sample concrete parameter values for one event instance.
 
         Parameters
@@ -43,7 +42,7 @@ class BaseApplicator(ABC):
             The raw event definition from events.json (includes
             ``variable_constraints``, ``variables``, etc.).
         rng : numpy.random.Generator
-            Seeded RNG — use this for all randomness.
+            Seeded RNG, use this for all randomness.
 
         Returns
         -------
@@ -66,7 +65,7 @@ class BaseApplicator(ABC):
     def on_step(self, params: Dict[str, Any], ctx: SimContext) -> None:
         """Called every sim step while the event is active.
 
-        This is where the actual injection happens — mutate
+        This is where the actual injection happens, mutate
         ``ctx.sensor_data``, apply USD changes, etc.
         """
         ...

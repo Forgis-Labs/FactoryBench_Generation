@@ -1,24 +1,42 @@
 % ============================================================
-% 8th Robot Learning Workshop: "Is Physical AI Going Zero-Shot?"
-% @ NeurIPS 2026 (Sydney).
-% Only file with prose specific to this workshop: abstract, introduction,
-% and the two connector sentences consumed by ../paper/_workshop_core.tex
-% (the method/results/limitations/conclusion shared with every other
-% workshop build). Everything else is \input from shared files below.
+% PER-VENUE WORKSHOP FILE: Robot Learning workshop.
 %
-% CFP constraints this build targets (robot-learning.ml/2026/submissions/,
-% checked 2026-08-10): up to 6 pages in NeurIPS format, non-archival,
-% OpenReview. The CFP states neither a references exemption nor a blind
-% policy; we target 6 pages excluding references (the NeurIPS convention)
-% and submit anonymized, which is safe under either review model.
-% The tighter limit is why the wrapper sets \workshopcompacttrue.
-% Only used by docs/robotlearning_tex/main_robotlearning.tex.
-% ============================================================
+% This file holds everything specific to this venue:
+%   - the title block, resource links and teaser figure
+%   - the abstract, reframed around zero-shot deployment of robot
+%     foundation models onto an unseen industrial machine
+%   - the introduction, framed for this workshop's theme
+%   - the two connector macros that _workshop_core.tex expands
+%
+% Everything after the introduction (related work, framework, generation,
+% evaluation, limitations, conclusion) comes from ../paper/_workshop_core.tex,
+% which every workshop build shares. Never copy body prose in here.
+%
+% COMPACT MODE: the wrapper for this venue says \workshopcompacttrue, which
+% drops the benchmark-comparison table, the levels-examples table and the
+% FactoryWave collage figure from the core body. Do not \ref those labels.
+%
+% CROSS-REFERENCES: a workshop build has NO APPENDIX, so nothing here may
+% \ref an app:* label. Where the extended paper points at an appendix, point
+% the reader at the released artefacts instead.
+%
 
-\input{../paper/_workshop_header}
+\maketitle
+
+\begin{center}\vspace{-2.4em}\small
+    \ifanon
+    {\faGithub}\ Code: \href{https://anonymous.4open.science/r/FactoryBench/README.md}{\nolinkurl{anonymous.4open.science/r/FactoryBench}} \\[0.15em]
+    \else
+    {\faGithub}\ Code: \href{https://github.com/Forgis-Labs/Factorybench}{\nolinkurl{github.com/Forgis-Labs/Factorybench}} \\[0.15em]
+    \fi
+    \raisebox{-0.25ex}{\includegraphics[height=1em]{figures/huggingface_logo.png}}\ Dataset: \href{https://huggingface.co/datasets/FactoryBench/FactoryBench}{\nolinkurl{huggingface.co/datasets/FactoryBench/FactoryBench}}
+\end{center}
+\vspace{-0.4em}
+\input{figures/figure_pipeline}
+\vspace{-1.5em}
 
 \begin{abstract}
-    Robot foundation models are increasingly deployed \textbf{zero-shot}: downloaded pretrained and pointed at a machine they were never trained on. We ask what such a model understands about a physical system it is seeing for the first time, and introduce \textbf{FactoryBench}, a zero-shot benchmark over dense industrial robot telemetry. Q\&A pairs span four levels (state estimation, intervention, counterfactual reasoning, and engineering decision-making) and five answer formats, four scored deterministically and free-form answers by an LLM-as-judge protocol. We release \textbf{FactoryWave} (a dense multitask sensor dataset from a UR3 cobot and a KUKA KR10 industrial arm) and build FactoryBench as over 70k items grounded in roughly 15k episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2023vorausad}. Across six frontier models, none exceeds 50\% (chance-corrected) on the structured levels, two fail to beat a linear-regression baseline on state estimation, and the ranking reshuffles entirely on decision-making, with the leader on the first three levels falling to the bottom of the fourth. A human expert reaches 0.96--0.98 on the same items, so the headroom is real rather than an artifact of unanswerable questions. Zero-shot transfer to an unseen industrial machine is not yet reliable enough to act on.
+    Robot foundation models are increasingly deployed zero-shot: downloaded pretrained and pointed at a machine they were never trained on. We ask what such a model understands about a physical system it is seeing for the first time, and introduce \textbf{FactoryBench}, a zero-shot benchmark over dense industrial robot telemetry. Q\&A pairs span four levels (state estimation, intervention, counterfactual reasoning, and engineering decision-making) and five answer formats, four scored deterministically and free-form answers by an LLM-as-judge protocol. We release \textbf{FactoryWave} (a dense multitask sensor dataset from a UR3 cobot and a KUKA KR10 industrial arm) and build FactoryBench as over 70k items grounded in roughly 15k episodes from FactoryWave, AURSAD~\cite{leporowski2022aursad}, and voraus-AD~\cite{brockmann2023vorausad}. Across six frontier models, none exceeds 50\% (chance-corrected) on the structured levels, two fail to beat a linear-regression baseline on state estimation, and the ranking reshuffles entirely on decision-making, with the leader on the first three levels falling to the bottom of the fourth. A human expert reaches 0.96--0.98 on the same items, so the headroom is real rather than an artifact of unanswerable questions. Zero-shot transfer to an unseen industrial machine is not yet reliable enough to act on.
 \end{abstract}
 
 \section{Introduction}
@@ -27,14 +45,28 @@ The premise of zero-shot Physical AI is that a pretrained model can be pointed a
 
 Zero-shot competence on a physical system is not one capability but several: reading operational state from raw multivariate signals, predicting what an intervention does to that state, reasoning counterfactually about histories that did not occur, and turning all of it into an action an operator could execute. These come apart, since a system can track a signal well and still have no idea what to do about it, and existing evaluations do not separate them. General benchmarks such as MMLU, BIG-bench, and MMMU \cite{hendrycks2021mmlu,srivastava2023bigbench,yue2024mmmu} probe textual or multimodal understanding rather than machine behavior, and time-series Q\&A benchmarks are typically synthetic or univariate and omit counterfactuals. Neither specialized time-series models \cite{zhou2021informer,su2019omni,audibert2020usad}, which generalize poorly off-task \cite{chalapathy2019survey,lavin2015numenta,zeng2023transformers}, nor LLMs on dense numerical series \cite{gruver2023llmtime,jin2024timellm}, have been evaluated on the full set.
 
-\input{../paper/_workshop_motivation}
+Evaluating on telemetry alone matches where industry is heading. Plants increasingly run lights-out to cut labour and energy costs: FANUC has operated a lights-out robot factory since 2001, running unsupervised for up to 30 days with lighting and HVAC reduced or eliminated~\cite{imts2026lightsout},
+and Xiaomi's Changping facility builds on the order of 10 million smartphones a year the same way~\cite{metrologynews2024darkfactory}.
+The human who would have caught a fault by sight or sound is off the floor, and where cameras are deployed it is overwhelmingly for product inspection rather than machine health~\cite{metrologynews2024darkfactory},
+which lives in quantities no camera observes: joint torque, motor current, tracking error, controller mode. Controller telemetry is emitted by default by every industrial machine and is the one modality guaranteed across a heterogeneous plant.
 
-Testing language models is also an increasingly good proxy for testing robot policies: current vision-language-action models are largely built by post-training a pretrained LLM or VLM backbone rather than training a controller from scratch (RT-2~\cite{brohan2023rt2}, OpenVLA~\cite{kim2024openvla}, $\pi_0$~\cite{black2024pi0}), so the reasoning limits we measure here bound what the resulting VLA can do on an unfamiliar platform, and are cheaper to measure than full policy rollouts.
+We evaluate LLMs and LLM-driven agents rather than specialised classifiers because in an unattended plant the artefact that matters is the justification, not the label. A classifier emits a fault class with no account of which signals produced it; a language model emits a trace from signal to root cause to procedure, checkable against the telemetry and the vendor manual, and rejectable when the reasoning is unsound even if the label is right. Downtime sets the stakes: unplanned downtime costs Fortune Global 500 industrial organizations almost \$1.5 trillion a year, 11\% of turnover, and an idle automotive line runs past \$2 million an hour~\cite{senseye2023downtime}.
 
-We propose FactoryBench to measure exactly this, evaluating every model strictly zero-shot: no finetuning, no in-context examples from the target platform, no exposure to the robot under test. It is grounded in \textbf{FactoryWave}, a dense multivariate dataset from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. To our knowledge it is the first extensive anomaly dataset to (partly) cover an industrial robot, which poses the cross-embodiment question directly: the cheap-to-instrument cobot and the production-grade industrial arm appear under the same schema. A framework of 21 structured templates, parameterized over generic primitives rather than hard-coded to a machine, instantiates over FactoryWave (and AURSAD / voraus-AD) to yield the full corpus, and extends to a new platform by populating its signal mapping.
+Testing language models is also an increasingly good proxy for testing robot policies: current vision-language-action models are largely built by post-training a pretrained LLM or VLM backbone rather than training a controller from scratch (RT-2~\cite{brohan2023rt2},
+OpenVLA~\cite{kim2024openvla},
+$\pi_0$~\cite{black2024pi0}),
+so the reasoning limits we measure here bound what the resulting VLA can do on an unfamiliar platform, and are cheaper to measure than full policy rollouts.
 
-\newcommand{\workshoprelatedworknote}{Generalist robot policies and robot foundation models are typically evaluated on task success under visuomotor control; FactoryBench is complementary, holding the platform fixed and asking what a model understands about a machine it has never seen, from the controller and sensor signals that any deployed system already emits, which is the modality available in industrial settings where cameras and teleoperation demonstrations are not.}
+We propose FactoryBench to measure exactly this, evaluating every model strictly zero-shot: no finetuning, no in-context examples from the target platform, no exposure to the robot under test. It is grounded in FactoryWave, a dense multivariate dataset from collaborative and industrial one-arm platforms (UR3 at 125\,Hz, KUKA KR10 at 83\,Hz) with synchronized setpoint, context, feedback, and effort signals. To our knowledge it is the first extensive anomaly dataset to (partly) cover an industrial robot, which poses the cross-embodiment question directly: the cheap-to-instrument cobot and the production-grade industrial arm appear under the same schema. A framework of 21 structured templates, parameterized over generic primitives rather than hard-coded to a machine, instantiates over FactoryWave (and AURSAD / voraus-AD) to yield the full corpus, and extends to a new platform by populating its signal mapping.
 
-\newcommand{\workshopclosingnote}{Zero-shot deployment onto unseen hardware is not yet reliable: models transfer some competence to a machine they have never seen, but not enough for an operator to act on it, at the level that matters most.}
-
-\input{../paper/_workshop_core}
+% ------------------------------------------------------------
+% CONNECTORS. _workshop_core.tex expands these two macros at the end of its
+% Related Work and its Conclusion. One sentence each, tying FactoryBench to
+% this workshop's theme. Keep them short: the core body carries the argument.
+% ------------------------------------------------------------
+\renewcommand{\workshoprelatedworknote}{%
+    Generalist robot policies and robot foundation models are typically evaluated on task success under visuomotor control; FactoryBench is complementary, holding the platform fixed and asking what a model understands about a machine it has never seen, from the controller and sensor signals that any deployed system already emits, which is the modality available in industrial settings where cameras and teleoperation demonstrations are not.%
+}
+\renewcommand{\workshopclosingnote}{%
+    Zero-shot deployment onto unseen hardware is not yet reliable: models transfer some competence to a machine they have never seen, but not enough for an operator to act on it, at the level that matters most.%
+}

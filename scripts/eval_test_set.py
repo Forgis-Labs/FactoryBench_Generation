@@ -19,8 +19,7 @@ Pipeline:
      ``_summary.json`` per (level, model).
 
 Logging:
-  * Orchestrator prints clean timestamped status lines to ``<out>/run.log`` —
-    just phase transitions, per-cell start/end, errors. **Tail this for an
+  * Orchestrator prints clean timestamped status lines to ``<out>/run.log``, just phase transitions, per-cell start/end, errors. **Tail this for an
     at-a-glance view of the whole job.**
   * Each (level, model) subprocess's verbose output (HTTP traffic, batch
     polling, TQDM bars) goes to ``<out>/logs/level<N>_<model_slug>.err.log``
@@ -156,8 +155,7 @@ def _eval_one(
     poll_interval: int,
     chunk_size: int,
     sync_threshold: int,
-    sync_concurrency: int = 1,
-) -> Dict[str, Any]:
+    sync_concurrency: int = 1) -> Dict[str, Any]:
     """Run one (level, model) cell, broken into chunks of size ``chunk_size``.
 
     The eval module's ``--batch-number`` / ``--batch-size`` slice the prompt
@@ -182,8 +180,7 @@ def _eval_one(
     cell_log.write_text(
         f"# {datetime.now().isoformat()}  cell L{level} {model}: "
         f"{n_items} items, {n_chunks} chunk(s) of up to {chunk_size}\n",
-        encoding="utf-8",
-    )
+        encoding="utf-8")
     _status(
         f"  ▶ L{level} {model}: {n_items} items in {n_chunks} chunk(s) "
         f"({eval_module.split('.')[-1]})  log={cell_log.name}"
@@ -290,7 +287,7 @@ def _eval_one(
         _status(
             f"  ✗ L{level} {model}: {cell_n_errors}/{n_chunks} chunks failed | "
             f"ok={agg['completed']} fail={agg['failed']} skip={agg['skipped']} "
-            f"time={cell_dt:.0f}s — see {cell_log}"
+            f"time={cell_dt:.0f}s, see {cell_log}"
         )
     else:
         _status(
@@ -341,8 +338,7 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     unknown = [m for m in args.models if m not in MODEL_NAMES]
     if unknown:
@@ -434,8 +430,7 @@ def main() -> None:
                 poll_interval=args.poll_interval,
                 chunk_size=args.chunk_size,
                 sync_threshold=args.sync_threshold,
-                sync_concurrency=args.sync_concurrency,
-            ))
+                sync_concurrency=args.sync_concurrency))
             done_count += 1
             _status(f"     progress: {done_count}/{total} cells done")
     else:
@@ -453,8 +448,7 @@ def main() -> None:
                     max_output_tokens=args.max_output_tokens,
                     poll_interval=args.poll_interval,
                     chunk_size=args.chunk_size,
-                    sync_threshold=args.sync_threshold,
-                ): (lvl, model)
+                    sync_threshold=args.sync_threshold): (lvl, model)
                 for (lvl, model, replies_dir) in tasks
             }
             for fut in as_completed(futures):

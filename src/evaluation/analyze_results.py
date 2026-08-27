@@ -1,8 +1,8 @@
 """Analyze FactoryBench evaluation results and generate publication-quality figures.
 
 Generates:
-  1. Per-model bar charts — accuracy by answer format
-  2. Multi-model comparison heatmap — models (rows) x answer formats (columns)
+  1. Per-model bar charts, accuracy by answer format
+  2. Multi-model comparison heatmap, models (rows) x answer formats (columns)
 
 Style: NeurIPS paper format with Forgis brand colours.
 """
@@ -34,8 +34,7 @@ FORMAT_PALETTE = [TIGER, FIRE, FLICKER, STEEL, GUNMETAL, PANEL]
 
 # Custom colour-map for heatmaps: white → orange → dark
 FORGIS_CMAP = mcolors.LinearSegmentedColormap.from_list(
-    "forgis", ["#FFFFFF", "#FFD6B8", TIGER, FLICKER, GUNMETAL],
-)
+    "forgis", ["#FFFFFF", "#FFD6B8", TIGER, FLICKER, GUNMETAL])
 
 # ── Human-readable labels & canonical ordering ────────────────────────
 FORMAT_LABELS = {
@@ -144,8 +143,7 @@ def aggregate(
     results: List[Dict[str, Any]],
     question_map: Dict[str, str],
     payload_map: Dict[str, Dict[str, Any]] | None = None,
-    apply_chance_correct: bool = False,
-) -> Dict[str, Dict[str, List[float]]]:
+    apply_chance_correct: bool = False) -> Dict[str, Dict[str, List[float]]]:
     """Return model -> format_label -> [scores].
 
     When ``apply_chance_correct`` is True, raw scores are mapped through
@@ -187,8 +185,7 @@ def _ordered_formats(format_scores: Dict[str, List[float]]) -> List[str]:
 def plot_bar_chart(
     model: str,
     format_scores: Dict[str, List[float]],
-    figures_dir: Path,
-) -> None:
+    figures_dir: Path) -> None:
     formats = _ordered_formats(format_scores)
     if not formats:
         return
@@ -201,8 +198,7 @@ def plot_bar_chart(
     fig, ax = plt.subplots(figsize=(max(5, len(formats) * 1.4), 4))
     bars = ax.bar(
         range(len(formats)), accs,
-        color=colors, width=0.65, edgecolor="white", linewidth=0.5,
-    )
+        color=colors, width=0.65, edgecolor="white", linewidth=0.5)
 
     for bar, acc in zip(bars, accs):
         ax.text(
@@ -210,8 +206,7 @@ def plot_bar_chart(
             bar.get_height() + 1.5,
             f"{acc:.1f}%",
             ha="center", va="bottom",
-            fontsize=9, fontweight="bold", color=GUNMETAL,
-        )
+            fontsize=9, fontweight="bold", color=GUNMETAL)
 
     ax.set_xticks(range(len(formats)))
     ax.set_xticklabels(labels)
@@ -228,8 +223,7 @@ def plot_bar_chart(
         0.98, 0.95,
         f"Overall: {overall:.1f}%  (N={len(all_scores)})",
         transform=ax.transAxes, ha="right", va="top",
-        fontsize=9, color=STEEL, style="italic",
-    )
+        fontsize=9, color=STEEL, style="italic")
 
     fig.tight_layout()
     safe = model.replace("/", "_").replace(":", "_")
@@ -242,8 +236,7 @@ def plot_bar_chart(
 # ── Figure 2: multi-model comparison heatmap ──────────────────────────
 def plot_comparison_heatmap(
     agg: Dict[str, Dict[str, List[float]]],
-    figures_dir: Path,
-) -> None:
+    figures_dir: Path) -> None:
     if not agg:
         return
 
@@ -270,8 +263,7 @@ def plot_comparison_heatmap(
         col_labels.append(f"{fmt}\n(N={total})")
 
     fig, ax = plt.subplots(
-        figsize=(max(6, len(formats) * 1.8), max(3, len(models) * 1.2 + 1)),
-    )
+        figsize=(max(6, len(formats) * 1.8), max(3, len(models) * 1.2 + 1)))
 
     sns.heatmap(
         matrix,
@@ -282,15 +274,13 @@ def plot_comparison_heatmap(
         linewidths=1.5, linecolor="white",
         cbar_kws={"label": "Accuracy (%)", "shrink": 0.8},
         ax=ax,
-        mask=np.isnan(matrix),
-    )
+        mask=np.isnan(matrix))
 
     ax.set_yticklabels(models, rotation=0, fontweight="bold")
     ax.set_xticklabels(col_labels, rotation=45, ha="right")
     ax.set_title(
         "Model Comparison \u2014 Accuracy by Answer Format",
-        fontweight="bold", pad=14,
-    )
+        fontweight="bold", pad=14)
 
     fig.tight_layout()
     out = figures_dir / f"heatmap_comparison_{model}.png"
@@ -302,8 +292,7 @@ def plot_comparison_heatmap(
 # ── Entry point ───────────────────────────────────────────────────────
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Analyze FactoryBench results and generate figures.",
-    )
+        description="Analyze FactoryBench results and generate figures.")
     parser.add_argument("--input", type=Path, required=True, help="Directory with LLM reply JSONs")
     parser.add_argument("--questions", type=Path, default=None, help="Question JSONs (fallback for format lookup)")
     parser.add_argument("--figures-dir", type=Path, required=True, help="Output directory for figures")

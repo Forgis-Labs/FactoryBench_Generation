@@ -125,8 +125,7 @@ def resolve_api_key(cli_api_key: Optional[str]) -> str:
 
 def create_client_and_model(
     cli_api_key: Optional[str],
-    cli_model: Optional[str],
-) -> tuple[Any, str, str]:
+    cli_model: Optional[str]) -> tuple[Any, str, str]:
     """
     Returns (client, model, provider), where provider is 'openai' or 'azure'.
     """
@@ -146,8 +145,7 @@ def create_client_and_model(
         client = AzureOpenAI(
             api_key=key,
             api_version=azure_api_version,
-            azure_endpoint=azure_endpoint,
-        )
+            azure_endpoint=azure_endpoint)
         model = cli_model or azure_model or "gpt-5.1"
         return client, model, "azure"
 
@@ -188,8 +186,7 @@ def load_prompt_entries(
     input_dir: Path,
     total_prompts: Optional[int] = None,
     batch_number: int = 0,
-    batch_size: int = 1000,
-) -> list[Tuple[Path, str, int, str]]:
+    batch_size: int = 1000) -> list[Tuple[Path, str, int, str]]:
     """
     Load pre-generated prompts and return selected slice entries.
 
@@ -295,8 +292,7 @@ def llm_judge_score(
     question: str,
     prediction: str,
     reference: str,
-    max_tokens: int = 256,
-) -> tuple[float, str]:
+    max_tokens: int = 256) -> tuple[float, str]:
     """
     Ask the LLM to score `prediction` against `reference` for the given `question`.
     Returns (normalised_score 0.0–1.0, justification_string).
@@ -314,8 +310,7 @@ def llm_judge_score(
                 model=model,
                 input=[{"role": "system", "content": JUDGE_SYSTEM_PROMPT},
                        {"role": "user",   "content": user_msg}],
-                max_output_tokens=max_tokens,
-            )
+                max_output_tokens=max_tokens)
             raw = _extract_output_text_from_responses_body(_to_dict(response))
         except Exception:
             # Fallback to Chat Completions
@@ -325,8 +320,7 @@ def llm_judge_score(
                     {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
                     {"role": "user",   "content": user_msg},
                 ],
-                max_tokens=max_tokens,
-            )
+                max_tokens=max_tokens)
             raw = _to_dict(response).get("choices", [{}])[0].get("message", {}).get("content", "")
 
         # Parse the JSON response from the judge
@@ -399,7 +393,7 @@ def _estimate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) 
         ("mistral-medium",    0.40,   2.00),
         ("mistral-small",     0.20,   0.60),
         # Qwen. The 235B moved from a self-hosted Together endpoint to Vertex
-        # Model Garden MaaS, which bills per token — the old blanket ("qwen",
+        # Model Garden MaaS, which bills per token, the old blanket ("qwen",
         # 0, 0) rule silently reported $0 for every 235B call after that
         # migration. These are order-of-magnitude MaaS rates and are NOT
         # vendor-confirmed; check the Vertex pricing page before quoting them
@@ -422,8 +416,7 @@ def _estimate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) 
     # cost-limit guard still trips at a sensible spend.
     logger.warning(
         "_estimate_cost: unknown model %r, using fallback rate $5/$15 per 1M tokens",
-        model_name,
-    )
+        model_name)
     return (prompt_tokens / 1_000_000) * 5.0 + (completion_tokens / 1_000_000) * 15.0
 
 
@@ -436,8 +429,7 @@ def run_direct_requests(
     overwrite: bool,
     ground_truth_index: Dict[str, Any],
     eval_level: str,
-    cost_limit: float = 40.0,
-) -> tuple[int, int, int]:
+    cost_limit: float = 40.0) -> tuple[int, int, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     completed = 0
@@ -483,8 +475,7 @@ def run_direct_requests(
                 response = client.responses.create(
                     model=model,
                     input=prompt_text,
-                    max_output_tokens=max_output_tokens,
-                )
+                    max_output_tokens=max_output_tokens)
                 body = _to_dict(response)
                 answer = _extract_output_text_from_responses_body(body)
             except Exception as e:
@@ -492,8 +483,7 @@ def run_direct_requests(
                     response = client.chat.completions.create(
                         model=model,
                         messages=[{"role": "user", "content": prompt_text}],
-                        max_tokens=max_output_tokens,
-                    )
+                        max_tokens=max_output_tokens)
                     body = _to_dict(response)
                     answer = body.get("choices", [{}])[0].get("message", {}).get("content", "")
                 else:
@@ -526,8 +516,7 @@ def run_direct_requests(
                         model=model,
                         question=question_text,
                         prediction=str(pred) if pred is not None else "",
-                        reference=ref_answer,
-                    )
+                        reference=ref_answer)
                     score = judge_score
                     llm_judge_result = (judge_score, judge_reason)
                 elif answer_format in ("numerical", "tensor"):
@@ -734,8 +723,7 @@ def run_direct_requests(
                         trace.log_feedback_score(
                             name="accuracy",
                             value=float(score),
-                            reason=accuracy_reason,
-                        )
+                            reason=accuracy_reason)
 
                         # LLM-as-a-judge score
                         if llm_judge_result is not None:
@@ -743,8 +731,7 @@ def run_direct_requests(
                             trace.log_feedback_score(
                                 name="llm_judge",
                                 value=judge_value,
-                                reason=judge_reason or accuracy_reason,
-                            )
+                                reason=judge_reason or accuracy_reason)
 
             except Exception as e:
                 logger.warning(f"Opik logging failed: {e}")
@@ -796,21 +783,18 @@ def main() -> None:
         "--input",
         type=Path,
         default=Path("output/prompts/level3"),
-        help="Directory containing pre-generated prompt JSON files",
-    )
+        help="Directory containing pre-generated prompt JSON files")
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("output/replies/level3"),
-        help="Directory to save answer outputs",
-    )
+        help="Directory to save answer outputs")
     parser.add_argument("--api-key", type=str, default=None, help="OpenAI API key (overrides .env)")
     parser.add_argument(
         "--env-file",
         type=Path,
         default=Path(".env"),
-        help="Path to .env file (default: ./.env)",
-    )
+        help="Path to .env file (default: ./.env)")
     parser.add_argument("--model", type=str, default=None, help="Model name (default from env or gpt-5.1)")
     parser.add_argument("--max-output-tokens", type=int, default=2000, help="Max output tokens")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing result files")
@@ -818,45 +802,38 @@ def main() -> None:
         "--total-prompts",
         type=int,
         default=None,
-        help="Total number of prompts to process across batches",
-    )
+        help="Total number of prompts to process across batches")
     parser.add_argument(
         "--batch-number",
         type=int,
         default=0,
-        help="Which batch slice to process (0-indexed)",
-    )
+        help="Which batch slice to process (0-indexed)")
     parser.add_argument(
         "--batch-size",
         type=int,
         default=1000,
-        help="How many prompts per batch slice",
-    )
+        help="How many prompts per batch slice")
     parser.add_argument(
         "--questions",
         type=Path,
         default=None,
-        help="Directory containing Q&A pair JSON files (for ground truth lookup)",
-    )
+        help="Directory containing Q&A pair JSON files (for ground truth lookup)")
     parser.add_argument(
         "--eval-level",
         type=str,
         default=None,
-        help="Evaluation level tag for Opik (e.g. level_1)",
-    )
+        help="Evaluation level tag for Opik (e.g. level_1)")
     parser.add_argument(
         "--cost-limit",
         type=float,
         default=20.0,
-        help="Maximum USD spend per run (default: $20.00). Stops after the limit is reached.",
-    )
+        help="Maximum USD spend per run (default: $20.00). Stops after the limit is reached.")
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     load_dotenv_file(args.env_file)
     client, model, provider = create_client_and_model(args.api_key, args.model)
@@ -872,8 +849,7 @@ def main() -> None:
         input_dir=args.input,
         total_prompts=args.total_prompts,
         batch_number=args.batch_number,
-        batch_size=args.batch_size,
-    )
+        batch_size=args.batch_size)
 
     if not entries:
         logger.error("No requests to process")
@@ -893,8 +869,7 @@ def main() -> None:
         overwrite=args.overwrite,
         ground_truth_index=ground_truth_index,
         eval_level=args.eval_level,
-        cost_limit=args.cost_limit,
-    )
+        cost_limit=args.cost_limit)
     logger.info(
         f"Done. Completed={completed}, Failed={failed}, Skipped={skipped}, OutputDir={args.output_dir}"
     )

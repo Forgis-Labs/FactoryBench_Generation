@@ -1,10 +1,10 @@
 """Launch FactoryBench evaluation on SageMaker for all 4 pretrained Shrike
-checkpoints — in baseline mode (no FactoryBench adapter) or in finetuned mode
+checkpoints, in baseline mode (no FactoryBench adapter) or in finetuned mode
 (stacking the DoRA trained by launch_dora_sweep.py).
 
 Workflow:
 
-    # 1. Baseline eval — pretrained Shrike/Bearing checkpoints, no FactoryBench finetune
+    # 1. Baseline eval, pretrained Shrike/Bearing checkpoints, no FactoryBench finetune
     python finetuning/launch_eval_sweep.py --mode baseline
 
     # 2. Launch finetuning (separate command)
@@ -33,11 +33,10 @@ from sagemaker.pytorch import PyTorch
 from launch_dora_sweep import (  # type: ignore[import-not-found]
     BUCKET, REGION, ROLE, S3_PREFIX,
     S3_LLM, S3_FACTORYBENCH_DATA,
-    SRC_DIR, CHECKPOINTS,
-)
+    SRC_DIR, CHECKPOINTS)
 
 
-# Inference only — one A10G GPU (24 GB) is plenty for both Qwen sizes at batch=1.
+# Inference only, one A10G GPU (24 GB) is plenty for both Qwen sizes at batch=1.
 # We deliberately use the same instance type for both so a single g5.2xlarge
 # spot quota slot covers every eval job (only one runs at a time anyway in
 # the pipeline orchestrator). If you raise quota on g5.xlarge separately,
@@ -86,13 +85,12 @@ def build_estimator(name: str, cfg: dict, mode: str, args: argparse.Namespace,
 
     Returns (estimator, data_channels, eval_job_name). The job name includes
     a timestamp suffix so re-running the launcher never collides with prior
-    submissions — SageMaker permanently reserves names once used.
+    submissions, SageMaker permanently reserves names once used.
 
     If cfg['job_name'] already ends with a -YYYYMMDD-HHMMSS timestamp
     (e.g. when called from run_pipeline.py which timestamps the training
     job name and reuses it for the eval cfg so the adapter URI matches),
-    we strip and reuse that timestamp instead of stacking a second one —
-    otherwise the final eval_job_name blows past SageMaker's 63-char limit.
+    we strip and reuse that timestamp instead of stacking a second one, otherwise the final eval_job_name blows past SageMaker's 63-char limit.
     """
     job_suffix = "baseline" if mode == "baseline" else "finetuned"
     m = _TIMESTAMP_RE.search(cfg["job_name"])
@@ -205,8 +203,7 @@ def build_estimator(name: str, cfg: dict, mode: str, args: argparse.Namespace,
             {"Key": "Sweep",   "Value": f"eval-{mode}"},
             {"Key": "Base",    "Value": name},
         ],
-        **spot_kwargs,
-    )
+        **spot_kwargs)
     return estimator, data_channels, eval_job_name
 
 
@@ -246,7 +243,7 @@ def main() -> None:
                          f"Valid: {list(CHECKPOINTS)}")
 
     print("=" * 72)
-    print(f"FactoryBench Eval — mode={args.mode}, {len(keys)} job(s)")
+    print(f"FactoryBench Eval, mode={args.mode}, {len(keys)} job(s)")
     print(f"Spot:        {args.spot}, wait={args.wait}")
     print(f"Levels:      {args.levels}  Split: {args.split}")
     print(f"Gen budget:  max_input={args.max_input_length}, "
@@ -264,7 +261,7 @@ def main() -> None:
             prefix = uri.split("/", 3)[3]
             resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=5)
             n = resp.get("KeyCount", 0)
-            status = f"{n} object(s)" if n else "EMPTY — adapter not yet synced"
+            status = f"{n} object(s)" if n else "EMPTY, adapter not yet synced"
             print(f"  adapter@{key}: {uri}  [{status}]")
         print()
 
@@ -277,8 +274,7 @@ def main() -> None:
         cfg = CHECKPOINTS[key]
         print(f"\n--- {key}  (mode={args.mode}) ---")
         estimator, channels, eval_job_name = build_estimator(
-            key, cfg, args.mode, args, sess,
-        )
+            key, cfg, args.mode, args, sess)
         print(f"  job_name:   {eval_job_name}")
         print(f"  instance:   {estimator.instance_type}")
         for ch, uri in channels.items():
@@ -293,8 +289,7 @@ def main() -> None:
             print(f"  -> launched: {estimator.latest_training_job.name}")
         except Exception as e:
             # Most common: ResourceLimitExceeded (per-instance-type quota cap).
-            # Don't let one quota-blocked job stop the rest of the sweep —
-            # other checkpoints may use a different instance type that does
+            # Don't let one quota-blocked job stop the rest of the sweep, # other checkpoints may use a different instance type that does
             # have headroom, and the user can retry the failed ones later
             # with --only after a quota increase or after another job ends.
             reason = type(e).__name__ + ": " + str(e).split("\n", 1)[0]

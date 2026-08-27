@@ -26,7 +26,7 @@ import numpy as np
 from isaacsim import SimulationApp
 
 # ---------------------------------------------------------------------------
-# CLI — only parse when run directly (not when imported)
+# CLI, only parse when run directly (not when imported)
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -56,7 +56,7 @@ if __name__ == "__main__":
         "headless": _args.headless,
     })
 else:
-    # Imported as a module — provide dummy _args so constants can be loaded
+    # Imported as a module, provide dummy _args so constants can be loaded
     class _args:
         headless = True
         seed = 0
@@ -66,7 +66,7 @@ else:
         event_i = None
 
 # ---------------------------------------------------------------------------
-# Deferred imports — these require SimulationApp to exist.
+# Deferred imports, these require SimulationApp to exist.
 # When imported, the caller must have created SimulationApp first.
 # ---------------------------------------------------------------------------
 
@@ -128,7 +128,7 @@ PERCEPTION_NOISE_XY_STD = float(CFG["noise"]["perception_xy_std"])
 PERCEPTION_NOISE_Z_STD  = float(CFG["noise"]["perception_z_std"])
 JOINT_NOISE_STD         = float(CFG["noise"]["joint_std"])
 
-GRASP_XY_THRESHOLD = 0.12  # 120mm — max XY error for grasp attempt
+GRASP_XY_THRESHOLD = 0.12  # 120mm, max XY error for grasp attempt
 LOG_DIR = str(_TASK_DIR / CFG["logging"]["log_dir"])
 
 TABLE_HEIGHT = 0.10
@@ -145,7 +145,7 @@ CONVEYOR_TOP_Z = CONVEYOR_NOMINAL[2] + 0.02
 
 # Gripper finger_joint base close angle (degrees).
 # Actual close target is increased linearly with cube mass to maintain
-# grip force — heavier objects get a larger overshoot past contact.
+# grip force, heavier objects get a larger overshoot past contact.
 GRIPPER_CLOSE_DEG_BASE = 56.0
 GRIPPER_CLOSE_DEG_MAX  = 68.0   # for heaviest cubes
 
@@ -207,8 +207,7 @@ def _apply_physics_material(stage, prim_path, static_friction, dynamic_friction,
         UsdShade.MaterialBindingAPI(prim).Bind(
             UsdShade.Material(mat_prim),
             UsdShade.Tokens.weakerThanDescendants,
-            "physics",
-        )
+            "physics")
 
     # Apply UsdPhysics.MaterialAPI and PhysxSchema.PhysxMaterialAPI
     if not mat_prim.HasAPI(UsdPhysics.MaterialAPI):
@@ -220,7 +219,7 @@ def _apply_physics_material(stage, prim_path, static_friction, dynamic_friction,
     phys_mat.CreateDynamicFrictionAttr().Set(dynamic_friction)
     phys_mat.CreateRestitutionAttr().Set(restitution)
 
-    # Set PhysX friction combine mode to "max" — the higher friction
+    # Set PhysX friction combine mode to "max", the higher friction
     # of the two contacting surfaces is used.  Without this, PhysX
     # defaults to "average", which halves friction when one surface
     # has no material (friction=0).
@@ -268,7 +267,7 @@ def randomize_cube_physics(cube, rng):
 
 
 # ---------------------------------------------------------------------------
-# HUD overlay — on-screen display of cube mass & friction
+# HUD overlay, on-screen display of cube mass & friction
 # ---------------------------------------------------------------------------
 _hud_window = None
 _hud_mass_label = None
@@ -278,7 +277,7 @@ _hud_friction_label = None
 def setup_hud():
     """Create a small floating window showing cube mass & friction.
 
-    Uses explicit screen position (top-left) — NOT docked into Viewport,
+    Uses explicit screen position (top-left), NOT docked into Viewport,
     which can silently fail in headless-first configurations.
     The window reference is kept in a global to prevent garbage collection.
     """
@@ -293,18 +292,15 @@ def setup_hud():
             flags=(ui.WINDOW_FLAGS_NO_RESIZE
                    | ui.WINDOW_FLAGS_NO_SCROLLBAR
                    | ui.WINDOW_FLAGS_NO_COLLAPSE
-                   | ui.WINDOW_FLAGS_NO_MOVE),
-        )
+                   | ui.WINDOW_FLAGS_NO_MOVE))
         with _hud_window.frame:
             with ui.VStack(spacing=4, height=0):
                 _hud_mass_label = ui.Label(
                     "mass: -- kg",
-                    style={"font_size": 22, "color": 0xFFFFFFFF},
-                )
+                    style={"font_size": 22, "color": 0xFFFFFFFF})
                 _hud_friction_label = ui.Label(
                     "friction: --",
-                    style={"font_size": 22, "color": 0xFFFFFFFF},
-                )
+                    style={"font_size": 22, "color": 0xFFFFFFFF})
         print("[HUD] Cube info overlay created")
     except Exception as e:
         print(f"[HUD] Could not create overlay: {e}")
@@ -341,25 +337,21 @@ def setup_event_indicator():
                    | ui.WINDOW_FLAGS_NO_SCROLLBAR
                    | ui.WINDOW_FLAGS_NO_COLLAPSE
                    | ui.WINDOW_FLAGS_NO_MOVE
-                   | ui.WINDOW_FLAGS_NO_TITLE_BAR),
-        )
+                   | ui.WINDOW_FLAGS_NO_TITLE_BAR))
         with _evt_window.frame:
             with ui.ZStack(height=0):
                 _evt_rect = ui.Rectangle(
                     style={"background_color": 0xFF333333,
-                           "border_radius": 4},
-                )
+                           "border_radius": 4})
                 with ui.VStack(spacing=2):
                     _evt_label = ui.Label(
                         "  No active event",
                         style={"font_size": 18, "color": 0xFF888888},
-                        alignment=ui.Alignment.LEFT_CENTER,
-                    )
+                        alignment=ui.Alignment.LEFT_CENTER)
                     _evt_params_label = ui.Label(
                         "",
                         style={"font_size": 14, "color": 0xFFCCCCCC},
-                        alignment=ui.Alignment.LEFT_CENTER,
-                    )
+                        alignment=ui.Alignment.LEFT_CENTER)
         print("[HUD] Event indicator created")
     except Exception as e:
         print(f"[HUD] Event indicator failed: {e}")
@@ -512,7 +504,7 @@ def build_workcell(stage):
     # ===== Conveyor belt assembly =====
     cx, cy = 0.55, 0.00
     cl, cw = 0.60, 0.28
-    # Flat belt surface — thick enough to be smooth, collision-enabled
+    # Flat belt surface, thick enough to be smooth, collision-enabled
     _box("/World/cell/conv_belt", [cx, cy, TABLE_H + 0.003], [cl, cw, 0.006], m_belt, collision=True)
     _box("/World/cell/conv_rail_l", [cx, cy + cw/2 + 0.018, TABLE_H + 0.018],
          [cl, 0.030, 0.036], m_conv_frame, collision=True)
@@ -522,7 +514,7 @@ def build_workcell(stage):
          [0.025, cw + 0.07, 0.036], m_conv_frame, collision=False)
     _box("/World/cell/conv_end_far",  [cx + cl/2, cy, TABLE_H + 0.018],
          [0.025, cw + 0.07, 0.036], m_conv_frame, collision=False)
-    # Rollers sit well below the belt — visible through the sides but
+    # Rollers sit well below the belt, visible through the sides but
     # don't protrude above the belt surface.  No collision.
     for i in range(9):
         rx = cx - cl/2 + 0.05 + i * (cl - 0.10) / 8
@@ -619,8 +611,7 @@ def spawn_workpiece(world, rng, spawn_pos, dims, existing_cube=None) -> DynamicC
             position=spawn_pos,
             scale=dims,
             color=color,
-            mass=0.5,
-        ))
+            mass=0.5))
         return cube
     existing_cube.set_local_scale(dims)
     # Update visual color each episode
@@ -669,14 +660,14 @@ def setup_gripper(stage):
                 p.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
                 print(f"[Gripper] Removed PhysxArticulationAPI from {check_path}")
 
-    # Clear any stale Xform on the gripper root — the articulation
+    # Clear any stale Xform on the gripper root, the articulation
     # solver computes body positions from joint angles, so a static
     # parent transform would only confuse the renderer.
     grip_xf = UsdGeom.Xformable(stage.GetPrimAtPath(ROBOTIQ_PRIM))
     grip_xf.ClearXformOpOrder()
 
     # Compute flange position offset relative to wrist_3_link.
-    # Only the translation is used — the flange's local rotation would
+    # Only the translation is used, the flange's local rotation would
     # rotate the gripper to the side.  The gripper base_link Z axis
     # should align with wrist_3_link Z (both point along the tool axis).
     flange_prim = stage.GetPrimAtPath(EEF_PRIM)
@@ -688,7 +679,7 @@ def setup_gripper(stage):
     else:
         offset_pos = Gf.Vec3d(0, 0, 0)
 
-    # Create FixedJoint — becomes part of the UR5 articulation tree
+    # Create FixedJoint, becomes part of the UR5 articulation tree
     joint_path = ROBOTIQ_BASE + "/wrist_fixed_joint"
     joint_prim = stage.GetPrimAtPath(joint_path)
     if not joint_prim.IsValid():
@@ -710,7 +701,7 @@ def setup_gripper(stage):
 
     # Add PhysxMimicJointAPI to each mimic joint so all fingers follow
     # finger_joint.  The URDF import doesn't create these constraints.
-    # Add PhysxMimicJointAPI — detect each joint's physics:axis to use
+    # Add PhysxMimicJointAPI, detect each joint's physics:axis to use
     # the correct mimic instance name (rotX, rotY, or rotZ).
     finger_joint_path = Sdf.Path(ROBOTIQ_BASE + "/joints/finger_joint")
     _MIMIC_JOINTS = [
@@ -799,7 +790,7 @@ def _grip_strength_for_mass(cube_mass):
     kp_lo, kp_hi = 5000.0, 12000.0
     kp = kp_lo + t * (kp_hi - kp_lo)
     kd = kp * 0.08
-    # Close angle — heavier cubes get more overshoot for stronger squeeze
+    # Close angle, heavier cubes get more overshoot for stronger squeeze
     close_deg = GRIPPER_CLOSE_DEG_BASE + t * (GRIPPER_CLOSE_DEG_MAX - GRIPPER_CLOSE_DEG_BASE)
     close_rad = np.radians(close_deg)
     return kp, kd, close_rad
@@ -854,16 +845,14 @@ class UR5RMPFlowController(mg.MotionPolicyController):
             self._articulation_motion_policy._robot_articulation.get_world_pose()
         self._motion_policy.set_robot_base_pose(
             robot_position=self._default_position,
-            robot_orientation=self._default_orientation,
-        )
+            robot_orientation=self._default_orientation)
         print("[RMPFlow] UR5 controller initialized.")
 
     def reset(self):
         mg.MotionPolicyController.reset(self)
         self._motion_policy.set_robot_base_pose(
             robot_position=self._default_position,
-            robot_orientation=self._default_orientation,
-        )
+            robot_orientation=self._default_orientation)
 
 
 # ---------------------------------------------------------------------------
@@ -930,17 +919,15 @@ def main():
     gripper = ParallelGripper(
         end_effector_prim_path=ROBOTIQ_BASE + "/robotiq_arg2f_base_link",
         joint_prim_names=["finger_joint"],
-        joint_opened_positions=np.array([0.0]),        # radians — fully open
-        joint_closed_positions=np.array([_CLOSE_RAD]),  # radians — fully closed
+        joint_opened_positions=np.array([0.0]),        # radians, fully open
+        joint_closed_positions=np.array([_CLOSE_RAD]),  # radians, fully closed
         action_deltas=None,
-        use_mimic_joints=True,
-    )
+        use_mimic_joints=True)
     gripper.initialize(
         articulation_apply_action_func=robot.apply_action,
         get_joint_positions_func=robot.get_joint_positions,
         set_joint_positions_func=robot.set_joint_positions,
-        dof_names=robot.dof_names,
-    )
+        dof_names=robot.dof_names)
     fj_idx = gripper.joint_dof_indicies[0]
     print(f"[Gripper] ParallelGripper initialized  "
           f"open=0.0rad  close={_CLOSE_RAD:.3f}rad ({GRIPPER_CLOSE_DEG_MAX}deg max)  "
@@ -974,8 +961,7 @@ def main():
         cspace_controller=rmp_controller,
         gripper=gripper,
         end_effector_initial_height=EEF_INITIAL_HEIGHT,
-        events_dt=EVENTS_DT,
-    )
+        events_dt=EVENTS_DT)
 
     # Validate EEF prim
     if not stage.GetPrimAtPath(EEF_PRIM).IsValid():
@@ -1018,8 +1004,7 @@ def main():
             applicators=BUILTIN_APPLICATORS,
             rng_seed=_args.seed + 10000,
             num_events_range=(0, _args.max_events_per_episode),
-            force_event_id=_args.event_i,
-        )
+            force_event_id=_args.event_i)
         event_scheduler.set_phase_boundaries(_phase_boundaries)
 
     cur_mass, cur_friction = randomize_cube_physics(cube, rng)
@@ -1062,7 +1047,7 @@ def main():
                    "lift", "move_xy", "lower", "open",
                    "retract", "return"]
 
-    # Slip detection state — detects the exact frame the cube starts moving
+    # Slip detection state, detects the exact frame the cube starts moving
     # relative to the EEF by comparing current offset to the grip-time offset.
     _slip_detected = False
     _slip_prev_cube_pos = None
@@ -1081,7 +1066,7 @@ def main():
         pick[2] = perceived[2] + GRIPPER_TCP_Z  # finger pads at cube centre height
         place = BIN_POSITION.copy()
         place[2] = BIN_POSITION[2] + GRIPPER_TCP_Z + 0.04
-        # Rotate gripper to match cube yaw — the gripper closes along
+        # Rotate gripper to match cube yaw, the gripper closes along
         # its local Y axis, and the cube's narrow side (dims[1]) is
         # along the cube's local Y.  Matching the yaw aligns them.
         ee_orient = euler_angles_to_quat(np.array([0, np.pi, cur_yaw]))
@@ -1102,8 +1087,7 @@ def main():
             cube_dims=cur_dims, cube_spawn=cur_spawn,
             sim_time=sim_time,
             plan_attempts=plan_attempts,
-            pick_attempts=pick_attempts,
-        )
+            pick_attempts=pick_attempts)
         episode       += 1
         sim_time       = 0.0
         plan_attempts  = 0
@@ -1170,8 +1154,7 @@ def main():
                 cube_prim_path=CUBE_PRIM,
                 robot_prim_path=ROBOT_PRIM,
                 sim_dt=SIM_DT,
-                extra={"robot": robot},
-            )
+                extra={"robot": robot})
             event_scheduler.reset(_setup_ctx)
             event_scheduler.schedule_episode(max_episode_steps=1500)
             event_scheduler.setup_episode(_setup_ctx)
@@ -1184,7 +1167,7 @@ def main():
         _skip_to = _args.start_episode
         print(f"[UR5] Fast-forwarding RNG from episode 0 to {_skip_to}...")
         # Episode 0 init consumed dims+pose+color+physics (12 draws) but
-        # NOT perception noise (3 draws) — consume them now.
+        # NOT perception noise (3 draws), consume them now.
         rng.normal(0, PERCEPTION_NOISE_XY_STD)
         rng.normal(0, PERCEPTION_NOISE_XY_STD)
         rng.normal(0, PERCEPTION_NOISE_Z_STD)
@@ -1241,8 +1224,7 @@ def main():
             cube_prim_path=CUBE_PRIM,
             robot_prim_path=ROBOT_PRIM,
             sim_dt=SIM_DT,
-            extra={"robot": robot},
-        )
+            extra={"robot": robot})
         event_scheduler.schedule_episode(max_episode_steps=1500)
         event_scheduler.setup_episode(_setup_ctx)
 
@@ -1277,12 +1259,11 @@ def main():
             picking_position=pick_pos,
             placing_position=place_pos,
             current_joint_positions=current_joints,
-            end_effector_orientation=ee_orient,
-        )
+            end_effector_orientation=ee_orient)
 
         robot.apply_action(action)
 
-        # Reinforce gripper target every step — PickPlaceController only
+        # Reinforce gripper target every step, PickPlaceController only
         # sends the close/open command during phases 3 and 7, but
         # apply_action during arm phases can clear the gripper target.
         phase = min(pick_place.get_current_event(), 9)
@@ -1298,7 +1279,7 @@ def main():
         )
         phase_name = PHASE_NAMES[phase]
 
-        # Sensor logging — record everything
+        # Sensor logging, record everything
         # Determine current Cartesian target based on controller phase
         if phase < 4:
             _ee_target = pick_pos
@@ -1325,10 +1306,9 @@ def main():
             ee_target_quat=ee_orient,
             gripper_cmd_rad=grip_target,
             gripper_pos_rad=_gripper_actual,
-            controller_phase=phase,
-        )
+            controller_phase=phase)
 
-        # Slip detection — compare cube and EEF velocities via finite
+        # Slip detection, compare cube and EEF velocities via finite
         # difference so both have identical lag characteristics.
         # A real slip produces sustained negative relative Z velocity.
         _slip_just_detected = False
@@ -1375,8 +1355,7 @@ def main():
                 sim_dt=SIM_DT,
                 episode_step=ep_step,
                 state_machine=phase_name,
-                extra={"robot": robot, "action": action},
-            )
+                extra={"robot": robot, "action": action})
             active_events = event_scheduler.step(ep_step, evt_ctx)
             if active_events:
                 evt = active_events[0]
@@ -1389,7 +1368,7 @@ def main():
                 sensor_row["event_params"] = pstr
             update_event_indicator(active_events)
 
-        # Show slip detection on the HUD — persists once detected
+        # Show slip detection on the HUD, persists once detected
         if _slip_just_detected or _slip_detected:
             if _evt_label is not None:
                 _evt_label.text = "  EVENT: Grip Slip (id=1)"
@@ -1415,10 +1394,10 @@ def main():
                       cube_final[2] > bp[2] - 0.12 and
                       cube_final[2] < bp[2] + 0.12)
             if in_bin:
-                print(f"[{step:6d}] Cycle complete — cube in bin.")
+                print(f"[{step:6d}] Cycle complete, cube in bin.")
                 reset_episode(success=True, reason="placed")
             else:
-                print(f"[{step:6d}] Cycle complete — cube NOT in bin "
+                print(f"[{step:6d}] Cycle complete, cube NOT in bin "
                       f"(pos={np.round(cube_final, 3)}).")
                 reset_episode(success=False, reason="missed_bin")
 

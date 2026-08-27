@@ -80,39 +80,39 @@ def _build_column_mapping() -> Dict[str, Optional[str]]:
     m: Dict[str, Optional[str]] = {}
 
     for i in range(6):
-        # INTENT — joint commands
+        # INTENT, joint commands
         m[f"setpoint_pos_{i}"]          = f"ur3_robot_target_joint_{i}"
         m[f"setpoint_speed_{i}"]        = f"ur3_robot_target_joint_vel_{i}"
         m[f"setpoint_acc_{i}"]          = None  # not exposed by UR3
 
-        # OUTCOME — joint feedback
+        # OUTCOME, joint feedback
         m[f"feedback_pos_{i}"]          = f"ur3_robot_joint_{i}"
         m[f"feedback_speed_{i}"]        = f"ur3_robot_joint_vel_{i}"
 
-        # OUTCOME — effort / current
+        # OUTCOME, effort / current
         m[f"effort_current_{i}"]        = f"ur3_robot_joint_current_{i}"
         m[f"effort_target_current_{i}"] = f"ur3_robot_target_joint_current_{i}"
         m[f"effort_target_torque_{i}"]  = None  # not in UR3 data stream
 
-        # OUTCOME — controller output
+        # OUTCOME, controller output
         m[f"control_output_{i}"]        = f"ur3_robot_joint_control_output_{i}"
 
-        # CONTEXT — per-joint
+        # CONTEXT, per-joint
         m[f"joint_temp_{i}"]            = f"ur3_robot_joint_temp_{i}"
         m[f"joint_mode_{i}"]            = f"ur3_robot_joint_mode_{i}"
         m[f"joint_voltage_{i}"]         = None  # not in UR3 data stream
 
-    # INTENT — TCP commands  (x, y, z, rx, ry, rz → indices 0-5)
+    # INTENT, TCP commands  (x, y, z, rx, ry, rz → indices 0-5)
     for i, axis in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
         m[f"setpoint_tcp_{i}"]          = f"ur3_robot_target_tcp_{axis}"
         m[f"setpoint_tcp_speed_{i}"]    = f"ur3_robot_target_tcp_speed_{axis}"
 
-    # OUTCOME — TCP feedback
+    # OUTCOME, TCP feedback
     for i, axis in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
         m[f"feedback_tcp_{i}"]          = f"ur3_robot_tcp_{axis}"
         m[f"feedback_tcp_speed_{i}"]    = f"ur3_robot_tcp_speed_{axis}"
 
-    # OUTCOME — contact forces / torques
+    # OUTCOME, contact forces / torques
     # tcp_force_x/y/z → true_force 0-2; tcp_torque_x/y/z → true_force 3-5
     for i, axis in enumerate(["x", "y", "z"]):
         m[f"true_force_{i}"]            = f"ur3_robot_tcp_force_{axis}"
@@ -120,16 +120,16 @@ def _build_column_mapping() -> Dict[str, Optional[str]]:
     for i in range(6):
         m[f"est_contact_force_{i}"]     = None  # not available from real robot
 
-    # OUTCOME — other
+    # OUTCOME, other
     for i in range(3):
         m[f"vibration_{i}"]             = None
     m["acoustic_0"]                     = None
     m["protective_stop_state"]          = None
 
-    # INTENT — gripper
+    # INTENT, gripper
     m["gripper_command"]                = None
 
-    # CONTEXT — system-level
+    # CONTEXT, system-level
     m["robot_mode"]                     = "ur3_robot_robot_mode"
     m["safety_mode"]                    = "ur3_robot_safety_mode"
     m["digital_input_bits"]             = "ur3_robot_digital_inputs"
@@ -178,8 +178,7 @@ _INT_COLS = {
 
 def normalize_row(
     row: pd.Series,
-    first_timestamp_ms: int,
-) -> Dict[str, Any]:
+    first_timestamp_ms: int) -> Dict[str, Any]:
     """Convert one CSV row to UR3e schema dict."""
     result: Dict[str, Any] = {}
 
@@ -218,8 +217,7 @@ def normalize_dataset(
     output_dir: Path,
     episode_id: str,
     include_metadata: bool = True,
-    downsample_q: int = 1,
-) -> None:
+    downsample_q: int = 1) -> None:
     """Normalize a single UR3 real-robot CSV to UR3e schema JSON."""
     logger.info(f"Loading {input_file.name} ...")
     df = pd.read_csv(input_file)
@@ -309,42 +307,35 @@ def main():
         "--input",
         type=Path,
         required=True,
-        help="Path to CSV file (or directory containing CSVs) to normalize.",
-    )
+        help="Path to CSV file (or directory containing CSVs) to normalize.")
     parser.add_argument(
         "--output",
         type=Path,
         required=True,
-        help="Output directory for normalized JSON files.",
-    )
+        help="Output directory for normalized JSON files.")
     parser.add_argument(
         "--episode-id",
         type=str,
         default=None,
-        help="Episode identifier. Defaults to the input file stem.",
-    )
+        help="Episode identifier. Defaults to the input file stem.")
     parser.add_argument(
         "--source-hz",
         type=int,
         default=None,
-        help="Source sampling rate in Hz.  Required when --target-hz is given.",
-    )
+        help="Source sampling rate in Hz.  Required when --target-hz is given.")
     parser.add_argument(
         "--target-hz",
         type=int,
         default=None,
-        help="Target sampling rate in Hz.  Enables anti-aliased decimation.",
-    )
+        help="Target sampling rate in Hz.  Enables anti-aliased decimation.")
     parser.add_argument(
         "--no-metadata",
         action="store_true",
-        help="Skip generating metadata files.",
-    )
+        help="Skip generating metadata files.")
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="Enable verbose logging.",
-    )
+        help="Enable verbose logging.")
     args = parser.parse_args()
 
     downsample_q = 1
@@ -359,8 +350,7 @@ def main():
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     input_path: Path = args.input
 
@@ -384,8 +374,7 @@ def main():
                 args.output,
                 episode_id=episode_id,
                 include_metadata=not args.no_metadata,
-                downsample_q=downsample_q,
-            )
+                downsample_q=downsample_q)
         except Exception as e:
             logger.error(f"Failed to normalize {csv_file.name}: {e}")
             import traceback

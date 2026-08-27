@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FactoryBench — Generate Level 1 (State Understanding) Q&A pairs.
+# FactoryBench, Generate Level 1 (State Understanding) Q&A pairs.
 #
 # Usage:
 #   bash scripts/generate_level1.sh               # default: 600 questions

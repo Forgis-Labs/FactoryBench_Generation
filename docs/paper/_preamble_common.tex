@@ -83,18 +83,48 @@
 \newif\ifneuripschecklist
 \neuripschecklisttrue
 
-% Venue toggle: compact the shared workshop body (docs/paper/_workshop_core.tex)
-% for venues with a tighter page limit than the usual 8. Dropping the optional
-% floats and their surrounding prose saves roughly two pages, enough for a
-% 6-page limit. Defaults to false; a wrapper that needs it says
-% \workshopcompacttrue AFTER inputting this file.
+% Venue toggle: compact workshop body?
+% Read by _workshop_core.tex to drop the three optional floats (the benchmark
+% comparison table, the levels-examples table, the FactoryWave collage) and the
+% prose that depends on them, taking the shared body from ~6 pages to ~4 for a
+% venue with a tighter cap. Nothing load-bearing is gated: every claim and
+% number survives compact mode.
+%
+% Declared and defaulted to FALSE here, so an 8-page workshop wrapper need do
+% nothing. A wrapper for a 6-page or shorter venue says \workshopcompacttrue
+% AFTER inputting this file. The full-paper builds never read it, but it must
+% be declared for them too, because _workshop_core.tex and _content.tex share
+% the same preamble.
 \newif\ifworkshopcompact
 \workshopcompactfalse
 
-% Venue toggle: is this any workshop build (as opposed to the main-conference
-% paper)? Set true by ../paper/_workshop_header.tex, which every workshop
-% venue file inputs and the main paper never does. Used to drop content from
-% the shared appendix (../paper/_appendix.tex) that only workshop builds pull
-% in wholesale but should not carry, without touching the main paper's copy.
-\newif\ifworkshopbuild
-\workshopbuildfalse
+% Workshop connector macros, expanded by _workshop_core.tex at the end of its
+% Related Work and its Conclusion. A per-venue file (_workshop_<venue>.tex)
+% renews them with one sentence each, tying FactoryBench to that venue theme.
+% They are declared here rather than in the core body because the venue file
+% is loaded first: a declaration inside the core would land after the venue
+% had already renewed them, and be too late to define them. Empty defaults,
+% so a build that sets neither still compiles.
+\providecommand{\workshoprelatedworknote}{}
+\providecommand{\workshopclosingnote}{}
+
+% Hero (pipeline) figure width. The figure is drawn inside a
+% resizebox that scales it to this width, so shrinking the value scales
+% width and height together: no distortion, just a smaller figure.
+% Defaults to full text width, which is what the full-paper builds use.
+% A workshop wrapper narrows it to pull the abstract up onto page 1, where
+% a reader decides whether to keep reading. Below about 0.80 the node
+% labels start to get hard to read.
+\providecommand{\herowidth}{\linewidth}
+
+% Body-figure widths, as fractions of \linewidth, overridable per venue.
+% Same purpose as \herowidth: a workshop sitting on its page limit can reclaim
+% a few lines by tightening a float instead of cutting prose. Defaults are the
+% sizes the figures were authored at, so any build that does not set them is
+% unchanged.
+%   \collagefrac    the FactoryWave tasks/faults collage
+%   \resultsafrac   panel (a) of the main results figure, the heatmap
+%   \resultsbfrac   panel (b), the GPT-5.1 L4 breakdown
+\providecommand{\collagefrac}{0.9}
+\providecommand{\resultsafrac}{0.85}
+\providecommand{\resultsbfrac}{0.95}

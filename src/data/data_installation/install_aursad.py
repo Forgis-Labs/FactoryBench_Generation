@@ -54,8 +54,7 @@ def download(url: str, out_path: Path) -> None:
 def dataset_to_dataframe(
     ds: h5py.Dataset,
     prefix: str,
-    target_rows: Optional[int],
-) -> pd.DataFrame:
+    target_rows: Optional[int]) -> pd.DataFrame:
     if target_rows is not None and ds.shape and len(ds.shape) > 0:
         data = ds[:target_rows]
     else:
@@ -98,8 +97,7 @@ def collect_datasets(h5_file: h5py.File) -> List[h5py.Dataset]:
 def export_by_experiments(
     data_frame: pd.DataFrame,
     out_dir: Path,
-    max_timestamps: Optional[int] = None,
-) -> None:
+    max_timestamps: Optional[int] = None) -> None:
     """
     Export DataFrame organized by experiments based on 'sample_nr' column.
     Each experiment is written as experiment_{i}.parquet in the output directory.
@@ -138,20 +136,17 @@ def main() -> None:
         "--out-dir",
         type=str,
         default=str(default_out_dir),
-        help="Where to store dataset files",
-    )
+        help="Where to store dataset files")
     ap.add_argument(
         "--max-timestamps",
         type=int,
         default=None,
-        help="Optional limit on number of timestamps (rows) to export",
-    )
+        help="Optional limit on number of timestamps (rows) to export")
     ap.add_argument(
         "--max-rows",
         type=int,
         default=None,
-        help="(Deprecated) Use --max-timestamps instead",
-    )
+        help="(Deprecated) Use --max-timestamps instead")
     ap.add_argument("--skip-md5", action="store_true", help="Skip checksum verification")
     args = ap.parse_args()
 
@@ -242,7 +237,7 @@ def main() -> None:
     if data_frame is not None:
         # Anti-aliased downsample (10x) per experiment to avoid cross-experiment filter artifacts.
         # Discrete / categorical columns (pin bits, int registers, mode codes, bit-packed digital
-        # inputs/outputs, label, sample_nr) must NOT be filtered — running a low-pass FIR over
+        # inputs/outputs, label, sample_nr) must NOT be filtered, running a low-pass FIR over
         # step-shaped boolean signals destroys them into float ringing noise.
         _NON_CONTINUOUS = {
             "sample_nr", "label",
@@ -270,7 +265,7 @@ def main() -> None:
 
         # Derive task_phase from the four pin-bit registers raised by the URCap program at
         # phase transitions. Per AURSAD paper Sec. 2.2 each bit is "Toggled to True then False"
-        # — a one-shot pulse marking the *start* of a phase, not its duration. We assign the
+        #, a one-shot pulse marking the *start* of a phase, not its duration. We assign the
         # phase id on the pulse row and forward-fill within each experiment so the value
         # persists until the next pulse.
         #   bit_64 (move_to_pin)  → 0  (approach)

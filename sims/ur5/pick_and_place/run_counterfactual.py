@@ -53,7 +53,7 @@ simulation_app = SimulationApp({
 })
 
 # ---------------------------------------------------------------------------
-# Deferred imports (after SimulationApp) — import shared functions from run.py.
+# Deferred imports (after SimulationApp), import shared functions from run.py.
 # SimulationApp must exist before this import because run.py's deferred
 # imports (omni.usd, pxr, etc.) require the Omniverse runtime.
 # ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ from event_injection import EventScheduler, SimContext, BUILTIN_APPLICATORS
 from counterfactual import CounterfactualRunner
 from counterfactual.episode_state import EpisodeState
 
-# Import shared code from run.py (safe now — SimulationApp already exists,
+# Import shared code from run.py (safe now, SimulationApp already exists,
 # and the CLI/SimulationApp block is guarded by __name__ == "__main__")
 from run import (
     CFG, SIM_DT, ROBOT_PRIM, EEF_PRIM, HOME_JOINTS,
@@ -83,8 +83,7 @@ from run import (
     update_gripper_for_episode, apply_perception_noise, yaw_to_quat,
     UR5RMPFlowController,
     setup_hud, update_hud,
-    setup_event_indicator, update_event_indicator,
-)
+    setup_event_indicator, update_event_indicator)
 
 TABLE_HEIGHT = 0.10
 _TASK_DIR = Path(__file__).parent.resolve()
@@ -133,14 +132,12 @@ def main():
         joint_opened_positions=np.array([0.0]),
         joint_closed_positions=np.array([np.radians(GRIPPER_CLOSE_DEG_MAX)]),
         action_deltas=None,
-        use_mimic_joints=True,
-    )
+        use_mimic_joints=True)
     gripper.initialize(
         articulation_apply_action_func=robot.apply_action,
         get_joint_positions_func=robot.get_joint_positions,
         set_joint_positions_func=robot.set_joint_positions,
-        dof_names=robot.dof_names,
-    )
+        dof_names=robot.dof_names)
     fj_idx = gripper.joint_dof_indicies[0]
 
     _GRIP_INDICES = np.array([6, 7, 8, 9, 10, 11])
@@ -161,8 +158,7 @@ def main():
         cspace_controller=rmp_controller,
         gripper=gripper,
         end_effector_initial_height=0.42,
-        events_dt=_EVENTS_DT,
-    )
+        events_dt=_EVENTS_DT)
 
     # Gripper proxy for collect_sensors
     class _GripperProxy:
@@ -177,7 +173,7 @@ def main():
             return self.attached
     gripper_proxy = _GripperProxy(gripper)
 
-    # HUD + event indicator — override run.py's _args.headless so the
+    # HUD + event indicator, override run.py's _args.headless so the
     # HUD functions know whether to create windows.
     import run as _run_module
     _run_module._args.headless = _args.headless
@@ -293,8 +289,7 @@ def main():
             picking_position=state["pick_pos"],
             placing_position=state["place_pos"],
             current_joint_positions=current_joints,
-            end_effector_orientation=state["ee_orient"],
-        )
+            end_effector_orientation=state["ee_orient"])
         robot.apply_action(action)
         state["action"] = action
 
@@ -334,8 +329,7 @@ def main():
             ee_target_quat=state["ee_orient"],
             gripper_cmd_rad=grip_target,
             gripper_pos_rad=_gripper_actual,
-            controller_phase=phase,
-        )
+            controller_phase=phase)
         return sensor_row
 
     def is_done_fn() -> tuple:
@@ -367,8 +361,7 @@ def main():
             cube_yaw=state["cur_yaw"],
             cube_mass=state["cur_mass"],
             cube_friction=state["cur_friction"],
-            cube_restitution=getattr(randomize_cube_physics, "_last_restitution", 0.0),
-        )
+            cube_restitution=getattr(randomize_cube_physics, "_last_restitution", 0.0))
 
     def event_step_fn(ep_step: int, sensor_row: dict):
         """Run event scheduler for one step."""
@@ -382,8 +375,7 @@ def main():
             sim_dt=SIM_DT,
             episode_step=ep_step,
             state_machine=PHASE_NAMES[state["phase"]],
-            extra={"robot": robot, "action": state.get("action")},
-        )
+            extra={"robot": robot, "action": state.get("action")})
         active = runner._scheduler.step(ep_step, ctx)
         update_event_indicator(active if active else None)
         return active
@@ -396,8 +388,7 @@ def main():
         task_name="pick_and_place",
         applicators=BUILTIN_APPLICATORS,
         seed=_args.seed,
-        phase_boundaries=_PHASE_BOUNDS,
-    )
+        phase_boundaries=_PHASE_BOUNDS)
 
     # Capture state BEFORE first reset for the runner
     print(f"[Counterfactual] Starting {_args.episodes} episode pairs → {output_dir}")
@@ -408,8 +399,7 @@ def main():
         is_done_fn=is_done_fn,
         get_state_fn=get_state_fn,
         event_step_fn=event_step_fn,
-        max_steps=_args.max_steps,
-    )
+        max_steps=_args.max_steps)
 
     simulation_app.close()
 

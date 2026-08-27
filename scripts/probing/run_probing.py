@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""FactoryBench linear-probing experiment (NeurIPS rebuttal W.6).
+"""FactoryBench linear-probing experiment.
 
 Self-contained end-to-end runner. Given the faithful eval prompts and the
 question JSONs, it:
@@ -31,7 +31,6 @@ Usage (on the GPU instance):
         --n-per-concept 600 \
         --random-init --behavioural
 
-Design notes live in docs/rebuttal/linear_probing_design.md.
 """
 from __future__ import annotations
 
@@ -1019,7 +1018,7 @@ def score_behavioural_on_split(beh, test_ids, seed):
 def _aggregate_seeds(per_seed):
     """Combine per-seed probe results. The seed-0 result is kept in full (its
     per-layer arrays feed the figures); a `multiseed` block adds mean +/- std of
-    the headline numbers across seeds, which is what the paper reports."""
+    the headline numbers across seeds, which is what we report."""
     base = dict(per_seed[0])
 
     def collect(getter):
@@ -1121,7 +1120,7 @@ def main() -> int:
         print(f"  [causal self-test] {'PASS' if ok else 'FAIL'} (max|Δ|={diff:.2e})", flush=True)
         if not ok:
             print("  ERROR: attention is NOT causal (top-k predictions shift when "
-                  "future tokens are removed) — activations would be invalid. "
+                  "future tokens are removed) - activations would be invalid. "
                   "Aborting.", file=sys.stderr, flush=True)
             return 2
 

@@ -2,10 +2,10 @@
 
 Reads PDFs from ``--pdf-dir`` (or a directory listed in ``--pdf-dir`` per
 machine), splits into overlapping chunks, embeds with
-``text-embedding-3-large`` (Azure Foundry deployment), and writes:
+``text-embedding-3-large``, and writes:
 
-  * ``data/manuals/index.faiss``   — inner-product index (L2-normalised)
-  * ``data/manuals/chunks.jsonl``  — one JSON per chunk with
+  * ``data/manuals/index.faiss``   - inner-product index (L2-normalised)
+  * ``data/manuals/chunks.jsonl``  - one JSON per chunk with
                                      {machine, source, section, text}
 
 Usage::
@@ -34,11 +34,11 @@ import numpy as np
 try:
     from pypdf import PdfReader
 except ImportError:
-    print("pypdf missing — pip install pypdf", file=sys.stderr); raise
+    print("pypdf missing - pip install pypdf", file=sys.stderr); raise
 try:
     import faiss
 except ImportError:
-    print("faiss missing — pip install faiss-cpu", file=sys.stderr); raise
+    print("faiss missing - pip install faiss-cpu", file=sys.stderr); raise
 
 
 def _iter_pdfs(root: Path) -> Iterable[tuple[str, Path]]:

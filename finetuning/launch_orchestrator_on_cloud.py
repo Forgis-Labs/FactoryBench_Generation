@@ -20,7 +20,7 @@ Usage:
     # Just one model
     python finetuning/launch_orchestrator_on_cloud.py --model bearing_r32_qwen3_4b --max_train_samples 5000
 
-    # Dry run — print plan, don't submit
+    # Dry run, print plan, don't submit
     python finetuning/launch_orchestrator_on_cloud.py --max_train_samples 5000 --dry-run
 """
 
@@ -43,7 +43,7 @@ FINETUNING_DIR = Path(__file__).resolve().parent
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    # Pipeline knobs — passed through to run_pipeline.py verbatim
+    # Pipeline knobs, passed through to run_pipeline.py verbatim
     p.add_argument("--model", nargs="*", default=None)
     p.add_argument("--skip", nargs="*", default=None,
                    choices=["baseline", "train", "finetuned"])
@@ -108,8 +108,7 @@ def main() -> None:
 
     sess = sagemaker.Session(
         boto_session=boto3.Session(region_name=REGION),
-        default_bucket=BUCKET,
-    )
+        default_bucket=BUCKET)
 
     processor = PyTorchProcessor(
         framework_version="2.5.1",
@@ -124,8 +123,7 @@ def main() -> None:
         tags=[
             {"Key": "Project", "Value": "factorybench"},
             {"Key": "Role",    "Value": "orchestrator"},
-        ],
-    )
+        ])
 
     # PyTorchProcessor uploads `source_dir` as a tarball; inside the container
     # it ends up at /opt/ml/processing/input/code/. `code=` is the entry script
@@ -137,8 +135,7 @@ def main() -> None:
         arguments=fwd,
         job_name=job_name,
         wait=False,
-        logs=False,
-    )
+        logs=False)
 
     print(f"\nOrchestrator launched: {job_name}")
     print(f"Tail logs:")

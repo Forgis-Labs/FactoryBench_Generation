@@ -13,7 +13,7 @@ Two evaluation modes, controlled purely by whether ``--adapter_dir`` is set:
      ``PeftModel.from_pretrained``. Generates from the stacked model.
 
 Prompt building MUST stay byte-identical to ``FactoryBenchDataset._format_chatml``
-in train_factorybench.py — eval/train skew is silent and ruinous, so the
+in train_factorybench.py, eval/train skew is silent and ruinous, so the
 formatter is reused directly from that module.
 
 Output (written to ``--output_dir``, which on SageMaker is /opt/ml/model
@@ -102,7 +102,7 @@ def _seed_resume_dir(prior_channel: str | None, ckpt_root: Path) -> int:
             shutil.copyfile(src, dst)
             seeded += 1
 
-    # Case 2: tarball — extract any level_*.jsonl found inside
+    # Case 2: tarball, extract any level_*.jsonl found inside
     if seeded == 0:
         for tar in list(p.glob("*.tar.gz")) + list(p.glob("*.tar")):
             try:
@@ -167,8 +167,7 @@ def _build_base_model(
     tokenizer_type: str | None,
     totem_ckpt: str | None,
     fsq_ckpt: str | None,
-    llm_id: str,
-):
+    llm_id: str):
     """Load the base LLM (with original DoRA already merged) + tokenizer.
 
     Mirrors train_factorybench._load_base_with_shrike_loader so eval picks up
@@ -182,8 +181,7 @@ def _build_base_model(
                 raise ValueError("--totem_ckpt is required for bearing checkpoints")
             wrapper = BearingModel.from_pretrained(
                 checkpoint_path=base_ckpt, totem_ckpt=totem_ckpt,
-                llm_id=llm_id, device="cpu",
-            )
+                llm_id=llm_id, device="cpu")
         elif ck == "shrike":
             from shrike.model.shrike import Shrike
             kwargs: dict = {"checkpoint_path": base_ckpt, "llm_id": llm_id,
@@ -199,7 +197,7 @@ def _build_base_model(
         print("  Merging existing DoRA into base LLM weights...", flush=True)
         merged = wrapper.llm.merge_and_unload()
         tokenizer = wrapper.tokenizer
-        # KEEP the TS tokenizer alive — needed to encode FactoryBench
+        # KEEP the TS tokenizer alive, needed to encode FactoryBench
         # signals into <ts_*> codes (the format the model was pretrained on).
         wrapper.llm = None
         gc.collect()
@@ -215,8 +213,7 @@ def _build_base_model(
         attn_impl = "sdpa"
     model = AutoModelForCausalLM.from_pretrained(
         llm_id, torch_dtype=torch.bfloat16,
-        trust_remote_code=True, attn_implementation=attn_impl,
-    )
+        trust_remote_code=True, attn_implementation=attn_impl)
     return model, tokenizer, None
 
 
@@ -236,8 +233,7 @@ def _generate_batch(model, tokenizer, prompts: list[str], device,
         return_tensors="pt",
         truncation=True,
         max_length=max_input_length,
-        add_special_tokens=False,
-    )
+        add_special_tokens=False)
     input_ids = enc.input_ids.to(device)
     attn_mask = enc.attention_mask.to(device)
 
@@ -253,8 +249,7 @@ def _generate_batch(model, tokenizer, prompts: list[str], device,
             max_new_tokens=max_new_tokens,
             do_sample=False,
             eos_token_id=eos_ids,
-            pad_token_id=tokenizer.pad_token_id,
-        )
+            pad_token_id=tokenizer.pad_token_id)
     new_ids = gen[:, input_ids.shape[1]:]
     n_pred = [int((row != tokenizer.pad_token_id).sum().item()) for row in new_ids]
     texts = tokenizer.batch_decode(new_ids, skip_special_tokens=True)
@@ -321,7 +316,7 @@ def main() -> None:
     args.adapter_dir = _resolve_adapter_dir(args.adapter_dir)
 
     # If the launcher mounted a prior eval's predictions, copy them into the
-    # resume checkpoint dir BEFORE any level loop runs — the existing resume
+    # resume checkpoint dir BEFORE any level loop runs, the existing resume
     # logic will then naturally skip the already-done samples.
     prior_channel = os.environ.get("SM_CHANNEL_PRIOR_PREDICTIONS") \
         or _env_opt("PRIOR_PREDICTIONS_DIR")
@@ -339,7 +334,7 @@ def main() -> None:
     print(f"  Ckpt type:     {args.checkpoint_type}")
     print(f"  TS tokenizer:  {args.tokenizer_type} "
           f"(totem={args.totem_ckpt}, fsq={args.fsq_ckpt})")
-    print(f"  Adapter:       {args.adapter_dir or '<none — baseline>'}")
+    print(f"  Adapter:       {args.adapter_dir or '<none, baseline>'}")
     print(f"  Levels:        {levels}  (split={args.split})")
     print(f"  Max samples:   {args.max_samples or 'ALL'}")
     print(f"  Gen budget:    max_input={args.max_input_length}, "
@@ -354,18 +349,17 @@ def main() -> None:
         tokenizer_type=args.tokenizer_type,
         totem_ckpt=args.totem_ckpt,
         fsq_ckpt=args.fsq_ckpt,
-        llm_id=args.llm_id,
-    )
+        llm_id=args.llm_id)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    # Left-pad for generation — keeps the assistant continuation slot aligned
+    # Left-pad for generation, keeps the assistant continuation slot aligned
     # across a batch.
     tokenizer.padding_side = "left"
     # Left-TRUNCATE too: FactoryBench L2/L3 prompts can run 12-16k+ tokens
     # because they embed 4-5 options worth of feature dumps. The question and
     # the <|im_start|>assistant\n<think>...</think> cue both sit at the END
     # of the prompt. HF's default truncation_side="right" would drop them,
-    # leaving the model staring at a half-finished options list — it'd just
+    # leaving the model staring at a half-finished options list, it'd just
     # keep generating more option-formatted text. Truncating from the LEFT
     # instead drops some early feature-dump rows but preserves the question
     # and the answer-time cue, which is what the model actually needs.
@@ -426,7 +420,7 @@ def main() -> None:
 
         # Surface the prompt-length distribution so we can see at a glance
         # whether max_input_length is cutting samples off (after left-truncation,
-        # cuts come from the FEATURE-DUMP head, not the question tail — but
+        # cuts come from the FEATURE-DUMP head, not the question tail, but
         # losing the feature dump still hurts grounding).
         tok_lens = [len(tokenizer(p, add_special_tokens=False).input_ids)
                     for p in prompts]
@@ -437,7 +431,7 @@ def main() -> None:
 
         out_path = output_dir / f"level_{level}_predictions.jsonl"
         # SageMaker syncs /opt/ml/checkpoints/<...> to S3 as raw files across
-        # spot reclaims — so we write predictions there too. On restart, we
+        # spot reclaims, so we write predictions there too. On restart, we
         # rehydrate `done_ids` from this file and skip already-done samples,
         # so the eval RESUMES instead of starting over. Final tarball still
         # gets a copy under SM_MODEL_DIR for downstream tooling.
@@ -463,7 +457,7 @@ def main() -> None:
                             continue
                 if done_ids:
                     print(f"  [resume] {len(done_ids)} samples already done "
-                          f"from prior run — skipping", flush=True)
+                          f"from prior run, skipping", flush=True)
             except OSError:
                 pass
 
@@ -486,7 +480,7 @@ def main() -> None:
 
         n_correct, n_seen = 0, 0
         t0 = time.time()
-        # APPEND mode — new predictions go after the resumed ones.
+        # APPEND mode, new predictions go after the resumed ones.
         with open(ckpt_path, "a", buffering=1) as fout:
             for batch_start in range(0, len(prompts), args.batch_size):
                 batch_prompts = prompts[batch_start: batch_start + args.batch_size]
@@ -494,16 +488,14 @@ def main() -> None:
                 try:
                     answers, n_pred = _generate_batch(
                         model, tokenizer, batch_prompts, device,
-                        args.max_new_tokens, args.max_input_length,
-                    )
+                        args.max_new_tokens, args.max_input_length)
                 except torch.cuda.OutOfMemoryError:
                     print(f"  [OOM] batch starting at {batch_start} "
-                          f"— halving max_new_tokens and retrying", flush=True)
+                          f", halving max_new_tokens and retrying", flush=True)
                     torch.cuda.empty_cache()
                     answers, n_pred = _generate_batch(
                         model, tokenizer, batch_prompts, device,
-                        max(32, args.max_new_tokens // 2), args.max_input_length,
-                    )
+                        max(32, args.max_new_tokens // 2), args.max_input_length)
 
                 for i, (s, ans, npt) in enumerate(zip(batch_samples, answers, n_pred)):
                     gt = s.get("answer")

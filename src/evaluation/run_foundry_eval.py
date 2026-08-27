@@ -28,8 +28,7 @@ from src.config import (
     DEFAULT_JUDGE_MODEL,
     FOUNDRY_MODELS,
     get_api_key_env,
-    get_upstream_model_id,
-)
+    get_upstream_model_id)
 from src.evaluation.test_gpt_5mini import (
     JUDGE_SYSTEM_PROMPT,
     _estimate_cost,
@@ -39,8 +38,7 @@ from src.evaluation.test_gpt_5mini import (
     load_json,
     load_prompt_entries,
     parse_llm_answer,
-    save_json,
-)
+    save_json)
 
 logger = logging.getLogger(__name__)
 
@@ -262,8 +260,7 @@ def call_openai_style(
     prompt: str,
     max_tokens: int,
     api_style: str = "openai",
-    api_version: Optional[str] = None,
-) -> Tuple[str, Dict[str, Any]]:
+    api_version: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
     """Call an OpenAI-compatible endpoint (gpt-5.1, DeepSeek, Mistral)."""
     # Vertex custom-container endpoints don't expose an OpenAI-compatible
     # sub-route; requests must go to `<endpoint>:rawPredict` and get passed
@@ -304,8 +301,7 @@ def call_openai_style(
             response = client.responses.create(
                 model=model,
                 input=prompt,
-                max_output_tokens=max_tokens,
-            )
+                max_output_tokens=max_tokens)
             body = _to_dict(response)
             answer = _extract_output_text_from_responses_body(body)
             if answer:
@@ -341,8 +337,7 @@ def call_anthropic_style(
     api_key: str,
     model: str,
     prompt: str,
-    max_tokens: int,
-) -> Tuple[str, Dict[str, Any]]:
+    max_tokens: int) -> Tuple[str, Dict[str, Any]]:
     """Call Anthropic-native /messages endpoint (claude-haiku-4-5)."""
     r = requests.post(
         f"{base_url}/messages",
@@ -356,8 +351,7 @@ def call_anthropic_style(
             "max_tokens": max_tokens,
             "messages": [{"role": "user", "content": prompt}],
         },
-        timeout=300,
-    )
+        timeout=300)
     r.raise_for_status()
     body = r.json()
 
@@ -388,8 +382,7 @@ def call_model(model: str, prompt: str, max_tokens: int) -> Tuple[str, Dict[str,
         return call_anthropic_style(endpoint, api_key, upstream_id, prompt, max_tokens)
     return call_openai_style(
         endpoint, api_key, upstream_id, prompt, max_tokens,
-        api_style=api_style, api_version=api_version,
-    )
+        api_style=api_style, api_version=api_version)
 
 
 def _is_judge_disabled(judge_model: Optional[str]) -> bool:
@@ -410,8 +403,7 @@ def foundry_llm_judge(
     prediction: str,
     reference: str,
     judge_model: str = DEFAULT_JUDGE_MODEL,
-    max_tokens: int = 256,
-) -> Tuple[float, str]:
+    max_tokens: int = 256) -> Tuple[float, str]:
     """Score a free-form prediction with the default judge model (gpt-5.1)."""
     user_msg = (
         f"Question: {question}\n\n"
@@ -437,7 +429,7 @@ def foundry_llm_judge(
 
 
 def build_question_index(questions_dir: Optional[Path]) -> Dict[str, Dict[str, Any]]:
-    """Map filename stem -> full question payload (answer, template_type, options, acceptance_bounds, ...)."""
+    """Map filename stem -> full question payload (answer, template_type, options, acceptance_bounds...)."""
     index: Dict[str, Dict[str, Any]] = {}
     if questions_dir is None or not questions_dir.is_dir():
         return index
@@ -517,8 +509,7 @@ def score_prediction(
     ground_truth: Any,
     acceptance_bounds: Optional[Dict[str, Any]],
     question_text: str,
-    judge_model: str,
-) -> Tuple[Optional[float], Optional[Tuple[float, str]]]:
+    judge_model: str) -> Tuple[Optional[float], Optional[Tuple[float, str]]]:
     """Return (score, judge_result_or_none). Mirrors test_gpt_5mini scoring branches."""
     acceptance_bounds = _normalized_acceptance_bounds(acceptance_bounds)
     gt = ground_truth
@@ -654,16 +645,14 @@ def log_to_opik(
     est_cost: float,
     usage_raw: Dict[str, Any],
     prompt_tokens: int,
-    completion_tokens: int,
-) -> None:
+    completion_tokens: int) -> None:
     if not os.getenv("OPIK_API_KEY"):
         return
     try:
         import opik
         client_opik = opik.Opik(
             project_name=os.getenv("OPIK_PROJECT_NAME", "FactoryBench"),
-            workspace=os.getenv("OPIK_WORKSPACE", "forgis"),
-        )
+            workspace=os.getenv("OPIK_WORKSPACE", "forgis"))
         total_tokens = int(usage_raw.get("total_tokens") or (prompt_tokens + completion_tokens))
         metadata_payload = qa_payload.get("metadata") or {}
         dataset_tag = metadata_payload.get("dataset")
@@ -708,8 +697,7 @@ def log_to_opik(
             },
             metadata=opik_metadata,
             total_estimated_cost=est_cost,
-            model=body.get("model") or model_name,
-        )
+            model=body.get("model") or model_name)
 
         if score is not None:
             pred_str_repr = str(pred).strip() if pred is not None else "N/A"
@@ -721,8 +709,7 @@ def log_to_opik(
             trace.log_feedback_score(name="accuracy", value=float(score), reason=accuracy_reason)
             if judge_result is not None:
                 trace.log_feedback_score(
-                    name="llm_judge", value=judge_result[0], reason=judge_result[1] or accuracy_reason,
-                )
+                    name="llm_judge", value=judge_result[0], reason=judge_result[1] or accuracy_reason)
     except Exception as e:
         logger.warning(f"Opik logging failed: {e}")
 
@@ -730,8 +717,7 @@ def log_to_opik(
 def _build_openai_batch_jsonl(
     entries: list[Tuple[Path, str, int, str]],
     model: str,
-    max_tokens: int,
-) -> str:
+    max_tokens: int) -> str:
     """JSONL body for OpenAI /v1/batches with /chat/completions endpoint."""
     from src.config import get_batch_deployment
     deployment = get_batch_deployment(model)
@@ -763,8 +749,7 @@ def run_openai_batch(
     lock: threading.Lock,
     total: int,
     cost_limit: float,
-    poll_interval: int = 30,
-) -> None:
+    poll_interval: int = 30) -> None:
     """Submit an OpenAI-style batch job, poll to completion, save results."""
     import tempfile
     import time
@@ -787,8 +772,7 @@ def run_openai_batch(
         batch = client.batches.create(
             input_file_id=file_obj.id,
             endpoint="/chat/completions",
-            completion_window="24h",
-        )
+            completion_window="24h")
         logger.info(
             f"[batch] Submitted {model} batch={batch.id} with {len(entries)} requests"
         )
@@ -819,8 +803,7 @@ def run_openai_batch(
         for entry in entries:
             _finalize_failure(
                 entry, f"batch ended with status={batch.status}",
-                output_dir, state, lock, total,
-            )
+                output_dir, state, lock, total)
         return
 
     results: Dict[str, Dict[str, Any]] = {}
@@ -873,8 +856,7 @@ def run_openai_batch(
             _finalize_success(
                 entry, answer, body, model, output_dir,
                 ground_truth_index, eval_level, judge_model,
-                state, lock, total, cost_limit,
-            )
+                state, lock, total, cost_limit)
         elif custom_id in errors:
             err = errors[custom_id]
             err_msg = err.get("message") if isinstance(err, dict) else str(err)
@@ -895,8 +877,7 @@ def run_anthropic_batch(
     lock: threading.Lock,
     total: int,
     cost_limit: float,
-    poll_interval: int = 30,
-) -> None:
+    poll_interval: int = 30) -> None:
     """Submit an Anthropic batch job to /v1/messages/batches, poll, save."""
     import time
 
@@ -924,8 +905,7 @@ def run_anthropic_batch(
         f"{base_url}/messages/batches",
         headers=headers,
         json={"requests": requests_payload},
-        timeout=300,
-    )
+        timeout=300)
     r.raise_for_status()
     batch = r.json()
     batch_id = batch["id"]
@@ -935,8 +915,7 @@ def run_anthropic_batch(
         r = requests.get(
             f"{base_url}/messages/batches/{batch_id}",
             headers=headers,
-            timeout=60,
-        )
+            timeout=60)
         r.raise_for_status()
         batch = r.json()
         status = batch.get("processing_status")
@@ -1003,8 +982,7 @@ def run_anthropic_batch(
             _finalize_success(
                 entry, answer, msg, model, output_dir,
                 ground_truth_index, eval_level, judge_model,
-                state, lock, total, cost_limit,
-            )
+                state, lock, total, cost_limit)
         else:
             err = result.get("error") or result
             err_msg = err.get("message") if isinstance(err, dict) else str(err)
@@ -1017,8 +995,7 @@ MISTRAL_NATIVE_BASE_URL = "https://api.mistral.ai/v1"
 
 def _build_mistral_batch_jsonl(
     entries: list[Tuple[Path, str, int, str]],
-    max_tokens: int,
-) -> str:
+    max_tokens: int) -> str:
     """Mistral native batch JSONL: no `method`/`url` per line; endpoint/model set at job creation."""
     lines = []
     for _prompt_path, prompt_text, _prompt_idx, custom_id in entries:
@@ -1042,8 +1019,7 @@ def run_mistral_batch(
     lock: threading.Lock,
     total: int,
     cost_limit: float,
-    poll_interval: int = 30,
-) -> None:
+    poll_interval: int = 30) -> None:
     """Submit a batch to Mistral's native API (api.mistral.ai).
 
     Requires MISTRAL_API_KEY env var. The Azure Foundry project endpoint does
@@ -1080,8 +1056,7 @@ def run_mistral_batch(
                 headers=auth_headers,
                 files=files,
                 data=data,
-                timeout=300,
-            )
+                timeout=300)
         r.raise_for_status()
         input_file_id = r.json()["id"]
 
@@ -1094,8 +1069,7 @@ def run_mistral_batch(
                 "model": native_model,
                 "metadata": {"source": "FactoryBench"},
             },
-            timeout=300,
-        )
+            timeout=300)
         r.raise_for_status()
         job = r.json()
         job_id = job["id"]
@@ -1114,8 +1088,7 @@ def run_mistral_batch(
         r = requests.get(
             f"{base_url}/batch/jobs/{job_id}",
             headers=auth_headers,
-            timeout=60,
-        )
+            timeout=60)
         r.raise_for_status()
         job = r.json()
         status = job.get("status")
@@ -1134,8 +1107,7 @@ def run_mistral_batch(
         for entry in entries:
             _finalize_failure(
                 entry, f"batch ended with status={status}",
-                output_dir, state, lock, total,
-            )
+                output_dir, state, lock, total)
         return
 
     output_file_id = job.get("output_file")
@@ -1149,8 +1121,7 @@ def run_mistral_batch(
     r = requests.get(
         f"{base_url}/files/{output_file_id}/content",
         headers=auth_headers,
-        timeout=600,
-    )
+        timeout=600)
     r.raise_for_status()
 
     results: Dict[str, Dict[str, Any]] = {}
@@ -1185,8 +1156,7 @@ def run_mistral_batch(
             r = requests.get(
                 f"{base_url}/files/{error_file_id}/content",
                 headers=auth_headers,
-                timeout=600,
-            )
+                timeout=600)
             r.raise_for_status()
             for line in r.text.strip().splitlines():
                 if not line.strip():
@@ -1212,8 +1182,7 @@ def run_mistral_batch(
             _finalize_success(
                 entry, answer, body, model, output_dir,
                 ground_truth_index, eval_level, judge_model,
-                state, lock, total, cost_limit,
-            )
+                state, lock, total, cost_limit)
         elif custom_id in errors:
             err = errors[custom_id]
             err_msg = err.get("message") if isinstance(err, dict) else str(err)
@@ -1235,15 +1204,14 @@ def _finalize_success(
     state: Dict[str, Any],
     lock: threading.Lock,
     total: int,
-    cost_limit: float,
-) -> None:
+    cost_limit: float) -> None:
     """Score, log to Opik, save the answer JSON, update counters."""
     prompt_path, prompt_text, prompt_idx, custom_id = entry
     out_path = output_dir / f"{custom_id}_answer.json"
 
     # ground_truth_index now holds the FULL question payload (not just the
     # answer) so we can read answer_format / template_type / acceptance_bounds
-    # from it — prompt JSONs carry only {prompt, metadata}.
+    # from it, prompt JSONs carry only {prompt, metadata}.
     qa_payload = ground_truth_index.get(prompt_path.stem) or {}
     if not isinstance(qa_payload, dict):
         qa_payload = {"answer": qa_payload}
@@ -1267,8 +1235,7 @@ def _finalize_success(
         ground_truth=gt,
         acceptance_bounds=acceptance_bounds,
         question_text=qa_payload.get("question", ""),
-        judge_model=judge_model,
-    )
+        judge_model=judge_model)
 
     log_to_opik(
         qa_payload=qa_payload,
@@ -1285,8 +1252,7 @@ def _finalize_success(
         est_cost=est_cost,
         usage_raw=usage_raw,
         prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens,
-    )
+        completion_tokens=completion_tokens)
 
     save_json(out_path, {
         "custom_id": custom_id,
@@ -1327,8 +1293,7 @@ def _finalize_failure(
     output_dir: Path,
     state: Dict[str, Any],
     lock: threading.Lock,
-    total: int,
-) -> None:
+    total: int) -> None:
     prompt_path, prompt_text, prompt_idx, custom_id = entry
     fail_path = output_dir / f"{custom_id}_failed.json"
     save_json(fail_path, {
@@ -1355,8 +1320,7 @@ def _process_entry(
     state: Dict[str, Any],
     lock: threading.Lock,
     total: int,
-    cost_limit: float,
-) -> None:
+    cost_limit: float) -> None:
     prompt_path, prompt_text, prompt_idx, custom_id = entry
     out_path = output_dir / f"{custom_id}_answer.json"
     fail_path = output_dir / f"{custom_id}_failed.json"
@@ -1391,8 +1355,7 @@ def _process_entry(
         _finalize_success(
             entry, answer, body, model, output_dir,
             ground_truth_index, eval_level, judge_model,
-            state, lock, total, cost_limit,
-        )
+            state, lock, total, cost_limit)
     except Exception as exc:
         _finalize_failure(entry, exc, output_dir, state, lock, total)
 
@@ -1414,8 +1377,7 @@ def run_foundry_eval(
     concurrency: int = 1,
     use_batch: bool = True,
     poll_interval: int = 30,
-    strict_batch: bool = False,
-) -> Tuple[int, int, int]:
+    strict_batch: bool = False) -> Tuple[int, int, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
     state: Dict[str, Any] = {
         "completed": 0, "failed": 0, "skipped": 0,
@@ -1451,7 +1413,7 @@ def run_foundry_eval(
             else:
                 batch_fn = run_anthropic_batch
         else:
-            # openai, deepseek, mistral — all OpenAI-compatible via /v1/batches.
+            # openai, deepseek, mistral, all OpenAI-compatible via /v1/batches.
             # Azure Foundry's project endpoint may not actually accept batch for
             # non-OpenAI models; if submission errors, the fallback kicks in
             # (unless strict_batch=True; then the exception propagates).
@@ -1460,7 +1422,7 @@ def run_foundry_eval(
     if strict_batch and batch_fn is None:
         raise StrictBatchUnavailable(
             f"--strict-batch: cannot route {model!r} to a batch endpoint"
-            + (f" — {skip_batch_reason}" if skip_batch_reason else "")
+            + (f", {skip_batch_reason}" if skip_batch_reason else "")
         )
 
     if use_batch and supports_batch and batch_fn is not None:
@@ -1491,8 +1453,7 @@ def run_foundry_eval(
             batch_fn(
                 pending, model, output_dir, max_output_tokens,
                 ground_truth_index, eval_level, judge_model,
-                state, lock, total, cost_limit, poll_interval=poll_interval,
-            )
+                state, lock, total, cost_limit, poll_interval=poll_interval)
             return state["completed"], state["failed"], state["skipped"]
         except Exception as exc:
             if strict_batch:
@@ -1507,14 +1468,13 @@ def run_foundry_eval(
             # Batch path only writes on success; sync path below picks up pending.
             entries = pending
     elif skip_batch_reason:
-        logger.info(f"[batch] {model}: skipping batch — {skip_batch_reason}")
+        logger.info(f"[batch] {model}: skipping batch, {skip_batch_reason}")
 
     def _work(entry):
         _process_entry(
             entry, model, output_dir, max_output_tokens, overwrite,
             ground_truth_index, eval_level, judge_model,
-            state, lock, total, cost_limit,
-        )
+            state, lock, total, cost_limit)
 
     if concurrency <= 1:
         for entry in entries:
@@ -1569,15 +1529,14 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-    )
+        format="%(levelname)s: %(message)s")
 
     load_dotenv_file(args.env_file)
 
     endpoint, api_style, _api_version = resolve_endpoint(args.model)
     logger.info(f"Model={args.model} | api_style={api_style} | endpoint={endpoint}")
 
-    # Full question payloads keyed by stem — needed so answer_format,
+    # Full question payloads keyed by stem, needed so answer_format,
     # template_type, and acceptance_bounds flow into scoring.
     ground_truth_index = build_question_index(args.questions)
     logger.info(f"Loaded {len(ground_truth_index)} question payloads from {args.questions}")
@@ -1585,8 +1544,7 @@ def main() -> None:
         input_dir=args.input,
         total_prompts=args.total_prompts,
         batch_number=args.batch_number,
-        batch_size=args.batch_size,
-    )
+        batch_size=args.batch_size)
     if not entries:
         logger.error("No prompts to process")
         return
@@ -1607,8 +1565,7 @@ def main() -> None:
         concurrency=args.concurrency,
         use_batch=args.use_batch,
         poll_interval=args.poll_interval,
-        strict_batch=args.strict_batch,
-    )
+        strict_batch=args.strict_batch)
     logger.info(
         f"Done. Completed={completed}, Failed={failed}, Skipped={skipped}, OutputDir={args.output_dir}"
     )
@@ -1618,8 +1575,7 @@ def main() -> None:
             json.dump(
                 {"completed": completed, "failed": failed, "skipped": skipped,
                  "model": args.model, "output_dir": str(args.output_dir)},
-                f,
-            )
+                f)
 
 
 if __name__ == "__main__":

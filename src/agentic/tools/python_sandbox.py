@@ -1,4 +1,4 @@
-"""python_sandbox — restricted-exec tool for arbitrary numerical analysis.
+"""python_sandbox - restricted-exec tool for arbitrary numerical analysis.
 
 Runs the agent-supplied code in a subprocess with:
   * a hard wall-clock timeout (default 10 s),
@@ -10,7 +10,7 @@ Runs the agent-supplied code in a subprocess with:
 
 No filesystem, network, or subprocess access from within the snippet
 (``builtins`` is trimmed and the subprocess itself is spawned with a
-scrubbed env). This is defence-in-depth, not a real sandbox — the model
+scrubbed env). This is defence-in-depth, not a real sandbox - the model
 is trusted at eval time; the point is to prevent accidental foot-guns
 (infinite loops, blowing up memory).
 """
@@ -74,7 +74,7 @@ class PythonSandboxTool:
                     "(channel_name -> np.ndarray of floats). Assign your final "
                     "answer to a variable named `result`; its repr() is returned. "
                     "Use this for change-point detection, FFT, correlation, custom "
-                    "arithmetic, filters — anything the other tools don't cover."
+                    "arithmetic, filters - anything the other tools don't cover."
                 ),
                 "parameters": {
                     "type": "object",

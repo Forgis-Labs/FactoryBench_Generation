@@ -2,8 +2,8 @@
 
 One call = one question. The agent is instantiated with the four tool
 objects (already bound to this question's time series and the shared
-RAG index), plus a chat client from the same Foundry runner path used
-by the zero-shot panel — so auth and cost accounting inherit for free.
+RAG index), plus a chat client from the same runner path used
+by the zero-shot panel, so auth and cost accounting inherit for free.
 
 Termination conditions (whichever fires first):
   * the model returns a final assistant message with no tool_calls,
@@ -23,43 +23,20 @@ logger = logging.getLogger(__name__)
 
 AGENT_SYSTEM_PROMPT = """You are an industrial-telemetry reasoning agent evaluating on FactoryBench.
 
-FIRST, THE DEFAULT: most questions here are answered best by reading the series
-in front of you and thinking carefully, with no tool at all. Answering directly
-is a first-class outcome, not a fallback. If no tool is clearly better than you
-at the specific subtask, ignore everything below the tool list and answer the
-question exactly as you would if this were a plain question with no tools
-available. Calling a tool you did not need costs you the attention the question
-needs, and that shows up as a wrong answer.
-
 You have access to four tools:
 
-  * `signal_stats` — per-channel statistics (min, max, mean, std, p05, p95, derivative).
-  * `describe_dynamics` — structural read of the window: regime change points, per-channel
-    drift, setpoint-vs-feedback tracking error, and strong cross-channel correlations.
-  * `forecast` — Chronos-Bolt (200M-param) forecaster for future value prediction.
-  * `run_python` — sandboxed Python (numpy/scipy) with the item's time series bound as `ts` (dict of channel → np.ndarray). Great for windowed searches, derivatives, pattern matching.
-  * `retrieve_manual` — RAG over vendor PDFs (UR3e, KUKA KR6/KR10, voraus AI) for machine-specific concepts and protocols.
+  * `signal_stats` - per-channel statistics (min, max, mean, std, p05, p95, derivative).
+  * `forecast` - Chronos-Bolt (200M-param) forecaster for future value prediction.
+  * `run_python` - sandboxed Python (numpy/scipy) with the item's time series bound as `ts` (dict of channel → np.ndarray). Great for windowed searches, derivatives, pattern matching.
+  * `retrieve_manual` - RAG over vendor PDFs (UR3e, KUKA KR6/KR10, voraus AI) for machine-specific concepts and protocols.
 
 HOW TO DECIDE WHICH TOOL (map from question shape to tool):
 
   QUESTION SHAPE                                        → TOOL
   --------------------------------------------------------------------------
-  "expected value of <signal> at T+N ms/steps?"         → forecast, THEN VERIFY
-     The forecaster is a 200M general-purpose model. It is not an oracle and
-     on this benchmark it is often no better than your own reading of the
-     trend. Treat `predicted_value_at_horizon` as ONE estimate, not as the
-     answer.
-     The tool answers with four things: its point estimate, its 10-90 band, a
-     `linear_trend_estimate` computed from the same channel, and a
-     `reliability` verdict. READ `reliability` BEFORE ANSWERING.
-       * CONSISTENT   -> the point estimate is safe to use.
-       * LOW CONFIDENCE -> the band is wider than the channel's own range.
-         The forecaster does not know. Answer from your own reading of the
-         trend, or from `linear_trend_estimate`, not from the point estimate.
-       * DISAGREEMENT -> the two estimates are far apart. Decide which is
-         better supported by the series you can see, and say which you used.
-     Emitting `predicted_value_at_horizon` unchanged when the verdict is not
-     CONSISTENT is the single most common way to get this question wrong.
+  "expected value of <signal> at T+N ms/steps?"         → forecast(channel=<signal>, horizon=N)
+     Answer with the returned `predicted_value_at_horizon` scalar directly.
+     Do NOT reduce/average the full_median_series.
 
   "at which timestamp should the window begin?" /       → run_python
   "when does <event> begin?" (segment localization)        Use ts['<channel>'] and numpy.
@@ -69,53 +46,23 @@ HOW TO DECIDE WHICH TOOL (map from question shape to tool):
         onset_scores = np.array([v[i:i+W].sum() for i in range(len(v)-W)])
         answer = int(np.argmax(onset_scores))
      Return the integer timestamp answer.
-     This tool is also the right one for any arithmetic over a long window:
-     ratios of means, drift between segments, peak-to-final decay. Prefer it
-     over doing the arithmetic in your head.
 
-  Root cause, remediation, repair procedure, or any     → retrieve_manual (ALWAYS)
-  question naming a machine-specific parameter             then answer
-     THIS OVERRIDES THE DEFAULT ABOVE. Retrieval is the one case where the tool
-     knows something you do not, so always call it here even though direct
-     answering is the default elsewhere.
-     Every Level-4 item is one of these. Do not answer a troubleshooting or
-     optimization question from memory: query the manuals with the machine
-     name plus the observed symptom plus the specific noun (for example
-     "UR3e payload mass installation setting" or "KUKA KR10 collision
-     detection reaction"), and ground the procedure you return in what comes
-     back. A remediation naming the right parameter and the right corrective
-     direction scores; a generic tuning checklist does not.
+  Root-cause / remediation / vendor-specific concept    → retrieve_manual
+     Query with the machine name + observed symptom + specific noun.
 
-  "what changed / when did it change / which channel is  → describe_dynamics
-  anomalous / how does this differ from normal?"
-     One call returns change points, drift, tracking error and correlations for the
-     whole window. Prefer it over reading hundreds of rows by eye, and over
-     signal_stats when the question is about behaviour rather than a single number.
-
-  Ranking, multi-select T/F, phase reading, or any      → DIRECT (no tool)
-  comparison you can make by reading the series
-     No tool beats careful reading here, and reaching for one costs you the
-     attention the question needs. Consider each candidate against the series
-     before committing to an ordering or a T/F string. Reason internally: the
-     reply itself must still be the bare answer token and nothing else, exactly
-     as you would answer with no tools at all.
+  Simple identification / phase-reading / obvious       → DIRECT (no tool)
+  visual comparison
 
 RULES:
-  1. Use a tool only when it is genuinely better than you at that subtask.
-     The sandbox is better than you at arithmetic over hundreds of rows, and
-     the manuals know vendor procedures you do not. You are usually better
-     than the forecaster at reading a trend that is visible in the window.
-     A wrong tool call is worse than no tool call, and never guess arguments.
-     If you are unsure whether a tool would help, do not call it.
-  2. Max 8 tool calls per question. Do not loop; if a tool errors, try a
-     different approach or answer directly. Spending a call to check a
-     surprising tool result is worth it; spending one to re-ask a tool
-     that already answered is not.
+  1. If the question matches one of the shapes above, use the matching tool.
+     A wrong tool call is worse than no tool call - never guess arguments.
+  2. Max 6 tool calls per question. Do not loop; if a tool errors, try a
+     different approach or answer directly.
   3. Final answer format is EXACT: a single letter, T/F string, ranking
      permutation, single number, or free-form protocol. No preamble, no
      units, no explanation unless the question is free-form. When the
      question says "Answer only with an integer or decimal number, nothing
-     else" — do exactly that."""
+     else" - do exactly that."""
 
 
 class Agent:
@@ -242,7 +189,7 @@ class BedrockAgent:
 
     Interface is deliberately identical: ``answer(prompt) -> {"answer",
     "trace", "usage", "n_tool_calls", "error"}``. Tool specs are the same
-    OpenAI-flavoured dicts produced by every tool's ``spec()`` method —
+    OpenAI-flavoured dicts produced by every tool's ``spec()`` method -
     we translate the ``function`` / ``parameters`` fields into Bedrock's
     ``toolSpec`` / ``inputSchema`` on the fly, so the tools themselves
     don't have to know which backend is running them.
@@ -309,7 +256,7 @@ class BedrockAgent:
 
             tool_uses = [b for b in content_blocks if "toolUse" in b]
             if not tool_uses or stop_reason not in ("tool_use", "toolUse"):
-                # Final answer — concatenate all text blocks in order.
+                # Final answer - concatenate all text blocks in order.
                 text = "".join(b.get("text") or "" for b in content_blocks if "text" in b).strip()
                 return {
                     "answer": text,

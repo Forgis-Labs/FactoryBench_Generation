@@ -95,7 +95,7 @@
   (t2.east) -- (t3.west);
 
 % ============================================================
-%  NODE 1 — INPUT DATA
+%  NODE 1, INPUT DATA
 % ============================================================
 \begin{scope}
   \fill[panelbg, rounded corners=8pt] (-3.5, -7.6) rectangle (3.5, 9.0);
@@ -164,7 +164,7 @@
   % grid (very subtle)
   \begin{scope}
     \clip[rounded corners=4pt] (-3.2, -7.4) rectangle (3.2, 1.0);
-    \foreach \y in {-7.0,-6.5,...,0.8} {
+    \foreach \y in {-7.0,-6.5...,0.8} {
       \draw[gray!18, line width=0.2pt] (-3.2, \y) -- (3.2, \y);
     }
   \end{scope}
@@ -209,7 +209,7 @@
 \end{scope}
 
 % ============================================================
-%  NODE 2 — REASONING LADDER
+%  NODE 2, REASONING LADDER
 % ============================================================
 \begin{scope}[xshift=8.5cm]
   \fill[panelbg, rounded corners=8pt] (-3.0, -7.6) rectangle (3.0, 9.0);
@@ -226,7 +226,7 @@
   \fill[gunmetal!85] (-2.78,-7.0) rectangle (-2.32,-6.8);
   \fill[gunmetal!85] ( 2.32,-7.0) rectangle ( 2.78,-6.8);
 
-  % --- Rung 4 (Decision) — top ---
+  % --- Rung 4 (Decision), top ---
   \node[font=\Huge, text=flicker] at (-1.6, 6.10) {\faWrench};
   \node[font=\sffamily\bfseries\small, text=flicker, anchor=west]
     at (-0.85, 6.50) {Rung 4 (Decision)};
@@ -256,7 +256,7 @@
   \node[anchor=west] at (-0.85, 0.30) {\citeFS};
   \fill[gunmetal!85] (-2.55, -0.55) rectangle (2.55, -0.25);
 
-  % --- Rung 1 (State) — bottom ---
+  % --- Rung 1 (State), bottom ---
   \node[font=\Huge, text=blue] at (-1.6, -1.95) {\faEye};
   \node[font=\sffamily\bfseries\small, text=blue, anchor=west]
     at (-0.85, -1.55) {Rung 1 (State)};
@@ -287,7 +287,7 @@
 \end{scope}
 
 % ============================================================
-%  NODE 3 — THE BENCHMARK GAP
+%  NODE 3, THE BENCHMARK GAP
 % ============================================================
 \begin{scope}[xshift=17cm]
   \fill[panelbg, rounded corners=8pt] (-3.5, -7.6) rectangle (3.5, 9.0);

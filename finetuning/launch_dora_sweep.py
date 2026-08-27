@@ -15,6 +15,13 @@ Usage:
     python finetuning/launch_dora_sweep.py --only bearing_r32 phase0_totem
     python finetuning/launch_dora_sweep.py --no-spot  # on-demand instead
     python finetuning/launch_dora_sweep.py --dry-run  # print plan, don't submit
+
+Required environment (see finetuning/README.md):
+    FB_SAGEMAKER_BUCKET     S3 bucket holding the checkpoints, tokenizers and
+                            FactoryBench JSONLs, and receiving job output
+    FB_SAGEMAKER_ROLE_ARN   SageMaker execution role ARN
+    AWS_REGION              region of the bucket and the training jobs
+    FB_SAGEMAKER_PREFIX     key prefix for the Shrike artefacts (default: shrike)
 """
 
 from __future__ import annotations
@@ -34,15 +41,47 @@ from sagemaker.pytorch import PyTorch
 # a "finetuning" directory.
 SRC_DIR = Path(__file__).resolve().parent / "_factorybench_src"
 
-BUCKET = "tslm-industrial-sagemaker-us-east-2"
-REGION = "us-east-2"
-ROLE = (
-    "arn:aws:iam::343218183018:role/service-role/"
-    "AmazonSageMaker-ExecutionRole-20260428T170055"
-)
-S3_PREFIX = "shrike"
 
-# Pre-staged base LLM weights (already on S3 — used as the "llm" channel)
+def _require_env(name: str, what: str, example: str) -> str:
+    """Read a required setting from the environment, or explain what is missing.
+
+    The account, bucket and execution role that ran the published sweep were
+    hardcoded here. They are private infrastructure, so they are now supplied
+    by the caller. Every launcher in this directory imports these three names,
+    so failing loudly at import is better than submitting a job into whatever
+    account boto3 happens to resolve.
+    """
+    value = (os.environ.get(name) or "").strip()
+    if not value:
+        raise SystemExit(
+            f"{name} is not set.\n"
+            f"  {what}\n"
+            f'  export {name}="{example}"\n'
+            "  See finetuning/README.md for the full environment."
+        )
+    return value
+
+
+BUCKET = _require_env(
+    "FB_SAGEMAKER_BUCKET",
+    "S3 bucket holding the Shrike checkpoints, TS tokenizers and FactoryBench "
+    "training JSONLs, and receiving training/eval output.",
+    "my-sagemaker-bucket")
+REGION = (os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "").strip()
+if not REGION:
+    raise SystemExit(
+        "AWS_REGION is not set.\n"
+        "  Region of the bucket above and of the SageMaker training jobs.\n"
+        '  export AWS_REGION="us-east-2"'
+    )
+ROLE = _require_env(
+    "FB_SAGEMAKER_ROLE_ARN",
+    "SageMaker execution role ARN, needs read/write on the bucket above.",
+    "arn:aws:iam::<acct>:role/service-role/AmazonSageMaker-ExecutionRole-<id>")
+# Key prefix under which the Shrike checkpoints and tokenizers are staged.
+S3_PREFIX = (os.environ.get("FB_SAGEMAKER_PREFIX") or "shrike").strip()
+
+# Pre-staged base LLM weights (already on S3, used as the "llm" channel)
 S3_LLM = {
     "Qwen/Qwen3-4B":   f"s3://{BUCKET}/{S3_PREFIX}/llm/Qwen3-4B/",
     "Qwen/Qwen3-1.7B": f"s3://{BUCKET}/{S3_PREFIX}/llm/Qwen3-1.7B/",
@@ -96,7 +135,7 @@ CHECKPOINTS = {
                      f"phase0_best.pt",
         "checkpoint_type": "shrike",
         "tokenizer_type": "totem",
-        # Matches phase0_totem.yaml (`fsq_ckpt: totem_625_best.pt` — yes, the
+        # Matches phase0_totem.yaml (`fsq_ckpt: totem_625_best.pt`, yes, the
         # field is misnamed in that config but it's the 625-code TOTEM).
         "ts_tokenizer_s3": f"s3://{BUCKET}/{S3_PREFIX}/tokenizer/totem_625_best.pt",
         "ts_tokenizer_channel": "totem_ckpt",
@@ -109,7 +148,7 @@ CHECKPOINTS = {
 
 
 # -- Defaults for training hyperparameters ------------------------------
-# Same shape as launch_factorybench.py — kept identical so the two sweeps are
+# Same shape as launch_factorybench.py, kept identical so the two sweeps are
 # directly comparable. The fresh DoRA targets attention + MLP (the FactoryBench
 # default in train_factorybench.py); existing per-checkpoint DoRA surface is
 # absorbed by merge_and_unload before the fresh adapter is attached.
@@ -196,8 +235,7 @@ def build_estimator(name: str, cfg: dict, args: argparse.Namespace,
             {"Key": "Sweep",   "Value": "dora-on-dora"},
             {"Key": "Base",    "Value": name},
         ],
-        **spot_kwargs,
-    )
+        **spot_kwargs)
 
     data_channels = {
         "llm":       S3_LLM[cfg["llm_id"]],
@@ -237,7 +275,7 @@ def main() -> None:
                          f"Valid: {list(CHECKPOINTS)}")
 
     print("=" * 72)
-    print(f"FactoryBench DoRA-on-DoRA sweep — {len(keys)} job(s)")
+    print(f"FactoryBench DoRA-on-DoRA sweep, {len(keys)} job(s)")
     print(f"Spot:        {args.spot}")
     print(f"LoRA r/α:    {args.lora_r}/{args.lora_alpha}, DoRA={args.use_dora}")
     print(f"Epochs:      {args.epochs}  Batch: {args.batch_size}x{args.grad_accum}")

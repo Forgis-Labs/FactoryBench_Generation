@@ -2,8 +2,8 @@
 Counterfactual data generation pipeline.
 
 Runs each episode twice:
-  1. **Baseline** — no events injected, normal execution.
-  2. **Counterfactual** — same initial conditions (cube dims, mass, friction,
+  1. **Baseline**, no events injected, normal execution.
+  2. **Counterfactual**, same initial conditions (cube dims, mass, friction,
      spawn position, yaw), but with a random event injected.
 
 Data is logged into per-episode subdirectories::

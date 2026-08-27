@@ -47,7 +47,7 @@ class FSQConfig:
 
 
 class FSQLayer(nn.Module):
-    """Finite Scalar Quantization — replaces VQ codebook lookup with rounding."""
+    """Finite Scalar Quantization, replaces VQ codebook lookup with rounding."""
 
     def __init__(self, levels: List[int]):
         super().__init__()
@@ -124,8 +124,7 @@ class _Residual(nn.Module):
             nn.ReLU(),
             nn.Conv1d(dim, hidden, 3, padding=1, bias=False),
             nn.ReLU(),
-            nn.Conv1d(hidden, dim, 1, bias=False),
-        )
+            nn.Conv1d(hidden, dim, 1, bias=False))
 
     def forward(self, x):
         return x + self.block(x)
@@ -151,8 +150,7 @@ class FSQTokenizer(nn.Module):
             nn.Conv1d(config.hid // 2, config.hid, 4, stride=2, padding=1),
             nn.Conv1d(config.hid, config.hid, 3, padding=1),
             *[_Residual(config.hid, config.res_hid) for _ in range(config.n_res)],
-            nn.Conv1d(config.hid, config.dim, 1),
-        )
+            nn.Conv1d(config.hid, config.dim, 1))
 
         # FSQ quantization layer
         self.fsq = FSQLayer(config.levels)
@@ -163,8 +161,7 @@ class FSQTokenizer(nn.Module):
             *[_Residual(config.hid, config.res_hid) for _ in range(config.n_res)],
             nn.ConvTranspose1d(config.hid, config.hid // 2, 4, stride=2, padding=1),
             nn.ReLU(),
-            nn.ConvTranspose1d(config.hid // 2, 1, 4, stride=2, padding=1),
-        )
+            nn.ConvTranspose1d(config.hid // 2, 1, 4, stride=2, padding=1))
 
     @property
     def codebook_size(self) -> int:
@@ -206,7 +203,7 @@ class FSQTokenizer(nn.Module):
         """Encode signal to flat code IDs.
 
         Args:
-            x: (batch, seq_len) or (seq_len,) raw signal
+            x: (batch, seq_len) or (seq_len) raw signal
 
         Returns:
             codes: (batch, seq_len/4) flat integer codes in [0, codebook_size)
@@ -252,8 +249,7 @@ class FSQTokenizer(nn.Module):
             compression=cfg_dict.get("compression", 4),
             hid=cfg_dict.get("hid", 128),
             n_res=cfg_dict.get("n_res", 4),
-            res_hid=cfg_dict.get("res_hid", 256),
-        )
+            res_hid=cfg_dict.get("res_hid", 256))
 
         model = cls(config).to(device)
         model.load_state_dict(ckpt["model_state"], strict=False)

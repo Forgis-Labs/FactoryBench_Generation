@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FactoryBench — Generate Level 2 (Event Reasoning) Q&A pairs.
+# FactoryBench, Generate Level 2 (Event Reasoning) Q&A pairs.
 #
 # Usage:
 #   bash scripts/generate_level2.sh               # default: 600 questions
