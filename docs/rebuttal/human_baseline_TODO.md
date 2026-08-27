@@ -32,7 +32,32 @@ L3 0.625.
 >
 > This matters because the paper and the reviewer comment both **commit to
 > releasing it** ("for every item, the expert's answer, its score, and the method
-> used to reach it"). That commitment cannot currently be met.
+> used to reach it"). That commitment cannot currently be met from this run.
+
+**A second, independent expert pass now exists: [`human_baseline.md`](human_baseline.md).**
+It is a *different* baseline, not a recovery of the one above. An expert answered
+21 items, one per active question template, sampled at `seed=42` from the released
+`FactoryBench/FactoryBench`, and wrote out the reasoning for each: 4 L1, 10 L2,
+5 L3, and **2 L4**. Every item carries the full prompt, the expert's answer, the
+reasoning that produced it, and the expected answer.
+
+What it changes:
+
+- **L4 is no longer at zero.** Two free-form items are answered and reasoned
+  through, where the 60-item run had none.
+- **The per-item release commitment is partly discharged.** The artifact the
+  paper promised now exists in this repository for 21 items, even though the
+  60-item run behind the `app:human_baseline` aggregates is still unrecoverable.
+
+What it does **not** change:
+
+- The scores in `app:human_baseline` still come from the 60-item run. Do not
+  merge the two counts; the item selections differ and this pass was not put
+  through the benchmark grader, so it carries expected answers rather than
+  scores. Two items are flagged `TO-CHECK` where the expert judged the answer
+  family derivable from the context but the exact value not.
+- The 100-item, 25-per-level target is still open. Read the gap table above as
+  covering the 60-item run only.
 
 ## Work items
 
